@@ -13,5 +13,33 @@ node_modules
 # In that case, don't forget to run `yarn config set enableGlobalCache false`!
 # Documentation here: https://yarnpkg.com/features/caching#zero-installs
 
-#!.yarn/cache
+#.yarn/cache
 .pnp.*
+
+# ========================================
+# OPTIMIZACIÓN MONOREPO Y SUBPROYECTOS
+# ========================================
+
+# Compilados y temporales
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+**/build/
+.turbo/
+
+# Archivos de entorno
+.env
+.env.*
+!.env.example
+
+# Logs y SO
+*.log
+.DS_Store
+**/.DS_Store
+
+# Yarn modern rules
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
