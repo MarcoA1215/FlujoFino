@@ -1,13 +1,22 @@
 export enum OrderStatus {
   PENDING = 'PENDING',
   PREPARING = 'PREPARING',
-  COMPLETED = 'COMPLETED',
   DELIVERED = 'DELIVERED',
-  PAID = 'PAID',
   CANCELED = 'CANCELED',
 }
 
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  PAID = 'PAID',
+}
+
 export enum MovementType {
+  IN_PURCHASE = 'IN_PURCHASE',
+  IN_PRODUCTION = 'IN_PRODUCTION',
+  OUT_PRODUCTION = 'OUT_PRODUCTION',
+  OUT_SALE = 'OUT_SALE',
+  LOSS = 'LOSS',
+  // Backward compatibility just in case
   IN = 'IN',
   OUT = 'OUT',
 }
@@ -47,10 +56,11 @@ export interface OrderItemDTO {
 export interface OrderDTO {
   id?: string;
   customerName: string;
-  customerPhone: string;
+  customerPhone?: string;
   customerAddress?: string;
   notes?: string;
   status: OrderStatus;
+  paymentStatus: PaymentStatus;
   totalAmount: number;
   items: OrderItemDTO[];
 }

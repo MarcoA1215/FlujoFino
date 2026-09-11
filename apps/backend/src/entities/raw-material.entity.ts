@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
 import { StockMovement } from './stock-movement.entity';
 import { RecipeItem } from './recipe-item.entity';
 
@@ -27,5 +27,14 @@ export class RawMaterial {
 
   @OneToMany(() => RecipeItem, recipeItem => recipeItem.rawMaterial)
   recipeItems: RecipeItem[];
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+
+  @DeleteDateColumn()
+  deletedAt: Date;
 }
 

@@ -1,46 +1,144 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { OrderStatus } from '@nutrideli/shared-types';
 import { Order } from '../entities/order.entity';
+import { OrderItem } from '../entities/order-item.entity';
 import { Product } from '../entities/product.entity';
+import { StockMovement } from '../entities/stock-movement.entity';
+import { PaymentStatus, OrderStatus, MovementType } from '@nutrideli/shared-types';
+
+export class CreateOrderDto {
+  customerName: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  notes?: string;
+  paymentStatus: PaymentStatus;
+  pagoMovilRef?: string;
+  pagoMovilPhone?: string;
+  pagoMovilCedula?: string;
+  pagoMovilBank?: string;
+  amountBs?: number;
+  exchangeRate?: number;
+  items: { productId: string; quantity: number; unitPrice: number }[];
+}
+
+export class UpdatePaymentDto {
+  status: PaymentStatus;
+  notes?: string;
+  pagoMovilRef?: string;
+  pagoMovilPhone?: string;
+  pagoMovilCedula?: string;
+  pagoMovilBank?: string;
+  amountBs?: number;
+  exchangeRate?: number;
+}
 
 @Injectable()
 export class OrdersService {
   constructor(private dataSource: DataSource) {}
 
-  async updateOrderStatus(orderId: string, newStatus: OrderStatus) {
-    const orderRepo = this.dataSource.getRepository(Order);
-    const order = await orderRepo.findOne({
-      where: { id: orderId },
-      relations: { items: true },
-    });
+  async createOrder(dto: CreateOrderDto) {
+    return this.dataSource.transaction(async (manager) => {
+      let totalAmount = 0;
 
+      // Create Order
+      const order = manager.create(Order, {
+        customerName: dto.customerName,
+        customerPhone: dto.customerPhone || '',
+        customerAddress: dto.customerAddress || '',
+        notes: dto.notes || '',
+        paymentStatus: dto.paymentStatus,
+        status: OrderStatus.PENDING,
+        totalAmount: 0,
+        pagoMovilRef: dto.pagoMovilRef,
+        pagoMovilPhone: dto.pagoMovilPhone,
+        pagoMovilCedula: dto.pagoMovilCedula,
+        pagoMovilBank: dto.pagoMovilBank,
+        amountBs: dto.amountBs,
+        exchangeRate: dto.exchangeRate,
+      });
+      const savedOrder = await manager.save(Order, order);
+
+      // Process Items
+      for (const itemDto of dto.items) {
+        const product = await manager.findOne(Product, { where: { id: itemDto.productId } });
+        
+        if (!product) {
+          throw new BadRequestException(`Producto no encontrado (ID: ${itemDto.productId})`);
+        }
+
+        const subtotal = itemDto.quantity * itemDto.unitPrice;
+        totalAmount += subtotal;
+
+        // Deduct Stock (Option A: Allows negative stock naturally)
+        product.stockQuantity -= itemDto.quantity;
+        await manager.save(Product, product);
+
+        // Save OrderItem
+        const orderItem = manager.create(OrderItem, {
+          orderId: savedOrder.id,
+          productId: product.id,
+          productName: product.name,
+          quantity: itemDto.quantity,
+          unitPrice: itemDto.unitPrice,
+          subtotal: subtotal,
+        });
+        await manager.save(OrderItem, orderItem);
+
+        // Log Product Out Movement
+        // Note: For MVP we might not need a ProductStockMovement table, 
+        // updating Product stock is sufficient for now.
+      }
+
+      savedOrder.totalAmount = totalAmount;
+      return manager.save(Order, savedOrder);
+    });
+  }
+
+  async getAllOrders() {
+    return this.dataSource.getRepository(Order).find({
+      relations: { items: { product: true } },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async updatePaymentStatus(id: string, dto: UpdatePaymentDto) {
+    const orderRepo = this.dataSource.getRepository(Order);
+    const order = await orderRepo.findOne({ where: { id } });
     if (!order) throw new BadRequestException('Pedido no encontrado');
     
-    // Validar regla de negocio: Descuento de stock en estado DELIVERED
-    if (newStatus === OrderStatus.DELIVERED && order.status !== OrderStatus.DELIVERED) {
-      return this.dataSource.transaction(async (manager) => {
-        // 1. Cambiar estado
-        order.status = newStatus;
-        const updatedOrder = await manager.save(Order, order);
+    order.paymentStatus = dto.status;
+    if (dto.notes) order.notes = dto.notes;
+    if (dto.pagoMovilRef) order.pagoMovilRef = dto.pagoMovilRef;
+    if (dto.pagoMovilPhone) order.pagoMovilPhone = dto.pagoMovilPhone;
+    if (dto.pagoMovilCedula) order.pagoMovilCedula = dto.pagoMovilCedula;
+    if (dto.pagoMovilBank) order.pagoMovilBank = dto.pagoMovilBank;
+    if (dto.amountBs) order.amountBs = dto.amountBs;
+    if (dto.exchangeRate) order.exchangeRate = dto.exchangeRate;
 
-        // 2. Descontar stock de producto terminado para cada item
-        for (const item of order.items) {
-          const product = await manager.findOne(Product, { where: { id: item.productId } });
-          if (!product || product.stockQuantity < item.quantity) {
-             throw new BadRequestException(`Stock insuficiente para el producto terminado ${product?.name}`);
-          }
+    return orderRepo.save(order);
+  }
 
-          // Descontar
-          product.stockQuantity -= item.quantity;
-          await manager.save(Product, product);
+  async updateOrderStatus(id: string, status: OrderStatus) {
+    const orderRepo = this.dataSource.getRepository(Order);
+    const order = await orderRepo.findOne({ 
+      where: { id },
+      relations: { items: true } 
+    });
+    
+    if (!order) throw new BadRequestException('Pedido no encontrado');
+
+    // Validación solicitada: No entregar si stock actual de los productos está negativo (backorder).
+    if (status === OrderStatus.DELIVERED) {
+      const productRepo = this.dataSource.getRepository(Product);
+      for (const item of order.items) {
+        const product = await productRepo.findOne({ where: { id: item.productId } });
+        if (product && product.stockQuantity < 0) {
+          throw new BadRequestException(`No se puede entregar el pedido. El producto ${product.name} tiene inventario negativo (${product.stockQuantity}). ¡Debe producir más primero!`);
         }
-        return updatedOrder;
-      });
+      }
     }
 
-    // Actualización de estado normal
-    order.status = newStatus;
+    order.status = status;
     return orderRepo.save(order);
   }
 }

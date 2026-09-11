@@ -2,6 +2,7 @@ import { IonApp, IonRouterOutlet, IonSplitPane, setupIonicReact } from '@ionic/r
 import { IonReactRouter } from '@ionic/react-router';
 import { Route, Navigate } from 'react-router-dom';
 import Menu from './components/Menu';
+import Dashboard from './pages/Dashboard';
 import RawMaterials from './pages/RawMaterials';
 import Products from './pages/Products';
 import Production from './pages/Production';
@@ -20,6 +21,9 @@ import '@ionic/react/css/text-transformation.css';
 import '@ionic/react/css/flex-utils.css';
 import '@ionic/react/css/display.css';
 
+/* Custom Theme and Mobile Fixes */
+import './theme.css';
+
 setupIonicReact();
 
 const App: React.FC = () => {
@@ -29,7 +33,8 @@ const App: React.FC = () => {
         <IonSplitPane contentId="main">
           <Menu />
           <IonRouterOutlet id="main">
-            <Route path="/" element={<Navigate to="/raw-materials" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/raw-materials" element={<RawMaterials />} />
             <Route path="/products" element={<Products />} />
             <Route path="/production" element={<Production />} />

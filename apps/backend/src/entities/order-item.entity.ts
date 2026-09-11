@@ -13,6 +13,9 @@ export class OrderItem {
   @Column()
   productId: string;
 
+  @Column({ nullable: true })
+  productName: string;
+
   @Column('int')
   quantity: number;
 

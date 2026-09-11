@@ -1,0 +1,69 @@
+/* Pastel & Sober Color Palette */
+:root {
+  /* Primary - Sober Teal/Sage */
+  --ion-color-primary: #5c8d89;
+  --ion-color-primary-rgb: 92,141,137;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255,255,255;
+  --ion-color-primary-shade: #517c79;
+  --ion-color-primary-tint: #6ca8a4;
+
+  /* Secondary - Muted Purple/Blue */
+  --ion-color-secondary: #748cab;
+  --ion-color-secondary-rgb: 116,140,171;
+  --ion-color-secondary-contrast: #ffffff;
+  
+  /* Tertiary - Soft Sand/Peach */
+  --ion-color-tertiary: #dcbfa6;
+  --ion-color-tertiary-rgb: 220,191,166;
+  --ion-color-tertiary-contrast: #000000;
+
+  /* Success - Pastel Green */
+  --ion-color-success: #8bb194;
+  --ion-color-success-rgb: 139,177,148;
+  --ion-color-success-contrast: #000000;
+
+  /* Warning - Pastel Yellow/Mustard */
+  --ion-color-warning: #dfc889;
+  --ion-color-warning-rgb: 223,200,137;
+  --ion-color-warning-contrast: #000000;
+
+  /* Danger - Pastel Red/Rose */
+  --ion-color-danger: #cf8a8a;
+  --ion-color-danger-rgb: 207,138,138;
+  --ion-color-danger-contrast: #ffffff;
+
+  /* Background nuances */
+  --ion-background-color: #fcfcfc;
+}
+
+/* Fix for mobile tables */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
+
+.table-responsive table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 600px; /* Forces scrolling on very small screens so content isn't crushed */
+}
+
+.table-responsive th {
+  background-color: var(--ion-color-light);
+  font-weight: 600;
+}
+
+.table-responsive th, .table-responsive td {
+  padding: 12px 8px;
+  border-bottom: 1px solid #eee;
+}
+
+/* Custom styling for the POS layout on mobile */
+@media (max-width: 768px) {
+  .ion-hide-sm-down {
+    display: none !important;
+  }
+}
+

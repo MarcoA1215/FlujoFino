@@ -12,6 +12,9 @@ export class ProductionBatch {
   @Column('int')
   quantity: number;
 
+  @Column('float', { default: 0 })
+  totalCost: number;
+
   @CreateDateColumn()
   createdAt: Date;
 

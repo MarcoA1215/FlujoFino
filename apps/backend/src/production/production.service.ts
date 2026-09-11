@@ -3,6 +3,8 @@ import { DataSource } from 'typeorm';
 import { Product } from '../entities/product.entity';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { ProductionBatch } from '../entities/production-batch.entity';
+import { StockMovement } from '../entities/stock-movement.entity';
+import { MovementType } from '@nutrideli/shared-types';
 
 @Injectable()
 export class ProductionService {
@@ -12,25 +14,41 @@ export class ProductionService {
     return this.dataSource.transaction(async (manager) => {
       const product = await manager.findOne(Product, {
         where: { id: productId },
-        relations: { recipe: true },
+        relations: { recipe: { rawMaterial: true } },
       });
 
       if (!product) throw new BadRequestException('Producto no encontrado');
+      if (!product.recipe || product.recipe.length === 0) {
+        throw new BadRequestException('El producto no tiene receta configurada.');
+      }
+
+      let totalBatchCost = 0;
 
       // 1. Validar y descontar stock de Materia Prima
       for (const recipeItem of product.recipe) {
         const requiredAmount = recipeItem.quantity * quantityToProduce;
-        
-        const material = await manager.findOne(RawMaterial, {
-          where: { id: recipeItem.rawMaterialId },
-        });
+        const material = recipeItem.rawMaterial;
 
         if (!material || material.stockQuantity < requiredAmount) {
-          throw new BadRequestException(`Insumo insuficiente: ${material?.name || 'Desconocido'}`);
+          throw new BadRequestException(`Insumo insuficiente: ${material?.name || 'Desconocido'} (Requiere ${requiredAmount} ${material?.unit}, hay ${material?.stockQuantity || 0})`);
         }
 
+        const materialCostUsed = requiredAmount * material.costPerUnit;
+        totalBatchCost += materialCostUsed;
+
+        // Descontar
         material.stockQuantity -= requiredAmount;
         await manager.save(RawMaterial, material);
+
+        // Registrar movimiento OUT
+        const movement = manager.create(StockMovement, {
+          rawMaterialId: material.id,
+          type: MovementType.OUT_PRODUCTION,
+          quantity: requiredAmount,
+          totalCost: materialCostUsed,
+          description: `Producción de Lote: ${product.name} (x${quantityToProduce})`,
+        });
+        await manager.save(StockMovement, movement);
       }
 
       // 2. Incrementar el stock de Producto Terminado
@@ -41,10 +59,14 @@ export class ProductionService {
       const batch = manager.create(ProductionBatch, {
         productId,
         quantity: quantityToProduce,
+        totalCost: totalBatchCost
       });
       await manager.save(ProductionBatch, batch);
 
-      return updatedProduct;
+      return {
+        product: updatedProduct,
+        batch
+      };
     });
   }
 }

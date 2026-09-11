@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
 import { RecipeItem } from './recipe-item.entity';
 import { OrderItem } from './order-item.entity';
 import { ProductionBatch } from './production-batch.entity';
@@ -13,11 +13,14 @@ export class Product {
 
   @Column({ nullable: true })
   description: string;
+  
+  @Column({ nullable: true })
+  category: string; // new field for categorization
 
   @Column('float')
   salePrice: number;
 
-  @Column('int', { default: 0 })
+  @Column('float', { default: 0 })
   stockQuantity: number;
 
   @OneToMany(() => RecipeItem, recipeItem => recipeItem.product)
@@ -28,5 +31,14 @@ export class Product {
 
   @OneToMany(() => ProductionBatch, batch => batch.product)
   batches: ProductionBatch[];
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+
+  @DeleteDateColumn()
+  deletedAt: Date;
 }
 
