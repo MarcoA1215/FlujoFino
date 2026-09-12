@@ -89,7 +89,7 @@ export const MovementHistoryModal: React.FC<MovementHistoryModalProps> = ({ mate
         <div className="table-responsive">
           <table>
             <thead>
-              <tr><th>Fecha</th><th>Tipo</th><th>Cantidad</th><th>Costo</th><th>Notas</th><th>Acci�n</th></tr>
+              <tr><th>Fecha</th><th>Tipo</th><th>Cantidad</th><th>Costo</th><th>Notas</th><th>Acción</th></tr>
             </thead>
             <tbody>
               {movements.map(mov => (

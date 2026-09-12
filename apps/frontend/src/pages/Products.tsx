@@ -46,7 +46,7 @@ const Products: React.FC = () => {
       header: isCombo ? 'Nuevo Combo' : 'Nuevo Producto Base',
       inputs: [
         { name: 'name', type: 'text', placeholder: 'Nombre' },
-        { name: 'category', type: 'text', placeholder: 'Categor�a' },
+        { name: 'category', type: 'text', placeholder: 'Categoría' },
         { name: 'salePrice', type: 'number', placeholder: 'Precio Venta' }
       ],
       buttons: [
@@ -77,7 +77,7 @@ const Products: React.FC = () => {
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         { 
-          text: 'A�adir Stock', 
+          text: 'Añadir Stock', 
           handler: async (data) => {
             if (!data.quantity) return false;
             try {
@@ -125,7 +125,7 @@ const Products: React.FC = () => {
       header: 'Editar Producto',
       inputs: [
         { name: 'name', type: 'text', value: p.name, placeholder: 'Nombre' },
-        { name: 'category', type: 'text', value: p.category, placeholder: 'Categor�a' },
+        { name: 'category', type: 'text', value: p.category, placeholder: 'Categoría' },
         { name: 'salePrice', type: 'number', value: p.salePrice, placeholder: 'Precio Venta ($)' }
       ],
       buttons: [
@@ -149,8 +149,8 @@ const Products: React.FC = () => {
 
   const handleDeleteProduct = (p: Product) => {
     presentAlert({
-      header: 'Confirmar Eliminaci�n',
-      message: '�Est�s seguro de eliminar este producto? Datos hist�ricos se mantendr�n.',
+      header: 'Confirmar Eliminación',
+      message: '¿Estás seguro de eliminar este producto? Datos históricos se mantendrán.',
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         {
@@ -181,7 +181,7 @@ const Products: React.FC = () => {
       <IonHeader>
         <IonToolbar color="success">
           <IonButtons slot="start"><IonMenuButton /></IonButtons>
-          <IonTitle>Cat�logo de Productos</IonTitle>
+          <IonTitle>Catálogo de Productos</IonTitle>
         </IonToolbar>
         <IonToolbar color="success">
           <IonSearchbar value={searchText} debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} placeholder="Buscar..." animated />
