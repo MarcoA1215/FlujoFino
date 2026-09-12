@@ -1,4 +1,4 @@
-import {
+﻿import {
   IonContent,
   IonIcon,
   IonItem,
@@ -13,9 +13,13 @@ import { useLocation } from 'react-router-dom';
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
-import { cubeOutline, cartOutline, constructOutline, cashOutline, listOutline, pieChartOutline, calculatorOutline, mapOutline } from 'ionicons/icons';
+import { peopleOutline, cubeOutline, cartOutline, constructOutline, cashOutline, listOutline, pieChartOutline, calculatorOutline, mapOutline } from 'ionicons/icons';
 
 const Menu: React.FC = () => {
+  const location = useLocation();
+  const { user, logout, isAuthenticated } = useContext(AuthContext);
+
+  if (!isAuthenticated) return null; // Ocultar el menú si no está logueado
 
   const rawPages = [
     { title: 'Tablero Principal', url: '/dashboard', iosIcon: pieChartOutline, mdIcon: pieChartOutline },
@@ -25,12 +29,10 @@ const Menu: React.FC = () => {
     { title: 'Calculadora', url: '/calculator', iosIcon: calculatorOutline, mdIcon: calculatorOutline },
     { title: 'POS (Caja)', url: '/pos', iosIcon: cashOutline, mdIcon: cashOutline },
     { title: 'Tablero Pedidos', url: '/orders', iosIcon: cartOutline, mdIcon: cartOutline },
-    { title: 'Zonas Delivery', url: '/delivery-zones', iosIcon: mapOutline, mdIcon: mapOutline }
+    { title: 'Zonas Delivery', url: '/delivery-zones', iosIcon: mapOutline, mdIcon: mapOutline },
+    { title: 'Usuarios', url: '/users', iosIcon: peopleOutline, mdIcon: peopleOutline }
   ];
 
-
-  const location = useLocation();
-  const { user, logout } = useContext(AuthContext);
   let appPages = rawPages;
   if (user?.role === UserRole.POS) {
     appPages = appPages.filter(p => ['/pos', '/orders', '/calculator', '/products'].includes(p.url));
@@ -41,7 +43,6 @@ const Menu: React.FC = () => {
   } else if (user?.role === UserRole.INVENTORY) {
     appPages = appPages.filter(p => ['/raw-materials', '/products'].includes(p.url));
   }
-
 
   return (
     <IonMenu contentId="main" type="overlay">
@@ -68,4 +69,5 @@ const Menu: React.FC = () => {
     </IonMenu>
   );
 };
+
 export default Menu;

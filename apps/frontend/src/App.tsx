@@ -1,6 +1,6 @@
 ﻿import { IonApp, IonRouterOutlet, IonSplitPane, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
-import { Route, Navigate } from 'react-router-dom';
+import { Navigate, Route } from 'react-router-dom';
 import Menu from './components/Menu';
 import Dashboard from './pages/Dashboard';
 import RawMaterials from './pages/RawMaterials';
@@ -11,36 +11,28 @@ import Pos from './pages/Pos';
 import Orders from './pages/Orders';
 import DeliveryZones from './pages/DeliveryZones';
 import Login from './pages/Login';
+import Users from './pages/Users';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { useContext } from 'react';
 
-/* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
-
-/* Basic CSS for apps built with Ionic */
 import '@ionic/react/css/normalize.css';
 import '@ionic/react/css/structure.css';
 import '@ionic/react/css/typography.css';
-
-/* Optional CSS utils that can be commented out */
 import '@ionic/react/css/padding.css';
 import '@ionic/react/css/float-elements.css';
 import '@ionic/react/css/text-alignment.css';
 import '@ionic/react/css/text-transformation.css';
 import '@ionic/react/css/flex-utils.css';
 import '@ionic/react/css/display.css';
-
-/* Theme variables */
 import './theme.css';
 
 setupIonicReact();
 
-const ProtectedRoute: React.FC<{ component: React.FC<any>; path: string }> = ({ component: Component, ...rest }) => {
+const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useContext(AuthContext);
   if (isLoading) return null;
-  return (
-    <Route {...rest} element={isAuthenticated ? <Component /> : <Navigate to="/login" replace />} />
-  );
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
 const App: React.FC = () => {
@@ -54,14 +46,15 @@ const App: React.FC = () => {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/login" element={<Login />} />
               
-              <ProtectedRoute path="/dashboard" component={Dashboard} />
-              <ProtectedRoute path="/raw-materials" component={RawMaterials} />
-              <ProtectedRoute path="/products" component={Products} />
-              <ProtectedRoute path="/production" component={Production} />
-              <ProtectedRoute path="/calculator" component={Calculator} />
-              <ProtectedRoute path="/pos" component={Pos} />
-              <ProtectedRoute path="/orders" component={Orders} />
-              <ProtectedRoute path="/delivery-zones" component={DeliveryZones} />
+              <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+              <Route path="/raw-materials" element={<PrivateRoute><RawMaterials /></PrivateRoute>} />
+              <Route path="/products" element={<PrivateRoute><Products /></PrivateRoute>} />
+              <Route path="/production" element={<PrivateRoute><Production /></PrivateRoute>} />
+              <Route path="/calculator" element={<PrivateRoute><Calculator /></PrivateRoute>} />
+              <Route path="/pos" element={<PrivateRoute><Pos /></PrivateRoute>} />
+              <Route path="/orders" element={<PrivateRoute><Orders /></PrivateRoute>} />
+              <Route path="/delivery-zones" element={<PrivateRoute><DeliveryZones /></PrivateRoute>} />
+              <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
             </IonRouterOutlet>
           </IonSplitPane>
         </IonReactRouter>
