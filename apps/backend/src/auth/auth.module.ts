@@ -13,7 +13,7 @@ import { env } from 'process';
     PassportModule,
     JwtModule.register({
       secret: env.JWT_SECRET || 'super-secret-key-nutrideli',
-      signOptions: { expiresIn: '7d' },
+      signOptions: { expiresIn: '365d' },
     }),
   ],
   providers: [AuthService, JwtStrategy],

@@ -13,6 +13,7 @@ import DeliveryZones from './pages/DeliveryZones';
 import Login from './pages/Login';
 import Users from './pages/Users';
 import { AuthProvider, AuthContext } from './context/AuthContext';
+import { UserRole } from '@nutrideli/shared-types';
 import { useContext } from 'react';
 
 import '@ionic/react/css/core.css';
@@ -29,6 +30,26 @@ import './theme.css';
 
 setupIonicReact();
 
+
+const HomeRedirector: React.FC = () => {
+  const { user, isAuthenticated, isLoading } = useContext(AuthContext);
+  if (isLoading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  
+  if (user?.role === UserRole.POS) return <Navigate to="/pos" replace />;
+  if (user?.role === UserRole.KITCHEN) return <Navigate to="/orders" replace />;
+  if (user?.role === UserRole.DELIVERY) return <Navigate to="/orders" replace />;
+  if (user?.role === UserRole.INVENTORY) return <Navigate to="/raw-materials" replace />;
+  return <Navigate to="/dashboard" replace />;
+};
+
+const LoginRoute: React.FC = () => {
+  const { isAuthenticated, isLoading } = useContext(AuthContext);
+  if (isLoading) return null;
+  if (isAuthenticated) return <HomeRedirector />;
+  return <Login />;
+};
+
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useContext(AuthContext);
   if (isLoading) return null;
@@ -43,8 +64,8 @@ const App: React.FC = () => {
           <IonSplitPane contentId="main">
             <Menu />
             <IonRouterOutlet id="main">
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/login" element={<Login />} />
+              <Route path="/" element={<HomeRedirector />} />
+              <Route path="/login" element={<LoginRoute />} />
               
               <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
               <Route path="/raw-materials" element={<PrivateRoute><RawMaterials /></PrivateRoute>} />

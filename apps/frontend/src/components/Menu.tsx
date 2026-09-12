@@ -10,6 +10,7 @@
   IonNote,
 } from '@ionic/react';
 import { useLocation } from 'react-router-dom';
+import { useIonAlert } from '@ionic/react';
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
@@ -17,10 +18,23 @@ import { peopleOutline, cubeOutline, cartOutline, constructOutline, cashOutline,
 
 const Menu: React.FC = () => {
   const location = useLocation();
+  const [presentAlert] = useIonAlert();
   const { user, logout, isAuthenticated } = useContext(AuthContext);
 
   if (!isAuthenticated) return null; // Ocultar el menú si no está logueado
 
+  
+  const confirmLogout = () => {
+    presentAlert({
+      header: 'Cerrar Sesión',
+      message: '¿Estás seguro de que quieres cerrar tu sesión?',
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { text: 'Salir', role: 'destructive', handler: logout }
+      ]
+    });
+  };
+  
   const rawPages = [
     { title: 'Tablero Principal', url: '/dashboard', iosIcon: pieChartOutline, mdIcon: pieChartOutline },
     { title: 'Insumos', url: '/raw-materials', iosIcon: cubeOutline, mdIcon: cubeOutline },
@@ -60,7 +74,7 @@ const Menu: React.FC = () => {
               </IonMenuToggle>
             );
           })}
-        <IonItem button onClick={logout} lines="none" color="light" style={{ marginTop: '20px' }}>
+        <IonItem button onClick={confirmLogout} lines="none" color="light" style={{ marginTop: '20px' }}>
             <IonIcon aria-hidden="true" slot="start" icon={pieChartOutline} />
             <IonLabel>Cerrar Sesión</IonLabel>
           </IonItem>
