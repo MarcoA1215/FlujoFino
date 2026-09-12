@@ -16,9 +16,9 @@ const Login: React.FC = () => {
     try {
       const res = await apiClient.post('/auth/login', { username, password });
       login(res.data.access_token, res.data.user);
-      router.push('/', 'root', 'replace'); // Redirigir al inicio
-    } catch (e) {
-      presentToast({ message: 'Credenciales inválidas', duration: 3000, color: 'danger' });
+      router.push('/dashboard', 'root', 'replace'); // Redirigir al inicio
+    } catch (e: any) {
+      presentToast({ message: 'Error: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
     }
   };
 
