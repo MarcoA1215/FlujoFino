@@ -13,10 +13,7 @@ import {
   IonCardHeader,
   IonCardTitle,
   IonCardContent,
-  IonItem,
   IonButton,
-  IonList,
-  IonLabel,
   IonBadge,
   useIonAlert,
   useIonToast,
@@ -29,6 +26,7 @@ type Product = {
   name: string;
   stockQuantity: number;
   salePrice: number;
+  isCombo?: boolean;
 };
 
 const Production: React.FC = () => {
@@ -103,21 +101,27 @@ const Production: React.FC = () => {
                 <IonCardContent>
                   <p>Selecciona un producto y la cantidad a fabricar. El sistema descontará automáticamente los insumos requeridos según la receta.</p>
                   
-                  <IonList className="ion-margin-top">
-                    {products.map(p => (
-                      <IonItem key={p.id}>
-                        <IonLabel>
-                          <h2>{p.name}</h2>
-                        </IonLabel>
-                        <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} slot="end" className="ion-margin-end">
-                          Stock Actual: {p.stockQuantity}
-                        </IonBadge>
-                        <IonButton fill="solid" color="primary" slot="end" onClick={() => openProduceAlert(p)}>
-                          Producir
-                        </IonButton>
-                      </IonItem>
-                    ))}
-                  </IonList>
+                  <IonGrid className="ion-no-padding ion-margin-top">
+                    <IonRow>
+                      {products.filter(p => !p.isCombo).map(p => (
+                        <IonCol size="12" sizeSm="6" sizeMd="4" key={p.id}>
+                          <IonCard style={{ margin: '5px' }}>
+                            <IonCardContent>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                                <h2 style={{ flex: 1, fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 10px 0' }}>{p.name}</h2>
+                                <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} style={{ padding: '8px', fontSize: '0.95rem', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                                  Stock: {p.stockQuantity}
+                                </IonBadge>
+                              </div>
+                              <IonButton size="small" fill="solid" color="primary" onClick={() => openProduceAlert(p)} expand="block">
+                                Producir Lote
+                              </IonButton>
+                            </IonCardContent>
+                          </IonCard>
+                        </IonCol>
+                      ))}
+                    </IonRow>
+                  </IonGrid>
                 </IonCardContent>
               </IonCard>
             </IonCol>

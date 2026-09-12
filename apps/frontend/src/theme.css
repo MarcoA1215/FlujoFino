@@ -1,40 +1,42 @@
-/* Pastel & Sober Color Palette */
+/* Vibrant but Professional Color Palette (Green, Blue, White) */
 :root {
-  /* Primary - Sober Teal/Sage */
-  --ion-color-primary: #5c8d89;
-  --ion-color-primary-rgb: 92,141,137;
+  /* Primary - Vibrant Blue */
+  --ion-color-primary: #2563EB;
+  --ion-color-primary-rgb: 37,99,235;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255,255,255;
-  --ion-color-primary-shade: #517c79;
-  --ion-color-primary-tint: #6ca8a4;
+  --ion-color-primary-shade: #2157ce;
+  --ion-color-primary-tint: #3b72ed;
 
-  /* Secondary - Muted Purple/Blue */
-  --ion-color-secondary: #748cab;
-  --ion-color-secondary-rgb: 116,140,171;
+  /* Secondary - Light Sky Blue */
+  --ion-color-secondary: #0EA5E9;
+  --ion-color-secondary-rgb: 14,165,233;
   --ion-color-secondary-contrast: #ffffff;
   
-  /* Tertiary - Soft Sand/Peach */
-  --ion-color-tertiary: #dcbfa6;
-  --ion-color-tertiary-rgb: 220,191,166;
-  --ion-color-tertiary-contrast: #000000;
+  /* Tertiary - Teal / Blue-Green */
+  --ion-color-tertiary: #14B8A6;
+  --ion-color-tertiary-rgb: 20,184,166;
+  --ion-color-tertiary-contrast: #ffffff;
 
-  /* Success - Pastel Green */
-  --ion-color-success: #8bb194;
-  --ion-color-success-rgb: 139,177,148;
-  --ion-color-success-contrast: #000000;
+  /* Success - Vibrant Emerald Green (Used in App Headers) */
+  --ion-color-success: #10B981;
+  --ion-color-success-rgb: 16,185,129;
+  --ion-color-success-contrast: #ffffff;
 
-  /* Warning - Pastel Yellow/Mustard */
-  --ion-color-warning: #dfc889;
-  --ion-color-warning-rgb: 223,200,137;
-  --ion-color-warning-contrast: #000000;
+  /* Warning - Amber (Kept for UI warnings) */
+  --ion-color-warning: #F59E0B;
+  --ion-color-warning-rgb: 245,158,11;
+  --ion-color-warning-contrast: #ffffff;
 
-  /* Danger - Pastel Red/Rose */
-  --ion-color-danger: #cf8a8a;
-  --ion-color-danger-rgb: 207,138,138;
+  /* Danger - Soft Vibrant Red (Kept for Merma/Delete) */
+  --ion-color-danger: #EF4444;
+  --ion-color-danger-rgb: 239,68,68;
   --ion-color-danger-contrast: #ffffff;
 
-  /* Background nuances */
-  --ion-background-color: #fcfcfc;
+  /* Background nuances - Clean White */
+  --ion-background-color: #ffffff;
+  --ion-color-light: #F3F4F6;
+  --ion-color-light-rgb: 243,244,246;
 }
 
 /* Fix for mobile tables */

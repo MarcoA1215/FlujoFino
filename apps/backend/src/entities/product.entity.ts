@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, Up
 import { RecipeItem } from './recipe-item.entity';
 import { OrderItem } from './order-item.entity';
 import { ProductionBatch } from './production-batch.entity';
+import { ComboItem } from './combo-item.entity';
 
 @Entity()
 export class Product {
@@ -23,6 +24,9 @@ export class Product {
   @Column('float', { default: 0 })
   stockQuantity: number;
 
+  @Column({ default: false })
+  isCombo: boolean;
+
   @OneToMany(() => RecipeItem, recipeItem => recipeItem.product)
   recipe: RecipeItem[];
 
@@ -31,6 +35,12 @@ export class Product {
 
   @OneToMany(() => ProductionBatch, batch => batch.product)
   batches: ProductionBatch[];
+
+  @OneToMany(() => ComboItem, comboItem => comboItem.combo)
+  comboItems: ComboItem[];
+
+  @OneToMany(() => ComboItem, comboItem => comboItem.component)
+  comboOf: ComboItem[];
 
   @CreateDateColumn()
   createdAt: Date;

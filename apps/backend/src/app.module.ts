@@ -18,6 +18,7 @@ import { ProductionBatch } from './entities/production-batch.entity';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { Settings } from './entities/settings.entity';
+import { ComboItem } from './entities/combo-item.entity';
 
 @Module({
   imports: [
@@ -30,7 +31,7 @@ import { Settings } from './entities/settings.entity';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
-        entities: [RawMaterial, StockMovement, RecipeItem, Product, ProductionBatch, Order, OrderItem, Settings],
+        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings],
         synchronize: true,
       }),
       inject: [ConfigService],

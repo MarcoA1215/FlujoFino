@@ -133,34 +133,53 @@ export class RawMaterialsService {
       const movement = await manager.findOne(StockMovement, { where: { id }, relations: { rawMaterial: true } });
       if (!movement) throw new NotFoundException('Movimiento no encontrado');
 
-      if (movement.type !== MovementType.IN_PURCHASE) {
-        throw new BadRequestException('Solo se pueden editar compras (IN_PURCHASE)');
-      }
-
       const material = movement.rawMaterial;
       if (!material) throw new NotFoundException('Insumo asociado no encontrado');
 
-      // Revertir matemática anterior
-      const oldTotalValue = material.stockQuantity * material.costPerUnit;
-      const revertedValue = oldTotalValue - movement.totalCost;
-      const revertedStock = material.stockQuantity - movement.quantity;
+      if (movement.type === MovementType.IN_PURCHASE) {
+        // Revertir matemática anterior
+        const oldTotalValue = material.stockQuantity * material.costPerUnit;
+        const revertedValue = oldTotalValue - movement.totalCost;
+        const revertedStock = material.stockQuantity - movement.quantity;
+  
+        // Aplicar nueva matemática
+        const newTotalValue = revertedValue + (dto.totalCost ?? movement.totalCost);
+        const newTotalStock = revertedStock + dto.quantity;
+  
+        if (newTotalStock > 0) {
+          material.costPerUnit = newTotalValue / newTotalStock;
+        } else if (newTotalStock === 0) {
+          material.costPerUnit = 0;
+        }
+        
+        material.stockQuantity = newTotalStock;
+        await manager.save(RawMaterial, material);
+  
+        movement.quantity = dto.quantity;
+        if (dto.totalCost !== undefined) movement.totalCost = dto.totalCost;
+        if (dto.description !== undefined) movement.description = dto.description;
+        
+      } else if (movement.type === MovementType.LOSS) {
+        // Revertir pérdida anterior
+        const revertedStock = material.stockQuantity + movement.quantity;
+        
+        // Aplicar nueva pérdida
+        const newTotalStock = revertedStock - dto.quantity;
+        if (newTotalStock < 0) {
+          throw new BadRequestException('La nueva cantidad resulta en stock negativo');
+        }
 
-      // Aplicar nueva matemática
-      const newTotalValue = revertedValue + dto.totalCost;
-      const newTotalStock = revertedStock + dto.quantity;
+        material.stockQuantity = newTotalStock;
+        await manager.save(RawMaterial, material);
 
-      if (newTotalStock > 0) {
-        material.costPerUnit = newTotalValue / newTotalStock;
-      } else if (newTotalStock === 0) {
-        material.costPerUnit = 0;
+        movement.quantity = dto.quantity;
+        movement.totalCost = dto.quantity * material.costPerUnit;
+        if (dto.description !== undefined) movement.description = dto.description;
+        
+      } else {
+        throw new BadRequestException('Solo se pueden editar compras (IN_PURCHASE) o pérdidas (LOSS)');
       }
-      
-      material.stockQuantity = newTotalStock;
-      await manager.save(RawMaterial, material);
 
-      movement.quantity = dto.quantity;
-      movement.totalCost = dto.totalCost;
-      movement.description = dto.description;
       return manager.save(StockMovement, movement);
     });
   }

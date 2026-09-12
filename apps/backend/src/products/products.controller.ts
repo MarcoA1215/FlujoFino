@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
@@ -23,6 +23,11 @@ export class ProductsController {
     return this.productsService.update(id, dto);
   }
 
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.productsService.remove(id);
+  }
+
   @Get(':id/recipe')
   getRecipe(@Param('id') id: string) {
     return this.productsService.getRecipeAndCost(id);
@@ -31,6 +36,11 @@ export class ProductsController {
   @Put(':id/recipe')
   updateRecipe(@Param('id') id: string, @Body() dto: UpdateRecipeDto) {
     return this.productsService.updateRecipe(id, dto);
+  }
+
+  @Put(':id/combo')
+  updateCombo(@Param('id') id: string, @Body() dto: any) {
+    return this.productsService.updateCombo(id, dto);
   }
 
   @Post(':id/loss')

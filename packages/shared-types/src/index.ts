@@ -36,13 +36,25 @@ export interface RecipeItemDTO {
   quantity: number;
 }
 
+export interface ComboItemDTO {
+  id?: string;
+  componentId: string;
+  componentName?: string;
+  quantity: number;
+  unitCost?: number;
+  totalItemCost?: number;
+}
+
 export interface ProductDTO {
   id?: string;
   name: string;
   description?: string;
+  category?: string;
   salePrice: number;
   stockQuantity: number;
+  isCombo?: boolean;
   recipe?: RecipeItemDTO[];
+  comboItems?: ComboItemDTO[];
 }
 
 export interface OrderItemDTO {

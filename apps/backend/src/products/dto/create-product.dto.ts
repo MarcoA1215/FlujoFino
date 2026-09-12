@@ -5,5 +5,6 @@ export class CreateProductDto {
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsString() category?: string;
   @IsNumber() salePrice: number;
+  @IsOptional() isCombo?: boolean;
 }
 

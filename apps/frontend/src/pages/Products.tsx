@@ -25,6 +25,8 @@ import {
   IonSelect,
   IonSelectOption,
   IonText,
+  IonCardSubtitle,
+  IonFooter,
 } from '@ionic/react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
@@ -35,6 +37,7 @@ type Product = {
   category?: string;
   salePrice: number;
   stockQuantity: number;
+  isCombo?: boolean;
 };
 
 type RawMaterial = {
@@ -58,11 +61,6 @@ const Products: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [materials, setMaterials] = useState<RawMaterial[]>([]);
   
-  // Create Product Form
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
-  const [salePrice, setSalePrice] = useState<number>();
-  
   const [presentAlert] = useIonAlert();
   const [presentToast] = useIonToast();
 
@@ -70,12 +68,17 @@ const Products: React.FC = () => {
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [recipeItems, setRecipeItems] = useState<RecipeItem[]>([]);
+  const [comboItems, setComboItems] = useState<any[]>([]);
   const [totalRecipeCost, setTotalRecipeCost] = useState(0);
 
   // Add Recipe Item Form
   const [newRmId, setNewRmId] = useState('');
   const [newRmQty, setNewRmQty] = useState<number>();
   const [inputUnit, setInputUnit] = useState<string>(''); // Para alternar entre Kg y Gramos si aplica
+
+  // Add Combo Item Form
+  const [newComboProdId, setNewComboProdId] = useState('');
+  const [newComboQty, setNewComboQty] = useState<number>();
 
   const selectedMaterial = materials.find(m => m.id === newRmId);
 
@@ -104,22 +107,39 @@ const Products: React.FC = () => {
     fetchData();
   }, []);
 
-  const handleCreate = async () => {
-    try {
-      await apiClient.post('/products', {
-        name,
-        category,
-        salePrice: salePrice || 0,
-      });
-      setName('');
-      setCategory('');
-      setSalePrice(undefined);
-      fetchData();
-      presentToast({ message: 'Producto creado', duration: 2000, color: 'success' });
-    } catch (e) {
-      console.error(e);
-      presentToast({ message: 'Error al crear', duration: 3000, color: 'danger' });
-    }
+  const openCreateAlert = (isCombo: boolean) => {
+    presentAlert({
+      header: isCombo ? 'Nuevo Combo' : 'Nuevo Producto Base',
+      inputs: [
+        { name: 'name', type: 'text', placeholder: 'Nombre (Ej. Pastel Queso)' },
+        { name: 'category', type: 'text', placeholder: 'Categoría (Ej. Pasteles)' },
+        { name: 'salePrice', type: 'number', placeholder: 'Precio de Venta ($)' }
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Crear',
+          handler: async (data) => {
+            if (!data.name || !data.salePrice) {
+              presentToast({ message: 'Nombre y precio son obligatorios', duration: 2000, color: 'warning' });
+              return false;
+            }
+            try {
+              await apiClient.post('/products', {
+                name: data.name,
+                category: data.category,
+                salePrice: parseFloat(data.salePrice),
+                isCombo: isCombo
+              });
+              fetchData();
+              presentToast({ message: isCombo ? 'Combo creado' : 'Producto creado', duration: 2000, color: 'success' });
+            } catch (e) {
+              presentToast({ message: 'Error al crear', duration: 3000, color: 'danger' });
+            }
+          }
+        }
+      ]
+    });
   };
 
   const openRecipe = async (product: Product) => {
@@ -127,6 +147,7 @@ const Products: React.FC = () => {
     try {
       const res = await apiClient.get(`/products/${product.id}/recipe`);
       setRecipeItems(res.data.items);
+      setComboItems(res.data.comboItems || []);
       setTotalRecipeCost(res.data.totalRecipeCost);
       setShowRecipeModal(true);
     } catch(e) {
@@ -168,18 +189,62 @@ const Products: React.FC = () => {
     setRecipeItems(recipeItems.filter((_, i) => i !== index));
   };
 
+  const addComboItem = async () => {
+    if (!newComboProdId || !newComboQty) return;
+    const component = products.find(p => p.id === newComboProdId);
+    if (!component) return;
+
+    let componentCost = 0;
+    try {
+      const res = await apiClient.get(`/products/${component.id}/recipe`);
+      componentCost = res.data.totalRecipeCost || 0;
+    } catch (e) {
+      console.error("No se pudo obtener el costo del subproducto", e);
+    }
+
+    const itemTotalCost = componentCost * newComboQty;
+
+    setComboItems([...comboItems, {
+      componentId: component.id,
+      componentName: component.name,
+      quantity: newComboQty,
+      unitCost: componentCost,
+      totalItemCost: itemTotalCost
+    }]);
+
+    setTotalRecipeCost(prev => prev + itemTotalCost);
+
+    setNewComboProdId('');
+    setNewComboQty(undefined);
+  };
+
+  const removeComboItem = (index: number) => {
+    const item = comboItems[index];
+    if (item.totalItemCost) {
+      setTotalRecipeCost(prev => prev - item.totalItemCost);
+    }
+    setComboItems(comboItems.filter((_, i) => i !== index));
+  };
+
   const saveRecipe = async () => {
     if (!selectedProduct) return;
     try {
-      const payload = {
+      const payloadRecipe = {
         items: recipeItems.map(i => ({ rawMaterialId: i.rawMaterialId, quantity: i.quantity }))
       };
-      await apiClient.put(`/products/${selectedProduct.id}/recipe`, payload);
-      presentToast({ message: 'Receta guardada exitosamente', duration: 2000, color: 'success' });
+      await apiClient.put(`/products/${selectedProduct.id}/recipe`, payloadRecipe);
+      
+      const payloadCombo = {
+        comboItems: comboItems.map(i => ({ componentId: i.componentId, quantity: i.quantity }))
+      };
+      await apiClient.put(`/products/${selectedProduct.id}/combo`, payloadCombo);
+
+      fetchData(); // Refresh list to get updated virtual stock
+      presentToast({ message: 'Composición guardada exitosamente', duration: 2000, color: 'success' });
       setShowRecipeModal(false);
     } catch (e) {
       console.error(e);
-      presentToast({ message: 'Error guardando receta', duration: 3000, color: 'danger' });
+      presentToast({ message: 'Error al guardar la composición', duration: 3000, color: 'danger' });
     }
   };
 
@@ -213,7 +278,7 @@ const Products: React.FC = () => {
 
   const openLossAlert = (p: Product) => {
     presentAlert({
-      header: `Merma de ${p.name}`,
+      header: `Pérdida / Ajuste: ${p.name}`,
       subHeader: `Stock actual: ${p.stockQuantity}`,
       inputs: [
         { name: 'quantity', type: 'number', placeholder: 'Cantidad perdida', min: 1 },
@@ -242,6 +307,60 @@ const Products: React.FC = () => {
     });
   };
 
+  const openEditProductAlert = (p: Product) => {
+    presentAlert({
+      header: 'Editar Producto',
+      inputs: [
+        { name: 'name', type: 'text', value: p.name, placeholder: 'Nombre' },
+        { name: 'category', type: 'text', value: p.category, placeholder: 'Categoría' },
+        { name: 'salePrice', type: 'number', value: p.salePrice, placeholder: 'Precio Venta ($)' }
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Guardar',
+          handler: async (data) => {
+            if (!data.name || !data.salePrice) return false;
+            try {
+              await apiClient.put(`/products/${p.id}`, { 
+                name: data.name, 
+                category: data.category,
+                salePrice: parseFloat(data.salePrice)
+              });
+              fetchData();
+              presentToast({ message: 'Producto actualizado', duration: 2000, color: 'success' });
+            } catch (e) {
+              presentToast({ message: 'Error al actualizar', duration: 3000, color: 'danger' });
+            }
+          }
+        }
+      ]
+    });
+  };
+
+  const handleDeleteProduct = (p: Product) => {
+    presentAlert({
+      header: 'Confirmar Eliminación',
+      message: `¿Estás seguro de que deseas eliminar "${p.name}"? Los datos históricos (pedidos, caja) no se verán afectados.`,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Eliminar',
+          role: 'destructive',
+          handler: async () => {
+            try {
+              await apiClient.delete(`/products/${p.id}`);
+              fetchData();
+              presentToast({ message: 'Producto eliminado', duration: 2000, color: 'success' });
+            } catch (e) {
+              presentToast({ message: 'Error al eliminar', duration: 3000, color: 'danger' });
+            }
+          }
+        }
+      ]
+    });
+  };
+
   return (
     <IonPage>
       <IonHeader>
@@ -255,55 +374,63 @@ const Products: React.FC = () => {
 
       <IonContent fullscreen className="ion-padding">
         <IonGrid>
-          <IonRow>
-            <IonCol size="12" sizeMd="4">
-              <IonCard>
-                <IonCardHeader>
-                  <IonCardTitle>Crear Producto</IonCardTitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  <IonItem>
-                    <IonLabel position="stacked">Nombre</IonLabel>
-                    <IonInput value={name} onIonChange={e => setName(e.detail.value!)} placeholder="Ej. Pastel de Cochino" />
-                  </IonItem>
-                  <IonItem>
-                    <IonLabel position="stacked">Categoría</IonLabel>
-                    <IonInput value={category} onIonChange={e => setCategory(e.detail.value!)} placeholder="Ej. Pasteles" />
-                  </IonItem>
-                  <IonItem>
-                    <IonLabel position="stacked">Precio de Venta ($)</IonLabel>
-                    <IonInput type="number" value={salePrice} onIonChange={e => setSalePrice(parseFloat(e.detail.value!))} placeholder="0.00" />
-                  </IonItem>
-                  <IonButton expand="block" color="success" className="ion-margin-top" onClick={handleCreate}>
-                    Guardar
-                  </IonButton>
-                </IonCardContent>
-              </IonCard>
+          <IonRow className="ion-margin-bottom">
+            <IonCol size="12" sizeSm="6" sizeMd="4">
+              <IonButton expand="block" color="primary" onClick={() => openCreateAlert(false)}>
+                + Crear Producto Base
+              </IonButton>
             </IonCol>
+            <IonCol size="12" sizeSm="6" sizeMd="4">
+              <IonButton expand="block" color="tertiary" onClick={() => openCreateAlert(true)}>
+                + Crear Combo
+              </IonButton>
+            </IonCol>
+          </IonRow>
 
-            <IonCol size="12" sizeMd="8">
-              <IonList>
-                {products.map(p => (
-                  <IonItem key={p.id}>
-                    <IonLabel>
-                      <h2>{p.name} {p.category && `(${p.category})`}</h2>
-                      <p>Precio Venta: ${p.salePrice.toFixed(2)}</p>
-                    </IonLabel>
-                    <IonBadge color={p.stockQuantity <= 0 ? 'danger' : 'primary'} slot="end" className="ion-margin-end">
-                      Stock: {p.stockQuantity}
-                    </IonBadge>
-                    <IonButton fill="outline" color="primary" slot="end" onClick={() => openRecipe(p)}>
-                      Ver Receta / Costos
-                    </IonButton>
-                    <IonButton fill="outline" color="tertiary" slot="end" onClick={() => openAdjustStockAlert(p)}>
-                      Stock Inicial
-                    </IonButton>
-                    <IonButton fill="outline" color="danger" slot="end" onClick={() => openLossAlert(p)}>
-                      Merma
-                    </IonButton>
-                  </IonItem>
-                ))}
-              </IonList>
+          <IonRow>
+            <IonCol size="12">
+              <IonGrid className="ion-no-padding">
+                <IonRow>
+                  {products.map(p => (
+                    <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3" key={p.id}>
+                      <IonCard style={{ margin: '5px' }}>
+                        <IonCardContent>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: '0 0 5px 0', wordBreak: 'break-word' }}>{p.name}</h2>
+                                <p style={{ margin: 0, color: 'gray', fontSize: '0.85rem' }}>
+                                  {p.category || 'Sin categoría'} • {p.isCombo ? 'Combo' : 'Base'}
+                                </p>
+                                <p style={{ margin: '5px 0 0 0', fontWeight: 'bold' }}>Precio: ${p.salePrice.toFixed(2)}</p>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, gap: '8px' }}>
+                                <IonBadge color={p.stockQuantity <= 0 ? 'danger' : 'primary'} style={{ padding: '8px 10px', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
+                                  Stock: {p.stockQuantity}
+                                </IonBadge>
+                                <div style={{ display: 'flex', gap: '5px' }}>
+                                  <IonButton fill="clear" size="small" onClick={() => openEditProductAlert(p)} style={{ margin: 0, width: '30px', height: '30px' }}>✏️</IonButton>
+                                  <IonButton fill="clear" size="small" color="danger" onClick={() => handleDeleteProduct(p)} style={{ margin: 0, width: '30px', height: '30px' }}>🗑️</IonButton>
+                                </div>
+                              </div>
+                            </div>
+                          
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '15px' }}>
+                            <IonButton size="small" fill="outline" color={p.isCombo ? "tertiary" : "primary"} onClick={() => openRecipe(p)}>
+                              {p.isCombo ? "Configurar Combo" : "Configurar Receta"}
+                            </IonButton>
+                            <IonButton size="small" fill="outline" color="medium" onClick={() => openAdjustStockAlert(p)}>
+                              Stock Inicial
+                            </IonButton>
+                            <IonButton size="small" fill="outline" color="danger" onClick={() => openLossAlert(p)}>
+                              Pérdida
+                            </IonButton>
+                          </div>
+                        </IonCardContent>
+                      </IonCard>
+                    </IonCol>
+                  ))}
+                </IonRow>
+              </IonGrid>
             </IonCol>
           </IonRow>
         </IonGrid>
@@ -312,7 +439,7 @@ const Products: React.FC = () => {
         <IonModal isOpen={showRecipeModal} onDidDismiss={() => setShowRecipeModal(false)}>
           <IonHeader>
             <IonToolbar color="light">
-              <IonTitle>Receta: {selectedProduct?.name}</IonTitle>
+              <IonTitle>{selectedProduct?.isCombo ? 'Configurar Combo:' : 'Receta:'} {selectedProduct?.name}</IonTitle>
               <IonButtons slot="end">
                 <IonButton onClick={() => setShowRecipeModal(false)}>Cerrar</IonButton>
               </IonButtons>
@@ -321,51 +448,110 @@ const Products: React.FC = () => {
           <IonContent className="ion-padding">
             <IonGrid>
               <IonRow>
-                <IonCol size="12" sizeMd="8">
-                  <IonList>
-                    {recipeItems.map((item, idx) => (
-                      <IonItem key={idx}>
-                        <IonLabel>
-                          <h3>{item.rawMaterialName}</h3>
-                          <p>{item.quantity} {item.unit} x ${item.costPerUnit.toFixed(2)} c/u</p>
-                        </IonLabel>
-                        <IonText slot="end" color="medium">${item.totalItemCost.toFixed(2)}</IonText>
-                        <IonButton slot="end" color="danger" fill="clear" onClick={() => removeRecipeItem(idx)}>X</IonButton>
-                      </IonItem>
-                    ))}
-                  </IonList>
-
-                  <div className="ion-margin-top" style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-                    <div style={{ flex: 1 }}>
-                      <IonLabel position="stacked">Insumo</IonLabel>
-                      <IonSelect value={newRmId} onIonChange={e => setNewRmId(e.detail.value)}>
-                        {materials.map(m => (
-                          <IonSelectOption key={m.id} value={m.id}>{m.name}</IonSelectOption>
+                <IonCol size="12" sizeLg="8">
+                  {/* Tarjeta de Insumos */}
+                  <IonCard style={{ margin: '0 0 20px 0' }}>
+                    <IonCardHeader>
+                      <IonCardTitle style={{ fontSize: '1.1rem' }}>Insumos y Empaques</IonCardTitle>
+                      <IonCardSubtitle>Materias primas directas usadas para este producto</IonCardSubtitle>
+                    </IonCardHeader>
+                    <IonCardContent>
+                      <IonList>
+                        {recipeItems.map((item, idx) => (
+                          <IonItem key={idx}>
+                            <IonLabel>
+                              <h3>{item.rawMaterialName}</h3>
+                              <p>{item.quantity} {item.unit} x ${item.costPerUnit.toFixed(2)} c/u</p>
+                            </IonLabel>
+                            <IonText slot="end" color="medium">${item.totalItemCost.toFixed(2)}</IonText>
+                            <IonButton slot="end" color="danger" fill="clear" onClick={() => removeRecipeItem(idx)}>X</IonButton>
+                          </IonItem>
                         ))}
-                      </IonSelect>
-                    </div>
-                    
-                    {selectedMaterial && (
-                      <div style={{ width: '120px' }}>
-                        <IonLabel position="stacked">Unidad</IonLabel>
-                        <IonSelect value={inputUnit} onIonChange={e => setInputUnit(e.detail.value)}>
-                          <IonSelectOption value={selectedMaterial.unit}>{selectedMaterial.unit}</IonSelectOption>
-                          {selectedMaterial.unit === 'Kg' && <IonSelectOption value="Gramos">Gramos</IonSelectOption>}
-                          {selectedMaterial.unit === 'Litros' && <IonSelectOption value="Mililitros">Mililitros</IonSelectOption>}
-                        </IonSelect>
-                      </div>
-                    )}
+                        {recipeItems.length === 0 && <p style={{ color: 'gray', fontStyle: 'italic' }}>No hay insumos asignados.</p>}
+                      </IonList>
 
-                    <div style={{ width: '100px' }}>
-                      <IonLabel position="stacked">Cantidad</IonLabel>
-                      <IonInput type="number" value={newRmQty} onIonChange={e => setNewRmQty(parseFloat(e.detail.value!))} />
-                    </div>
-                    <IonButton onClick={addRecipeItem}>Agregar</IonButton>
-                  </div>
+                      <IonGrid className="ion-no-padding ion-margin-top">
+                        <IonRow className="ion-align-items-end">
+                          <IonCol size="12" sizeMd="5">
+                            <IonLabel position="stacked">Insumo</IonLabel>
+                            <IonSelect value={newRmId} onIonChange={e => setNewRmId(e.detail.value)} interface="popover" placeholder="Seleccione...">
+                              {materials.map(m => (
+                                <IonSelectOption key={m.id} value={m.id}>{m.name}</IonSelectOption>
+                              ))}
+                            </IonSelect>
+                          </IonCol>
+                          
+                          {selectedMaterial && (
+                            <IonCol size="12" sizeMd="3">
+                              <IonLabel position="stacked">Unidad</IonLabel>
+                              <IonSelect value={inputUnit} onIonChange={e => setInputUnit(e.detail.value)} interface="popover">
+                                <IonSelectOption value={selectedMaterial.unit}>{selectedMaterial.unit}</IonSelectOption>
+                                {selectedMaterial.unit === 'Kg' && <IonSelectOption value="Gramos">Gramos</IonSelectOption>}
+                                {selectedMaterial.unit === 'Litros' && <IonSelectOption value="Mililitros">Mililitros</IonSelectOption>}
+                              </IonSelect>
+                            </IonCol>
+                          )}
+
+                          <IonCol size="8" sizeMd="2">
+                            <IonLabel position="stacked">Cantidad</IonLabel>
+                            <IonInput type="number" value={newRmQty} onIonChange={e => setNewRmQty(parseFloat(e.detail.value!))} placeholder="0" />
+                          </IonCol>
+                          <IonCol size="4" sizeMd="2">
+                            <IonButton expand="block" onClick={addRecipeItem}>Agregar</IonButton>
+                          </IonCol>
+                        </IonRow>
+                      </IonGrid>
+                    </IonCardContent>
+                  </IonCard>
+
+                  {selectedProduct?.isCombo && (
+                    <IonCard style={{ margin: '0 0 20px 0' }}>
+                      <IonCardHeader>
+                        <IonCardTitle style={{ fontSize: '1.1rem' }}>Productos del Combo</IonCardTitle>
+                        <IonCardSubtitle>Agrega aquí los sabores y variantes que componen el combo</IonCardSubtitle>
+                      </IonCardHeader>
+                      <IonCardContent>
+                        <IonList>
+                          {comboItems.map((item, idx) => (
+                            <IonItem key={`combo-${idx}`}>
+                              <IonLabel>
+                                <h3>{item.componentName}</h3>
+                                <p>{item.quantity} Unidades x ${(item.unitCost || 0).toFixed(2)} c/u (Fabricación)</p>
+                              </IonLabel>
+                              <IonText slot="end" color="medium">${(item.totalItemCost || 0).toFixed(2)}</IonText>
+                              <IonButton slot="end" color="danger" fill="clear" onClick={() => removeComboItem(idx)}>X</IonButton>
+                            </IonItem>
+                          ))}
+                          {comboItems.length === 0 && <p style={{ color: 'gray', fontStyle: 'italic' }}>Este combo aún no tiene productos.</p>}
+                        </IonList>
+
+                        <IonGrid className="ion-no-padding ion-margin-top">
+                          <IonRow className="ion-align-items-end">
+                            <IonCol size="12" sizeMd="7">
+                              <IonLabel position="stacked">Sub-Producto a incluir</IonLabel>
+                              <IonSelect value={newComboProdId} onIonChange={e => setNewComboProdId(e.detail.value)} interface="popover" placeholder="Seleccione un producto...">
+                                {products.filter(p => p.id !== selectedProduct?.id && !p.isCombo).map(p => (
+                                  <IonSelectOption key={p.id} value={p.id}>{p.name}</IonSelectOption>
+                                ))}
+                              </IonSelect>
+                            </IonCol>
+
+                            <IonCol size="8" sizeMd="2">
+                              <IonLabel position="stacked">Cant.</IonLabel>
+                              <IonInput type="number" value={newComboQty} onIonChange={e => setNewComboQty(parseFloat(e.detail.value!))} placeholder="1" />
+                            </IonCol>
+                            <IonCol size="4" sizeMd="3">
+                              <IonButton expand="block" onClick={addComboItem}>Agregar</IonButton>
+                            </IonCol>
+                          </IonRow>
+                        </IonGrid>
+                      </IonCardContent>
+                    </IonCard>
+                  )}
                 </IonCol>
 
-                <IonCol size="12" sizeMd="4">
-                  <IonCard color="light">
+                <IonCol size="12" sizeLg="4">
+                  <IonCard color="light" style={{ margin: '0 0 20px 0' }}>
                     <IonCardHeader>
                       <IonCardTitle>Rentabilidad</IonCardTitle>
                     </IonCardHeader>
@@ -386,14 +572,17 @@ const Products: React.FC = () => {
                       )}
                     </IonCardContent>
                   </IonCard>
-                  
-                  <IonButton expand="block" color="success" className="ion-margin-top" onClick={saveRecipe}>
-                    Guardar Receta Definitiva
-                  </IonButton>
                 </IonCol>
               </IonRow>
             </IonGrid>
           </IonContent>
+          <IonFooter>
+            <IonToolbar>
+              <IonButton expand="block" color="success" style={{ margin: '10px' }} onClick={saveRecipe}>
+                Guardar Receta y Combo
+              </IonButton>
+            </IonToolbar>
+          </IonFooter>
         </IonModal>
       </IonContent>
     </IonPage>

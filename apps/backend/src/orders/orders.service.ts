@@ -5,6 +5,7 @@ import { OrderItem } from '../entities/order-item.entity';
 import { Product } from '../entities/product.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
 import { PaymentStatus, OrderStatus, MovementType } from '@nutrideli/shared-types';
+import { RawMaterial } from '../entities/raw-material.entity';
 
 export class CreateOrderDto {
   customerName: string;
@@ -60,7 +61,13 @@ export class OrdersService {
 
       // Process Items
       for (const itemDto of dto.items) {
-        const product = await manager.findOne(Product, { where: { id: itemDto.productId } });
+        const product = await manager.findOne(Product, { 
+          where: { id: itemDto.productId },
+          relations: {
+            comboItems: { component: true },
+            recipe: { rawMaterial: true }
+          }
+        });
         
         if (!product) {
           throw new BadRequestException(`Producto no encontrado (ID: ${itemDto.productId})`);
@@ -69,9 +76,39 @@ export class OrdersService {
         const subtotal = itemDto.quantity * itemDto.unitPrice;
         totalAmount += subtotal;
 
-        // Deduct Stock (Option A: Allows negative stock naturally)
-        product.stockQuantity -= itemDto.quantity;
-        await manager.save(Product, product);
+        // Si es un combo, se descuenta el stock de sus componentes y de sus insumos directos
+        if (product.comboItems && product.comboItems.length > 0) {
+          // Descontar componentes (Sub-productos)
+          for (const ci of product.comboItems) {
+            if (ci.component) {
+              ci.component.stockQuantity -= (itemDto.quantity * ci.quantity);
+              await manager.save(Product, ci.component);
+            }
+          }
+          // Descontar insumos directos del combo (ej. la bandeja de empaque)
+          if (product.recipe && product.recipe.length > 0) {
+            for (const ri of product.recipe) {
+              if (ri.rawMaterial) {
+                ri.rawMaterial.stockQuantity -= (itemDto.quantity * ri.quantity);
+                await manager.save(RawMaterial, ri.rawMaterial);
+                
+                // Registrar movimiento de salida para la materia prima
+                const mov = manager.create(StockMovement, {
+                  rawMaterialId: ri.rawMaterial.id,
+                  type: MovementType.OUT_SALE,
+                  quantity: itemDto.quantity * ri.quantity,
+                  totalCost: (itemDto.quantity * ri.quantity) * ri.rawMaterial.costPerUnit,
+                  description: `Venta de Combo: ${product.name}`
+                });
+                await manager.save(StockMovement, mov);
+              }
+            }
+          }
+        } else {
+          // Deduct Stock normally for regular product
+          product.stockQuantity -= itemDto.quantity;
+          await manager.save(Product, product);
+        }
 
         // Save OrderItem
         const orderItem = manager.create(OrderItem, {
@@ -83,10 +120,6 @@ export class OrdersService {
           subtotal: subtotal,
         });
         await manager.save(OrderItem, orderItem);
-
-        // Log Product Out Movement
-        // Note: For MVP we might not need a ProductStockMovement table, 
-        // updating Product stock is sufficient for now.
       }
 
       savedOrder.totalAmount = totalAmount;
@@ -131,9 +164,27 @@ export class OrdersService {
     if (status === OrderStatus.DELIVERED) {
       const productRepo = this.dataSource.getRepository(Product);
       for (const item of order.items) {
-        const product = await productRepo.findOne({ where: { id: item.productId } });
-        if (product && product.stockQuantity < 0) {
-          throw new BadRequestException(`No se puede entregar el pedido. El producto ${product.name} tiene inventario negativo (${product.stockQuantity}). ¡Debe producir más primero!`);
+        const product = await productRepo.findOne({ 
+          where: { id: item.productId },
+          relations: {
+            comboItems: { component: true }
+          }
+        });
+        
+        if (product) {
+          if (product.comboItems && product.comboItems.length > 0) {
+            // Verificar si algún componente quedó en negativo
+            for (const ci of product.comboItems) {
+              if (ci.component && ci.component.stockQuantity < 0) {
+                throw new BadRequestException(`No se puede entregar el pedido. El componente ${ci.component.name} del combo ${product.name} tiene inventario negativo (${ci.component.stockQuantity}).`);
+              }
+            }
+          } else {
+            // Verificación normal
+            if (product.stockQuantity < 0) {
+              throw new BadRequestException(`No se puede entregar el pedido. El producto ${product.name} tiene inventario negativo (${product.stockQuantity}). ¡Debe producir más primero!`);
+            }
+          }
         }
       }
     }
