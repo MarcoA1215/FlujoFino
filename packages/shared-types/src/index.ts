@@ -91,3 +91,11 @@ export interface OrderDTO {
   totalAmount: number;
   items: OrderItemDTO[];
 }
+
+export enum UserRole {
+  ADMIN = 'ADMIN',
+  KITCHEN = 'KITCHEN',
+  POS = 'POS',
+  DELIVERY = 'DELIVERY',
+  INVENTORY = 'INVENTORY'
+}
