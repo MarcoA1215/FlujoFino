@@ -11,7 +11,7 @@ const movementTypeTranslations: Record<string, string> = {
   IN_PRODUCTION: 'Entrada (Producci�n)',
   OUT_PRODUCTION: 'Salida (Producci�n)',
   OUT_SALE: 'Venta',
-  LOSS: 'P�rdida / Ajuste',
+  LOSS: 'Pérdida / Ajuste',
   IN_INITIAL: 'Inv. Inicial',
   IN_RESTOCK: 'Compra',
   IN: 'Entrada',
@@ -51,7 +51,7 @@ export const MovementHistoryModal: React.FC<MovementHistoryModalProps> = ({ mate
     if (!isLoss) inputs.push({ name: 'cost', type: 'number', value: mov.totalCost, placeholder: 'Costo total correcto ($)' });
 
     presentAlert({
-      header: isLoss ? 'Corregir P�rdida' : 'Corregir Compra',
+      header: isLoss ? 'Corregir Pérdida' : 'Corregir Compra',
       inputs,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },

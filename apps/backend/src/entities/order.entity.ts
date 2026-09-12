@@ -1,4 +1,4 @@
-﻿import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+﻿import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { OrderItem } from './order-item.entity';
 import { DeliveryZone } from './delivery-zone.entity';
 import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';
@@ -20,6 +20,7 @@ export class Order {
   @Column({ nullable: true })
   notes: string;
 
+  @Index()
   @Column({
     type: 'enum',
     enum: OrderStatus,
@@ -27,6 +28,7 @@ export class Order {
   })
   status: OrderStatus;
 
+  @Index()
   @Column({
     type: 'enum',
     enum: PaymentStatus,
@@ -72,6 +74,7 @@ export class Order {
   @Column('float', { nullable: true })
   exchangeRate: number;
 
+  @Index()
   @CreateDateColumn()
   createdAt: Date;
 

@@ -4,7 +4,7 @@ import {
   IonContent,
   IonHeader,
   IonMenuButton,
-  IonPage,
+  IonPage, IonSearchbar,
   IonTitle,
   IonToolbar,
   IonGrid,
@@ -22,6 +22,7 @@ import { RecipeModal } from '../components/products/RecipeModal';
 const Products: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [presentAlert] = useIonAlert();
+  const [searchText, setSearchText] = useState('');
   const [presentToast] = useIonToast();
 
   const [selectedProductForRecipe, setSelectedProductForRecipe] = useState<Product | null>(null);
@@ -94,9 +95,9 @@ const Products: React.FC = () => {
 
   const openLossAlert = (p: Product) => {
     presentAlert({
-      header: 'P�rdida: ' + p.name,
+      header: 'Pérdida: ' + p.name,
       inputs: [
-        { name: 'quantity', type: 'number', placeholder: 'Cantidad perdida', min: 1 },
+        { name: 'quantity', type: 'number', placeholder: 'Cantidad pérdida', min: 1 },
         { name: 'reason', type: 'text', placeholder: 'Motivo' }
       ],
       buttons: [
@@ -109,7 +110,7 @@ const Products: React.FC = () => {
             try {
               await apiClient.post('/products/' + p.id + '/loss', { quantity: parseFloat(data.quantity), reason: data.reason });
               fetchData();
-              presentToast({ message: 'P�rdida registrada', duration: 2000, color: 'warning' });
+              presentToast({ message: 'Pérdida registrada', duration: 2000, color: 'warning' });
             } catch(e) {
               presentToast({ message: 'Error', duration: 3000, color: 'danger' });
             }
@@ -169,12 +170,21 @@ const Products: React.FC = () => {
     });
   };
 
+
+  const filteredData = products.filter(item => {
+    if (searchText.trim() === '') return true;
+    return item.name.toLowerCase().includes(searchText.toLowerCase());
+  });
+  
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar color="success">
           <IonButtons slot="start"><IonMenuButton /></IonButtons>
           <IonTitle>Cat�logo de Productos</IonTitle>
+        </IonToolbar>
+        <IonToolbar color="success">
+          <IonSearchbar value={searchText} debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} placeholder="Buscar..." animated />
         </IonToolbar>
       </IonHeader>
 
@@ -189,7 +199,7 @@ const Products: React.FC = () => {
             <IonCol size="12">
               <IonGrid className="ion-no-padding">
                 <IonRow>
-                  {products.map(p => (
+                  {filteredData.map(p => (
                     <ProductCard
                       key={p.id}
                       product={p}

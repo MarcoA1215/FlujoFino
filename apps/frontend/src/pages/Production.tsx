@@ -1,23 +1,4 @@
-import {
-  IonButtons,
-  IonContent,
-  IonHeader,
-  IonMenuButton,
-  IonPage,
-  IonTitle,
-  IonToolbar,
-  IonGrid,
-  IonRow,
-  IonCol,
-  IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonCardContent,
-  IonButton,
-  IonBadge,
-  useIonAlert,
-  useIonToast,
-} from '@ionic/react';
+import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonButton, IonBadge, useIonAlert, useIonToast, IonToolbar, IonTitle } from '@ionic/react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 
@@ -32,8 +13,8 @@ type Product = {
 const Production: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [presentAlert] = useIonAlert();
+  const [searchText, setSearchText] = useState('');
   const [presentToast] = useIonToast();
-
   const fetchProducts = async () => {
     try {
       const res = await apiClient.get<Product[]>('/products');
@@ -79,6 +60,13 @@ const Production: React.FC = () => {
     });
   };
 
+
+  const filteredData = products.filter(p => {
+    if (p.isCombo) return false;
+    if (searchText.trim() === '') return true;
+    return p.name?.toLowerCase().includes(searchText.toLowerCase());
+  });
+
   return (
     <IonPage>
       <IonHeader>
@@ -87,6 +75,10 @@ const Production: React.FC = () => {
             <IonMenuButton />
           </IonButtons>
           <IonTitle>Producción de Lotes</IonTitle>
+        </IonToolbar>
+
+        <IonToolbar color="light">
+          <IonSearchbar value={searchText} debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} placeholder="Buscar..." animated />
         </IonToolbar>
       </IonHeader>
 
@@ -103,7 +95,7 @@ const Production: React.FC = () => {
                   
                   <IonGrid className="ion-no-padding ion-margin-top">
                     <IonRow>
-                      {products.filter(p => !p.isCombo).map(p => (
+                      {filteredData.map(p => (
                         <IonCol size="12" sizeSm="6" sizeMd="4" key={p.id}>
                           <IonCard style={{ margin: '5px' }}>
                             <IonCardContent>

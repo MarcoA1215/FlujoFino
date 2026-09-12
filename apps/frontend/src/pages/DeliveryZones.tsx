@@ -1,10 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle,
-  IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle,
-  IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList,
-  IonInput, useIonToast, IonText, IonFab, IonFabButton, IonModal
-} from '@ionic/react';
+import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, IonInput, useIonToast, IonText, IonFab, IonFabButton, IonModal } from '@ionic/react';
 import { addOutline, trashOutline, pencilOutline, mapOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import type { DeliveryZone } from '../types';
@@ -18,6 +13,7 @@ const DeliveryZones: React.FC = () => {
   const [feePrice, setFeePrice] = useState<number>(0);
   
   const [presentToast] = useIonToast();
+  const [searchText, setSearchText] = useState('');
 
   const fetchZones = async () => {
     try {
@@ -75,6 +71,11 @@ const DeliveryZones: React.FC = () => {
     }
   };
 
+
+  const filteredData = zones.filter(item => {
+    if (searchText.trim() === '') return true;
+    return item.name?.toLowerCase().includes(searchText.toLowerCase());
+  });
   return (
     <IonPage>
       <IonHeader>
@@ -83,6 +84,10 @@ const DeliveryZones: React.FC = () => {
             <IonMenuButton />
           </IonButtons>
           <IonTitle>Zonas de Delivery</IonTitle>
+        </IonToolbar>
+
+        <IonToolbar color="light">
+          <IonSearchbar value={searchText} debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} placeholder="Buscar..." animated />
         </IonToolbar>
       </IonHeader>
 
@@ -102,7 +107,7 @@ const DeliveryZones: React.FC = () => {
                     <p className="ion-text-center">No hay zonas configuradas. Agrega una nueva.</p>
                   ) : (
                     <IonList>
-                      {zones.map(z => (
+                      {filteredData.map(z => (
                         <IonItem key={z.id}>
                           <IonLabel>
                             <h2><strong>{z.name}</strong></h2>

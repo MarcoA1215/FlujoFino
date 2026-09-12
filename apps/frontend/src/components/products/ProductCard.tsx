@@ -1,3 +1,5 @@
+import { IonIcon } from '@ionic/react';
+import { pencilOutline } from 'ionicons/icons';
 import React from 'react';
 import { IonCol, IonCard, IonCardContent, IonBadge, IonButton } from '@ionic/react';
 import type { Product } from '../../types';
@@ -36,8 +38,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 Stock: {p.stockQuantity}
               </IonBadge>
               <div style={{ display: 'flex', gap: '5px' }}>
-                <IonButton fill="clear" size="small" onClick={() => onEdit(p)} style={{ margin: 0, width: '30px', height: '30px' }}>??</IonButton>
-                <IonButton fill="clear" size="small" color="danger" onClick={() => onDelete(p)} style={{ margin: 0, width: '30px', height: '30px' }}>???</IonButton>
+                <IonButton fill="clear" size="small" onClick={() => onEdit(p)} style={{ margin: 0, width: '30px', height: '30px' }}><IonIcon icon={pencilOutline} slot="icon-only" /></IonButton>
+                <IonButton fill="clear" size="small" color="danger" onClick={() => onDelete(p)} style={{ margin: 0, width: '30px', height: '30px' }}>?<IonIcon icon={pencilOutline} slot="icon-only" /></IonButton>
               </div>
             </div>
           </div>
@@ -50,7 +52,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               Stock Inicial
             </IonButton>
             <IonButton size="small" fill="outline" color="danger" onClick={() => onRegisterLoss(p)}>
-              Perdida
+              Pérdida
             </IonButton>
           </div>
         </IonCardContent>

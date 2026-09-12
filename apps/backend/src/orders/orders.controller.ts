@@ -25,5 +25,9 @@ export class OrdersController {
   updateOrderStatus(@Param('id') id: string, @Body('status') status: OrderStatus) {
     return this.ordersService.updateOrderStatus(id, status);
   }
-}
 
+  @Post(':id/clone')
+  clone(@Param('id') id: string) {
+    return this.ordersService.cloneOrder(id);
+  }
+}

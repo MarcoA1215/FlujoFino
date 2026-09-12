@@ -1,4 +1,6 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+﻿const fs = require('fs');
+
+const code = `import { Injectable, BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
@@ -265,3 +267,5 @@ export class OrdersService {
     return this.createOrder(dto);
   }
 }
+`;
+fs.writeFileSync('apps/backend/src/orders/orders.service.ts', code, 'utf8');

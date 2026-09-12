@@ -1,10 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle,
-  IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle,
-  IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList,
-  IonInput, useIonToast, IonSelect, IonSelectOption
-} from '@ionic/react';
+import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, IonInput, useIonToast, IonSelect, IonSelectOption } from '@ionic/react';
 import { calculatorOutline, addOutline, removeOutline, trashOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import type { Product, DeliveryZone } from '../types';
@@ -22,6 +17,7 @@ const Calculator: React.FC = () => {
   const [selectedZoneId, setSelectedZoneId] = useState<string>('');
   
   const [presentToast] = useIonToast();
+  const [searchText, setSearchText] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -75,6 +71,11 @@ const Calculator: React.FC = () => {
   const totalUSD = cartSubtotal + deliveryFee;
   const totalBs = totalUSD * exchangeRate;
 
+
+  const filteredData = products.filter(item => {
+    if (searchText.trim() === '') return true;
+    return item.name?.toLowerCase().includes(searchText.toLowerCase());
+  });
   return (
     <IonPage>
       <IonHeader>
@@ -83,6 +84,10 @@ const Calculator: React.FC = () => {
             <IonMenuButton />
           </IonButtons>
           <IonTitle>Calculadora de Presupuestos</IonTitle>
+        </IonToolbar>
+
+        <IonToolbar color="light">
+          <IonSearchbar value={searchText} debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} placeholder="Buscar..." animated />
         </IonToolbar>
       </IonHeader>
 
@@ -97,7 +102,7 @@ const Calculator: React.FC = () => {
                 </IonCardHeader>
                 <IonCardContent style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                   <IonList>
-                    {products.map(p => (
+                    {filteredData.map(p => (
                       <IonItem key={p.id}>
                         <IonLabel>
                           <h2 style={{ fontWeight: 'bold' }}>{p.name}</h2>

@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
+import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
 import { RecipeItem } from './recipe-item.entity';
 import { OrderItem } from './order-item.entity';
 import { ProductionBatch } from './production-batch.entity';
@@ -9,12 +9,14 @@ export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index()
   @Column()
   name: string;
 
   @Column({ nullable: true })
   description: string;
   
+  @Index()
   @Column({ nullable: true })
   category: string; // new field for categorization
 

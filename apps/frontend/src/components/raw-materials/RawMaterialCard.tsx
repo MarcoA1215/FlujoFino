@@ -1,5 +1,7 @@
 import React from 'react';
 import { IonCol, IonCard, IonCardContent, IonBadge, IonButton } from '@ionic/react';
+import { pencilOutline } from 'ionicons/icons';
+import { IonIcon } from '@ionic/react';
 import type { RawMaterial } from '../../types';
 
 interface RawMaterialCardProps {
@@ -31,7 +33,7 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
                 {m.stockQuantity.toFixed(2)} {m.unit}
               </IonBadge>
               <div style={{ display: 'flex', gap: '5px' }}>
-                <IonButton fill="clear" size="small" onClick={() => onEditName(m)} style={{ margin: 0, width: '30px', height: '30px' }}>??</IonButton>
+                <IonButton fill="clear" size="small" onClick={() => onEditName(m)} style={{ margin: 0, width: '30px', height: '30px' }}><IonIcon icon={pencilOutline} slot="icon-only" /></IonButton>
               </div>
             </div>
           </div>
@@ -41,7 +43,7 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
               Comprar
             </IonButton>
             <IonButton size="small" fill="outline" color="warning" onClick={() => onRegisterLoss(m)}>
-              Registrar P�rdida
+              Registrar Pérdida
             </IonButton>
             <IonButton size="small" fill="outline" color="tertiary" onClick={() => onViewHistory(m)}>
               Historial

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle,
+  IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle,
   IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle,
   IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton,
   IonLabel, useIonAlert, useIonToast,
@@ -17,6 +17,7 @@ const RawMaterials: React.FC = () => {
   const [costPerUnit, setCostPerUnit] = useState<number>();
   const [initialStock, setInitialStock] = useState<number>();
   const [presentAlert] = useIonAlert();
+  const [searchText, setSearchText] = useState('');
   const [presentToast] = useIonToast();
   const [selectedMaterialForHistory, setSelectedMaterialForHistory] = useState<RawMaterial | null>(null);
 
@@ -67,7 +68,7 @@ const RawMaterials: React.FC = () => {
 
   const openLossAlert = (m: RawMaterial) => {
     presentAlert({
-      header: 'P�rdida / Ajuste: ' + m.name,
+      header: 'Pérdida / Ajuste: ' + m.name,
       inputs: [{ name: 'qty', type: 'number', placeholder: 'Cantidad a descontar' }, { name: 'reason', type: 'text', placeholder: 'Motivo' }],
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
@@ -111,10 +112,19 @@ const RawMaterials: React.FC = () => {
     });
   };
 
+
+  const filteredData = materials.filter(item => {
+    if (searchText.trim() === '') return true;
+    return item.name.toLowerCase().includes(searchText.toLowerCase());
+  });
+  
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar color="success"><IonButtons slot="start"><IonMenuButton /></IonButtons><IonTitle>Insumos (Materia Prima)</IonTitle></IonToolbar>
+        <IonToolbar color="success">
+          <IonSearchbar value={searchText} debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} placeholder="Buscar..." animated />
+        </IonToolbar>
       </IonHeader>
       <IonContent fullscreen className="ion-padding">
         <IonGrid>
@@ -134,7 +144,7 @@ const RawMaterials: React.FC = () => {
             <IonCol size="12" sizeMd="8">
               <IonGrid className="ion-no-padding">
                 <IonRow>
-                  {materials.map(m => (
+                  {filteredData.map(m => (
                     <RawMaterialCard key={m.id} material={m} onEditName={openEditNameAlert} onRestock={openRestockAlert} onRegisterLoss={openLossAlert} onViewHistory={() => setSelectedMaterialForHistory(m)} />
                   ))}
                 </IonRow>

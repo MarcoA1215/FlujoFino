@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
+import { Entity, Index, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
 import { RawMaterial } from './raw-material.entity';
 import { MovementType } from '@nutrideli/shared-types';
 
@@ -10,6 +10,7 @@ export class StockMovement {
   @Column()
   rawMaterialId: string;
 
+  @Index()
   @Column({
     type: 'enum',
     enum: MovementType,
@@ -25,6 +26,7 @@ export class StockMovement {
   @Column({ nullable: true })
   description: string;
 
+  @Index()
   @CreateDateColumn()
   createdAt: Date;
 
