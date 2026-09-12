@@ -282,7 +282,7 @@ const Orders: React.FC = () => {
                       {order.items.map((item: any) => (
                         <IonItem key={item.id} style={{ "--background": "transparent" }}>
                           <IonLabel>
-                            <IonText color={order.status === OrderStatus.CANCELED ? "light" : "dark"}><b>{item.quantity}x</b> {item.productName || item.product?.name || "Producto Desconocido"}</IonText>
+                            <IonText color={order.status === OrderStatus.CANCELED ? "light" : "dark"}><b>{parseFloat(Number(item.quantity).toFixed(4))}x</b> {item.productName || item.product?.name || "Producto Desconocido"}</IonText>
                           </IonLabel>
                         </IonItem>
                       ))}

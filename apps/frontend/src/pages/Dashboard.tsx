@@ -191,7 +191,7 @@ const Dashboard: React.FC = () => {
                           <IonItem key={i}>
                             <IonLabel>
                               <h2>{p.name}</h2>
-                              <p>{p.quantity} unidades vendidas</p>
+                              <p>{parseFloat(Number(p.quantity).toFixed(4))} unidades vendidas</p>
                             </IonLabel>
                             <IonText slot="end" color="success">
                               <strong>$ {p.revenue.toFixed(2)}</strong>
@@ -225,11 +225,11 @@ const Dashboard: React.FC = () => {
                               <IonText color="danger">
                                 <h2 style={{ fontWeight: 'bold' }}>{alert.name}</h2>
                               </IonText>
-                              <p style={{ fontSize: '0.85rem' }}>Stock físico: {alert.realStock} {alert.unit}</p>
-                              {alert.debt > 0 && <p style={{ fontSize: '0.85rem', color: 'orange' }}>Reservado (Pedidos): -{alert.debt} {alert.unit}</p>}
+                              <p style={{ fontSize: '0.85rem' }}>Stock físico: {parseFloat(Number(alert.realStock).toFixed(4))} {alert.unit}</p>
+                              {alert.debt > 0 && <p style={{ fontSize: '0.85rem', color: 'orange' }}>Reservado (Pedidos): -{parseFloat(Number(alert.debt).toFixed(4))} {alert.unit}</p>}
                             </IonLabel>
                             <div slot="end" style={{ textAlign: 'right' }}>
-                              <IonBadge color="danger">Efectivo: {alert.effectiveStock} {alert.unit}</IonBadge>
+                              <IonBadge color="danger">Efectivo: {parseFloat(Number(alert.effectiveStock).toFixed(4))} {alert.unit}</IonBadge>
                               <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>¡Reabastecer!</div>
                             </div>
                           </IonItem>
@@ -261,7 +261,7 @@ const Dashboard: React.FC = () => {
                               </IonText>
                             </IonLabel>
                             <div slot="end" style={{ textAlign: 'right' }}>
-                              <IonBadge color="warning">Fabricar: {prod.toProduce}</IonBadge>
+                              <IonBadge color="warning">Fabricar: {parseFloat(Number(prod.toProduce).toFixed(4))}</IonBadge>
                               <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>Pendientes</div>
                             </div>
                           </IonItem>

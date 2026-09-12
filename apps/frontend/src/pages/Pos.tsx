@@ -25,6 +25,7 @@ import {
   IonSelectOption,
   IonText,
   IonIcon,
+  IonSearchbar,
 } from '@ionic/react';
 import { cartOutline, cashOutline, trashOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
@@ -49,6 +50,7 @@ type PaymentMethod = 'PENDING' | 'PAGO_MOVIL' | 'USD';
 
 const Pos: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -218,11 +220,13 @@ const Pos: React.FC = () => {
               <IonCard>
                 <IonCardHeader>
                   <IonCardTitle>Catálogo de Productos</IonCardTitle>
-                </IonCardHeader>
-                <IonCardContent>
+                  </IonCardHeader>
+                  <IonCardContent>
+                    <IonSearchbar placeholder="Buscar producto..." value={searchTerm} onIonInput={e => setSearchTerm(e.detail.value!)}></IonSearchbar>
+
                   <IonGrid>
                     <IonRow>
-                      {products.map(p => (
+                      {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
                         <IonCol size="6" sizeMd="4" key={p.id}>
                           <IonCard button onClick={() => addToCart(p)} color={p.stockQuantity <= 0 ? 'light' : 'white'} style={{ margin: 0, height: '100%' }}>
                             <IonCardHeader>
