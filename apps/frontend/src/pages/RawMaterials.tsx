@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
-  IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle,
+  IonPage, IonHeader, IonContent, IonButtons, IonMenuButton, IonTitle,
+  IonSearchbar,
   IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle,
   IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton,
   IonLabel, useIonAlert, useIonToast,
@@ -9,6 +10,7 @@ import { apiClient } from '../api/client';
 import type { RawMaterial } from '../types';
 import { RawMaterialCard } from '../components/raw-materials/RawMaterialCard';
 import { MovementHistoryModal } from '../components/raw-materials/MovementHistoryModal';
+import { StockOperationModal } from '../components/raw-materials/StockOperationModal';
 
 const RawMaterials: React.FC = () => {
   const [materials, setMaterials] = useState<RawMaterial[]>([]);
@@ -21,6 +23,8 @@ const RawMaterials: React.FC = () => {
   const [presentToast] = useIonToast();
   const [selectedMaterialForHistory, setSelectedMaterialForHistory] = useState<RawMaterial | null>(null);
 
+  const [operationMaterial, setOperationMaterial] = useState<RawMaterial | null>(null);
+  const [operationType, setOperationType] = useState<'restock' | 'loss' | null>(null);
   
   const archiveRawMaterial = async (m: RawMaterial) => {
     presentAlert({
@@ -68,49 +72,13 @@ const RawMaterials: React.FC = () => {
   };
 
   const openRestockAlert = (m: RawMaterial) => {
-    presentAlert({
-      header: 'Comprar ' + m.name,
-      inputs: [{ name: 'qty', type: 'number', placeholder: 'Cantidad' }, { name: 'cost', type: 'number', placeholder: 'Costo Total ($)' }],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Guardar Compra',
-          handler: async (data) => {
-            if (!data.qty || !data.cost) return false;
-            try {
-              await apiClient.post('/raw-materials/' + m.id + '/restock', { quantity: parseFloat(data.qty), totalCost: parseFloat(data.cost) });
-              fetchMaterials();
-              presentToast({ message: 'Compra registrada', duration: 2000, color: 'success' });
-            } catch (e) {
-              presentToast({ message: 'Error', duration: 3000, color: 'danger' });
-            }
-          }
-        }
-      ]
-    });
+    setOperationMaterial(m);
+    setOperationType('restock');
   };
 
   const openLossAlert = (m: RawMaterial) => {
-    presentAlert({
-      header: 'Pérdida / Ajuste: ' + m.name,
-      inputs: [{ name: 'qty', type: 'number', placeholder: 'Cantidad a descontar' }, { name: 'reason', type: 'text', placeholder: 'Motivo' }],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Registrar',
-          handler: async (data) => {
-            if (!data.qty || !data.reason) return false;
-            try {
-              await apiClient.post('/raw-materials/' + m.id + '/loss', { quantity: parseFloat(data.qty), reason: data.reason });
-              fetchMaterials();
-              presentToast({ message: 'Ajuste registrado', duration: 2000, color: 'warning' });
-            } catch (e) {
-              presentToast({ message: 'Error', duration: 3000, color: 'danger' });
-            }
-          }
-        }
-      ]
-    });
+    setOperationMaterial(m);
+    setOperationType('loss');
   };
 
   const openEditNameAlert = (m: RawMaterial) => {
@@ -177,9 +145,15 @@ const RawMaterials: React.FC = () => {
           </IonRow>
         </IonGrid>
         <MovementHistoryModal material={selectedMaterialForHistory} onClose={() => setSelectedMaterialForHistory(null)} onCorrected={fetchMaterials} />
+        
+        <StockOperationModal 
+          material={operationMaterial} 
+          operationType={operationType} 
+          onClose={() => { setOperationMaterial(null); setOperationType(null); }} 
+          onSuccess={fetchMaterials} 
+        />
       </IonContent>
     </IonPage>
   );
 };
 export default RawMaterials;
-
