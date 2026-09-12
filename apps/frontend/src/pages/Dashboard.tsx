@@ -21,21 +21,11 @@ import {
   IonLabel,
   IonBadge
 } from '@ionic/react';
-import { cashOutline, alertCircleOutline, trendingDownOutline, basketOutline } from 'ionicons/icons';
-import { useEffect, useState } from 'react';
+import { alertCircleOutline, trendingDownOutline, basketOutline, trendingUpOutline, pieChartOutline, walletOutline } from 'ionicons/icons';
+import React, { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
-
-type DashboardSummary = {
-  totalRawMaterialCapital: number;
-  expectedRevenue: number;
-  totalLosses: number;
-  lowStockAlerts: {
-    id: string;
-    name: string;
-    stock: number;
-    unit: string;
-  }[];
-};
+import type { DashboardSummary } from '../types';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 const Dashboard: React.FC = () => {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -70,81 +60,188 @@ const Dashboard: React.FC = () => {
           <p>Cargando datos...</p>
         ) : (
           <IonGrid>
+            {/* Main KPIs Row */}
             <IonRow>
-              <IonCol size="12" sizeMd="4">
-                <IonCard color="primary">
+              <IonCol size="12" sizeSm="6" sizeMd="3">
+                <IonCard color="tertiary">
+                  <IonCardHeader>
+                    <IonCardTitle className="ion-text-center">
+                      <IonIcon icon={walletOutline} style={{ fontSize: '2rem' }} />
+                      <br />
+                      Ingresos Históricos
+                    </IonCardTitle>
+                  </IonCardHeader>
+                  <IonCardContent className="ion-text-center">
+                    <h1 style={{ fontSize: '2rem', margin: 0, fontWeight: 'bold', color: 'white' }}>
+                      $ {summary.historicalRevenue.toFixed(2)}
+                    </h1>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+
+              <IonCol size="12" sizeSm="6" sizeMd="3">
+                <IonCard color="warning">
                   <IonCardHeader>
                     <IonCardTitle className="ion-text-center">
                       <IonIcon icon={basketOutline} style={{ fontSize: '2rem' }} />
                       <br />
-                      Capital en Insumos
+                      Inversión Histórica
                     </IonCardTitle>
                   </IonCardHeader>
                   <IonCardContent className="ion-text-center">
-                    <h1 style={{ fontSize: '2.5rem', margin: 0, fontWeight: 'bold', color: 'white' }}>
-                      ${summary.totalRawMaterialCapital.toFixed(2)}
+                    <h1 style={{ fontSize: '2rem', margin: 0, fontWeight: 'bold', color: 'white' }}>
+                      $ {summary.historicalInvestment.toFixed(2)}
                     </h1>
                   </IonCardContent>
                 </IonCard>
               </IonCol>
 
-              <IonCol size="12" sizeMd="4">
+              <IonCol size="12" sizeSm="6" sizeMd="3">
                 <IonCard color="success">
                   <IonCardHeader>
                     <IonCardTitle className="ion-text-center">
-                      <IonIcon icon={cashOutline} style={{ fontSize: '2rem' }} />
+                      <IonIcon icon={trendingUpOutline} style={{ fontSize: '2rem' }} />
                       <br />
-                      Valor Potencial (Productos)
+                      Ganancia Neta Bruta
                     </IonCardTitle>
                   </IonCardHeader>
                   <IonCardContent className="ion-text-center">
-                    <h1 style={{ fontSize: '2.5rem', margin: 0, fontWeight: 'bold', color: 'white' }}>
-                      ${summary.expectedRevenue.toFixed(2)}
+                    <h1 style={{ fontSize: '2rem', margin: 0, fontWeight: 'bold', color: 'white' }}>
+                      $ {summary.historicalProfit.toFixed(2)}
                     </h1>
                   </IonCardContent>
                 </IonCard>
               </IonCol>
 
-              <IonCol size="12" sizeMd="4">
+              <IonCol size="12" sizeSm="6" sizeMd="3">
                 <IonCard color="danger">
                   <IonCardHeader>
                     <IonCardTitle className="ion-text-center">
                       <IonIcon icon={trendingDownOutline} style={{ fontSize: '2rem' }} />
                       <br />
-                      Mermas (Dinero Perdido)
+                      Mermas y Pérdidas
                     </IonCardTitle>
                   </IonCardHeader>
                   <IonCardContent className="ion-text-center">
-                    <h1 style={{ fontSize: '2.5rem', margin: 0, fontWeight: 'bold', color: 'white' }}>
-                      ${summary.totalLosses.toFixed(2)}
+                    <h1 style={{ fontSize: '2rem', margin: 0, fontWeight: 'bold', color: 'white' }}>
+                      $ {summary.totalLosses.toFixed(2)}
                     </h1>
                   </IonCardContent>
                 </IonCard>
               </IonCol>
             </IonRow>
 
+            {/* Charts and Lists Row */}
             <IonRow className="ion-margin-top">
-              <IonCol size="12">
-                <IonCard>
+              <IonCol size="12" sizeLg="8">
+                <IonCard style={{ height: '100%' }}>
                   <IonCardHeader>
-                    <IonCardTitle>
-                      <IonIcon icon={alertCircleOutline} color="warning" /> Alertas de Stock Bajo
+                    <IonCardTitle style={{ fontSize: '1.2rem' }}>Ventas de los últimos 7 días</IonCardTitle>
+                  </IonCardHeader>
+                  <IonCardContent style={{ height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={summary.salesChart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" fontSize={12} />
+                        <YAxis fontSize={12} />
+                        <Tooltip formatter={(value: any) => [`$ ${Number(value).toFixed(2)}`, 'Ventas']} />
+                        <Bar dataKey="total" fill="#2dd36f" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+
+              <IonCol size="12" sizeLg="4">
+                <IonCard style={{ height: '100%' }}>
+                  <IonCardHeader>
+                    <IonCardTitle style={{ fontSize: '1.2rem' }}>
+                      <IonIcon icon={pieChartOutline} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
+                      Productos más vendidos
                     </IonCardTitle>
                   </IonCardHeader>
                   <IonCardContent>
-                    {summary.lowStockAlerts.length === 0 ? (
-                      <p>Todos los insumos están en niveles óptimos.</p>
+                    {summary.topProducts.length === 0 ? (
+                      <p style={{ color: 'gray', fontStyle: 'italic' }}>No hay ventas registradas aún.</p>
                     ) : (
                       <IonList>
-                        {summary.lowStockAlerts.map(alert => (
-                          <IonItem key={alert.id}>
+                        {summary.topProducts.map((p, i) => (
+                          <IonItem key={i}>
+                            <IonLabel>
+                              <h2>{p.name}</h2>
+                              <p>{p.quantity} unidades vendidas</p>
+                            </IonLabel>
+                            <IonText slot="end" color="success">
+                              <strong>$ {p.revenue.toFixed(2)}</strong>
+                            </IonText>
+                          </IonItem>
+                        ))}
+                      </IonList>
+                    )}
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+            </IonRow>
+
+            <IonRow className="ion-margin-top">
+              <IonCol size="12" sizeMd="6">
+                <IonCard>
+                  <IonCardHeader>
+                    <IonCardTitle style={{ fontSize: '1.2rem' }}>
+                      <IonIcon icon={alertCircleOutline} color="danger" style={{ verticalAlign: 'middle', marginRight: '8px' }} /> 
+                      Insumos por Comprar
+                    </IonCardTitle>
+                  </IonCardHeader>
+                  <IonCardContent>
+                    {summary.lowStockMaterials.length === 0 ? (
+                      <p style={{ color: 'gray', fontStyle: 'italic' }}>Todos los insumos están en niveles óptimos.</p>
+                    ) : (
+                      <IonList>
+                        {summary.lowStockMaterials.map(alert => (
+                          <IonItem key={'mat-' + alert.id}>
                             <IonLabel>
                               <IonText color="danger">
-                                <h2>{alert.name}</h2>
+                                <h2 style={{ fontWeight: 'bold' }}>{alert.name}</h2>
                               </IonText>
-                              <p>Stock actual: {alert.stock} {alert.unit}</p>
+                              <p style={{ fontSize: '0.85rem' }}>Stock físico: {alert.realStock} {alert.unit}</p>
+                              {alert.debt > 0 && <p style={{ fontSize: '0.85rem', color: 'orange' }}>Reservado (Pedidos): -{alert.debt} {alert.unit}</p>}
                             </IonLabel>
-                            <IonBadge color="danger" slot="end">Crítico</IonBadge>
+                            <div slot="end" style={{ textAlign: 'right' }}>
+                              <IonBadge color="danger">Efectivo: {alert.effectiveStock} {alert.unit}</IonBadge>
+                              <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>¡Reabastecer!</div>
+                            </div>
+                          </IonItem>
+                        ))}
+                      </IonList>
+                    )}
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+
+              <IonCol size="12" sizeMd="6">
+                <IonCard>
+                  <IonCardHeader>
+                    <IonCardTitle style={{ fontSize: '1.2rem' }}>
+                      <IonIcon icon={alertCircleOutline} color="warning" style={{ verticalAlign: 'middle', marginRight: '8px' }} /> 
+                      Productos por Fabricar
+                    </IonCardTitle>
+                  </IonCardHeader>
+                  <IonCardContent>
+                    {summary.lowStockProducts.length === 0 ? (
+                      <p style={{ color: 'gray', fontStyle: 'italic' }}>No hay pedidos pendientes por fabricar.</p>
+                    ) : (
+                      <IonList>
+                        {summary.lowStockProducts.map(prod => (
+                          <IonItem key={'prod-' + prod.id}>
+                            <IonLabel>
+                              <IonText color="warning">
+                                <h2 style={{ fontWeight: 'bold' }}>{prod.name}</h2>
+                              </IonText>
+                            </IonLabel>
+                            <div slot="end" style={{ textAlign: 'right' }}>
+                              <IonBadge color="warning">Fabricar: {prod.toProduce}</IonBadge>
+                              <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>Pendientes</div>
+                            </div>
                           </IonItem>
                         ))}
                       </IonList>
@@ -159,6 +256,5 @@ const Dashboard: React.FC = () => {
     </IonPage>
   );
 };
-
 export default Dashboard;
 

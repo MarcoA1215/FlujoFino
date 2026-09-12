@@ -1,0 +1,61 @@
+import React from 'react';
+import { IonCol, IonCard, IonCardContent, IonBadge, IonButton } from '@ionic/react';
+import type { Product } from '../../types';
+
+interface ProductCardProps {
+  product: Product;
+  onEdit: (p: Product) => void;
+  onDelete: (p: Product) => void;
+  onConfigure: (p: Product) => void;
+  onAdjustStock: (p: Product) => void;
+  onRegisterLoss: (p: Product) => void;
+}
+
+export const ProductCard: React.FC<ProductCardProps> = ({
+  product: p,
+  onEdit,
+  onDelete,
+  onConfigure,
+  onAdjustStock,
+  onRegisterLoss
+}) => {
+  return (
+    <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3">
+      <IonCard style={{ margin: '5px' }}>
+        <IonCardContent>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: '0 0 5px 0', wordBreak: 'break-word' }}>{p.name}</h2>
+              <p style={{ margin: 0, color: 'gray', fontSize: '0.85rem' }}>
+                {p.category || 'Sin categor�a'} � {p.isCombo ? 'Combo' : 'Base'}
+              </p>
+              <p style={{ margin: '5px 0 0 0', fontWeight: 'bold' }}>Precio: {p.salePrice.toFixed(2)}</p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, gap: '8px' }}>
+              <IonBadge color={p.stockQuantity <= 0 ? 'danger' : 'primary'} style={{ padding: '8px 10px', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
+                Stock: {p.stockQuantity}
+              </IonBadge>
+              <div style={{ display: 'flex', gap: '5px' }}>
+                <IonButton fill="clear" size="small" onClick={() => onEdit(p)} style={{ margin: 0, width: '30px', height: '30px' }}>??</IonButton>
+                <IonButton fill="clear" size="small" color="danger" onClick={() => onDelete(p)} style={{ margin: 0, width: '30px', height: '30px' }}>???</IonButton>
+              </div>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '15px' }}>
+            <IonButton size="small" fill="outline" color={p.isCombo ? 'tertiary' : 'primary'} onClick={() => onConfigure(p)}>
+              {p.isCombo ? 'Configurar Combo' : 'Configurar Receta'}
+            </IonButton>
+            <IonButton size="small" fill="outline" color="medium" onClick={() => onAdjustStock(p)}>
+              Stock Inicial
+            </IonButton>
+            <IonButton size="small" fill="outline" color="danger" onClick={() => onRegisterLoss(p)}>
+              Perdida
+            </IonButton>
+          </div>
+        </IonCardContent>
+      </IonCard>
+    </IonCol>
+  );
+};
+

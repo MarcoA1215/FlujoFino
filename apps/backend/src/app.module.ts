@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ProductionModule } from './production/production.module';
 import { OrdersModule } from './orders/orders.module';
+import { DeliveryZonesModule } from './delivery-zones/delivery-zones.module';
 import { RawMaterialsModule } from './raw-materials/raw-materials.module';
 import { ProductsModule } from './products/products.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -19,6 +20,7 @@ import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { Settings } from './entities/settings.entity';
 import { ComboItem } from './entities/combo-item.entity';
+import { DeliveryZone } from './entities/delivery-zone.entity';
 
 @Module({
   imports: [
@@ -31,13 +33,13 @@ import { ComboItem } from './entities/combo-item.entity';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
-        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings],
+        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone],
         synchronize: true,
       }),
       inject: [ConfigService],
     }),
     ProductionModule,
-    OrdersModule,
+    OrdersModule, DeliveryZonesModule,
     RawMaterialsModule,
     ProductsModule,
     DashboardModule,
@@ -47,3 +49,5 @@ import { ComboItem } from './entities/combo-item.entity';
   providers: [AppService],
 })
 export class AppModule {}
+
+

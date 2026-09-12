@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn } from 'typeorm';
+﻿import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { OrderItem } from './order-item.entity';
-import { OrderStatus, PaymentStatus } from '@nutrideli/shared-types';
+import { DeliveryZone } from './delivery-zone.entity';
+import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';
 
 @Entity()
 export class Order {
@@ -33,6 +34,23 @@ export class Order {
   })
   paymentStatus: PaymentStatus;
 
+  @Column({
+    type: 'enum',
+    enum: DeliveryMethod,
+    default: DeliveryMethod.IN_STORE,
+  })
+  deliveryMethod: DeliveryMethod;
+
+  @Column({ nullable: true })
+  deliveryZoneId: string;
+
+  @ManyToOne(() => DeliveryZone)
+  @JoinColumn({ name: 'deliveryZoneId' })
+  deliveryZone: DeliveryZone;
+
+  @Column('float', { default: 0 })
+  deliveryFee: number;
+
   @Column('float', { default: 0 })
   totalAmount: number;
 
@@ -60,4 +78,3 @@ export class Order {
   @OneToMany(() => OrderItem, item => item.order)
   items: OrderItem[];
 }
-

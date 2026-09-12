@@ -1,0 +1,55 @@
+import React from 'react';
+import { IonCol, IonCard, IonCardContent, IonBadge, IonButton } from '@ionic/react';
+import type { RawMaterial } from '../../types';
+
+interface RawMaterialCardProps {
+  material: RawMaterial;
+  onEditName: (m: RawMaterial) => void;
+  onRestock: (m: RawMaterial) => void;
+  onRegisterLoss: (m: RawMaterial) => void;
+  onViewHistory: (m: RawMaterial) => void;
+}
+
+export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
+  material: m,
+  onEditName,
+  onRestock,
+  onRegisterLoss,
+  onViewHistory
+}) => {
+  return (
+    <IonCol size="12" sizeSm="6" sizeLg="6">
+      <IonCard style={{ margin: '5px' }}>
+        <IonCardContent>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: '0 0 5px 0', wordBreak: 'break-word' }}>{m.name}</h2>
+              <p style={{ margin: 0, color: 'gray', fontSize: '0.9rem' }}>Costo prom: {m.costPerUnit.toFixed(2)} / {m.unit}</p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, gap: '8px' }}>
+              <IonBadge color={m.stockQuantity <= m.minStockAlert ? 'danger' : 'success'} style={{ padding: '8px 10px', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
+                {m.stockQuantity.toFixed(2)} {m.unit}
+              </IonBadge>
+              <div style={{ display: 'flex', gap: '5px' }}>
+                <IonButton fill="clear" size="small" onClick={() => onEditName(m)} style={{ margin: 0, width: '30px', height: '30px' }}>??</IonButton>
+              </div>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '15px' }}>
+            <IonButton size="small" fill="outline" color="primary" onClick={() => onRestock(m)}>
+              Comprar
+            </IonButton>
+            <IonButton size="small" fill="outline" color="warning" onClick={() => onRegisterLoss(m)}>
+              Registrar P�rdida
+            </IonButton>
+            <IonButton size="small" fill="outline" color="tertiary" onClick={() => onViewHistory(m)}>
+              Historial
+            </IonButton>
+          </div>
+        </IonCardContent>
+      </IonCard>
+    </IonCol>
+  );
+};
+

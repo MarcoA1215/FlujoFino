@@ -10,15 +10,17 @@ import {
   IonNote,
 } from '@ionic/react';
 import { useLocation } from 'react-router-dom';
-import { cubeOutline, cartOutline, constructOutline, cashOutline, listOutline, pieChartOutline } from 'ionicons/icons';
+import { cubeOutline, cartOutline, constructOutline, cashOutline, listOutline, pieChartOutline, calculatorOutline, mapOutline } from 'ionicons/icons';
 
 const appPages = [
   { title: 'Tablero Principal', url: '/dashboard', icon: pieChartOutline },
   { title: 'Insumos', url: '/raw-materials', icon: cubeOutline },
   { title: 'Productos', url: '/products', icon: listOutline },
   { title: 'Producción', url: '/production', icon: constructOutline },
-  { title: 'Tablero Pedidos', url: '/orders', icon: cartOutline },
+  { title: 'Calculadora', url: '/calculator', icon: calculatorOutline },
   { title: 'POS (Caja)', url: '/pos', icon: cashOutline },
+  { title: 'Tablero Pedidos', url: '/orders', icon: cartOutline },
+  { title: 'Zonas Delivery', url: '/delivery-zones', icon: mapOutline },
 ];
 
 const Menu: React.FC = () => {
@@ -45,6 +47,4 @@ const Menu: React.FC = () => {
     </IonMenu>
   );
 };
-
 export default Menu;
-

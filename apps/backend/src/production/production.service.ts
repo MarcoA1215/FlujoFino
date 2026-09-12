@@ -24,14 +24,29 @@ export class ProductionService {
 
       let totalBatchCost = 0;
 
-      // 1. Validar y descontar stock de Materia Prima
+      // 1. Validar stock de Materia Prima
+      const missing: string[] = [];
       for (const recipeItem of product.recipe) {
         const requiredAmount = recipeItem.quantity * quantityToProduce;
         const material = recipeItem.rawMaterial;
 
         if (!material || material.stockQuantity < requiredAmount) {
-          throw new BadRequestException(`Insumo insuficiente: ${material?.name || 'Desconocido'} (Requiere ${requiredAmount} ${material?.unit}, hay ${material?.stockQuantity || 0})`);
+          missing.push(material?.name || 'Desconocido');
         }
+      }
+
+      if (missing.length > 0) {
+        if (missing.length === 1) {
+          throw new BadRequestException(`Insumo insuficiente: ${missing[0]}`);
+        } else {
+          throw new BadRequestException(`Faltan ${missing.length} insumos para fabricar este lote.`);
+        }
+      }
+
+      // 2. Descontar stock y registrar movimientos
+      for (const recipeItem of product.recipe) {
+        const requiredAmount = recipeItem.quantity * quantityToProduce;
+        const material = recipeItem.rawMaterial;
 
         const materialCostUsed = requiredAmount * material.costPerUnit;
         totalBatchCost += materialCostUsed;

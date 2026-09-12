@@ -1,4 +1,4 @@
-export enum OrderStatus {
+﻿export enum OrderStatus {
   PENDING = 'PENDING',
   PREPARING = 'PREPARING',
   DELIVERED = 'DELIVERED',
@@ -16,9 +16,20 @@ export enum MovementType {
   OUT_PRODUCTION = 'OUT_PRODUCTION',
   OUT_SALE = 'OUT_SALE',
   LOSS = 'LOSS',
-  // Backward compatibility just in case
   IN = 'IN',
   OUT = 'OUT',
+}
+
+export enum DeliveryMethod {
+  IN_STORE = 'IN_STORE',
+  PICKUP = 'PICKUP',
+  DELIVERY = 'DELIVERY',
+}
+
+export interface DeliveryZoneDTO {
+  id?: string;
+  name: string;
+  feePrice: number;
 }
 
 export interface RawMaterialDTO {
@@ -73,6 +84,9 @@ export interface OrderDTO {
   notes?: string;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
+  deliveryMethod?: DeliveryMethod;
+  deliveryZoneId?: string;
+  deliveryFee?: number;
   totalAmount: number;
   items: OrderItemDTO[];
 }

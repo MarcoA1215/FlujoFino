@@ -8,8 +8,9 @@ import Products from './pages/Products';
 import Production from './pages/Production';
 import Pos from './pages/Pos';
 import Orders from './pages/Orders';
+import Calculator from './pages/Calculator';
+import DeliveryZones from './pages/DeliveryZones';
 
-/* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
 import '@ionic/react/css/structure.css';
@@ -20,8 +21,6 @@ import '@ionic/react/css/text-alignment.css';
 import '@ionic/react/css/text-transformation.css';
 import '@ionic/react/css/flex-utils.css';
 import '@ionic/react/css/display.css';
-
-/* Custom Theme and Mobile Fixes */
 import './theme.css';
 
 setupIonicReact();
@@ -40,11 +39,12 @@ const App: React.FC = () => {
             <Route path="/production" element={<Production />} />
             <Route path="/pos" element={<Pos />} />
             <Route path="/orders" element={<Orders />} />
+            <Route path="/calculator" element={<Calculator />} />
+            <Route path="/delivery-zones" element={<DeliveryZones />} />
           </IonRouterOutlet>
         </IonSplitPane>
       </IonReactRouter>
     </IonApp>
   );
 };
-
 export default App;

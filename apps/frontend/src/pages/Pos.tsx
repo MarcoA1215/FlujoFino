@@ -28,6 +28,8 @@ import {
 } from '@ionic/react';
 import { cartOutline, cashOutline, trashOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
+import type { DeliveryZone } from '../types';
+import { DeliveryMethod } from '@nutrideli/shared-types';
 import { apiClient } from '../api/client';
 import { PaymentStatus } from '@nutrideli/shared-types';
 
@@ -62,6 +64,10 @@ const Pos: React.FC = () => {
 
   // USD Fields
   const [usdReceived, setUsdReceived] = useState<number | ''>('');
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(DeliveryMethod.IN_STORE);
+  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
+  const [deliveryZoneId, setDeliveryZoneId] = useState<string>('');
+  const [customerAddress, setCustomerAddress] = useState<string>('');
   
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
@@ -83,9 +89,17 @@ const Pos: React.FC = () => {
     } catch (e) {}
   };
 
+  const fetchZones = async () => {
+    try {
+      const res = await apiClient.get<DeliveryZone[]>('/delivery-zones');
+      setDeliveryZones(res.data);
+    } catch(e) {}
+  };
+
   useEffect(() => {
     fetchProducts();
     fetchRate();
+    fetchZones();
   }, []);
 
   const openRateAlert = () => {
@@ -125,7 +139,11 @@ const Pos: React.FC = () => {
     setCart(prev => prev.map(item => item.product.id === productId ? { ...item, quantity: qty } : item));
   };
 
-  const totalCart = cart.reduce((acc, item) => acc + (item.product.salePrice * item.quantity), 0);
+  const cartSubtotal = cart.reduce((acc, item) => acc + (item.product.salePrice * item.quantity), 0);
+  const deliveryFee = (deliveryMethod === DeliveryMethod.DELIVERY && deliveryZoneId) 
+    ? (deliveryZones.find(z => z.id === deliveryZoneId)?.feePrice || 0) 
+    : 0;
+  const totalCart = cartSubtotal + deliveryFee;
 
   const placeOrder = async () => {
     if (cart.length === 0) return presentToast({ message: 'Carrito vacío', duration: 2000, color: 'warning' });
@@ -251,6 +269,38 @@ const Pos: React.FC = () => {
                     />
                   </IonItem>
 
+                  
+                  <IonItem className="ion-margin-bottom">
+                    <IonLabel position="stacked">Método de Entrega</IonLabel>
+                    <IonSelect value={deliveryMethod} onIonChange={e => setDeliveryMethod(e.detail.value)}>
+                      <IonSelectOption value={DeliveryMethod.IN_STORE}>Consumo en Local / Retiro Inmediato</IonSelectOption>
+                      <IonSelectOption value={DeliveryMethod.PICKUP}>Pickup (Para LLevar / Encargo)</IonSelectOption>
+                      <IonSelectOption value={DeliveryMethod.DELIVERY}>Delivery (Envío)</IonSelectOption>
+                    </IonSelect>
+                  </IonItem>
+
+                  {deliveryMethod !== DeliveryMethod.IN_STORE && (
+                    <IonItem className="ion-margin-bottom">
+                      <IonLabel position="stacked">Dirección / Referencia Exacta</IonLabel>
+                      <IonInput 
+                        value={customerAddress} 
+                        onIonChange={e => setCustomerAddress(e.detail.value!)} 
+                        placeholder="Ej. Calle 1, Casa 2..." 
+                      />
+                    </IonItem>
+                  )}
+
+                  {deliveryMethod === DeliveryMethod.DELIVERY && (
+                    <IonItem className="ion-margin-bottom">
+                      <IonLabel position="stacked">Zona de Envío</IonLabel>
+                      <IonSelect value={deliveryZoneId} onIonChange={e => setDeliveryZoneId(e.detail.value)}>
+                        {deliveryZones.map(z => (
+                          <IonSelectOption key={z.id} value={z.id}>{z.name} (+ $ {z.feePrice.toFixed(2)})</IonSelectOption>
+                        ))}
+                      </IonSelect>
+                    </IonItem>
+                  )}
+
                   <IonItem className="ion-margin-bottom">
                     <IonLabel position="stacked">Método de Pago</IonLabel>
                     <IonSelect value={paymentMethod} onIonChange={e => setPaymentMethod(e.detail.value)}>
@@ -322,8 +372,18 @@ const Pos: React.FC = () => {
                     <>
                       <hr className="ion-margin-vertical" />
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h2>Total:</h2>
-                        <h2 style={{ fontWeight: 'bold' }}>${totalCart.toFixed(2)}</h2>
+                        <h4>Subtotal:</h4>
+                        <h4>${cartSubtotal.toFixed(2)}</h4>
+                      </div>
+                      {deliveryMethod === DeliveryMethod.DELIVERY && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'gray' }}>
+                          <h4>Delivery:</h4>
+                          <h4>+ ${deliveryFee.toFixed(2)}</h4>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                        <h2>Total a Pagar:</h2>
+                        <h2 style={{ fontWeight: 'bold', color: '#2dd36f' }}>${totalCart.toFixed(2)}</h2>
                       </div>
                       
                       <IonButton 

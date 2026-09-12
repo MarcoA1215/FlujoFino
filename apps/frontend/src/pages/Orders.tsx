@@ -26,7 +26,8 @@ import {
 } from '@ionic/react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
-import { OrderStatus, PaymentStatus } from '@nutrideli/shared-types';
+import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';
+import type { DeliveryZone } from '../types';
 
 type OrderItem = {
   id: string;
@@ -37,12 +38,17 @@ type OrderItem = {
 type Order = {
   id: string;
   customerName: string;
+  customerPhone?: string;
+  customerAddress?: string;
   totalAmount: number;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   notes?: string;
   items: OrderItem[];
   createdAt: string;
+  deliveryMethod?: DeliveryMethod;
+  deliveryZone?: DeliveryZone;
+  deliveryFee?: number;
 };
 
 const Orders: React.FC = () => {
@@ -205,6 +211,21 @@ const Orders: React.FC = () => {
                     <p style={{ margin: '5px 0 0 0', fontSize: '0.9rem', color: 'gray' }}>
                       Hora: {new Date(order.createdAt).toLocaleTimeString()}
                     </p>
+
+                    {order.deliveryMethod && (
+                      <div style={{ marginTop: '10px' }}>
+                        <IonBadge color={order.deliveryMethod === DeliveryMethod.DELIVERY ? 'tertiary' : 'medium'}>
+                          {order.deliveryMethod === DeliveryMethod.DELIVERY ? 'Delivery' : (order.deliveryMethod === DeliveryMethod.PICKUP ? 'Pickup' : 'Local')}
+                        </IonBadge>
+                        {order.deliveryMethod === DeliveryMethod.DELIVERY && order.deliveryZone && (
+                          <IonBadge color="primary" style={{ marginLeft: '5px' }}>{order.deliveryZone.name}</IonBadge>
+                        )}
+                      </div>
+                    )}
+                    {(order.deliveryMethod === DeliveryMethod.DELIVERY || order.deliveryMethod === DeliveryMethod.PICKUP) && order.customerAddress && (
+                      <p style={{ margin: '5px 0 0 0', fontSize: '0.9rem' }}><strong>Dir/Ref:</strong> {order.customerAddress}</p>
+                    )}
+
                   </IonCardHeader>
 
                   <IonCardContent>
@@ -227,7 +248,12 @@ const Orders: React.FC = () => {
                     <hr />
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '10px 0' }}>
-                      <h3 style={{ margin: 0, fontWeight: 'bold' }}>Total: ${order.totalAmount.toFixed(2)}</h3>
+                      
+                      <div>
+                        {(order.deliveryFee || 0) > 0 && <div style={{ fontSize: '0.8rem', color: 'gray' }}>+ $ {(order.deliveryFee || 0).toFixed(2)} Delivery</div>}
+                        <h3 style={{ margin: 0, fontWeight: 'bold' }}>Total: ${order.totalAmount.toFixed(2)}</h3>
+                      </div>
+
                       {order.paymentStatus === PaymentStatus.PAID ? (
                         <IonBadge color="success">Pagado</IonBadge>
                       ) : (

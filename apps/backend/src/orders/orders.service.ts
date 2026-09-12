@@ -1,11 +1,12 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+﻿import { Injectable, BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Product } from '../entities/product.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
-import { PaymentStatus, OrderStatus, MovementType } from '@nutrideli/shared-types';
+import { PaymentStatus, OrderStatus, MovementType, DeliveryMethod } from '@nutrideli/shared-types';
 import { RawMaterial } from '../entities/raw-material.entity';
+import { DeliveryZone } from '../entities/delivery-zone.entity';
 
 export class CreateOrderDto {
   customerName: string;
@@ -13,6 +14,8 @@ export class CreateOrderDto {
   customerAddress?: string;
   notes?: string;
   paymentStatus: PaymentStatus;
+  deliveryMethod?: DeliveryMethod;
+  deliveryZoneId?: string;
   pagoMovilRef?: string;
   pagoMovilPhone?: string;
   pagoMovilCedula?: string;
@@ -40,6 +43,14 @@ export class OrdersService {
   async createOrder(dto: CreateOrderDto) {
     return this.dataSource.transaction(async (manager) => {
       let totalAmount = 0;
+      let deliveryFee = 0;
+
+      if (dto.deliveryMethod === DeliveryMethod.DELIVERY && dto.deliveryZoneId) {
+        const zone = await manager.findOne(DeliveryZone, { where: { id: dto.deliveryZoneId } });
+        if (zone) {
+          deliveryFee = zone.feePrice;
+        }
+      }
 
       // Create Order
       const order = manager.create(Order, {
@@ -49,6 +60,9 @@ export class OrdersService {
         notes: dto.notes || '',
         paymentStatus: dto.paymentStatus,
         status: OrderStatus.PENDING,
+        deliveryMethod: dto.deliveryMethod || DeliveryMethod.IN_STORE,
+        deliveryZoneId: dto.deliveryZoneId,
+        deliveryFee: deliveryFee,
         totalAmount: 0,
         pagoMovilRef: dto.pagoMovilRef,
         pagoMovilPhone: dto.pagoMovilPhone,
@@ -122,14 +136,14 @@ export class OrdersService {
         await manager.save(OrderItem, orderItem);
       }
 
-      savedOrder.totalAmount = totalAmount;
+      savedOrder.totalAmount = totalAmount + deliveryFee;
       return manager.save(Order, savedOrder);
     });
   }
 
   async getAllOrders() {
     return this.dataSource.getRepository(Order).find({
-      relations: { items: { product: true } },
+      relations: { items: { product: true }, deliveryZone: true },
       order: { createdAt: 'DESC' },
     });
   }
@@ -160,7 +174,6 @@ export class OrdersService {
     
     if (!order) throw new BadRequestException('Pedido no encontrado');
 
-    // Validación solicitada: No entregar si stock actual de los productos está negativo (backorder).
     if (status === OrderStatus.DELIVERED) {
       const productRepo = this.dataSource.getRepository(Product);
       for (const item of order.items) {
@@ -173,14 +186,12 @@ export class OrdersService {
         
         if (product) {
           if (product.comboItems && product.comboItems.length > 0) {
-            // Verificar si algún componente quedó en negativo
             for (const ci of product.comboItems) {
               if (ci.component && ci.component.stockQuantity < 0) {
                 throw new BadRequestException(`No se puede entregar el pedido. El componente ${ci.component.name} del combo ${product.name} tiene inventario negativo (${ci.component.stockQuantity}).`);
               }
             }
           } else {
-            // Verificación normal
             if (product.stockQuantity < 0) {
               throw new BadRequestException(`No se puede entregar el pedido. El producto ${product.name} tiene inventario negativo (${product.stockQuantity}). ¡Debe producir más primero!`);
             }
