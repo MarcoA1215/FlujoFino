@@ -147,11 +147,11 @@ const DeliveryZones: React.FC = () => {
           <IonContent className="ion-padding">
             <IonItem>
               <IonLabel position="stacked">Nombre de la Zona (Ej. Centro)</IonLabel>
-              <IonInput value={name} onIonChange={e => setName(e.detail.value!)} />
+              <IonInput value={name} onIonInput={e => setName(e.detail.value!)} />
             </IonItem>
             <IonItem>
               <IonLabel position="stacked">Tarifa de Envío (USD)</IonLabel>
-              <IonInput type="number" value={feePrice} onIonChange={e => setFeePrice(parseFloat(e.detail.value!) || 0)} />
+              <IonInput type="number" step="any" value={feePrice} onIonInput={e => setFeePrice(parseFloat(e.detail.value!) || 0)} />
             </IonItem>
             <IonButton expand="block" className="ion-margin-top" onClick={saveZone}>
               Guardar Zona
