@@ -30,6 +30,10 @@ export class RawMaterial {
   recipeItems: RecipeItem[];
 
   @CreateDateColumn()
+  @Column({ default: true })
+  isActive: boolean;
+
+  @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()

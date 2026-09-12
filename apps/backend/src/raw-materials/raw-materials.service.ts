@@ -183,4 +183,8 @@ export class RawMaterialsService {
       return manager.save(StockMovement, movement);
     });
   }
+
+  async archive(id: string) {
+    await this.rawMaterialRepo.update(id, { isActive: false });
+  }
 }

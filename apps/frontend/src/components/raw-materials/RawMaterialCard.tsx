@@ -10,6 +10,7 @@ interface RawMaterialCardProps {
   onRestock: (m: RawMaterial) => void;
   onRegisterLoss: (m: RawMaterial) => void;
   onViewHistory: (m: RawMaterial) => void;
+  onArchive: (m: RawMaterial) => void;
 }
 
 export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
@@ -17,7 +18,8 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
   onEditName,
   onRestock,
   onRegisterLoss,
-  onViewHistory
+  onViewHistory,
+  onArchive
 }) => {
   return (
     <IonCol size="12" sizeSm="6" sizeLg="6">
@@ -47,6 +49,9 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
             </IonButton>
             <IonButton size="small" fill="outline" color="tertiary" onClick={() => onViewHistory(m)}>
               Historial
+            </IonButton>
+            <IonButton size="small" fill="outline" color="danger" onClick={() => onArchive(m)}>
+              Archivar
             </IonButton>
           </div>
         </IonCardContent>

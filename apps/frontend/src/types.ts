@@ -14,6 +14,7 @@ export type RawMaterial = {
   costPerUnit: number;
   stockQuantity: number;
   minStockAlert: number;
+  isActive?: boolean;
 };
 
 export type RecipeItem = {

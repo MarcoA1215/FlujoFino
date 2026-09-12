@@ -8,8 +8,8 @@ import type { RawMaterial, Movement } from '../../types';
 
 const movementTypeTranslations: Record<string, string> = {
   IN_PURCHASE: 'Compra',
-  IN_PRODUCTION: 'Entrada (Producci�n)',
-  OUT_PRODUCTION: 'Salida (Producci�n)',
+  IN_PRODUCTION: 'Entrada (Producción)',
+  OUT_PRODUCTION: 'Salida (Producción)',
   OUT_SALE: 'Venta',
   LOSS: 'Pérdida / Ajuste',
   IN_INITIAL: 'Inv. Inicial',

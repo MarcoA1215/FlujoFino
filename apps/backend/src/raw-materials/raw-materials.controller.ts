@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Patch } from '@nestjs/common';
 import { RawMaterialsService } from './raw-materials.service';
 import { CreateRawMaterialDto } from './dto/create-raw-material.dto';
 import { RestockRawMaterialDto } from './dto/restock-raw-material.dto';
@@ -49,5 +49,10 @@ export class StockMovementsController {
   @Put(':id')
   updateMovement(@Param('id') id: string, @Body() dto: UpdateMovementDto) {
     return this.rawMaterialsService.updateMovement(id, dto);
+  }
+
+  @Patch(':id/archive')
+  archive(@Param('id') id: string) {
+    return this.rawMaterialsService.archive(id);
   }
 }

@@ -21,6 +21,30 @@ const RawMaterials: React.FC = () => {
   const [presentToast] = useIonToast();
   const [selectedMaterialForHistory, setSelectedMaterialForHistory] = useState<RawMaterial | null>(null);
 
+  
+  const archiveRawMaterial = async (m: RawMaterial) => {
+    presentAlert({
+      header: 'Archivar Insumo',
+      message: '¿Estás seguro de archivar este insumo? Desaparecerá de la lista, pero su historial se mantendrá intacto.',
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { 
+          text: 'Archivar', 
+          role: 'destructive',
+          handler: async () => {
+            try {
+              await apiClient.patch('/raw-materials/' + m.id + '/archive');
+              fetchMaterials();
+              presentToast({ message: 'Insumo archivado', duration: 2000, color: 'success' });
+            } catch (e) {
+              presentToast({ message: 'Error al archivar', duration: 3000, color: 'danger' });
+            }
+          }
+        }
+      ]
+    });
+  };
+
   const fetchMaterials = async () => {
     try {
       const res = await apiClient.get<RawMaterial[]>('/raw-materials');
@@ -145,7 +169,7 @@ const RawMaterials: React.FC = () => {
               <IonGrid className="ion-no-padding">
                 <IonRow>
                   {filteredData.map(m => (
-                    <RawMaterialCard key={m.id} material={m} onEditName={openEditNameAlert} onRestock={openRestockAlert} onRegisterLoss={openLossAlert} onViewHistory={() => setSelectedMaterialForHistory(m)} />
+                    <RawMaterialCard key={m.id} material={m} onEditName={openEditNameAlert} onRestock={openRestockAlert} onRegisterLoss={openLossAlert} onViewHistory={() => setSelectedMaterialForHistory(m)} onArchive={archiveRawMaterial} />
                   ))}
                 </IonRow>
               </IonGrid>
