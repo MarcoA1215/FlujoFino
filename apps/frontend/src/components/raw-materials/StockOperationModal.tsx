@@ -96,7 +96,7 @@ export const StockOperationModal: React.FC<Props> = ({ material, operationType, 
             <IonItem>
               <IonLabel position="stacked">Cantidad a {operationType === 'restock' ? 'sumar' : 'descontar'}</IonLabel>
               <IonInput 
-                type="number" 
+                type="number" step="any" 
                 value={quantity} 
                 onIonChange={e => setQuantity(parseFloat(e.detail.value!) || undefined)} 
                 placeholder="Ej. 500" 
@@ -115,7 +115,7 @@ export const StockOperationModal: React.FC<Props> = ({ material, operationType, 
               <IonItem>
                 <IonLabel position="stacked">Costo Total de la Compra ($)</IonLabel>
                 <IonInput 
-                  type="number" 
+                  type="number" step="any" 
                   value={cost} 
                   onIonChange={e => setCost(parseFloat(e.detail.value!) || undefined)} 
                   placeholder="0.00" 

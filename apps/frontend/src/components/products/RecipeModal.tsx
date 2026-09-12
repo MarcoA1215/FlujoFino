@@ -171,7 +171,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
                       )}
                       <IonCol size="8" sizeMd="2">
                         <IonLabel position="stacked">Cantidad</IonLabel>
-                        <IonInput type="number" value={newRmQty} onIonChange={e => setNewRmQty(parseFloat(e.detail.value!))} placeholder="0" />
+                        <IonInput type="number" step="any" value={newRmQty} onIonChange={e => setNewRmQty(parseFloat(e.detail.value!))} placeholder="0" />
                       </IonCol>
                       <IonCol size="4" sizeMd="2"><IonButton expand="block" onClick={addRecipeItem}>Agregar</IonButton></IonCol>
                     </IonRow>
@@ -205,7 +205,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
                         </IonCol>
                         <IonCol size="8" sizeMd="2">
                           <IonLabel position="stacked">Cant.</IonLabel>
-                          <IonInput type="number" value={newComboQty} onIonChange={e => setNewComboQty(parseFloat(e.detail.value!))} placeholder="1" />
+                          <IonInput type="number" step="any" value={newComboQty} onIonChange={e => setNewComboQty(parseFloat(e.detail.value!))} placeholder="1" />
                         </IonCol>
                         <IonCol size="4" sizeMd="3"><IonButton expand="block" onClick={addComboItem}>Agregar</IonButton></IonCol>
                       </IonRow>
