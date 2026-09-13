@@ -89,11 +89,11 @@ const Users: React.FC = () => {
                 <IonCardContent>
                   <IonItem>
                     <IonLabel position="stacked">Nombre de Usuario</IonLabel>
-                    <IonInput value={username} onIonChange={e => setUsername(e.detail.value!)} placeholder="Ej. juan_cajero" />
+                    <IonInput value={username} onIonInput={e => setUsername(e.detail.value!)} placeholder="Ej. juan_cajero" />
                   </IonItem>
                   <IonItem>
                     <IonLabel position="stacked">Contraseña</IonLabel>
-                    <IonInput type="password" value={password} onIonChange={e => setPassword(e.detail.value!)} placeholder="***" />
+                    <IonInput type="password" value={password} onIonInput={e => setPassword(e.detail.value!)} placeholder="***" />
                   </IonItem>
                   <IonItem>
                     <IonLabel position="stacked">Rol / Permiso</IonLabel>

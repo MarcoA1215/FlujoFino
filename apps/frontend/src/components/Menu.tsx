@@ -4,25 +4,22 @@
   IonItem,
   IonLabel,
   IonList,
-  IonListHeader,
   IonMenu,
   IonMenuToggle,
-  IonNote,
 } from '@ionic/react';
 import { useLocation } from 'react-router-dom';
 import { useIonAlert } from '@ionic/react';
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
-import { peopleOutline, cubeOutline, cartOutline, constructOutline, cashOutline, listOutline, pieChartOutline, calculatorOutline, mapOutline } from 'ionicons/icons';
+import { peopleOutline, cubeOutline, cartOutline, constructOutline, cashOutline, listOutline, pieChartOutline, calculatorOutline, mapOutline, logOutOutline } from 'ionicons/icons';
 
 const Menu: React.FC = () => {
   const location = useLocation();
   const [presentAlert] = useIonAlert();
   const { user, logout, isAuthenticated } = useContext(AuthContext);
 
-  if (!isAuthenticated) return null; // Ocultar el menú si no está logueado
-
+  if (!isAuthenticated) return null;
   
   const confirmLogout = () => {
     presentAlert({
@@ -61,9 +58,10 @@ const Menu: React.FC = () => {
   return (
     <IonMenu contentId="main" type="overlay">
       <IonContent>
-        <IonList id="inbox-list">
-          <IonListHeader>Nutri Deli</IonListHeader>
-          <IonNote>Sistema de Gestión</IonNote>
+        <div style={{ padding: '20px', textAlign: 'center', backgroundColor: '#f4f5f8' }}>
+          <img src="/assets/logo.png" alt="Nutri Deli" style={{ maxWidth: '150px', borderRadius: '8px' }} />
+        </div>
+        <IonList id="inbox-list" style={{ paddingTop: 0 }}>
           {appPages.map((appPage, index) => {
             return (
               <IonMenuToggle key={index} autoHide={false}>
@@ -75,7 +73,7 @@ const Menu: React.FC = () => {
             );
           })}
         <IonItem button onClick={confirmLogout} lines="none" color="light" style={{ marginTop: '20px' }}>
-            <IonIcon aria-hidden="true" slot="start" icon={pieChartOutline} />
+            <IonIcon aria-hidden="true" slot="start" icon={logOutOutline} />
             <IonLabel>Cerrar Sesión</IonLabel>
           </IonItem>
         </IonList>

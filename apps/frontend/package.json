@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
     "@ionic/react": "^9.0.3",
     "@ionic/react-router": "^9.0.3",
     "@nutrideli/shared-types": "workspace:*",
@@ -23,6 +25,8 @@
     "recharts": "^3.10.1"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.2",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",

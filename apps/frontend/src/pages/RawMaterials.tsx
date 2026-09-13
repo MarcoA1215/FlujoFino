@@ -125,10 +125,10 @@ const RawMaterials: React.FC = () => {
               <IonCard>
                 <IonCardHeader><IonCardTitle>Agregar Insumo</IonCardTitle></IonCardHeader>
                 <IonCardContent>
-                  <IonItem><IonLabel position="stacked">Nombre</IonLabel><IonInput value={name} onIonChange={e => setName(e.detail.value!)} placeholder="Ej. Harina" /></IonItem>
+                  <IonItem><IonLabel position="stacked">Nombre</IonLabel><IonInput value={name} onIonInput={e => setName(e.detail.value!)} placeholder="Ej. Harina" /></IonItem>
                   <IonItem><IonLabel position="stacked">Unidad</IonLabel><IonSelect value={unit} onIonChange={e => setUnit(e.detail.value)}><IonSelectOption value="Kg">Kg</IonSelectOption><IonSelectOption value="Litros">Litros</IonSelectOption><IonSelectOption value="Unidades">Unidades</IonSelectOption></IonSelect></IonItem>
-                  <IonItem><IonLabel position="stacked">Costo Estimado x Unidad</IonLabel><IonInput type="number" value={costPerUnit} onIonChange={e => setCostPerUnit(parseFloat(e.detail.value!))} placeholder="0.00" /></IonItem>
-                  <IonItem><IonLabel position="stacked">Cantidad Inicial</IonLabel><IonInput type="number" value={initialStock} onIonChange={e => setInitialStock(parseFloat(e.detail.value!))} placeholder="0" /></IonItem>
+                  <IonItem><IonLabel position="stacked">Costo Estimado x Unidad</IonLabel><IonInput type="number" value={costPerUnit} onIonInput={e => setCostPerUnit(parseFloat(e.detail.value!))} placeholder="0.00" /></IonItem>
+                  <IonItem><IonLabel position="stacked">Cantidad Inicial</IonLabel><IonInput type="number" value={initialStock} onIonInput={e => setInitialStock(parseFloat(e.detail.value!))} placeholder="0" /></IonItem>
                   <IonButton expand="block" color="success" className="ion-margin-top" onClick={handleCreate}>Guardar</IonButton>
                 </IonCardContent>
               </IonCard>

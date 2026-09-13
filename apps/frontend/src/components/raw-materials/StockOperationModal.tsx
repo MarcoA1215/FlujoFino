@@ -5,7 +5,7 @@ import {
   IonNote, useIonToast
 } from '@ionic/react';
 import { apiClient } from '../../api/client';
-import { RawMaterial } from '../../types';
+import type { RawMaterial } from '../../types';
 
 interface Props {
   material: RawMaterial | null;
@@ -98,7 +98,7 @@ export const StockOperationModal: React.FC<Props> = ({ material, operationType, 
               <IonInput 
                 type="number" step="any" 
                 value={quantity} 
-                onIonChange={e => setQuantity(parseFloat(e.detail.value!) || undefined)} 
+                onIonInput={e => setQuantity(parseFloat(e.detail.value!) || undefined)} 
                 placeholder="Ej. 500" 
               />
             </IonItem>
@@ -117,7 +117,7 @@ export const StockOperationModal: React.FC<Props> = ({ material, operationType, 
                 <IonInput 
                   type="number" step="any" 
                   value={cost} 
-                  onIonChange={e => setCost(parseFloat(e.detail.value!) || undefined)} 
+                  onIonInput={e => setCost(parseFloat(e.detail.value!) || undefined)} 
                   placeholder="0.00" 
                 />
               </IonItem>
@@ -129,7 +129,7 @@ export const StockOperationModal: React.FC<Props> = ({ material, operationType, 
                 <IonInput 
                   type="text" 
                   value={reason} 
-                  onIonChange={e => setReason(e.detail.value!)} 
+                  onIonInput={e => setReason(e.detail.value!)} 
                   placeholder="Ej. Vencido, derramado, ajuste de inventario" 
                 />
               </IonItem>

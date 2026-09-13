@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">NutriDeli</string>
+    <string name="title_activity_main">NutriDeli</string>
+    <string name="package_name">com.nutrideli.app</string>
+    <string name="custom_url_scheme">com.nutrideli.app</string>
+</resources>

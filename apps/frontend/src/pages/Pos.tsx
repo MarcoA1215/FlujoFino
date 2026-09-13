@@ -260,7 +260,7 @@ const Pos: React.FC = () => {
                     <IonLabel position="stacked">Cliente / Mesa</IonLabel>
                     <IonInput 
                       value={customerName} 
-                      onIonChange={e => setCustomerName(e.detail.value!)} 
+                      onIonInput={e => setCustomerName(e.detail.value!)} 
                       placeholder="Ej. Juan Pérez" 
                     />
                   </IonItem>
@@ -268,7 +268,7 @@ const Pos: React.FC = () => {
                     <IonLabel position="stacked">Teléfono del Cliente (Opcional)</IonLabel>
                     <IonInput 
                       value={customerPhone} 
-                      onIonChange={e => setCustomerPhone(e.detail.value!)} 
+                      onIonInput={e => setCustomerPhone(e.detail.value!)} 
                       placeholder="0414-0000000" 
                     />
                   </IonItem>
@@ -288,7 +288,7 @@ const Pos: React.FC = () => {
                       <IonLabel position="stacked">Dirección / Referencia Exacta</IonLabel>
                       <IonInput 
                         value={customerAddress} 
-                        onIonChange={e => setCustomerAddress(e.detail.value!)} 
+                        onIonInput={e => setCustomerAddress(e.detail.value!)} 
                         placeholder="Ej. Calle 1, Casa 2..." 
                       />
                     </IonItem>
@@ -319,19 +319,19 @@ const Pos: React.FC = () => {
                       <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem' }}>Datos del Pago Móvil (Total: Bs. {(totalCart * exchangeRate).toFixed(2)})</h4>
                       <IonItem color="light">
                         <IonLabel position="stacked">Ref.</IonLabel>
-                        <IonInput value={pagoMovilRef} onIonChange={e => setPagoMovilRef(e.detail.value!)} placeholder="Ej. 123456" />
+                        <IonInput value={pagoMovilRef} onIonInput={e => setPagoMovilRef(e.detail.value!)} placeholder="Ej. 123456" />
                       </IonItem>
                       <IonItem color="light">
                         <IonLabel position="stacked">Teléfono Origen</IonLabel>
-                        <IonInput value={pagoMovilPhone} onIonChange={e => setPagoMovilPhone(e.detail.value!)} placeholder="0414-XXXXXXX" />
+                        <IonInput value={pagoMovilPhone} onIonInput={e => setPagoMovilPhone(e.detail.value!)} placeholder="0414-XXXXXXX" />
                       </IonItem>
                       <IonItem color="light">
                         <IonLabel position="stacked">Cédula</IonLabel>
-                        <IonInput value={pagoMovilCedula} onIonChange={e => setPagoMovilCedula(e.detail.value!)} placeholder="V-12345678" />
+                        <IonInput value={pagoMovilCedula} onIonInput={e => setPagoMovilCedula(e.detail.value!)} placeholder="V-12345678" />
                       </IonItem>
                       <IonItem color="light">
                         <IonLabel position="stacked">Banco</IonLabel>
-                        <IonInput value={pagoMovilBank} onIonChange={e => setPagoMovilBank(e.detail.value!)} placeholder="Banesco" />
+                        <IonInput value={pagoMovilBank} onIonInput={e => setPagoMovilBank(e.detail.value!)} placeholder="Banesco" />
                       </IonItem>
                     </div>
                   )}
@@ -341,7 +341,7 @@ const Pos: React.FC = () => {
                       <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem' }}>Pago en Divisas</h4>
                       <IonItem color="light">
                         <IonLabel position="stacked">Monto Recibido ($)</IonLabel>
-                        <IonInput type="number" value={usdReceived} onIonChange={e => setUsdReceived(parseFloat(e.detail.value!) || '')} placeholder={`Mínimo: $${totalCart.toFixed(2)}`} />
+                        <IonInput type="number" value={usdReceived} onIonInput={e => setUsdReceived(parseFloat(e.detail.value!) || '')} placeholder={`Mínimo: $${totalCart.toFixed(2)}`} />
                       </IonItem>
                       
                       {typeof usdReceived === 'number' && usdReceived >= totalCart && (
