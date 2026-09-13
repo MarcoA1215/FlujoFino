@@ -43,7 +43,7 @@ const Login: React.FC = () => {
               <IonButton expand="block" className="ion-margin-top" onClick={handleLogin}>
                 Entrar
               </IonButton>
-              <div style={{textAlign:'center', fontSize:'10px', color:'gray', marginTop:'10px'}}>API: {import.meta.env.VITE_API_URL || 'https://nutrideli.onrender.com'}</div>
+              
         </IonCardContent>
           </IonCard>
         </div>
