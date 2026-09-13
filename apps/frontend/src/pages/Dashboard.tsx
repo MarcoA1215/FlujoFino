@@ -19,7 +19,7 @@ const Dashboard: React.FC = () => {
           <IonToolbar color="primary">
             <IonButtons slot="start"><IonMenuButton /></IonButtons>
             <IonTitle>Bienvenido</IonTitle>
-          <IonButtons slot="end"><IonButton onClick={fetchSummary}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
+          <IonButtons slot="end"><IonButton onClick={() => window.location.reload()}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding ion-text-center">
@@ -260,6 +260,7 @@ const Dashboard: React.FC = () => {
   );
 };
 export default Dashboard;
+
 
 
 
