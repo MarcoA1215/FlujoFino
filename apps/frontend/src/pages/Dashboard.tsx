@@ -25,7 +25,7 @@ const Dashboard: React.FC = () => {
         <IonContent className="ion-padding ion-text-center">
           <br /><br />
           <h2>Hola, {user?.username}</h2>
-          <p>Selecciona una opciÃ³n del menÃº lateral para comenzar a trabajar.</p>
+          <p>Selecciona una opción del menú lateral para comenzar a trabajar.</p>
         </IonContent>
       </IonPage>
     );
@@ -71,7 +71,7 @@ const Dashboard: React.FC = () => {
                     <IonCardTitle className="ion-text-center">
                       <IonIcon icon={walletOutline} style={{ fontSize: '2rem' }} />
                       <br />
-                      Ingresos HistÃ³ricos
+                      Ingresos Históricos
                     </IonCardTitle>
                   </IonCardHeader>
                   <IonCardContent className="ion-text-center">
@@ -88,7 +88,7 @@ const Dashboard: React.FC = () => {
                     <IonCardTitle className="ion-text-center">
                       <IonIcon icon={basketOutline} style={{ fontSize: '2rem' }} />
                       <br />
-                      InversiÃ³n HistÃ³rica
+                      Inversión Histórica
                     </IonCardTitle>
                   </IonCardHeader>
                   <IonCardContent className="ion-text-center">
@@ -122,7 +122,7 @@ const Dashboard: React.FC = () => {
                     <IonCardTitle className="ion-text-center">
                       <IonIcon icon={trendingDownOutline} style={{ fontSize: '2rem' }} />
                       <br />
-                      Mermas y PÃ©rdidas
+                      Mermas y Pérdidas
                     </IonCardTitle>
                   </IonCardHeader>
                   <IonCardContent className="ion-text-center">
@@ -139,7 +139,7 @@ const Dashboard: React.FC = () => {
               <IonCol size="12" sizeLg="8">
                 <IonCard style={{ height: '100%' }}>
                   <IonCardHeader>
-                    <IonCardTitle style={{ fontSize: '1.2rem' }}>Ventas de los Ãºltimos 7 dÃ­as</IonCardTitle>
+                    <IonCardTitle style={{ fontSize: '1.2rem' }}>Ventas de los últimos 7 días</IonCardTitle>
                   </IonCardHeader>
                   <IonCardContent style={{ height: '300px' }}>
                     <ResponsiveContainer width="100%" height="100%">
@@ -160,12 +160,12 @@ const Dashboard: React.FC = () => {
                   <IonCardHeader>
                     <IonCardTitle style={{ fontSize: '1.2rem' }}>
                       <IonIcon icon={pieChartOutline} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                      Productos mÃ¡s vendidos
+                      Productos más vendidos
                     </IonCardTitle>
                   </IonCardHeader>
                   <IonCardContent>
                     {summary.topProducts.length === 0 ? (
-                      <p style={{ color: 'gray', fontStyle: 'italic' }}>No hay ventas registradas aÃºn.</p>
+                      <p style={{ color: 'gray', fontStyle: 'italic' }}>No hay ventas registradas aún.</p>
                     ) : (
                       <IonList>
                         {summary.topProducts.map((p, i) => (
@@ -197,7 +197,7 @@ const Dashboard: React.FC = () => {
                   </IonCardHeader>
                   <IonCardContent>
                     {summary.lowStockMaterials.length === 0 ? (
-                      <p style={{ color: 'gray', fontStyle: 'italic' }}>Todos los insumos estÃ¡n en niveles Ã³ptimos.</p>
+                      <p style={{ color: 'gray', fontStyle: 'italic' }}>Todos los insumos están en niveles óptimos.</p>
                     ) : (
                       <IonList>
                         {summary.lowStockMaterials.map(alert => (
@@ -206,12 +206,12 @@ const Dashboard: React.FC = () => {
                               <IonText color="danger">
                                 <h2 style={{ fontWeight: 'bold' }}>{alert.name}</h2>
                               </IonText>
-                              <p style={{ fontSize: '0.85rem' }}>Stock fÃ­sico: {parseFloat(Number(alert.realStock).toFixed(4))} {alert.unit}</p>
+                              <p style={{ fontSize: '0.85rem' }}>Stock físico: {parseFloat(Number(alert.realStock).toFixed(4))} {alert.unit}</p>
                               {alert.debt > 0 && <p style={{ fontSize: '0.85rem', color: 'orange' }}>Reservado (Pedidos): -{parseFloat(Number(alert.debt).toFixed(4))} {alert.unit}</p>}
                             </IonLabel>
                             <div slot="end" style={{ textAlign: 'right' }}>
                               <IonBadge color="danger">Efectivo: {parseFloat(Number(alert.effectiveStock).toFixed(4))} {alert.unit}</IonBadge>
-                              <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>Â¡Reabastecer!</div>
+                              <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>¡Reabastecer!</div>
                             </div>
                           </IonItem>
                         ))}

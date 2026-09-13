@@ -33,7 +33,7 @@ const Products: React.FC = () => {
       header: isCombo ? 'Nuevo Combo' : 'Nuevo Producto Base',
       inputs: [
         { name: 'name', type: 'text', placeholder: 'Nombre' },
-        { name: 'category', type: 'text', placeholder: 'CategorÃ­a' },
+        { name: 'category', type: 'text', placeholder: 'Categoría' },
         { name: 'salePrice', type: 'number', placeholder: 'Precio Venta' }
       ],
       buttons: [
@@ -64,7 +64,7 @@ const Products: React.FC = () => {
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         { 
-          text: 'AÃ±adir Stock', 
+          text: 'Añadir Stock', 
           handler: async (data) => {
             if (!data.quantity) return false;
             try {
@@ -82,9 +82,9 @@ const Products: React.FC = () => {
 
   const openLossAlert = (p: Product) => {
     presentAlert({
-      header: 'PÃ©rdida: ' + p.name,
+      header: 'Pérdida: ' + p.name,
       inputs: [
-        { name: 'quantity', type: 'number', placeholder: 'Cantidad pÃ©rdida', min: 1 },
+        { name: 'quantity', type: 'number', placeholder: 'Cantidad pérdida', min: 1 },
         { name: 'reason', type: 'text', placeholder: 'Motivo' }
       ],
       buttons: [
@@ -97,7 +97,7 @@ const Products: React.FC = () => {
             try {
               await apiClient.post('/products/' + p.id + '/loss', { quantity: parseFloat(data.quantity), reason: data.reason });
               fetchData();
-              presentToast({ message: 'PÃ©rdida registrada', duration: 2000, color: 'warning' });
+              presentToast({ message: 'Pérdida registrada', duration: 2000, color: 'warning' });
             } catch(e) {
               presentToast({ message: 'Error', duration: 3000, color: 'danger' });
             }
@@ -112,7 +112,7 @@ const Products: React.FC = () => {
       header: 'Editar Producto',
       inputs: [
         { name: 'name', type: 'text', value: p.name, placeholder: 'Nombre' },
-        { name: 'category', type: 'text', value: p.category, placeholder: 'CategorÃ­a' },
+        { name: 'category', type: 'text', value: p.category, placeholder: 'Categoría' },
         { name: 'salePrice', type: 'number', value: p.salePrice, placeholder: 'Precio Venta ($)' }
       ],
       buttons: [
@@ -136,8 +136,8 @@ const Products: React.FC = () => {
 
   const handleDeleteProduct = (p: Product) => {
     presentAlert({
-      header: 'Confirmar EliminaciÃ³n',
-      message: 'Â¿EstÃ¡s seguro de eliminar este producto? Datos histÃ³ricos se mantendrÃ¡n.',
+      header: 'Confirmar Eliminación',
+      message: '¿Estás seguro de eliminar este producto? Datos históricos se mantendrán.',
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         {
@@ -168,7 +168,7 @@ const Products: React.FC = () => {
       <IonHeader>
         <IonToolbar color="success">
           <IonButtons slot="start"><IonMenuButton /></IonButtons>
-          <IonTitle>CatÃ¡logo de Productos</IonTitle>
+          <IonTitle>Catálogo de Productos</IonTitle>
           <IonButtons slot="end"><IonButton onClick={fetchData}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
         </IonToolbar>
         <IonToolbar color="success">

@@ -33,7 +33,7 @@ const Production: React.FC = () => {
   const openProduceAlert = (p: Product) => {
     presentAlert({
       header: `Producir ${p.name}`,
-      subHeader: `Se descontarÃ¡n insumos automÃ¡ticamente`,
+      subHeader: `Se descontarán insumos automáticamente`,
       inputs: [
         { name: 'quantity', type: 'number', placeholder: 'Cantidad a fabricar', min: 1 },
       ],
@@ -75,7 +75,7 @@ const Production: React.FC = () => {
           <IonButtons slot="start">
             <IonMenuButton />
           </IonButtons>
-          <IonTitle>ProducciÃ³n de Lotes</IonTitle>
+          <IonTitle>Producción de Lotes</IonTitle>
           <IonButtons slot="end"><IonButton onClick={fetchProducts}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
         </IonToolbar>
 
@@ -90,10 +90,10 @@ const Production: React.FC = () => {
             <IonCol size="12">
               <IonCard>
                 <IonCardHeader>
-                  <IonCardTitle>FÃ¡brica / Cocina</IonCardTitle>
+                  <IonCardTitle>Fábrica / Cocina</IonCardTitle>
                 </IonCardHeader>
                 <IonCardContent>
-                  <p>Selecciona un producto y la cantidad a fabricar. El sistema descontarÃ¡ automÃ¡ticamente los insumos requeridos segÃºn la receta.</p>
+                  <p>Selecciona un producto y la cantidad a fabricar. El sistema descontará automáticamente los insumos requeridos según la receta.</p>
                   
                   <IonGrid className="ion-no-padding ion-margin-top">
                     <IonRow>
