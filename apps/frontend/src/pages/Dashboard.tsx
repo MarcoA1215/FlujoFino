@@ -1,29 +1,9 @@
+import { refreshOutline } from 'ionicons/icons';
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
 import {
-  IonButtons,
-  IonContent,
-  IonHeader,
-  IonMenuButton,
-  IonPage,
-  IonTitle,
-  IonToolbar,
-  IonGrid,
-  IonRow,
-  IonCol,
-  IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonCardContent,
-  IonIcon,
-  IonText,
-  useIonToast,
-  IonList,
-  IonItem,
-  IonLabel,
-  IonBadge
-} from '@ionic/react';
+  IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonIcon, IonText, useIonToast, IonList, IonItem, IonLabel, IonBadge, IonButtons, IonButton } from '@ionic/react';
 import { alertCircleOutline, trendingDownOutline, basketOutline, trendingUpOutline, pieChartOutline, walletOutline } from 'ionicons/icons';
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
@@ -39,6 +19,7 @@ const Dashboard: React.FC = () => {
           <IonToolbar color="primary">
             <IonButtons slot="start"><IonMenuButton /></IonButtons>
             <IonTitle>Bienvenido</IonTitle>
+          <IonButtons slot="end"><IonButton onClick={fetchStats}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding ion-text-center">

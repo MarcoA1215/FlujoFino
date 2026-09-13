@@ -1,11 +1,6 @@
+import { refreshOutline } from 'ionicons/icons';
 ﻿import React, { useState, useEffect } from 'react';
-import {
-  IonPage, IonHeader, IonContent, IonButtons, IonMenuButton, IonTitle,
-  IonSearchbar,
-  IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle,
-  IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton,
-  IonLabel, useIonAlert, useIonToast, IonNote
-} from '@ionic/react';
+import { IonPage, IonHeader, IonContent, IonButtons, IonMenuButton, IonTitle, IonSearchbar, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton, IonLabel, useIonAlert, useIonToast, IonNote, IonIcon } from '@ionic/react';
 import { apiClient } from '../api/client';
 import type { RawMaterial } from '../types';
 import { RawMaterialCard } from '../components/raw-materials/RawMaterialCard';
@@ -138,7 +133,8 @@ const RawMaterials: React.FC = () => {
   return (
     <IonPage>
       <IonHeader>
-        <IonToolbar color="success"><IonButtons slot="start"><IonMenuButton /></IonButtons><IonTitle>Insumos (Materia Prima)</IonTitle></IonToolbar>
+        <IonToolbar color="success"><IonButtons slot="start"><IonMenuButton /></IonButtons><IonTitle>Insumos (Materia Prima)</IonTitle>
+          <IonButtons slot="end"><IonButton onClick={fetchMaterials}><IonIcon icon={refreshOutline} /></IonButton></IonButtons></IonToolbar>
         <IonToolbar color="success">
           <IonSearchbar value={searchText} debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} placeholder="Buscar..." animated />
         </IonToolbar>

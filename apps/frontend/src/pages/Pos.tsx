@@ -1,32 +1,5 @@
-import {
-  IonButtons,
-  IonContent,
-  IonHeader,
-  IonMenuButton,
-  IonPage,
-  IonTitle,
-  IonToolbar,
-  IonGrid,
-  IonRow,
-  IonCol,
-  IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonCardContent,
-  IonItem,
-  IonButton,
-  IonList,
-  IonLabel,
-  IonBadge,
-  useIonToast,
-  useIonAlert,
-  IonInput,
-  IonSelect,
-  IonSelectOption,
-  IonText,
-  IonIcon,
-  IonSearchbar,
-} from '@ionic/react';
+import { refreshOutline } from 'ionicons/icons';
+import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonInput, IonSelect, IonSelectOption, IonText, IonIcon, IonSearchbar } from '@ionic/react';
 import { cartOutline, cashOutline, trashOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
 import type { DeliveryZone } from '../types';
@@ -202,6 +175,7 @@ const Pos: React.FC = () => {
             <IonMenuButton />
           </IonButtons>
           <IonTitle>POS / Caja</IonTitle>
+          <IonButtons slot="end"><IonButton onClick={fetchProducts}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
           <IonButtons slot="end">
             <IonButton onClick={openRateAlert}>
               <IonBadge color="light" style={{ padding: '8px', fontSize: '1rem', color: '#000' }}>

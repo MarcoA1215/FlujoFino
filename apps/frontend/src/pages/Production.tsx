@@ -1,4 +1,5 @@
-import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonButton, IonBadge, useIonAlert, useIonToast, IonToolbar, IonTitle } from '@ionic/react';
+import { refreshOutline } from 'ionicons/icons';
+import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonButton, IonBadge, useIonAlert, useIonToast, IonToolbar, IonTitle, IonIcon } from '@ionic/react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 
@@ -75,6 +76,7 @@ const Production: React.FC = () => {
             <IonMenuButton />
           </IonButtons>
           <IonTitle>Producción de Lotes</IonTitle>
+          <IonButtons slot="end"><IonButton onClick={fetchBatches}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
         </IonToolbar>
 
         <IonToolbar color="light">

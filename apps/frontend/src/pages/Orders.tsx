@@ -1,32 +1,5 @@
-﻿import {
-  IonButtons,
-  IonContent,
-  IonHeader,
-  IonMenuButton,
-  IonPage,
-  IonTitle,
-  IonToolbar,
-  IonGrid,
-  IonRow,
-  IonCol,
-  IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonCardContent,
-  IonItem,
-  IonButton,
-  IonList,
-  IonLabel,
-  IonBadge,
-  useIonToast,
-  useIonAlert,
-  IonText,
-  IonSelect,
-  IonSelectOption,
-  IonSegment,
-  IonSegmentButton,
-  IonSearchbar
-} from '@ionic/react';
+import { refreshOutline } from 'ionicons/icons';
+﻿import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonText, IonSelect, IonSelectOption, IonSegment, IonSegmentButton, IonSearchbar, IonIcon } from '@ionic/react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';
@@ -221,6 +194,7 @@ const Orders: React.FC = () => {
             <IonMenuButton />
           </IonButtons>
           <IonTitle>Tablero de Pedidos</IonTitle>
+          <IonButtons slot="end"><IonButton onClick={fetchOrders}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
         </IonToolbar>
         <IonToolbar color="success">
           <IonSegment value={tab} onIonChange={e => setTab(e.detail.value as any)}>

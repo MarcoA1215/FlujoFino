@@ -1,5 +1,6 @@
+import { refreshOutline } from 'ionicons/icons';
 ﻿import React, { useState, useEffect, useContext } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonSelect, IonSelectOption, IonButton, IonButtons, IonMenuButton, useIonToast, IonBadge } from '@ionic/react';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonSelect, IonSelectOption, IonButton, IonButtons, IonMenuButton, useIonToast, IonBadge, IonIcon } from '@ionic/react';
 import { apiClient } from '../api/client';
 import { UserRole } from '@nutrideli/shared-types';
 import { AuthContext } from '../context/AuthContext';
@@ -62,7 +63,8 @@ const Users: React.FC = () => {
   if (user?.role !== UserRole.ADMIN) {
     return (
       <IonPage>
-        <IonHeader><IonToolbar color="danger"><IonButtons slot="start"><IonMenuButton /></IonButtons><IonTitle>Acceso Denegado</IonTitle></IonToolbar></IonHeader>
+        <IonHeader><IonToolbar color="danger"><IonButtons slot="start"><IonMenuButton /></IonButtons><IonTitle>Acceso Denegado</IonTitle>
+          <IonButtons slot="end"><IonButton onClick={fetchUsers}><IonIcon icon={refreshOutline} /></IonButton></IonButtons></IonToolbar></IonHeader>
         <IonContent className="ion-padding ion-text-center">
           <h2>No tienes permiso para ver esta pantalla.</h2>
         </IonContent>

@@ -1,3 +1,4 @@
+import { refreshOutline } from 'ionicons/icons';
 import React, { useEffect, useState } from 'react';
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, IonInput, useIonToast, IonText, IonFab, IonFabButton, IonModal } from '@ionic/react';
 import { addOutline, trashOutline, pencilOutline, mapOutline } from 'ionicons/icons';
@@ -84,6 +85,7 @@ const DeliveryZones: React.FC = () => {
             <IonMenuButton />
           </IonButtons>
           <IonTitle>Zonas de Delivery</IonTitle>
+          <IonButtons slot="end"><IonButton onClick={fetchZones}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
         </IonToolbar>
 
         <IonToolbar color="light">

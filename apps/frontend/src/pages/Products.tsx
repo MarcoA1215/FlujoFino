@@ -1,19 +1,6 @@
+import { refreshOutline } from 'ionicons/icons';
 import React, { useEffect, useState } from 'react';
-import {
-  IonButtons,
-  IonContent,
-  IonHeader,
-  IonMenuButton,
-  IonPage, IonSearchbar,
-  IonTitle,
-  IonToolbar,
-  IonGrid,
-  IonRow,
-  IonCol,
-  IonButton,
-  useIonAlert,
-  useIonToast
-} from '@ionic/react';
+import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonToast, IonIcon } from '@ionic/react';
 import { apiClient } from '../api/client';
 import type { Product } from '../types';
 import { ProductCard } from '../components/products/ProductCard';
@@ -182,6 +169,7 @@ const Products: React.FC = () => {
         <IonToolbar color="success">
           <IonButtons slot="start"><IonMenuButton /></IonButtons>
           <IonTitle>Catálogo de Productos</IonTitle>
+          <IonButtons slot="end"><IonButton onClick={fetchProducts}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
         </IonToolbar>
         <IonToolbar color="success">
           <IonSearchbar value={searchText} debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} placeholder="Buscar..." animated />
