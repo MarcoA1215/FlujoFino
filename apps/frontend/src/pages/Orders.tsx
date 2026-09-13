@@ -78,10 +78,7 @@ const Orders: React.FC = () => {
     } catch (e) {}
   };
 
-  useEffect(() => {
-    fetchOrders();
-    fetchRate();
-  }, []);
+  useEffect(() => { fetchOrders(); fetchRate(); const interval = setInterval(() => { fetchOrders(); }, 15000); return () => clearInterval(interval); }, []);
 
   const updateStatus = async (id: string, status: OrderStatus) => {
     try {
@@ -352,3 +349,4 @@ const Orders: React.FC = () => {
   );
 };
 export default Orders;
+
