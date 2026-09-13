@@ -1,4 +1,4 @@
-import { refreshOutline } from 'ionicons/icons';
+﻿import { refreshOutline } from 'ionicons/icons';
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonButton, IonBadge, useIonAlert, useIonToast, IonToolbar, IonTitle, IonIcon } from '@ionic/react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
@@ -33,7 +33,7 @@ const Production: React.FC = () => {
   const openProduceAlert = (p: Product) => {
     presentAlert({
       header: `Producir ${p.name}`,
-      subHeader: `Se descontarán insumos automáticamente`,
+      subHeader: `Se descontarÃ¡n insumos automÃ¡ticamente`,
       inputs: [
         { name: 'quantity', type: 'number', placeholder: 'Cantidad a fabricar', min: 1 },
       ],
@@ -75,8 +75,8 @@ const Production: React.FC = () => {
           <IonButtons slot="start">
             <IonMenuButton />
           </IonButtons>
-          <IonTitle>Producción de Lotes</IonTitle>
-          <IonButtons slot="end"><IonButton onClick={fetchBatches}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
+          <IonTitle>ProducciÃ³n de Lotes</IonTitle>
+          <IonButtons slot="end"><IonButton onClick={fetchProducts}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
         </IonToolbar>
 
         <IonToolbar color="light">
@@ -90,10 +90,10 @@ const Production: React.FC = () => {
             <IonCol size="12">
               <IonCard>
                 <IonCardHeader>
-                  <IonCardTitle>Fábrica / Cocina</IonCardTitle>
+                  <IonCardTitle>FÃ¡brica / Cocina</IonCardTitle>
                 </IonCardHeader>
                 <IonCardContent>
-                  <p>Selecciona un producto y la cantidad a fabricar. El sistema descontará automáticamente los insumos requeridos según la receta.</p>
+                  <p>Selecciona un producto y la cantidad a fabricar. El sistema descontarÃ¡ automÃ¡ticamente los insumos requeridos segÃºn la receta.</p>
                   
                   <IonGrid className="ion-no-padding ion-margin-top">
                     <IonRow>
@@ -127,3 +127,4 @@ const Production: React.FC = () => {
 };
 
 export default Production;
+

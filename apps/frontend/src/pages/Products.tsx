@@ -1,4 +1,4 @@
-import { refreshOutline } from 'ionicons/icons';
+﻿import { refreshOutline } from 'ionicons/icons';
 import React, { useEffect, useState } from 'react';
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonToast, IonIcon } from '@ionic/react';
 import { apiClient } from '../api/client';
@@ -33,7 +33,7 @@ const Products: React.FC = () => {
       header: isCombo ? 'Nuevo Combo' : 'Nuevo Producto Base',
       inputs: [
         { name: 'name', type: 'text', placeholder: 'Nombre' },
-        { name: 'category', type: 'text', placeholder: 'Categoría' },
+        { name: 'category', type: 'text', placeholder: 'CategorÃ­a' },
         { name: 'salePrice', type: 'number', placeholder: 'Precio Venta' }
       ],
       buttons: [
@@ -64,7 +64,7 @@ const Products: React.FC = () => {
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         { 
-          text: 'Añadir Stock', 
+          text: 'AÃ±adir Stock', 
           handler: async (data) => {
             if (!data.quantity) return false;
             try {
@@ -82,9 +82,9 @@ const Products: React.FC = () => {
 
   const openLossAlert = (p: Product) => {
     presentAlert({
-      header: 'Pérdida: ' + p.name,
+      header: 'PÃ©rdida: ' + p.name,
       inputs: [
-        { name: 'quantity', type: 'number', placeholder: 'Cantidad pérdida', min: 1 },
+        { name: 'quantity', type: 'number', placeholder: 'Cantidad pÃ©rdida', min: 1 },
         { name: 'reason', type: 'text', placeholder: 'Motivo' }
       ],
       buttons: [
@@ -97,7 +97,7 @@ const Products: React.FC = () => {
             try {
               await apiClient.post('/products/' + p.id + '/loss', { quantity: parseFloat(data.quantity), reason: data.reason });
               fetchData();
-              presentToast({ message: 'Pérdida registrada', duration: 2000, color: 'warning' });
+              presentToast({ message: 'PÃ©rdida registrada', duration: 2000, color: 'warning' });
             } catch(e) {
               presentToast({ message: 'Error', duration: 3000, color: 'danger' });
             }
@@ -112,7 +112,7 @@ const Products: React.FC = () => {
       header: 'Editar Producto',
       inputs: [
         { name: 'name', type: 'text', value: p.name, placeholder: 'Nombre' },
-        { name: 'category', type: 'text', value: p.category, placeholder: 'Categoría' },
+        { name: 'category', type: 'text', value: p.category, placeholder: 'CategorÃ­a' },
         { name: 'salePrice', type: 'number', value: p.salePrice, placeholder: 'Precio Venta ($)' }
       ],
       buttons: [
@@ -136,8 +136,8 @@ const Products: React.FC = () => {
 
   const handleDeleteProduct = (p: Product) => {
     presentAlert({
-      header: 'Confirmar Eliminación',
-      message: '¿Estás seguro de eliminar este producto? Datos históricos se mantendrán.',
+      header: 'Confirmar EliminaciÃ³n',
+      message: 'Â¿EstÃ¡s seguro de eliminar este producto? Datos histÃ³ricos se mantendrÃ¡n.',
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         {
@@ -168,8 +168,8 @@ const Products: React.FC = () => {
       <IonHeader>
         <IonToolbar color="success">
           <IonButtons slot="start"><IonMenuButton /></IonButtons>
-          <IonTitle>Catálogo de Productos</IonTitle>
-          <IonButtons slot="end"><IonButton onClick={fetchProducts}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
+          <IonTitle>CatÃ¡logo de Productos</IonTitle>
+          <IonButtons slot="end"><IonButton onClick={fetchData}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
         </IonToolbar>
         <IonToolbar color="success">
           <IonSearchbar value={searchText} debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} placeholder="Buscar..." animated />
@@ -209,4 +209,5 @@ const Products: React.FC = () => {
   );
 };
 export default Products;
+
 
