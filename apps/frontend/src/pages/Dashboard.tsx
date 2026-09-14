@@ -191,6 +191,38 @@ const Dashboard: React.FC = () => {
                 <IonCard>
                   <IonCardHeader>
                     <IonCardTitle style={{ fontSize: '1.2rem' }}>
+                      <IonIcon icon={alertCircleOutline} color="warning" style={{ verticalAlign: 'middle', marginRight: '8px' }} /> 
+                      Productos por Fabricar
+                    </IonCardTitle>
+                  </IonCardHeader>
+                  <IonCardContent>
+                    {summary.lowStockProducts.length === 0 ? (
+                      <p style={{ color: 'gray', fontStyle: 'italic' }}>No hay pedidos pendientes por fabricar.</p>
+                    ) : (
+                      <IonList>
+                        {summary.lowStockProducts.map(prod => (
+                          <IonItem key={'prod-' + prod.id}>
+                            <IonLabel>
+                              <IonText color="warning">
+                                <h2 style={{ fontWeight: 'bold' }}>{prod.name}</h2>
+                              </IonText>
+                            </IonLabel>
+                            <div slot="end" style={{ textAlign: 'right' }}>
+                              <IonBadge color="warning">Fabricar: {parseFloat(Number(prod.toProduce).toFixed(4))}</IonBadge>
+                              <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>Pendientes</div>
+                            </div>
+                          </IonItem>
+                        ))}
+                      </IonList>
+                    )}
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+
+<IonCol size="12" sizeMd="6">
+                <IonCard>
+                  <IonCardHeader>
+                    <IonCardTitle style={{ fontSize: '1.2rem' }}>
                       <IonIcon icon={alertCircleOutline} color="danger" style={{ verticalAlign: 'middle', marginRight: '8px' }} /> 
                       Insumos por Comprar
                     </IonCardTitle>
@@ -212,38 +244,6 @@ const Dashboard: React.FC = () => {
                             <div slot="end" style={{ textAlign: 'right' }}>
                               <IonBadge color="danger">Efectivo: {parseFloat(Number(alert.effectiveStock).toFixed(4))} {alert.unit}</IonBadge>
                               <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>¡Reabastecer!</div>
-                            </div>
-                          </IonItem>
-                        ))}
-                      </IonList>
-                    )}
-                  </IonCardContent>
-                </IonCard>
-              </IonCol>
-
-              <IonCol size="12" sizeMd="6">
-                <IonCard>
-                  <IonCardHeader>
-                    <IonCardTitle style={{ fontSize: '1.2rem' }}>
-                      <IonIcon icon={alertCircleOutline} color="warning" style={{ verticalAlign: 'middle', marginRight: '8px' }} /> 
-                      Productos por Fabricar
-                    </IonCardTitle>
-                  </IonCardHeader>
-                  <IonCardContent>
-                    {summary.lowStockProducts.length === 0 ? (
-                      <p style={{ color: 'gray', fontStyle: 'italic' }}>No hay pedidos pendientes por fabricar.</p>
-                    ) : (
-                      <IonList>
-                        {summary.lowStockProducts.map(prod => (
-                          <IonItem key={'prod-' + prod.id}>
-                            <IonLabel>
-                              <IonText color="warning">
-                                <h2 style={{ fontWeight: 'bold' }}>{prod.name}</h2>
-                              </IonText>
-                            </IonLabel>
-                            <div slot="end" style={{ textAlign: 'right' }}>
-                              <IonBadge color="warning">Fabricar: {parseFloat(Number(prod.toProduce).toFixed(4))}</IonBadge>
-                              <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>Pendientes</div>
                             </div>
                           </IonItem>
                         ))}
