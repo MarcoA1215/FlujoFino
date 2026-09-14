@@ -1,5 +1,5 @@
 ﻿import { refreshOutline } from 'ionicons/icons';
-ï»¿import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonText, IonSelect, IonSelectOption, IonSegment, IonSegmentButton, IonSearchbar, IonIcon } from '@ionic/react';
+import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonText, IonSelect, IonSelectOption, IonSegment, IonSegmentButton, IonSearchbar, IonIcon } from '@ionic/react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';
@@ -9,7 +9,7 @@ type OrderItem = {
   id: string;
   productName: string;
   quantity: number;
-};
+
 
 type Order = {
   id: string;
@@ -25,7 +25,7 @@ type Order = {
   deliveryMethod?: DeliveryMethod;
   deliveryZone?: DeliveryZone;
   deliveryFee?: number;
-};
+
 
 const Orders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -80,12 +80,12 @@ const Orders: React.FC = () => {
     if (order.status === OrderStatus.CANCELED) return;
     const totalBs = (order.totalAmount * exchangeRate).toFixed(2);
     presentAlert({
-      header: "Confirmar Pago MÃ³vil",
+      header: "Confirmar Pago Mvil",
       subHeader: `Monto a cobrar: Bs. ${totalBs}`,
       inputs: [
         { name: "pagoMovilRef", type: "text", placeholder: "Referencia (Ej. 123456)" },
-        { name: "pagoMovilPhone", type: "text", placeholder: "Teléfono Origen (Opcional)" },
-        { name: "pagoMovilCedula", type: "text", placeholder: "Cédula (Opcional)" },
+        { name: "pagoMovilPhone", type: "text", placeholder: "Telfono Origen (Opcional)" },
+        { name: "pagoMovilCedula", type: "text", placeholder: "Cdula (Opcional)" },
         { name: "pagoMovilBank", type: "text", placeholder: "Banco" },
       ],
       buttons: [
@@ -141,12 +141,12 @@ const Orders: React.FC = () => {
             try {
               await apiClient.patch(`/orders/${order.id}/payment`, {
                 status: PaymentStatus.PAID,
-                notes: `MÃ‰TODO: Divisas (USD) | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
+                notes: `MTODO: Divisas (USD) | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
               });
               fetchOrders();
               presentAlert({
                 header: "Pago Confirmado",
-                message: `Dar Vuelto: <br><br><b>$${changeUsd.toFixed(2)}</b> Ã³ <br><b>Bs. ${changeBs.toFixed(2)}</b>`,
+                message: `Dar Vuelto: <br><br><b>$${changeUsd.toFixed(2)}</b>  <br><b>Bs. ${changeBs.toFixed(2)}</b>`,
                 buttons: ["OK"]
               });
             } catch (e) {
@@ -320,13 +320,15 @@ const Orders: React.FC = () => {
         </IonGrid>
 
         <IonInfiniteScroll onIonInfinite={loadMore} disabled={displayCount >= filteredOrders.length}>
-          <IonInfiniteScrollContent loadingText="Cargando más..."></IonInfiniteScrollContent>
+          <IonInfiniteScrollContent loadingText="Cargando ms..."></IonInfiniteScrollContent>
         </IonInfiniteScroll>
 
       </IonContent>
     </IonPage>
   );
-};
+
 export default Orders;
+
+
 
 

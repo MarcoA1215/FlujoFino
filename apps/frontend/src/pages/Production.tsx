@@ -184,6 +184,7 @@ const Production: React.FC = () => {
             </IonRow>
           </IonGrid>
         ) : (
+          <>
           <IonList>
             {paginatedBatches.map(b => (
               <IonItem key={b.id}>
@@ -206,6 +207,7 @@ const Production: React.FC = () => {
           <IonInfiniteScroll onIonInfinite={loadMore} disabled={displayCount >= batches.length}>
             <IonInfiniteScrollContent loadingText="Cargando más..."></IonInfiniteScrollContent>
           </IonInfiniteScroll>
+          </>
         )}
       </IonContent>
     </IonPage>
