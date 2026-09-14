@@ -222,7 +222,7 @@ const Orders: React.FC = () => {
       <IonContent fullscreen className="ion-padding">
         <IonGrid>
           <IonRow>
-            {paginatedOrders.map(order => (
+            {filteredOrders.map(order => (
               <IonCol size="12" sizeMd="6" sizeLg="4" key={order.id}>
                 <IonCard color={order.status === OrderStatus.DELIVERED ? "light" : (order.status === OrderStatus.CANCELED ? "medium" : "white")}>
                   <IonCardHeader>
@@ -319,9 +319,7 @@ const Orders: React.FC = () => {
           </IonRow>
         </IonGrid>
 
-        <IonInfiniteScroll onIonInfinite={loadMore} disabled={displayCount >= filteredOrders.length}>
-          <IonInfiniteScrollContent loadingText="Cargando más..."></IonInfiniteScrollContent>
-        </IonInfiniteScroll>
+        
 
       </IonContent>
     </IonPage>

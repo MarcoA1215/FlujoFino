@@ -102,7 +102,7 @@ export const MovementHistoryModal: React.FC<MovementHistoryModalProps> = ({ mate
               <tr><th>Fecha</th><th>Tipo</th><th>Cantidad</th><th>Costo</th><th>Notas</th><th>Acción</th></tr>
             </thead>
             <tbody>
-              {paginatedMovements.map(mov => (
+              {movements.map(mov => (
                 <tr key={mov.id}>
                   <td>{new Date(mov.createdAt).toLocaleString()}</td>
                   <td>
