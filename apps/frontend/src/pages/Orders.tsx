@@ -1,5 +1,5 @@
 ﻿import { refreshOutline } from 'ionicons/icons';
-import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonText, IonSelect, IonSelectOption, IonSegment, IonSegmentButton, IonSearchbar, IonIcon, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/react';
+import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonText, IonSelect, IonSelectOption, IonSegment, IonSegmentButton, IonSearchbar, IonIcon } from '@ionic/react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';

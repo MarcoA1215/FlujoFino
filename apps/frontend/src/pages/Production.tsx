@@ -24,7 +24,7 @@ const Production: React.FC = () => {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [presentAlert] = useIonAlert();
   const [searchText, setSearchText] = useState('');
-  const [displayCount, setDisplayCount] = useState(15);
+  
   const [presentToast] = useIonToast();
 
   const fetchData = async () => {
@@ -107,14 +107,9 @@ const Production: React.FC = () => {
     return p.name?.toLowerCase().includes(searchText.toLowerCase());
   });
 
-  const paginatedBatches = batches.slice(0, displayCount);
+  
 
-  const loadMore = (e: any) => {
-    setTimeout(() => {
-      setDisplayCount(prev => prev + 15);
-      e.target.complete();
-    }, 500);
-  };
+  
 
   return (
     <IonPage>
