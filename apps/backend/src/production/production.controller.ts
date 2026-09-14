@@ -8,6 +8,10 @@ export class CreateBatchDto {
 
 @Controller('production')
 export class ProductionController {
+  @Delete(':id')
+  revertBatch(@Param('id') id: string) {
+    return this.productionService.revertBatch(id);
+  }
   @Get()
   getBatches() {
     return this.productionService.getBatches();
@@ -20,6 +24,7 @@ export class ProductionController {
     return this.productionService.createBatch(dto.productId, dto.quantity);
   }
 }
+
 
 
 
