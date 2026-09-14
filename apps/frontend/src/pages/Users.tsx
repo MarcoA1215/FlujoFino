@@ -1,18 +1,23 @@
-import { refreshOutline, saveOutline } from 'ionicons/icons';
-﻿import React, { useState, useEffect, useContext } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonSelect, IonSelectOption, IonButton, IonButtons, IonMenuButton, useIonToast, IonBadge, IonIcon } from '@ionic/react';
+﻿import { refreshOutline, saveOutline } from 'ionicons/icons';
+import React, { useState, useEffect, useContext } from 'react';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonSelect, IonSelectOption, IonButton, IonButtons, IonMenuButton, useIonToast, IonBadge, IonIcon, IonList } from '@ionic/react';
 import { apiClient } from '../api/client';
 import { UserRole } from '@nutrideli/shared-types';
 import { AuthContext } from '../context/AuthContext';
 
-type Settings = { exchangeRateBs: number; companyBank?: string; companyCedula?: string; companyPhone?: string; };
+type Settings = { 
+  exchangeRateBs: number; 
+  companyBank?: string; 
+  companyCedula?: string; 
+  companyPhone?: string; 
+};
 
 interface User {
   id: string;
   username: string;
   role: UserRole;
   createdAt: string;
-
+}
 
 const Users: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -42,7 +47,11 @@ const Users: React.FC = () => {
 
   const handleSaveSettings = async () => {
     try {
-      await apiClient.put('/settings', { companyBank: settings.companyBank, companyCedula: settings.companyCedula, companyPhone: settings.companyPhone });
+      await apiClient.put('/settings', { 
+        companyBank: settings.companyBank, 
+        companyCedula: settings.companyCedula, 
+        companyPhone: settings.companyPhone 
+      });
       presentToast({ message: 'Ajustes guardados', duration: 2000, color: 'success' });
       fetchUsers();
     } catch(e: any) {
@@ -61,7 +70,7 @@ const Users: React.FC = () => {
       setPassword('');
       fetchUsers();
     } catch (e: any) {
-      presentToast({ message: 'Error al crear usuario. (Puede que el nombre ya exista)', duration: 4000, color: 'danger' });
+      presentToast({ message: 'Error al crear usuario', duration: 4000, color: 'danger' });
     }
   };
 
@@ -78,8 +87,13 @@ const Users: React.FC = () => {
   if (user?.role !== UserRole.ADMIN) {
     return (
       <IonPage>
-        <IonHeader><IonToolbar color="danger"><IonButtons slot="start"><IonMenuButton /></IonButtons><IonTitle>Acceso Denegado</IonTitle>
-          <IonButtons slot="end"><IonButton onClick={fetchUsers}><IonIcon icon={refreshOutline} /></IonButton></IonButtons></IonToolbar></IonHeader>
+        <IonHeader>
+          <IonToolbar color="danger">
+            <IonButtons slot="start"><IonMenuButton /></IonButtons>
+            <IonTitle>Acceso Denegado</IonTitle>
+            <IonButtons slot="end"><IonButton onClick={fetchUsers}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
+          </IonToolbar>
+        </IonHeader>
         <IonContent className="ion-padding ion-text-center">
           <h2>No tienes permiso para ver esta pantalla.</h2>
         </IonContent>
@@ -104,6 +118,7 @@ const Users: React.FC = () => {
                   <IonCardTitle>Datos Bancarios de la Empresa</IonCardTitle>
                 </IonCardHeader>
                 <IonCardContent>
+                  <p style={{marginBottom: '15px'}}>Estos datos se usarán para autocompletar recibos y textos copiados para WhatsApp.</p>
                   <IonList>
                     <IonItem>
                       <IonLabel position="stacked">Banco Receptor</IonLabel>
@@ -199,6 +214,6 @@ const Users: React.FC = () => {
       </IonContent>
     </IonPage>
   );
-
+};
 
 export default Users;
