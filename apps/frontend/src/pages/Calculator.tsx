@@ -75,6 +75,31 @@ const Calculator: React.FC = () => {
     setSelectedZoneId('');
   };
 
+  
+  const handleCopyTicket = () => {
+    if (cart.length === 0) {
+      return presentToast({ message: 'El carrito está vacío', duration: 2000, color: 'warning' });
+    }
+    let text = '*NutriDeli - Resumen de Pedido*\n--------------------------\n';
+    cart.forEach(item => { text += `- ${item.quantity}x ${item.product.name} (${item.product.salePrice.toFixed(2)})\n`; });
+    text += '--------------------------\n';
+    text += `Subtotal: ${cartSubtotal.toFixed(2)}\n`;
+    const deliveryFee = selectedZoneId ? (deliveryZones.find(z => z.id === selectedZoneId)?.feePrice || 0) : 0;
+    if (deliveryFee > 0) text += `Delivery: ${deliveryFee.toFixed(2)}\n`;
+    const totalUSD = cartSubtotal + deliveryFee;
+    const totalBs = totalUSD * exchangeRate;
+    text += `*TOTAL: ${totalUSD.toFixed(2)}* (aprox Bs. ${totalBs.toFixed(2)})\n\n`;
+    if (settings && (settings.companyBank || settings.companyPhone || settings.companyCedula)) {
+      text += '*Nuestros Datos de Pago (Pago Móvil):*\n';
+      if (settings.companyBank) text += `Banco: ${settings.companyBank}\n`;
+      if (settings.companyCedula) text += `Cédula: ${settings.companyCedula}\n`;
+      if (settings.companyPhone) text += `Teléfono: ${settings.companyPhone}\n`;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+      presentToast({ message: 'Ticket copiado al portapapeles', duration: 2000, color: 'success' });
+    });
+  };
+
   const cartSubtotal = cart.reduce((acc, item) => acc + (item.product.salePrice * item.quantity), 0);
   const deliveryFee = selectedZoneId ? (deliveryZones.find(z => z.id === selectedZoneId)?.feePrice || 0) : 0;
   const totalUSD = cartSubtotal + deliveryFee;
