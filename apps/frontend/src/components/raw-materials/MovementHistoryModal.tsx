@@ -26,6 +26,16 @@ interface MovementHistoryModalProps {
 
 export const MovementHistoryModal: React.FC<MovementHistoryModalProps> = ({ material, onClose, onCorrected }) => {
   const [movements, setMovements] = useState<Movement[]>([]);
+  const [displayCount, setDisplayCount] = useState(15);
+
+  const paginatedMovements = movements.slice(0, displayCount);
+
+  const loadMore = (e: any) => {
+    setTimeout(() => {
+      setDisplayCount(prev => prev + 15);
+      e.target.complete();
+    }, 500);
+  };
   const [presentAlert] = useIonAlert();
   const [presentToast] = useIonToast();
 
@@ -92,7 +102,7 @@ export const MovementHistoryModal: React.FC<MovementHistoryModalProps> = ({ mate
               <tr><th>Fecha</th><th>Tipo</th><th>Cantidad</th><th>Costo</th><th>Notas</th><th>Acción</th></tr>
             </thead>
             <tbody>
-              {movements.map(mov => (
+              {paginatedMovements.map(mov => (
                 <tr key={mov.id}>
                   <td>{new Date(mov.createdAt).toLocaleString()}</td>
                   <td>

@@ -1,5 +1,5 @@
-import { refreshOutline } from 'ionicons/icons';
-﻿import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonText, IonSelect, IonSelectOption, IonSegment, IonSegmentButton, IonSearchbar, IonIcon } from '@ionic/react';
+﻿import { refreshOutline } from 'ionicons/icons';
+ï»¿import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonText, IonSelect, IonSelectOption, IonSegment, IonSegmentButton, IonSearchbar, IonIcon } from '@ionic/react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';
@@ -80,12 +80,12 @@ const Orders: React.FC = () => {
     if (order.status === OrderStatus.CANCELED) return;
     const totalBs = (order.totalAmount * exchangeRate).toFixed(2);
     presentAlert({
-      header: "Confirmar Pago Móvil",
+      header: "Confirmar Pago MÃ³vil",
       subHeader: `Monto a cobrar: Bs. ${totalBs}`,
       inputs: [
         { name: "pagoMovilRef", type: "text", placeholder: "Referencia (Ej. 123456)" },
-        { name: "pagoMovilPhone", type: "text", placeholder: "Teléfono Origen" },
-        { name: "pagoMovilCedula", type: "text", placeholder: "Cédula" },
+        { name: "pagoMovilPhone", type: "text", placeholder: "Teléfono Origen (Opcional)" },
+        { name: "pagoMovilCedula", type: "text", placeholder: "Cédula (Opcional)" },
         { name: "pagoMovilBank", type: "text", placeholder: "Banco" },
       ],
       buttons: [
@@ -93,8 +93,8 @@ const Orders: React.FC = () => {
         {
           text: "Confirmar Pago",
           handler: async (data: any) => {
-            if (!data.pagoMovilRef || !data.pagoMovilPhone || !data.pagoMovilCedula || !data.pagoMovilBank) {
-              presentToast({ message: "Todos los datos son obligatorios", duration: 3000, color: "warning" });
+            if (!data.pagoMovilRef || !data.pagoMovilBank) {
+              presentToast({ message: "Referencia y Banco son obligatorios", duration: 3000, color: "warning" });
               return false;
             }
             try {
@@ -141,12 +141,12 @@ const Orders: React.FC = () => {
             try {
               await apiClient.patch(`/orders/${order.id}/payment`, {
                 status: PaymentStatus.PAID,
-                notes: `MÉTODO: Divisas (USD) | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
+                notes: `MÃ‰TODO: Divisas (USD) | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
               });
               fetchOrders();
               presentAlert({
                 header: "Pago Confirmado",
-                message: `Dar Vuelto: <br><br><b>$${changeUsd.toFixed(2)}</b> ó <br><b>Bs. ${changeBs.toFixed(2)}</b>`,
+                message: `Dar Vuelto: <br><br><b>$${changeUsd.toFixed(2)}</b> Ã³ <br><b>Bs. ${changeBs.toFixed(2)}</b>`,
                 buttons: ["OK"]
               });
             } catch (e) {
@@ -222,7 +222,7 @@ const Orders: React.FC = () => {
       <IonContent fullscreen className="ion-padding">
         <IonGrid>
           <IonRow>
-            {filteredOrders.map(order => (
+            {paginatedOrders.map(order => (
               <IonCol size="12" sizeMd="6" sizeLg="4" key={order.id}>
                 <IonCard color={order.status === OrderStatus.DELIVERED ? "light" : (order.status === OrderStatus.CANCELED ? "medium" : "white")}>
                   <IonCardHeader>
@@ -318,9 +318,15 @@ const Orders: React.FC = () => {
             )}
           </IonRow>
         </IonGrid>
+
+        <IonInfiniteScroll onIonInfinite={loadMore} disabled={displayCount >= filteredOrders.length}>
+          <IonInfiniteScrollContent loadingText="Cargando más..."></IonInfiniteScrollContent>
+        </IonInfiniteScroll>
+
       </IonContent>
     </IonPage>
   );
 };
 export default Orders;
+
 

@@ -1,8 +1,15 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, IonInput, useIonToast, IonSelect, IonSelectOption } from '@ionic/react';
-import { calculatorOutline, addOutline, removeOutline, trashOutline } from 'ionicons/icons';
+import { calculatorOutline, addOutline, removeOutline, trashOutline, copyOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import type { Product, DeliveryZone } from '../types';
+
+type Settings = {
+  exchangeRateBs: number;
+  companyBank?: string;
+  companyCedula?: string;
+  companyPhone?: string;
+};
 
 interface CartItem {
   product: Product;
@@ -13,6 +20,7 @@ const Calculator: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(36.5);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState<string>('');
   
@@ -24,11 +32,12 @@ const Calculator: React.FC = () => {
       try {
         const [productsRes, rateRes, zonesRes] = await Promise.all([
           apiClient.get<Product[]>('/products'),
-          apiClient.get<{ exchangeRateBs: number }>('/settings/exchange-rate'),
+          apiClient.get<Settings>('/settings'),
           apiClient.get<DeliveryZone[]>('/delivery-zones')
         ]);
         setProducts(productsRes.data);
         setExchangeRate(rateRes.data.exchangeRateBs);
+          setSettings(rateRes.data);
         setDeliveryZones(zonesRes.data);
       } catch (e) {
         presentToast({ message: 'Error cargando datos', duration: 3000, color: 'danger' });
@@ -124,7 +133,7 @@ const Calculator: React.FC = () => {
                 <IonCardHeader>
                   <IonCardTitle className="ion-text-center">
                     <IonIcon icon={calculatorOutline} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                    Presupuesto Rápido
+                    Presupuesto RÃ¡pido
                   </IonCardTitle>
                 </IonCardHeader>
                 <IonCardContent>
@@ -139,7 +148,7 @@ const Calculator: React.FC = () => {
                   }}>
                     <div style={{ textAlign: 'center', marginBottom: '20px' }}>
                       <h2 style={{ margin: 0, fontWeight: 'bold', fontSize: '1.5rem' }}>NUTRI DELI</h2>
-                      <p style={{ margin: 0, color: '#666' }}>Cotización de Pedido</p>
+                      <p style={{ margin: 0, color: '#666' }}>CotizaciÃ³n de Pedido</p>
                     </div>
                     
                     <div style={{ borderBottom: '2px dashed #ccc', paddingBottom: '10px', marginBottom: '10px' }}>
@@ -170,7 +179,7 @@ const Calculator: React.FC = () => {
                                 $ {(item.product.salePrice * item.quantity).toFixed(2)}
                               </IonCol>
                             </IonRow>
-                            {/* Controles ocultos en la captura idealmente, pero útiles para editar */}
+                            {/* Controles ocultos en la captura idealmente, pero Ãºtiles para editar */}
                             <IonRow className="ion-margin-top">
                               <IonCol size="12" className="ion-text-right">
                                 <IonButton fill="clear" size="small" onClick={() => updateQuantity(item.product.id, -1)}><IonIcon icon={removeOutline}/></IonButton>
@@ -251,13 +260,18 @@ const Calculator: React.FC = () => {
                       Limpiar
                     </IonButton>
                   </div>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          </IonRow>
-        </IonGrid>
-      </IonContent>
+                  <IonButton expand="block" color="secondary" className="ion-margin-top" onClick={handleCopyTicket}>
+                            <IonIcon slot="start" icon={copyOutline} />
+                            Copiar para WhatsApp
+                          </IonButton>
+                        </IonCardContent>
+                      </IonCard>
+                    </IonCol>
+                  </IonRow>
+                </IonGrid>
+              </IonContent>
     </IonPage>
   );
 };
 export default Calculator;
+
