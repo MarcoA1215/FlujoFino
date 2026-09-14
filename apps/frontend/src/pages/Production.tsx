@@ -160,15 +160,17 @@ const Production: React.FC = () => {
                           <IonCol size="12" sizeSm="6" sizeMd="4" key={p.id}>
                             <IonCard style={{ margin: '5px' }}>
                               <IonCardContent>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
-                                  <h2 style={{ flex: 1, fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 10px 0' }}>{p.name}</h2>
-                                  <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '8px', fontSize: '0.95rem', flexShrink: 0, whiteSpace: 'nowrap', marginRight: '5px' }}>
-                                    Físico: {p.physicalStock}
-                                  </IonBadge>
-                                  <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} style={{ padding: '8px', fontSize: '0.95rem', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                                    Disp: {p.stockQuantity}
-                                  </IonBadge>
-                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                                    <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 10px 0', whiteSpace: 'normal', lineHeight: '1.4' }}>{p.name}</h2>
+                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                      <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '8px', fontSize: '0.95rem' }}>
+                                        Físico: {p.physicalStock}
+                                      </IonBadge>
+                                      <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} style={{ padding: '8px', fontSize: '0.95rem' }}>
+                                        Disp: {p.stockQuantity}
+                                      </IonBadge>
+                                    </div>
+                                  </div>
                                 <IonButton size="small" fill="solid" color="primary" onClick={() => openProduceAlert(p)} expand="block">
                                   Producir Lote
                                 </IonButton>

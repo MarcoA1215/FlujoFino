@@ -34,9 +34,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <p style={{ margin: '5px 0 0 0', fontWeight: 'bold' }}>Precio: {p.salePrice.toFixed(2)}</p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, gap: '8px' }}>
-              <IonBadge color={p.stockQuantity <= 0 ? 'danger' : 'primary'} style={{ padding: '8px 10px', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
-                Stock: {p.stockQuantity}
-              </IonBadge>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+                <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '8px 10px', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
+                  Físico: {p.physicalStock}
+                </IonBadge>
+                <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} style={{ padding: '8px 10px', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
+                  Disp: {p.stockQuantity}
+                </IonBadge>
+              </div>
               <div style={{ display: 'flex', gap: '5px' }}>
                 <IonButton fill="clear" size="small" onClick={() => onEdit(p)} style={{ margin: 0, width: '30px', height: '30px' }}><IonIcon icon={pencilOutline} slot="icon-only" /></IonButton>
                 <IonButton fill="clear" size="small" color="danger" onClick={() => onDelete(p)} style={{ margin: 0, width: "30px", height: "30px" }}><IonIcon icon={trashOutline} slot="icon-only" /></IonButton>
