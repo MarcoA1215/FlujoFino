@@ -1,5 +1,5 @@
 ﻿import { refreshOutline, trashOutline } from 'ionicons/icons';
-import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonButton, IonBadge, useIonAlert, useIonToast, IonToolbar, IonTitle, IonIcon, IonSegment, IonSegmentButton, IonLabel, IonList, IonItem, IonText } from '@ionic/react';
+import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonButton, IonBadge, useIonAlert, useIonToast, IonToolbar, IonTitle, IonIcon, IonSegment, IonSegmentButton, IonLabel, IonList, IonItem, } from '@ionic/react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 
@@ -200,3 +200,4 @@ const Production: React.FC = () => {
 };
 
 export default Production;
+
