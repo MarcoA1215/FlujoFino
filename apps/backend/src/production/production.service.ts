@@ -1,10 +1,10 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+﻿import { Injectable, BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Product } from '../entities/product.entity';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { ProductionBatch } from '../entities/production-batch.entity';
-import { StockMovement } from '../entities/stock-movement.entity';
 import { MovementType } from '@nutrideli/shared-types';
+import { StockMovement } from '../entities/stock-movement.entity';
 
 @Injectable()
 export class ProductionService {
@@ -61,7 +61,7 @@ export class ProductionService {
           type: MovementType.OUT_PRODUCTION,
           quantity: requiredAmount,
           totalCost: materialCostUsed,
-          description: `Producción de Lote: ${product.name} (x${quantityToProduce})`,
+          description: `ProducciÃ³n de Lote: ${product.name} (x${quantityToProduce})`,
         });
         await manager.save(StockMovement, movement);
       }
@@ -84,4 +84,59 @@ export class ProductionService {
       };
     });
   }
+  async getBatches() {
+    return this.dataSource.getRepository(ProductionBatch).find({
+      relations: { product: true },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async revertBatch(batchId: string) {
+    return this.dataSource.transaction(async (manager) => {
+      const batch = await manager.findOne(ProductionBatch, { 
+        where: { id: batchId },
+      });
+      if (!batch) throw new BadRequestException('Lote no encontrado');
+
+      const product = await manager.findOne(Product, { 
+        where: { id: batch.productId },
+        relations: { recipe: { rawMaterial: true } }
+      });
+      if (!product) throw new BadRequestException('Producto asociado no encontrado');
+
+      if (product.stockQuantity < batch.quantity) {
+        throw new BadRequestException(`No se puede revertir este lote. El stock actual (${product.stockQuantity}) es menor a la cantidad fabricada (${batch.quantity}). Ya se han vendido/comprometido unidades.`);
+      }
+
+      product.stockQuantity -= batch.quantity;
+      await manager.save(Product, product);
+
+      if (product.recipe && product.recipe.length > 0) {
+        for (const ri of product.recipe) {
+          if (ri.rawMaterial) {
+            const returnedAmount = ri.quantity * batch.quantity;
+            ri.rawMaterial.stockQuantity += returnedAmount;
+            await manager.save(RawMaterial, ri.rawMaterial);
+            
+            const mov = manager.create(StockMovement, {
+              rawMaterialId: ri.rawMaterial.id,
+              type: MovementType.IN,
+              quantity: returnedAmount,
+              totalCost: returnedAmount * ri.rawMaterial.costPerUnit,
+              description: `Reverso de Lote: ${product.name} (x${batch.quantity})`
+            });
+            await manager.save(StockMovement, mov);
+          }
+        }
+      }
+
+      // Finally, delete the batch record so it doesn't show in history
+      await manager.remove(ProductionBatch, batch);
+      return { success: true, message: 'Lote revertido correctamente' };
+    });
+  }
 }
+
+
+
+

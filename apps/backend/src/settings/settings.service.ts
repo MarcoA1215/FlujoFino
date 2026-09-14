@@ -27,6 +27,16 @@ export class SettingsService implements OnModuleInit {
     setTimeout(() => this.syncCotizave(), 5000);
   }
 
+  async getSettings() {
+    const settings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+    return settings || { exchangeRateBs: 40.0 };
+  }
+
+  async updateSettings(dto: Partial<Settings>) {
+    await this.settingsRepo.update('GLOBAL', dto);
+    return this.getSettings();
+  }
+
   async getExchangeRate() {
     const settings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
     return { exchangeRateBs: settings?.exchangeRateBs || 40.0 };
@@ -82,3 +92,4 @@ export class SettingsService implements OnModuleInit {
     }
   }
 }
+

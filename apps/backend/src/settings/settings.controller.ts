@@ -1,8 +1,17 @@
-import { Controller, Get, Put, Body } from '@nestjs/common';
+﻿import { Controller, Get, Put, Body } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 
 @Controller('settings')
 export class SettingsController {
+  @Get()
+  getSettings() {
+    return this.settingsService.getSettings();
+  }
+
+  @Put()
+  updateSettings(@Body() dto: any) {
+    return this.settingsService.updateSettings(dto);
+  }
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get('exchange-rate')
@@ -15,4 +24,5 @@ export class SettingsController {
     return this.settingsService.updateExchangeRate(rate);
   }
 }
+
 

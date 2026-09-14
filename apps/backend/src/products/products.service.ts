@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from '../entities/product.entity';
@@ -32,18 +32,45 @@ export class ProductsService {
       }
     });
 
+    // Calcular stock reservado en pedidos PENDING o PREPARING
+    const reservedDirect = await this.dataSource.query(`
+      SELECT i."productId", SUM(i.quantity) as reserved
+      FROM order_item i
+      JOIN "order" o ON o.id = i."orderId"
+      WHERE o.status IN ('PENDING', 'PREPARING')
+      GROUP BY i."productId"
+    `);
+    
+    const reservedCombos = await this.dataSource.query(`
+      SELECT ci."componentId" as "productId", SUM(i.quantity * ci.quantity) as reserved
+      FROM order_item i
+      JOIN "order" o ON o.id = i."orderId"
+      JOIN combo_item ci ON ci."comboId" = i."productId"
+      WHERE o.status IN ('PENDING', 'PREPARING')
+      GROUP BY ci."componentId"
+    `);
+
+    const reservedMap: Record<string, number> = {};
+    for (const row of reservedDirect) {
+      reservedMap[row.productId] = (reservedMap[row.productId] || 0) + Number(row.reserved);
+    }
+    for (const row of reservedCombos) {
+      reservedMap[row.productId] = (reservedMap[row.productId] || 0) + Number(row.reserved);
+    }
+
     return products.map(p => {
+      let reservedQuantity = reservedMap[p.id] || 0;
+      let physicalStock = 0;
+
       // Si es un combo (tiene comboItems), su stock es virtual
       if (p.comboItems && p.comboItems.length > 0) {
         let minPossible = Infinity;
 
-        // Revisar límite por sub-productos
         for (const ci of p.comboItems) {
           const possibleFromComponent = Math.floor((ci.component?.stockQuantity || 0) / ci.quantity);
           if (possibleFromComponent < minPossible) minPossible = possibleFromComponent;
         }
 
-        // Revisar límite por insumos extra de la bandeja (recipe items directos del combo)
         if (p.recipe && p.recipe.length > 0) {
           for (const ri of p.recipe) {
             const possibleFromRaw = Math.floor((ri.rawMaterial?.stockQuantity || 0) / ri.quantity);
@@ -52,9 +79,12 @@ export class ProductsService {
         }
 
         p.stockQuantity = minPossible === Infinity ? 0 : minPossible;
+        reservedQuantity = 0; // Combos don't have physical stock of their own
+        physicalStock = p.stockQuantity;
+      } else {
+        physicalStock = p.stockQuantity + reservedQuantity;
       }
       
-      // Sanitizar relaciones para no enviar data innecesaria masiva
       const cleanedComboItems = p.comboItems?.map(ci => ({
         id: ci.id,
         componentId: ci.componentId,
@@ -63,8 +93,10 @@ export class ProductsService {
 
       return {
         ...p,
+        reservedQuantity,
+        physicalStock,
         comboItems: cleanedComboItems,
-        recipe: undefined // Hiding recipe to save bandwidth unless specifically requested
+        recipe: undefined
       };
     });
   }
@@ -150,7 +182,7 @@ export class ProductsService {
       // Validaciones de seguridad
       for (const item of dto.comboItems) {
         if (item.componentId === id) {
-          throw new BadRequestException('Un producto no puede ser componente de sí mismo');
+          throw new BadRequestException('Un producto no puede ser componente de sÃ­ mismo');
         }
         const component = await manager.findOne(Product, { where: { id: item.componentId } });
         if (component?.isCombo) {
@@ -215,8 +247,8 @@ export class ProductsService {
       product.stockQuantity -= dto.quantity;
       await manager.save(Product, product);
 
-      // Si hubiéramos creado una tabla de ProductStockMovement la registraríamos aquí.
-      // Por ahora la pérdida se anota actualizando el stock.
+      // Si hubiÃ©ramos creado una tabla de ProductStockMovement la registrarÃ­amos aquÃ­.
+      // Por ahora la pÃ©rdida se anota actualizando el stock.
 
     });
   }
@@ -227,4 +259,5 @@ export class ProductsService {
     return this.productRepo.save(product);
   }
 }
+
 

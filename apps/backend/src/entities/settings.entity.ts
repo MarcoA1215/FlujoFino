@@ -1,11 +1,19 @@
-import { Entity, PrimaryColumn, Column } from 'typeorm';
+﻿import { Entity, PrimaryColumn, Column } from 'typeorm';
 
 @Entity()
 export class Settings {
   @PrimaryColumn()
-  id: string; // We'll just use 'GLOBAL'
+  id: string;
 
-  @Column('float', { default: 40.0 }) // Default rate just in case
+  @Column('float', { default: 40.0 })
   exchangeRateBs: number;
-}
 
+  @Column({ nullable: true })
+  companyBank: string;
+
+  @Column({ nullable: true })
+  companyCedula: string;
+
+  @Column({ nullable: true })
+  companyPhone: string;
+}
