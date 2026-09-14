@@ -5,6 +5,8 @@
   salePrice: number;
   stockQuantity: number;
   isCombo?: boolean;
+  physicalStock?: number;
+  reservedQuantity?: number;
 };
 
 export type RawMaterial = {
