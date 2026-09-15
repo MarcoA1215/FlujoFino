@@ -11,6 +11,7 @@ interface ProductCardProps {
   onConfigure: (p: Product) => void;
   onAdjustStock: (p: Product) => void;
   onRegisterLoss: (p: Product) => void;
+  onToggleKitting?: (p: Product) => void;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -35,7 +36,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, gap: '8px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
-                  {!p.isCombo && (
+                  {(!p.isCombo || p.isPreAssembled) && (
                     <>
                       <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '8px 10px', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
                         Físico: {p.physicalStock}
@@ -45,7 +46,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                       </IonBadge>
                     </>
                   )}
-                  {p.isCombo && (
+                  {(p.isCombo && !p.isPreAssembled) && (
                     <IonBadge color="tertiary" style={{ padding: '8px 10px', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
                       Combo (Virtual)
                     </IonBadge>
@@ -65,6 +66,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <IonButton size="small" fill="outline" color="medium" onClick={() => onAdjustStock(p)}>
               Stock Inicial
             </IonButton>
+              {p.isCombo && onToggleKitting && (
+                <IonButton size="small" fill="outline" color="warning" onClick={() => onToggleKitting(p)}>
+                  Hacer {p.isPreAssembled ? 'Virtual' : 'Físico (Kitting)'}
+                </IonButton>
+              )}
             <IonButton size="small" fill="outline" color="danger" onClick={() => onRegisterLoss(p)}>
               Pérdida
             </IonButton>

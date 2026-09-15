@@ -44,8 +44,7 @@ const Products: React.FC = () => {
             if (!data.name || !data.salePrice) return false;
             try {
               await apiClient.post('/products', {
-                name: data.name, category: data.category, salePrice: parseFloat(data.salePrice), isCombo
-              });
+                name: data.name, category: data.category, salePrice: parseFloat(data.salePrice), isCombo, isPreAssembled: false });
               fetchData();
               presentToast({ message: 'Creado', duration: 2000, color: 'success' });
             } catch (e) {
@@ -107,6 +106,16 @@ const Products: React.FC = () => {
     });
   };
 
+  
+  const handleToggleKitting = async (p: Product) => {
+    try {
+      await apiClient.put('/products/' + p.id, { isPreAssembled: !p.isPreAssembled });
+      fetchData();
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Error al cambiar modo');
+    }
+  };
+  
   const openEditProductAlert = (p: Product) => {
     presentAlert({
       header: 'Editar Producto',
@@ -196,6 +205,7 @@ const Products: React.FC = () => {
                       onConfigure={() => setSelectedProductForRecipe(p)}
                       onAdjustStock={openAdjustStockAlert}
                       onRegisterLoss={openLossAlert}
+                        onToggleKitting={handleToggleKitting}
                     />
                   ))}
                 </IonRow>
