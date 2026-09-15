@@ -35,7 +35,7 @@ export class ProductsService {
       let finalStock = p.stockQuantity;
       let finalPhysical = p.physicalStock;
 
-      if (p.comboItems && p.comboItems.length > 0) {
+      if (p.comboItems && p.comboItems.length > 0 && !p.isPreAssembled) {
         let minAvail = Infinity;
         let minPhys = Infinity;
         for (const ci of p.comboItems) {
