@@ -52,7 +52,7 @@ export class OrdersService {
         }
       }
 
-      // Check if we have enough physical stock for everything
+      // Check if we have enough available stock (Disponible) for everything
       let requiresPreparation = false;
       for (const itemDto of dto.items) {
         const product = await manager.findOne(Product, { 
@@ -62,12 +62,12 @@ export class OrdersService {
         if (product) {
           if (product.comboItems && product.comboItems.length > 0) {
             for (const ci of product.comboItems) {
-              if (ci.component && ci.component.physicalStock < (itemDto.quantity * ci.quantity)) {
+              if (ci.component && ci.component.stockQuantity < (itemDto.quantity * ci.quantity)) {
                 requiresPreparation = true;
               }
             }
           } else {
-            if (product.physicalStock < itemDto.quantity) {
+            if (product.stockQuantity < itemDto.quantity) {
               requiresPreparation = true;
             }
           }
