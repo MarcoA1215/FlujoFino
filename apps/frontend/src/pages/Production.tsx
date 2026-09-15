@@ -104,7 +104,7 @@ const Production: React.FC = () => {
   };
 
   const filteredProducts = products.filter(p => {
-    if (p.isCombo) return false;
+    if (p.isCombo && (!p.isPreAssembled || !p.comboItems || p.comboItems.length === 0)) return false;
     if (searchText.trim() === '') return true;
     return p.name?.toLowerCase().includes(searchText.toLowerCase());
   });
