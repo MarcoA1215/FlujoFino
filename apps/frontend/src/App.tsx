@@ -14,7 +14,8 @@ import Login from './pages/Login';
 import Users from './pages/Users';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -57,6 +58,19 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 };
 
 const App: React.FC = () => {
+  useEffect(() => {
+    const backListener = CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+      if (!canGoBack) {
+        CapacitorApp.exitApp();
+      } else {
+        window.history.back();
+      }
+    });
+    return () => {
+      backListener.then(l => l.remove());
+    };
+  }, []);
+
   return (
     <AuthProvider>
       <IonApp>

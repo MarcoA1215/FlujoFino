@@ -477,6 +477,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@capacitor/app@npm:^8.1.1":
+  version: 8.1.1
+  resolution: "@capacitor/app@npm:8.1.1"
+  peerDependencies:
+    "@capacitor/core": ">=8.0.0"
+  checksum: 10c0/11d246e22bd3e2409d2c7e8fcfa690be7f977e8dff44f2934b9fa24d074ca8fa980b156cc027ad652755a9d1de04a2c00750570a6c3a79cd530d04b7e97b5d3d
+  languageName: node
+  linkType: hard
+
 "@capacitor/assets@npm:^3.0.5":
   version: 3.0.5
   resolution: "@capacitor/assets@npm:3.0.5"
@@ -5759,6 +5768,7 @@ __metadata:
   resolution: "frontend@workspace:apps/frontend"
   dependencies:
     "@capacitor/android": "npm:^8.5.2"
+    "@capacitor/app": "npm:^8.1.1"
     "@capacitor/assets": "npm:^3.0.5"
     "@capacitor/cli": "npm:^8.5.2"
     "@capacitor/core": "npm:^8.5.2"
