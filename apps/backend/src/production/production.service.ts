@@ -107,8 +107,8 @@ private dataSource: DataSource) {}
       });
       if (!product) throw new BadRequestException('Producto asociado no encontrado');
 
-      if (product.stockQuantity < batch.quantity) {
-        throw new BadRequestException(`No se puede revertir este lote. El stock actual (${product.stockQuantity}) es menor a la cantidad fabricada (${batch.quantity}). Ya se han vendido/comprometido unidades.`);
+      if (product.physicalStock < batch.quantity) {
+        throw new BadRequestException(`No se puede revertir este lote. El stock físico actual (${product.physicalStock}) es menor a la cantidad fabricada (${batch.quantity}). Ya se han vendido/comprometido unidades.`);
       }
 
       product.stockQuantity -= batch.quantity;
