@@ -5,6 +5,9 @@
   salePrice: number;
   stockQuantity: number;
   isCombo?: boolean;
+  isPreAssembled?: boolean;
+  comboItems?: { id: string; componentId: string; quantity: number; component?: any }[];
+  recipe?: any[];
   physicalStock?: number;
   reservedQuantity?: number;
 };

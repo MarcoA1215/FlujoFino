@@ -65,6 +65,7 @@ export interface ProductDTO {
   salePrice: number;
   stockQuantity: number;
   isCombo?: boolean;
+  isPreAssembled?: boolean;
   physicalStock?: number;
   reservedQuantity?: number;
   recipe?: RecipeItemDTO[];

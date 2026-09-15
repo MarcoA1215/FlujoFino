@@ -9,6 +9,9 @@ type Product = {
   stockQuantity: number;
   salePrice: number;
   isCombo?: boolean;
+    isPreAssembled?: boolean;
+    comboItems?: any[];
+    recipe?: any[];
   physicalStock?: number;
   reservedQuantity?: number;
 };
