@@ -66,7 +66,7 @@ export class OrdersService {
                 requiresPreparation = true;
               }
             }
-          } else {
+          } else if (!product.isCombo) {
             if (product.stockQuantity < itemDto.quantity) {
               requiresPreparation = true;
             }
@@ -130,10 +130,10 @@ export class OrdersService {
               }
             }
           }
-        } else {
-          product.stockQuantity -= itemDto.quantity;
-          await manager.save(Product, product);
-        }
+        } else if (!product.isCombo) {
+            product.stockQuantity -= itemDto.quantity;
+            await manager.save(Product, product);
+          }
 
         const orderItem = manager.create(OrderItem, {
           orderId: savedOrder.id,
@@ -203,13 +203,13 @@ export class OrdersService {
                   await manager.save(Product, ci.component);
                 }
               }
-            } else {
-              if (product.physicalStock < item.quantity) {
-                throw new BadRequestException('Falta stock físico para entregar');
+            } else if (!product.isCombo) {
+                if (product.physicalStock < item.quantity) {
+                  throw new BadRequestException('Falta stock físico para entregar');
+                }
+                product.physicalStock -= item.quantity;
+                await manager.save(Product, product);
               }
-              product.physicalStock -= item.quantity;
-              await manager.save(Product, product);
-            }
           }
         }
       }
@@ -251,8 +251,8 @@ export class OrdersService {
                   }
                 }
               }
-            } else {
-              product.stockQuantity += item.quantity;
+            } else if (!product.isCombo) {
+                product.stockQuantity += item.quantity;
               if (order.status === OrderStatus.DELIVERED) {
                  product.physicalStock += item.quantity;
               }
@@ -349,9 +349,9 @@ export class OrdersService {
                 deductions.set(ci.component.id, (deductions.get(ci.component.id) || 0) + required);
               }
             }
-          } else {
-            const currentPhysical = physicalStockMap.get(product.id) || 0;
-            if (currentPhysical < item.quantity) {
+          } else if (!product.isCombo) {
+              const currentPhysical = physicalStockMap.get(product.id) || 0;
+              if (currentPhysical < item.quantity) {
               canFulfill = false;
             } else {
               deductions.set(product.id, (deductions.get(product.id) || 0) + item.quantity);
