@@ -1,3 +1,4 @@
+import { OrdersModule } from '../orders/orders.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductionService } from './production.service';
@@ -7,7 +8,7 @@ import { RawMaterial } from '../entities/raw-material.entity';
 import { ProductionBatch } from '../entities/production-batch.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Product, RawMaterial, ProductionBatch])],
+  imports: [TypeOrmModule.forFeature([Product, RawMaterial, ProductionBatch]), OrdersModule],
   controllers: [ProductionController],
   providers: [ProductionService],
   exports: [ProductionService],

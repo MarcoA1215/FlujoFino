@@ -1,3 +1,4 @@
+import { OrdersService } from '../orders/orders.service';
 ﻿import { Injectable, BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Product } from '../entities/product.entity';
@@ -8,7 +9,9 @@ import { StockMovement } from '../entities/stock-movement.entity';
 
 @Injectable()
 export class ProductionService {
-  constructor(private dataSource: DataSource) {}
+  constructor(
+    private ordersService: OrdersService,
+private dataSource: DataSource) {}
 
   async createBatch(productId: string, quantityToProduce: number) {
     return this.dataSource.transaction(async (manager) => {

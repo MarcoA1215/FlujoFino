@@ -30,4 +30,10 @@ export class OrdersController {
   clone(@Param('id') id: string) {
     return this.ordersService.cloneOrder(id);
   }
+
+  @Get('auto-allocate')
+  autoAllocate() {
+    return this.ordersService.autoAllocatePhysicalStock();
+  }
+
 }
