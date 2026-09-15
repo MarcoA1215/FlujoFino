@@ -52,13 +52,37 @@ export class OrdersService {
         }
       }
 
+      // Check if we have enough physical stock for everything
+      let requiresPreparation = false;
+      for (const itemDto of dto.items) {
+        const product = await manager.findOne(Product, { 
+          where: { id: itemDto.productId },
+          relations: { comboItems: { component: true } }
+        });
+        if (product) {
+          if (product.comboItems && product.comboItems.length > 0) {
+            for (const ci of product.comboItems) {
+              if (ci.component && ci.component.physicalStock < (itemDto.quantity * ci.quantity)) {
+                requiresPreparation = true;
+              }
+            }
+          } else {
+            if (product.physicalStock < itemDto.quantity) {
+              requiresPreparation = true;
+            }
+          }
+        }
+      }
+
+      const initialStatus = requiresPreparation ? OrderStatus.PREPARING : OrderStatus.PENDING;
+
       const order = manager.create(Order, {
         customerName: dto.customerName,
         customerPhone: dto.customerPhone || '',
         customerAddress: dto.customerAddress || '',
         notes: dto.notes || '',
         paymentStatus: dto.paymentStatus,
-        status: OrderStatus.PENDING,
+        status: initialStatus,
         deliveryMethod: dto.deliveryMethod || DeliveryMethod.IN_STORE,
         deliveryZoneId: dto.deliveryZoneId,
         deliveryFee: deliveryFee,
