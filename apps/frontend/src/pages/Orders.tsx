@@ -302,11 +302,7 @@ const Orders: React.FC = () => {
 
                     {order.status !== OrderStatus.CANCELED && order.status !== OrderStatus.DELIVERED && (
                       <div className="ion-margin-top" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                        {order.status === OrderStatus.PENDING && (
-                          <IonButton style={{ flex: 1 }} color="tertiary" onClick={() => updateStatus(order.id, OrderStatus.PREPARING)}>
-                            Cocina (Preparar)
-                          </IonButton>
-                        )}
+                        
                         {order.status === OrderStatus.PREPARING && (
                           <IonButton style={{ flex: 1 }} color="warning" onClick={() => updateStatus(order.id, OrderStatus.PENDING)}>
                             Mover a Pendiente
