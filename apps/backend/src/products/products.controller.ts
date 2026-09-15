@@ -6,6 +6,11 @@ import { RegisterLossDto } from '../raw-materials/dto/register-loss.dto';
 
 @Controller('products')
 export class ProductsController {
+  @Post(':id/unpack')
+  async unpackKit(@Param('id') id: string) {
+    return this.productsService.unpackKit(id);
+  }
+
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
