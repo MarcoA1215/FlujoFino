@@ -159,7 +159,16 @@ const Pos: React.FC = () => {
       presentToast({ message: 'Pedido creado exitosamente', duration: 2000, color: 'success' });
       setCart([]);
       setCustomerName('');
+      setCustomerPhone('');
+      setCustomerAddress('');
+      setPagoMovilRef('');
+      setPagoMovilPhone('');
+      setPagoMovilCedula('');
+      setPagoMovilBank('');
+      setDeliveryMethod(DeliveryMethod.IN_STORE);
+      setDeliveryZoneId('');
       setUsdReceived('');
+      setSearchTerm('');
       setPaymentMethod('PAGO_MOVIL');
       fetchProducts();
     } catch (e: any) {
