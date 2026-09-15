@@ -158,6 +158,17 @@ const Orders: React.FC = () => {
     });
   };
 
+  
+  const translateStatus = (status: OrderStatus) => {
+    switch(status) {
+      case OrderStatus.PENDING: return "Pendiente";
+      case OrderStatus.PREPARING: return "Preparando";
+      case OrderStatus.DELIVERED: return "Entregado";
+      case OrderStatus.CANCELED: return "Cancelado";
+      default: return status;
+    }
+  };
+
   const getStatusColor = (status: OrderStatus) => {
     switch(status) {
       case OrderStatus.PENDING: return "warning";
@@ -228,7 +239,7 @@ const Orders: React.FC = () => {
                   <IonCardHeader>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                       <IonCardTitle>{order.customerName}</IonCardTitle>
-                      <IonBadge color={getStatusColor(order.status)}>{order.status}</IonBadge>
+                      <IonBadge color={getStatusColor(order.status)}>{translateStatus(order.status)}</IonBadge>
                     </div>
                     <p style={{ margin: "5px 0 0 0", fontSize: "0.9rem", color: order.status === OrderStatus.CANCELED ? "white" : "gray" }}>
                       Hora: {new Date(order.createdAt).toLocaleTimeString()}
@@ -289,16 +300,27 @@ const Orders: React.FC = () => {
                       ) : null}
                     </div>
 
-                    {order.status !== OrderStatus.CANCELED && (
-                      <IonItem className="ion-margin-top" lines="none" style={{ "--background": "rgba(0,0,0,0.03)", borderRadius: "8px" }}>
-                        <IonLabel position="stacked">Estado</IonLabel>
-                        <IonSelect value={order.status} onIonChange={e => updateStatus(order.id, e.detail.value)}>
-                          <IonSelectOption value={OrderStatus.PENDING}>Pendiente</IonSelectOption>
-                          <IonSelectOption value={OrderStatus.PREPARING}>Preparando</IonSelectOption>
-                          <IonSelectOption value={OrderStatus.DELIVERED}>Entregado</IonSelectOption>
-                          <IonSelectOption value={OrderStatus.CANCELED}>Cancelar Pedido</IonSelectOption>
-                        </IonSelect>
-                      </IonItem>
+                    {order.status !== OrderStatus.CANCELED && order.status !== OrderStatus.DELIVERED && (
+                      <div className="ion-margin-top" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        {order.status === OrderStatus.PENDING && (
+                          <IonButton style={{ flex: 1 }} color="tertiary" onClick={() => updateStatus(order.id, OrderStatus.PREPARING)}>
+                            Cocina (Preparar)
+                          </IonButton>
+                        )}
+                        {order.status === OrderStatus.PREPARING && (
+                          <IonButton style={{ flex: 1 }} color="warning" onClick={() => updateStatus(order.id, OrderStatus.PENDING)}>
+                            Mover a Pendiente
+                          </IonButton>
+                        )}
+                        <IonButton style={{ flex: 1 }} color="success" onClick={() => updateStatus(order.id, OrderStatus.DELIVERED)}>
+                          Entregar Pedido
+                        </IonButton>
+                        <div style={{ width: '100%', textAlign: 'center', marginTop: '5px' }}>
+                          <IonButton fill="clear" color="danger" size="small" onClick={() => updateStatus(order.id, OrderStatus.CANCELED)}>
+                            Cancelar Pedido
+                          </IonButton>
+                        </div>
+                      </div>
                     )}
 
                     {(order.status === OrderStatus.CANCELED || order.status === OrderStatus.DELIVERED) && (
