@@ -162,26 +162,6 @@ export class OrdersService {
       if (!order) throw new BadRequestException('Pedido no encontrado');
       if (order.status === OrderStatus.CANCELED) throw new BadRequestException('El pedido ya está cancelado');
 
-      if (status === OrderStatus.DELIVERED) {
-        for (const item of order.items) {
-          const product = await manager.findOne(Product, { 
-            where: { id: item.productId },
-            relations: { comboItems: { component: true } }
-          });
-          if (product) {
-            if (product.comboItems && product.comboItems.length > 0) {
-              for (const ci of product.comboItems) {
-                if (ci.component && ci.component.stockQuantity < 0) {
-                  throw new BadRequestException('Falta stock para entregar');
-                }
-              }
-            } else if (product.stockQuantity < 0) {
-              throw new BadRequestException('Falta stock para entregar');
-            }
-          }
-        }
-      }
-
       if (status === OrderStatus.CANCELED) {
         // Reverse inventory
         for (const item of order.items) {
