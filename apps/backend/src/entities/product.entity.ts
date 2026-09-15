@@ -32,6 +32,9 @@ export class Product {
   @Column({ default: false })
   isCombo: boolean;
 
+  @Column({ default: false })
+  isPreAssembled: boolean;
+
   @OneToMany(() => RecipeItem, recipeItem => recipeItem.product)
   recipe: RecipeItem[];
 
