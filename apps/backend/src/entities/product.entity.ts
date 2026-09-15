@@ -26,6 +26,9 @@ export class Product {
   @Column('float', { default: 0 })
   stockQuantity: number;
 
+  @Column('float', { default: 0 })
+  physicalStock: number;
+
   @Column({ default: false })
   isCombo: boolean;
 

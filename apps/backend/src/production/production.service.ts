@@ -109,6 +109,7 @@ export class ProductionService {
       }
 
       product.stockQuantity -= batch.quantity;
+          product.physicalStock -= batch.quantity;
       await manager.save(Product, product);
 
       if (product.recipe && product.recipe.length > 0) {

@@ -162,6 +162,34 @@ export class OrdersService {
       if (!order) throw new BadRequestException('Pedido no encontrado');
       if (order.status === OrderStatus.CANCELED) throw new BadRequestException('El pedido ya está cancelado');
 
+      if (status === OrderStatus.DELIVERED) {
+        for (const item of order.items) {
+          const product = await manager.findOne(Product, { 
+            where: { id: item.productId },
+            relations: { comboItems: { component: true } }
+          });
+          if (product) {
+            if (product.comboItems && product.comboItems.length > 0) {
+              for (const ci of product.comboItems) {
+                if (ci.component) {
+                  if (ci.component.physicalStock < (item.quantity * ci.quantity)) {
+                    throw new BadRequestException('Falta stock físico para entregar');
+                  }
+                  ci.component.physicalStock -= (item.quantity * ci.quantity);
+                  await manager.save(Product, ci.component);
+                }
+              }
+            } else {
+              if (product.physicalStock < item.quantity) {
+                throw new BadRequestException('Falta stock físico para entregar');
+              }
+              product.physicalStock -= item.quantity;
+              await manager.save(Product, product);
+            }
+          }
+        }
+      }
+
       if (status === OrderStatus.CANCELED) {
         // Reverse inventory
         for (const item of order.items) {
@@ -176,6 +204,9 @@ export class OrdersService {
               for (const ci of product.comboItems) {
                 if (ci.component) {
                   ci.component.stockQuantity += (item.quantity * ci.quantity);
+                  if (order.status === OrderStatus.DELIVERED) {
+                     ci.component.physicalStock += (item.quantity * ci.quantity);
+                  }
                   await manager.save(Product, ci.component);
                 }
               }
@@ -198,11 +229,13 @@ export class OrdersService {
               }
             } else {
               product.stockQuantity += item.quantity;
+              if (order.status === OrderStatus.DELIVERED) {
+                 product.physicalStock += item.quantity;
+              }
               await manager.save(Product, product);
             }
           }
         }
-        
         // Reverse Payment
         if (order.paymentStatus === PaymentStatus.PAID) {
           order.paymentStatus = PaymentStatus.REFUNDED;

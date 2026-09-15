@@ -52,5 +52,10 @@ export class ProductsController {
   adjustStock(@Param('id') id: string, @Body('quantity') quantity: number) {
     return this.productsService.adjustStock(id, quantity);
   }
-}
 
+  @Get('migrate-stock')
+  migratePhysicalStock() {
+    return this.productsService.migratePhysicalStock();
+  }
+
+}

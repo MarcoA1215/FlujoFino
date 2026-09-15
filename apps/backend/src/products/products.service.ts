@@ -1,4 +1,4 @@
-﻿import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from '../entities/product.entity';
@@ -24,67 +24,30 @@ export class ProductsService {
   ) {}
 
   async findAll() {
-    const products = await this.productRepo.find({ 
-      order: { name: 'ASC' },
+    const products = await this.productRepo.find({
       relations: {
         comboItems: { component: true },
         recipe: { rawMaterial: true }
       }
     });
 
-    // Calcular stock reservado en pedidos PENDING o PREPARING
-    const reservedDirect = await this.dataSource.query(`
-      SELECT i."productId", SUM(i.quantity) as reserved
-      FROM order_item i
-      JOIN "order" o ON o.id = i."orderId"
-      WHERE o.status IN ('PENDING', 'PREPARING')
-      GROUP BY i."productId"
-    `);
-    
-    const reservedCombos = await this.dataSource.query(`
-      SELECT ci."componentId" as "productId", SUM(i.quantity * ci.quantity) as reserved
-      FROM order_item i
-      JOIN "order" o ON o.id = i."orderId"
-      JOIN combo_item ci ON ci."comboId" = i."productId"
-      WHERE o.status IN ('PENDING', 'PREPARING')
-      GROUP BY ci."componentId"
-    `);
-
-    const reservedMap: Record<string, number> = {};
-    for (const row of reservedDirect) {
-      reservedMap[row.productId] = (reservedMap[row.productId] || 0) + Number(row.reserved);
-    }
-    for (const row of reservedCombos) {
-      reservedMap[row.productId] = (reservedMap[row.productId] || 0) + Number(row.reserved);
-    }
-
     return products.map(p => {
-      let reservedQuantity = reservedMap[p.id] || 0;
-      let physicalStock = 0;
+      let finalStock = p.stockQuantity;
+      let finalPhysical = p.physicalStock;
 
-      // Si es un combo (tiene comboItems), su stock es virtual
       if (p.comboItems && p.comboItems.length > 0) {
-        let minPossible = Infinity;
-
+        let minAvail = Infinity;
+        let minPhys = Infinity;
         for (const ci of p.comboItems) {
-          const possibleFromComponent = Math.floor((ci.component?.stockQuantity || 0) / ci.quantity);
-          if (possibleFromComponent < minPossible) minPossible = possibleFromComponent;
+          const availFromComp = Math.floor((ci.component?.stockQuantity || 0) / ci.quantity);
+          const physFromComp = Math.floor((ci.component?.physicalStock || 0) / ci.quantity);
+          if (availFromComp < minAvail) minAvail = availFromComp;
+          if (physFromComp < minPhys) minPhys = physFromComp;
         }
-
-        if (p.recipe && p.recipe.length > 0) {
-          for (const ri of p.recipe) {
-            const possibleFromRaw = Math.floor((ri.rawMaterial?.stockQuantity || 0) / ri.quantity);
-            if (possibleFromRaw < minPossible) minPossible = possibleFromRaw;
-          }
-        }
-
-        p.stockQuantity = minPossible === Infinity ? 0 : minPossible;
-        reservedQuantity = 0; // Combos don't have physical stock of their own
-        physicalStock = p.stockQuantity;
-      } else {
-        physicalStock = p.stockQuantity + reservedQuantity;
+        finalStock = minAvail === Infinity ? 0 : minAvail;
+        finalPhysical = minPhys === Infinity ? 0 : minPhys;
       }
-      
+
       const cleanedComboItems = p.comboItems?.map(ci => ({
         id: ci.id,
         componentId: ci.componentId,
@@ -93,8 +56,8 @@ export class ProductsService {
 
       return {
         ...p,
-        reservedQuantity,
-        physicalStock,
+        stockQuantity: finalStock,
+        physicalStock: finalPhysical,
         comboItems: cleanedComboItems,
         recipe: undefined
       };
@@ -258,6 +221,40 @@ export class ProductsService {
     product.stockQuantity += quantity;
     return this.productRepo.save(product);
   }
+
+  async migratePhysicalStock() {
+    const reservedDirect = await this.dataSource.query(`
+      SELECT i."productId", SUM(i.quantity) as reserved
+      FROM order_item i
+      JOIN "order" o ON o.id = i."orderId"
+      WHERE o.status IN ('PENDING', 'PREPARING')
+      GROUP BY i."productId"
+    `);
+    
+    const reservedCombos = await this.dataSource.query(`
+      SELECT ci."componentId" as "productId", SUM(i.quantity * ci.quantity) as reserved
+      FROM order_item i
+      JOIN "order" o ON o.id = i."orderId"
+      JOIN combo_item ci ON ci."comboId" = i."productId"
+      WHERE o.status IN ('PENDING', 'PREPARING')
+      GROUP BY ci."componentId"
+    `);
+
+    const reservedMap: Record<string, number> = {};
+    for (const row of reservedDirect) {
+      reservedMap[row.productId] = (reservedMap[row.productId] || 0) + Number(row.reserved);
+    }
+    for (const row of reservedCombos) {
+      reservedMap[row.productId] = (reservedMap[row.productId] || 0) + Number(row.reserved);
+    }
+
+    const products = await this.productRepo.find();
+    for (const p of products) {
+      const reserved = reservedMap[p.id] || 0;
+      p.physicalStock = p.stockQuantity + reserved;
+      await this.productRepo.save(p);
+    }
+    return { success: true, migratedCount: products.length };
+  }
+
 }
-
-
