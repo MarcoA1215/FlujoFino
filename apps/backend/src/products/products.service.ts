@@ -209,7 +209,7 @@ export class ProductsService {
       // Validaciones de seguridad
       for (const item of dto.comboItems) {
         if (item.componentId === id) {
-          throw new BadRequestException('Un producto no puede ser componente de sÃ­ mismo');
+          throw new BadRequestException('Un producto no puede ser componente de sí mismo');
         }
         const component = await manager.findOne(Product, { where: { id: item.componentId } });
         if (component?.isCombo) {
@@ -274,8 +274,8 @@ export class ProductsService {
       product.stockQuantity -= dto.quantity;
       await manager.save(Product, product);
 
-      // Si hubiÃ©ramos creado una tabla de ProductStockMovement la registrarÃ­amos aquÃ­.
-      // Por ahora la pÃ©rdida se anota actualizando el stock.
+      // Si hubiéramos creado una tabla de ProductStockMovement la registraríamos aquí.
+      // Por ahora la pérdida se anota actualizando el stock.
 
     });
   }

@@ -121,7 +121,7 @@ const Pos: React.FC = () => {
   const totalCart = cartSubtotal + deliveryFee;
 
   const placeOrder = async () => {
-    if (cart.length === 0) return presentToast({ message: 'Carrito vacÃ­o', duration: 2000, color: 'warning' });
+    if (cart.length === 0) return presentToast({ message: 'Carrito vacío', duration: 2000, color: 'warning' });
     if (!customerName.trim()) return presentToast({ message: 'Ingresa el nombre', duration: 2000, color: 'warning' });
 
     if (paymentMethod === 'PAGO_MOVIL') {
@@ -135,7 +135,7 @@ const Pos: React.FC = () => {
       const received = typeof usdReceived === 'number' ? usdReceived : totalCart;
       const changeUsd = received - totalCart;
       const changeBs = changeUsd * exchangeRate;
-      notes = `MÃ‰TODO: Divisas (USD) | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`;
+      notes = `MÉTODO: Divisas (USD) | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`;
     }
 
     try {
@@ -193,7 +193,7 @@ const Pos: React.FC = () => {
             <IonCol size="12" sizeMd="7">
               <IonCard>
                 <IonCardHeader>
-                  <IonCardTitle>CatÃ¡logo de Productos</IonCardTitle>
+                  <IonCardTitle>Catálogo de Productos</IonCardTitle>
                   </IonCardHeader>
                   <IonCardContent>
                     <IonSearchbar placeholder="Buscar producto..." value={searchTerm} onIonInput={e => setSearchTerm(e.detail.value!)}></IonSearchbar>
@@ -235,11 +235,11 @@ const Pos: React.FC = () => {
                     <IonInput 
                       value={customerName} 
                       onIonInput={e => setCustomerName(e.detail.value!)} 
-                      placeholder="Ej. Juan PÃ©rez" 
+                      placeholder="Ej. Juan Pérez" 
                     />
                   </IonItem>
                   <IonItem className="ion-margin-bottom">
-                    <IonLabel position="stacked">TelÃ©fono del Cliente (Opcional)</IonLabel>
+                    <IonLabel position="stacked">Teléfono del Cliente (Opcional)</IonLabel>
                     <IonInput 
                       value={customerPhone} 
                       onIonInput={e => setCustomerPhone(e.detail.value!)} 
@@ -249,17 +249,17 @@ const Pos: React.FC = () => {
 
                   
                   <IonItem className="ion-margin-bottom">
-                    <IonLabel position="stacked">MÃ©todo de Entrega</IonLabel>
+                    <IonLabel position="stacked">Método de Entrega</IonLabel>
                     <IonSelect value={deliveryMethod} onIonChange={e => setDeliveryMethod(e.detail.value)}>
                       <IonSelectOption value={DeliveryMethod.IN_STORE}>Consumo en Local / Retiro Inmediato</IonSelectOption>
                       <IonSelectOption value={DeliveryMethod.PICKUP}>Pickup (Para LLevar / Encargo)</IonSelectOption>
-                      <IonSelectOption value={DeliveryMethod.DELIVERY}>Delivery (EnvÃ­o)</IonSelectOption>
+                      <IonSelectOption value={DeliveryMethod.DELIVERY}>Delivery (Envío)</IonSelectOption>
                     </IonSelect>
                   </IonItem>
 
                   {deliveryMethod !== DeliveryMethod.IN_STORE && (
                     <IonItem className="ion-margin-bottom">
-                      <IonLabel position="stacked">DirecciÃ³n / Referencia Exacta</IonLabel>
+                      <IonLabel position="stacked">Dirección / Referencia Exacta</IonLabel>
                       <IonInput 
                         value={customerAddress} 
                         onIonInput={e => setCustomerAddress(e.detail.value!)} 
@@ -270,7 +270,7 @@ const Pos: React.FC = () => {
 
                   {deliveryMethod === DeliveryMethod.DELIVERY && (
                     <IonItem className="ion-margin-bottom">
-                      <IonLabel position="stacked">Zona de EnvÃ­o</IonLabel>
+                      <IonLabel position="stacked">Zona de Envío</IonLabel>
                       <IonSelect value={deliveryZoneId} onIonChange={e => setDeliveryZoneId(e.detail.value)}>
                         {deliveryZones.map(z => (
                           <IonSelectOption key={z.id} value={z.id}>{z.name} (+ $ {z.feePrice.toFixed(2)})</IonSelectOption>
@@ -280,9 +280,9 @@ const Pos: React.FC = () => {
                   )}
 
                   <IonItem className="ion-margin-bottom">
-                    <IonLabel position="stacked">MÃ©todo de Pago</IonLabel>
+                    <IonLabel position="stacked">Método de Pago</IonLabel>
                     <IonSelect value={paymentMethod} onIonChange={e => setPaymentMethod(e.detail.value)}>
-                      <IonSelectOption value="PAGO_MOVIL">Pago MÃ³vil Confirmado</IonSelectOption>
+                      <IonSelectOption value="PAGO_MOVIL">Pago Móvil Confirmado</IonSelectOption>
                       <IonSelectOption value="USD">Divisas (USD Efectivo)</IonSelectOption>
                       <IonSelectOption value="PENDING">Por Pagar</IonSelectOption>
                     </IonSelect>
@@ -290,7 +290,7 @@ const Pos: React.FC = () => {
 
                   {paymentMethod === 'PAGO_MOVIL' && (
                     <div style={{ background: '#f4f5f8', padding: '10px', borderRadius: '8px', marginBottom: '15px' }}>
-                      <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem' }}>Datos del Pago MÃ³vil (Total: Bs. {(totalCart * exchangeRate).toFixed(2)})</h4>
+                      <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem' }}>Datos del Pago Móvil (Total: Bs. {(totalCart * exchangeRate).toFixed(2)})</h4>
                       <IonItem color="light">
                         <IonLabel position="stacked">Ref.</IonLabel>
                         <IonInput value={pagoMovilRef} onIonInput={e => setPagoMovilRef(e.detail.value!)} placeholder="Ej. 123456" />
@@ -315,7 +315,7 @@ const Pos: React.FC = () => {
                       <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem' }}>Pago en Divisas</h4>
                       <IonItem color="light">
                         <IonLabel position="stacked">Monto Recibido ($)</IonLabel>
-                        <IonInput type="number" value={usdReceived} onIonInput={e => setUsdReceived(parseFloat(e.detail.value!) || '')} placeholder={`MÃ­nimo: $${totalCart.toFixed(2)}`} />
+                        <IonInput type="number" value={usdReceived} onIonInput={e => setUsdReceived(parseFloat(e.detail.value!) || '')} placeholder={`Mínimo: $${totalCart.toFixed(2)}`} />
                       </IonItem>
                       
                       {typeof usdReceived === 'number' && usdReceived >= totalCart && (

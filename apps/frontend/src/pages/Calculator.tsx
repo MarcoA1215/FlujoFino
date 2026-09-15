@@ -158,7 +158,7 @@ const Calculator: React.FC = () => {
                 <IonCardHeader>
                   <IonCardTitle className="ion-text-center">
                     <IonIcon icon={calculatorOutline} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                    Presupuesto RÃ¡pido
+                    Presupuesto Rápido
                   </IonCardTitle>
                 </IonCardHeader>
                 <IonCardContent>
@@ -173,7 +173,7 @@ const Calculator: React.FC = () => {
                   }}>
                     <div style={{ textAlign: 'center', marginBottom: '20px' }}>
                       <h2 style={{ margin: 0, fontWeight: 'bold', fontSize: '1.5rem' }}>NUTRI DELI</h2>
-                      <p style={{ margin: 0, color: '#666' }}>CotizaciÃ³n de Pedido</p>
+                      <p style={{ margin: 0, color: '#666' }}>Cotización de Pedido</p>
                     </div>
                     
                     <div style={{ borderBottom: '2px dashed #ccc', paddingBottom: '10px', marginBottom: '10px' }}>
@@ -204,7 +204,7 @@ const Calculator: React.FC = () => {
                                 $ {(item.product.salePrice * item.quantity).toFixed(2)}
                               </IonCol>
                             </IonRow>
-                            {/* Controles ocultos en la captura idealmente, pero Ãºtiles para editar */}
+                            {/* Controles ocultos en la captura idealmente, pero útiles para editar */}
                             <IonRow className="ion-margin-top">
                               <IonCol size="12" className="ion-text-right">
                                 <IonButton fill="clear" size="small" onClick={() => updateQuantity(item.product.id, -1)}><IonIcon icon={removeOutline}/></IonButton>

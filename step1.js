@@ -1,11 +1,10 @@
 ﻿const fs = require('fs');
+let code = fs.readFileSync('apps/backend/src/entities/product.entity.ts', 'utf8');
 
-// 1. Update Entity
-let productEntity = fs.readFileSync('apps/backend/src/entities/product.entity.ts', 'utf8');
-if (!productEntity.includes("physicalStock: number;")) {
-  productEntity = productEntity.replace(
-    "@Column('float', { default: 0 })\n  stockQuantity: number;",
-    "@Column('float', { default: 0 })\n  stockQuantity: number;\n\n  @Column('float', { default: 0 })\n  physicalStock: number;"
+if (!code.includes("isPreAssembled")) {
+  code = code.replace(
+    "@Column({ default: false })\n  isCombo: boolean;",
+    "@Column({ default: false })\n  isCombo: boolean;\n\n  @Column({ default: false })\n  isPreAssembled: boolean;"
   );
-  fs.writeFileSync('apps/backend/src/entities/product.entity.ts', productEntity, 'utf8');
+  fs.writeFileSync('apps/backend/src/entities/product.entity.ts', code, 'utf8');
 }

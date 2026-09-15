@@ -80,7 +80,7 @@ const Orders: React.FC = () => {
     if (order.status === OrderStatus.CANCELED) return;
     const totalBs = (order.totalAmount * exchangeRate).toFixed(2);
     presentAlert({
-      header: "Confirmar Pago MÃ³vil",
+      header: "Confirmar Pago Móvil",
       subHeader: `Monto a cobrar: Bs. ${totalBs}`,
       inputs: [
         { name: "pagoMovilRef", type: "text", placeholder: "Referencia (Ej. 123456)" },
@@ -141,12 +141,12 @@ const Orders: React.FC = () => {
             try {
               await apiClient.patch(`/orders/${order.id}/payment`, {
                 status: PaymentStatus.PAID,
-                notes: `MÃ‰TODO: Divisas (USD) | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
+                notes: `MÉTODO: Divisas (USD) | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
               });
               fetchOrders();
               presentAlert({
                 header: "Pago Confirmado",
-                message: `Dar Vuelto: <br><br><b>$${changeUsd.toFixed(2)}</b> Ã³ <br><b>Bs. ${changeBs.toFixed(2)}</b>`,
+                message: `Dar Vuelto: <br><br><b>$${changeUsd.toFixed(2)}</b> ó <br><b>Bs. ${changeBs.toFixed(2)}</b>`,
                 buttons: ["OK"]
               });
             } catch (e) {
