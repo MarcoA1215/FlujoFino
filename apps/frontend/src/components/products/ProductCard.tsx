@@ -20,7 +20,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onDelete,
   onConfigure,
   onAdjustStock,
-  onRegisterLoss
+  onRegisterLoss,
+  onToggleKitting
 }) => {
   return (
     <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3">
