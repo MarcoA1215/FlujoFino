@@ -12,6 +12,7 @@ interface ProductCardProps {
   onAdjustStock: (p: Product) => void;
   onRegisterLoss: (p: Product) => void;
   onToggleKitting?: (p: Product) => void;
+  onUnpackKit?: (p: Product) => void;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -21,7 +22,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onConfigure,
   onAdjustStock,
   onRegisterLoss,
-  onToggleKitting
+  onToggleKitting,
+  onUnpackKit
 }) => {
   return (
     <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3">
@@ -70,6 +72,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               {p.isCombo && onToggleKitting && (
                 <IonButton size="small" fill="outline" color="warning" onClick={() => onToggleKitting(p)}>
                   Hacer {p.isPreAssembled ? 'Virtual' : 'Físico (Kitting)'}
+                </IonButton>
+              )}
+              {(p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) && (
+                <IonButton size="small" fill="outline" color="secondary" onClick={() => onUnpackKit(p)}>
+                  Desarmar 1 Und
                 </IonButton>
               )}
             <IonButton size="small" fill="outline" color="danger" onClick={() => onRegisterLoss(p)}>

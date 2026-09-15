@@ -107,6 +107,16 @@ const Products: React.FC = () => {
   };
 
   
+  const handleUnpackKit = async (p: Product) => {
+    if (!window.confirm(`¿Estás seguro de desarmar 1 ${p.name}? Los componentes regresarán al inventario.`)) return;
+    try {
+      await apiClient.post(`/products/${p.id}/unpack`);
+      fetchData();
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Error al desarmar el kit');
+    }
+  };
+  
   const handleToggleKitting = async (p: Product) => {
     try {
       await apiClient.put('/products/' + p.id, { isPreAssembled: !p.isPreAssembled });
@@ -206,6 +216,7 @@ const Products: React.FC = () => {
                       onAdjustStock={openAdjustStockAlert}
                       onRegisterLoss={openLossAlert}
                         onToggleKitting={handleToggleKitting}
+                        onUnpackKit={handleUnpackKit}
                     />
                   ))}
                 </IonRow>
