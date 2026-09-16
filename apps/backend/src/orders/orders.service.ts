@@ -60,13 +60,13 @@ export class OrdersService {
           relations: { comboItems: { component: true } }
         });
         if (product) {
-          if (product.comboItems && product.comboItems.length > 0) {
+          if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
             for (const ci of product.comboItems) {
               if (ci.component && ci.component.stockQuantity < (itemDto.quantity * ci.quantity)) {
                 requiresPreparation = true;
               }
             }
-          } else if (!product.isCombo) {
+          } else if (!product.isCombo || product.isPreAssembled) {
             if (product.stockQuantity < itemDto.quantity) {
               requiresPreparation = true;
             }
@@ -107,7 +107,7 @@ export class OrdersService {
         const subtotal = itemDto.quantity * itemDto.unitPrice;
         totalAmount += subtotal;
 
-        if (product.comboItems && product.comboItems.length > 0) {
+        if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
           for (const ci of product.comboItems) {
             if (ci.component) {
               ci.component.stockQuantity -= (itemDto.quantity * ci.quantity);
@@ -130,7 +130,7 @@ export class OrdersService {
               }
             }
           }
-        } else if (!product.isCombo) {
+        } else if (!product.isCombo || product.isPreAssembled) {
             product.stockQuantity -= itemDto.quantity;
             await manager.save(Product, product);
           }
@@ -193,7 +193,7 @@ export class OrdersService {
             relations: { comboItems: { component: true } }
           });
           if (product) {
-            if (product.comboItems && product.comboItems.length > 0) {
+            if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
               for (const ci of product.comboItems) {
                 if (ci.component) {
                   if (ci.component.physicalStock < (item.quantity * ci.quantity)) {
@@ -203,7 +203,7 @@ export class OrdersService {
                   await manager.save(Product, ci.component);
                 }
               }
-            } else if (!product.isCombo) {
+            } else if (!product.isCombo || product.isPreAssembled) {
                 if (product.physicalStock < item.quantity) {
                   throw new BadRequestException('Falta stock físico para entregar');
                 }
@@ -223,7 +223,7 @@ export class OrdersService {
           });
           
           if (product) {
-            if (product.comboItems && product.comboItems.length > 0) {
+            if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
               // Restore combo components
               for (const ci of product.comboItems) {
                 if (ci.component) {
@@ -251,7 +251,7 @@ export class OrdersService {
                   }
                 }
               }
-            } else if (!product.isCombo) {
+            } else if (!product.isCombo || product.isPreAssembled) {
                 product.stockQuantity += item.quantity;
               if (order.status === OrderStatus.DELIVERED) {
                  product.physicalStock += item.quantity;
@@ -337,7 +337,7 @@ export class OrdersService {
           const product = products.find(p => p.id === item.productId);
           if (!product) continue;
 
-          if (product.comboItems && product.comboItems.length > 0) {
+          if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
             for (const ci of product.comboItems) {
               if (ci.component) {
                 const currentPhysical = physicalStockMap.get(ci.component.id) || 0;
@@ -349,7 +349,7 @@ export class OrdersService {
                 deductions.set(ci.component.id, (deductions.get(ci.component.id) || 0) + required);
               }
             }
-          } else if (!product.isCombo) {
+          } else if (!product.isCombo || product.isPreAssembled) {
               const currentPhysical = physicalStockMap.get(product.id) || 0;
               if (currentPhysical < item.quantity) {
               canFulfill = false;
