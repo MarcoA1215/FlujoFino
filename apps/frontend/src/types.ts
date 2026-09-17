@@ -60,8 +60,10 @@ export type DashboardSummary = {
   }[];
   totalLosses: number;
   historicalInvestment: number;
-  historicalRevenue: number;
+  reinvestmentExpense: number;
+  totalInventoryCapital: number;
   historicalProfit: number;
+  historicalRevenue: number;
   salesChart: {
     date: string;
     total: number;

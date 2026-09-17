@@ -1,6 +1,6 @@
 ﻿import { refreshOutline } from 'ionicons/icons';
 import React, { useEffect, useState } from 'react';
-import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonToast, IonIcon } from '@ionic/react';
+import { IonToggle, IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonToast, IonIcon } from '@ionic/react';
 import { apiClient } from '../api/client';
 import type { Product } from '../types';
 import { ProductCard } from '../components/products/ProductCard';
@@ -10,6 +10,7 @@ const Products: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [presentAlert] = useIonAlert();
   const [searchText, setSearchText] = useState('');
+  const [isClientMode, setIsClientMode] = useState(false);
   const [presentToast] = useIonToast();
 
   const [selectedProductForRecipe, setSelectedProductForRecipe] = useState<Product | null>(null);
@@ -188,7 +189,13 @@ const Products: React.FC = () => {
         <IonToolbar color="success">
           <IonButtons slot="start"><IonMenuButton /></IonButtons>
           <IonTitle>Catálogo de Productos</IonTitle>
-          <IonButtons slot="end"><IonButton onClick={fetchData}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
+          <IonButtons slot="end">
+            <div style={{ display: 'flex', alignItems: 'center', marginRight: '10px' }}>
+              <span style={{ fontSize: '0.8rem', marginRight: '5px', color: 'white' }}>Modo Cliente</span>
+              <IonToggle checked={isClientMode} onIonChange={e => setIsClientMode(e.detail.checked)} color="light" />
+            </div>
+            <IonButton onClick={fetchData}><IonIcon icon={refreshOutline} /></IonButton>
+          </IonButtons>
         </IonToolbar>
         <IonToolbar color="success">
           <IonSearchbar value={searchText} debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} placeholder="Buscar..." animated />
@@ -207,7 +214,7 @@ const Products: React.FC = () => {
               <IonGrid className="ion-no-padding">
                 <IonRow>
                   {filteredData.map(p => (
-                    <ProductCard
+                    <ProductCard isClientMode={isClientMode}
                       key={p.id}
                       product={p}
                       onEdit={openEditProductAlert}

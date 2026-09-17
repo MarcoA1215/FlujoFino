@@ -38,7 +38,7 @@ const Menu: React.FC = () => {
     { title: 'Productos', url: '/products', iosIcon: listOutline, mdIcon: listOutline },
     { title: 'Producción', url: '/production', iosIcon: constructOutline, mdIcon: constructOutline },
     { title: 'Calculadora', url: '/calculator', iosIcon: calculatorOutline, mdIcon: calculatorOutline },
-    { title: 'POS (Caja)', url: '/pos', iosIcon: cashOutline, mdIcon: cashOutline },
+    { title: 'Caja', url: '/pos', iosIcon: cashOutline, mdIcon: cashOutline },
     { title: 'Tablero Pedidos', url: '/orders', iosIcon: cartOutline, mdIcon: cartOutline },
     { title: 'Zonas Delivery', url: '/delivery-zones', iosIcon: mapOutline, mdIcon: mapOutline },
     { title: 'Usuarios', url: '/users', iosIcon: peopleOutline, mdIcon: peopleOutline }
