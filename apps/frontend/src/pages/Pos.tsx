@@ -79,6 +79,13 @@ const Pos: React.FC = () => {
     fetchProducts();
     fetchRate();
     fetchZones();
+    const calcCart = localStorage.getItem('calculator_cart');
+    if (calcCart) {
+      try {
+        setCart(JSON.parse(calcCart));
+        localStorage.removeItem('calculator_cart');
+      } catch (e) {}
+    }
   }, []);
 
   const openRateAlert = () => {
