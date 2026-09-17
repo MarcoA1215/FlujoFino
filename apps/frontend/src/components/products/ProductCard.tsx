@@ -101,7 +101,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           
           {!isClientMode && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '15px' }}>
-                <IonButton size="small" fill="solid" color="light" onClick={openOptions}>
+                <IonButton size="small" fill="solid" color="primary" onClick={openOptions}>
                   Opciones
                 </IonButton>
               </div>
