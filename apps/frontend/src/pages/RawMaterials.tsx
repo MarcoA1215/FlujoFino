@@ -104,20 +104,26 @@ const RawMaterials: React.FC = () => {
 
   const openEditNameAlert = (m: RawMaterial) => {
     presentAlert({
-      header: 'Editar Nombre',
-      inputs: [{ name: 'newName', type: 'text', value: m.name, placeholder: 'Nuevo nombre' }],
+      header: 'Editar Insumo',
+      inputs: [
+        { name: 'newName', type: 'text', value: m.name, placeholder: 'Nuevo nombre' },
+        { name: 'newMinStock', type: 'number', value: m.minStockAlert?.toString() || '5', placeholder: 'Alerta minima de stock' }
+      ],
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         {
           text: 'Guardar',
           handler: async (data) => {
-            if (!data.newName || data.newName === m.name) return true;
+            if (!data.newName) return;
             try {
-              await apiClient.put('/raw-materials/' + m.id, { name: data.newName });
+              await apiClient.put('/raw-materials/' + m.id, { 
+                name: data.newName, 
+                minStockAlert: parseFloat(data.newMinStock) || 0
+              });
+              presentToast({ message: 'Insumo actualizado', duration: 2000, color: 'success' });
               fetchMaterials();
-              presentToast({ message: 'Actualizado', duration: 2000, color: 'success' });
             } catch (e) {
-              presentToast({ message: 'Error', duration: 3000, color: 'danger' });
+              presentToast({ message: 'Error al actualizar', duration: 2000, color: 'danger' });
             }
           }
         }
