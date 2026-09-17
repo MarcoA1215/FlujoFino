@@ -1,5 +1,5 @@
 import React from 'react';
-import { IonCol, IonCard, IonCardContent, IonBadge, IonButton } from '@ionic/react';
+import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
 import { pencilOutline } from 'ionicons/icons';
 import { IonIcon } from '@ionic/react';
 import type { RawMaterial } from '../../types';
@@ -40,20 +40,11 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
             </div>
           </div>
           
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '15px' }}>
-            <IonButton size="small" fill="outline" color="primary" onClick={() => onRestock(m)}>
-              Comprar
-            </IonButton>
-            <IonButton size="small" fill="outline" color="warning" onClick={() => onRegisterLoss(m)}>
-              Registrar Pérdida
-            </IonButton>
-            <IonButton size="small" fill="outline" color="tertiary" onClick={() => onViewHistory(m)}>
-              Historial
-            </IonButton>
-            <IonButton size="small" fill="outline" color="danger" onClick={() => onArchive(m)}>
-              Archivar
-            </IonButton>
-          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '15px' }}>
+              <IonButton size="small" fill="solid" color="light" onClick={openOptions}>
+                Opciones
+              </IonButton>
+            </div>
         </IonCardContent>
       </IonCard>
     </IonCol>

@@ -1,7 +1,7 @@
 ﻿import { pencilOutline, trashOutline } from 'ionicons/icons';
 import { IonIcon } from '@ionic/react';
 import React from 'react';
-import { IonCol, IonCard, IonCardContent, IonBadge, IonButton } from '@ionic/react';
+import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
 import type { Product } from '../../types';
 
 interface ProductCardProps {
@@ -75,27 +75,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
           
           {!isClientMode && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '15px' }}>
-              <IonButton size="small" fill="outline" color={p.isCombo ? 'tertiary' : 'primary'} onClick={() => onConfigure(p)}>
-                {p.isCombo ? 'Configurar Combo' : 'Configurar Receta'}
-              </IonButton>
-              <IonButton size="small" fill="outline" color="medium" onClick={() => onAdjustStock(p)}>
-                Stock Inicial
-              </IonButton>
-                {p.isCombo && onToggleKitting && (
-                  <IonButton size="small" fill="outline" color="warning" onClick={() => onToggleKitting(p)}>
-                    Hacer {p.isPreAssembled ? 'Virtual' : 'Físico (Kitting)'}
-                  </IonButton>
-                )}
-                {(p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) && (
-                  <IonButton size="small" fill="outline" color="secondary" onClick={() => onUnpackKit(p)}>
-                    Desarmar 1 Und
-                  </IonButton>
-                )}
-              <IonButton size="small" fill="outline" color="danger" onClick={() => onRegisterLoss(p)}>
-                Pérdida
-              </IonButton>
-            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '15px' }}>
+                <IonButton size="small" fill="solid" color="light" onClick={openOptions}>
+                  Opciones
+                </IonButton>
+              </div>
           )}
         </IonCardContent>
       </IonCard>
