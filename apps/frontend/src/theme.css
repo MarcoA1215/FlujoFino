@@ -79,3 +79,39 @@ ion-badge, ion-button, th, td, ion-card-title, h1, h2, h3, p {
 .ion-text-wrap {
   word-break: normal !important;
 }
+
+/* Action Sheet Colors (Color Psychology) */
+.action-sheet-comprar {
+  color: var(--ion-color-success) !important;
+}
+.action-sheet-comprar .action-sheet-icon {
+  color: var(--ion-color-success) !important;
+}
+
+.action-sheet-editar {
+  color: var(--ion-color-primary) !important;
+}
+.action-sheet-editar .action-sheet-icon {
+  color: var(--ion-color-primary) !important;
+}
+
+.action-sheet-cambiar {
+  color: var(--ion-color-tertiary) !important;
+}
+.action-sheet-cambiar .action-sheet-icon {
+  color: var(--ion-color-tertiary) !important;
+}
+
+.action-sheet-desarmar {
+  color: var(--ion-color-warning) !important;
+}
+.action-sheet-desarmar .action-sheet-icon {
+  color: var(--ion-color-warning) !important;
+}
+
+.action-sheet-eliminar {
+  color: var(--ion-color-danger) !important;
+}
+.action-sheet-eliminar .action-sheet-icon {
+  color: var(--ion-color-danger) !important;
+}

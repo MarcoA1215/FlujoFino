@@ -30,20 +30,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const openOptions = () => {
     const buttons: any[] = [
-      { text: 'Editar Info / Precio', icon: pencilOutline, handler: () => onEdit(p) },
-      { text: p.isCombo ? 'Configurar Combo' : 'Configurar Receta', icon: buildOutline, handler: () => onConfigure(p) },
-      { text: 'Stock Inicial / Ajuste', icon: cubeOutline, handler: () => onAdjustStock(p) }
+      { text: 'Editar Info / Precio', icon: pencilOutline, cssClass: 'action-sheet-editar', handler: () => onEdit(p) },
+      { text: p.isCombo ? 'Configurar Combo' : 'Configurar Receta', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) },
+      { text: 'Stock Inicial / Ajuste', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) }
     ];
 
     if (p.isCombo && onToggleKitting) {
-      buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Virtual' : 'Físico (Kitting)'}`, icon: swapHorizontalOutline, handler: () => onToggleKitting(p) });
+      buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Virtual' : 'Físico (Kitting)'}`, icon: swapHorizontalOutline, cssClass: 'action-sheet-cambiar', handler: () => onToggleKitting(p) });
     }
 
     if (p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) {
-      buttons.push({ text: 'Desarmar 1 Und', icon: cutOutline, handler: () => onUnpackKit(p) });
+      buttons.push({ text: 'Desarmar 1 Und', icon: cutOutline, cssClass: 'action-sheet-desarmar', handler: () => onUnpackKit(p) });
     }
 
-    buttons.push({ text: 'Registrar Pérdida', icon: warningOutline, handler: () => onRegisterLoss(p) });
+    buttons.push({ text: 'Registrar Pérdida', icon: warningOutline, cssClass: 'action-sheet-eliminar', handler: () => onRegisterLoss(p) });
     buttons.push({ text: 'Eliminar Producto', icon: trashOutline, role: 'destructive', handler: () => onDelete(p) });
     buttons.push({ text: 'Cancelar', icon: closeOutline, role: 'cancel' });
 

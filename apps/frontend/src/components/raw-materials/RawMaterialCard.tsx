@@ -26,10 +26,10 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
     present({
       header: 'Opciones de Insumo',
       buttons: [
-        { text: 'Editar Nombre/Alerta', icon: pencilOutline, handler: () => onEditName(m) },
-        { text: 'Comprar', icon: cartOutline, handler: () => onRestock(m) },
-        { text: 'Registrar Pérdida', icon: warningOutline, handler: () => onRegisterLoss(m) },
-        { text: 'Historial', icon: timeOutline, handler: () => onViewHistory(m) },
+        { text: 'Editar Nombre/Alerta', icon: pencilOutline, cssClass: 'action-sheet-editar', handler: () => onEditName(m) },
+        { text: 'Comprar', icon: cartOutline, cssClass: 'action-sheet-comprar', handler: () => onRestock(m) },
+        { text: 'Registrar Pérdida', icon: warningOutline, cssClass: 'action-sheet-eliminar', handler: () => onRegisterLoss(m) },
+        { text: 'Historial', icon: timeOutline, cssClass: 'action-sheet-editar', handler: () => onViewHistory(m) },
         { text: 'Archivar', icon: archiveOutline, role: 'destructive', handler: () => onArchive(m) },
         { text: 'Cancelar', icon: closeOutline, role: 'cancel' }
       ]
