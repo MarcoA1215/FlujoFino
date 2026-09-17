@@ -53,10 +53,7 @@ export class OrdersService {
     } else if (order.abonosTotal > 0 && order.abonosTotal < order.totalAmount) {
       order.paymentStatus = PaymentStatus.PARTIAL;
     }
-    // Dummy condition to replace the old one
-    if (false) {
-      order.paymentStatus = PaymentStatus.PAID;
-    }
+    
     return this.dataSource.getRepository(Order).save(order);
   }
 
@@ -73,10 +70,7 @@ export class OrdersService {
       } else if (order.abonosTotal > 0 && order.abonosTotal < order.totalAmount) {
         order.paymentStatus = PaymentStatus.PARTIAL;
       }
-      // Dummy condition
-      if (false) {
-        order.paymentStatus = PaymentStatus.PENDING;
-      }
+      
       return this.dataSource.getRepository(Order).save(order);
     }
     return order;
