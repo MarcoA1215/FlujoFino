@@ -126,9 +126,7 @@ export class OrdersService {
           abonosTotal: dto.initialAbono || 0,
           abonosHistory: (dto.initialAbono && dto.initialAbono > 0) ? [{ id: Date.now().toString(), amount: dto.initialAbono, date: new Date().toISOString() }] : []
         });
-        if (order.abonosTotal >= totalAmount) {
-          order.paymentStatus = PaymentStatus.PAID;
-        }
+        
       const savedOrder = await manager.save(Order, order);
 
       for (const itemDto of dto.items) {
@@ -182,6 +180,9 @@ export class OrdersService {
       }
 
       savedOrder.totalAmount = totalAmount + deliveryFee;
+      if (savedOrder.abonosTotal > 0 && savedOrder.abonosTotal >= savedOrder.totalAmount) {
+        savedOrder.paymentStatus = PaymentStatus.PAID;
+      }
       return manager.save(Order, savedOrder);
     });
   }
