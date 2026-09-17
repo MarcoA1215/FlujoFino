@@ -63,7 +63,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             
             {!isClientMode && (
               <p style={{ margin: '0 0 8px 0', color: 'gray', fontSize: '0.85rem' }}>
-                {p.category || 'Sin categor\u00eda'} - {p.isCombo ? 'Combo' : 'Base'}
+                {p.category || 'Sin categoría'} - {p.isCombo ? 'Combo' : 'Base'}
               </p>
             )}
             
@@ -82,7 +82,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 {(!p.isCombo || p.isPreAssembled) && (
                   <>
                     <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
-                      F\u00edsico: {p.physicalStock}
+                      Físico: {p.physicalStock}
                     </IonBadge>
                     <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
                       Disp: {p.stockQuantity}
