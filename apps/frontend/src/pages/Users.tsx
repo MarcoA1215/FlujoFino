@@ -50,10 +50,11 @@ const Users: React.FC = () => {
   const handleSaveSettings = async () => {
     try {
       await apiClient.put('/settings', { 
-        companyBank: settings.companyBank, 
-        companyCedula: settings.companyCedula, 
-        companyPhone: settings.companyPhone 
-      });
+          companyBank: settings.companyBank, 
+          companyCedula: settings.companyCedula, 
+          companyPhone: settings.companyPhone,
+          allowPartialPayments: settings.allowPartialPayments
+        });
       presentToast({ message: 'Ajustes guardados', duration: 2000, color: 'success' });
       fetchUsers();
     } catch(e: any) {

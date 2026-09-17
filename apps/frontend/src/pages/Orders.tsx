@@ -100,6 +100,17 @@ const Orders: React.FC = () => {
     presentToast({ message: 'Pedido copiado al portapapeles', duration: 2000, color: 'success' });
   };
 
+  const fetchSettings = async () => {
+    try {
+      const res = await apiClient.get('/settings');
+      setSettings(res.data);
+    } catch(e) {}
+  };
+  
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+  
   const fetchOrders = async () => {
     try {
       const res = await apiClient.get<Order[]>("/orders");
