@@ -14,6 +14,8 @@ const RawMaterials: React.FC = () => {
   const [inputUnit, setInputUnit] = useState('Kg');
   const [inputQty, setInputQty] = useState<number>();
   const [inputCost, setInputCost] = useState<number>();
+  const [currency, setCurrency] = useState<'USD' | 'VES'>('USD');
+  const [exchangeRate, setExchangeRate] = useState<number>(36.5);
   
   const [presentAlert] = useIonAlert();
   const [searchText, setSearchText] = useState('');
@@ -52,8 +54,14 @@ const RawMaterials: React.FC = () => {
 
   const fetchMaterials = async () => {
     try {
-      const res = await apiClient.get<RawMaterial[]>('/raw-materials');
-      setMaterials(res.data);
+      const [matRes, setRes] = await Promise.all([
+        apiClient.get<RawMaterial[]>('/raw-materials'),
+        apiClient.get('/settings')
+      ]);
+      setMaterials(matRes.data);
+      if (setRes.data && setRes.data.exchangeRateBs) {
+        setExchangeRate(setRes.data.exchangeRateBs);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -177,7 +185,13 @@ const RawMaterials: React.FC = () => {
                     </IonSelect>
                   </IonItem>
                   <IonItem>
-                    <IonLabel position="stacked">Costo Total de esta compra ($)</IonLabel>
+                    <IonLabel position="stacked" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  <span>Costo Total de esta compra</span>
+  <IonSelect value={currency} onIonChange={e => setCurrency(e.detail.value)} style={{ minHeight: 'auto', padding: '0', background: '#eee', borderRadius: '4px', paddingLeft: '5px', paddingRight: '5px' }}>
+    <IonSelectOption value="USD">$ USD</IonSelectOption>
+    <IonSelectOption value="VES">Bs. VES</IonSelectOption>
+  </IonSelect>
+</IonLabel>
                     <IonInput type="number" step="any" value={inputCost} onIonInput={e => setInputCost(parseFloat(e.detail.value!) || undefined)} placeholder="Ej. 2.00" />
                   </IonItem>
                   {inputQty && (inputUnit === 'g' || inputUnit === 'ml') && (
@@ -207,7 +221,7 @@ const RawMaterials: React.FC = () => {
           operationType={operationType} 
           onClose={() => { setOperationMaterial(null); setOperationType(null); }} 
           onSuccess={fetchMaterials} 
-        />
+         exchangeRate={exchangeRate} />
       </IonContent>
     </IonPage>
   );
