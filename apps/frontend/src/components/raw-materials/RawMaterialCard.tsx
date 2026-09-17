@@ -1,7 +1,6 @@
 import React from 'react';
 import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
 import { pencilOutline, cartOutline, warningOutline, timeOutline, archiveOutline, closeOutline } from 'ionicons/icons';
-import { IonIcon } from '@ionic/react';
 import type { RawMaterial } from '../../types';
 
 interface RawMaterialCardProps {
@@ -27,6 +26,7 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
     present({
       header: 'Opciones de Insumo',
       buttons: [
+        { text: 'Editar Nombre/Alerta', icon: pencilOutline, handler: () => onEditName(m) },
         { text: 'Comprar', icon: cartOutline, handler: () => onRestock(m) },
         { text: 'Registrar Pérdida', icon: warningOutline, handler: () => onRegisterLoss(m) },
         { text: 'Historial', icon: timeOutline, handler: () => onViewHistory(m) },
@@ -49,9 +49,7 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
               <IonBadge color={m.stockQuantity <= m.minStockAlert ? 'danger' : 'success'} style={{ padding: '8px 10px', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
                 {m.stockQuantity.toFixed(2)} {m.unit}
               </IonBadge>
-              <div style={{ display: 'flex', gap: '5px' }}>
-                <IonButton fill="clear" size="small" onClick={() => onEditName(m)} style={{ margin: 0, width: '30px', height: '30px' }}><IonIcon icon={pencilOutline} slot="icon-only" /></IonButton>
-              </div>
+              
             </div>
           </div>
           

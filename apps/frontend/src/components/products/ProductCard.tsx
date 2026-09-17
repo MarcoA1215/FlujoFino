@@ -1,5 +1,4 @@
 ﻿import { pencilOutline, trashOutline, buildOutline, cubeOutline, swapHorizontalOutline, cutOutline, warningOutline, closeOutline } from 'ionicons/icons';
-import { IonIcon } from '@ionic/react';
 import React from 'react';
 import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
 import type { Product } from '../../types';
@@ -31,6 +30,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const openOptions = () => {
     const buttons: any[] = [
+      { text: 'Editar Info / Precio', icon: pencilOutline, handler: () => onEdit(p) },
       { text: p.isCombo ? 'Configurar Combo' : 'Configurar Receta', icon: buildOutline, handler: () => onConfigure(p) },
       { text: 'Stock Inicial / Ajuste', icon: cubeOutline, handler: () => onAdjustStock(p) }
     ];
@@ -44,6 +44,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     }
 
     buttons.push({ text: 'Registrar Pérdida', icon: warningOutline, handler: () => onRegisterLoss(p) });
+    buttons.push({ text: 'Eliminar Producto', icon: trashOutline, role: 'destructive', handler: () => onDelete(p) });
     buttons.push({ text: 'Cancelar', icon: closeOutline, role: 'cancel' });
 
     present({
@@ -91,10 +92,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                       </IonBadge>
                     )}
                   </div>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                  <IonButton fill="clear" size="small" onClick={() => onEdit(p)} style={{ margin: 0, width: '30px', height: '30px' }}><IonIcon icon={pencilOutline} slot="icon-only" /></IonButton>
-                  <IonButton fill="clear" size="small" color="danger" onClick={() => onDelete(p)} style={{ margin: 0, width: "30px", height: "30px" }}><IonIcon icon={trashOutline} slot="icon-only" /></IonButton>
-                </div>
+                
               </div>
             )}
           </div>
