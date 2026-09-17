@@ -118,5 +118,5 @@ ion-badge, ion-button, th, td, ion-card-title, h1, h2, h3, p {
 
 /* Rounded Searchbars */
 ion-searchbar {
-  --border-radius: 10px;
+  --border-radius: 20px;
 }
