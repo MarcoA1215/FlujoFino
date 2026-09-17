@@ -16,4 +16,7 @@ export class Settings {
 
   @Column({ nullable: true })
   companyPhone: string;
+
+  @Column('boolean', { default: false })
+  allowPartialPayments: boolean;
 }

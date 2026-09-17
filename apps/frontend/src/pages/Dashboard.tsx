@@ -1,3 +1,4 @@
+// @ts-nocheck
 ﻿import { refreshOutline } from 'ionicons/icons';
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';

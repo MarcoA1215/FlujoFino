@@ -80,4 +80,10 @@ export class Order {
 
   @OneToMany(() => OrderItem, item => item.order)
   items: OrderItem[];
+
+  @Column('float', { default: 0 })
+  abonosTotal: number;
+
+  @Column('json', { nullable: true })
+  abonosHistory: any;
 }

@@ -23,6 +23,7 @@ export class CreateOrderDto {
   amountBs?: number;
   exchangeRate?: number;
   items: { productId: string; quantity: number; unitPrice: number }[];
+  initialAbono?: number;
 }
 
 export class UpdatePaymentDto {
@@ -39,6 +40,35 @@ export class UpdatePaymentDto {
 @Injectable()
 export class OrdersService {
   constructor(private dataSource: DataSource) {}
+
+  async addAbono(orderId: string, amount: number) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new Error("Order not found");
+    const history = order.abonosHistory || [];
+    history.push({ id: Date.now().toString(), amount, date: new Date().toISOString() });
+    order.abonosHistory = history;
+    order.abonosTotal = (order.abonosTotal || 0) + amount;
+    if (order.abonosTotal >= order.totalAmount && order.paymentStatus === PaymentStatus.PENDING) {
+      order.paymentStatus = PaymentStatus.PAID;
+    }
+    return this.orderRepo.save(order);
+  }
+
+  async revertAbono(orderId: string, index: number) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new Error("Order not found");
+    const history = order.abonosHistory || [];
+    if (index >= 0 && index < history.length) {
+      const removed = history.splice(index, 1)[0];
+      order.abonosHistory = history;
+      order.abonosTotal = (order.abonosTotal || 0) - removed.amount;
+      if (order.abonosTotal < order.totalAmount && order.paymentStatus === PaymentStatus.PAID) {
+        order.paymentStatus = PaymentStatus.PENDING;
+      }
+      return this.orderRepo.save(order);
+    }
+    return order;
+  }
 
   async createOrder(dto: CreateOrderDto) {
     return this.dataSource.transaction(async (manager) => {
@@ -170,6 +200,13 @@ export class OrdersService {
     if (dto.pagoMovilPhone) order.pagoMovilPhone = dto.pagoMovilPhone;
     if (dto.pagoMovilCedula) order.pagoMovilCedula = dto.pagoMovilCedula;
     if (dto.pagoMovilBank) order.pagoMovilBank = dto.pagoMovilBank;
+      order.abonosTotal = dto.initialAbono || 0;
+      if (dto.initialAbono && dto.initialAbono > 0) {
+        order.abonosHistory = [{ id: Date.now().toString(), amount: dto.initialAbono, date: new Date().toISOString() }];
+        if (order.abonosTotal >= totalAmount) {
+          order.paymentStatus = PaymentStatus.PAID;
+        }
+      }
     if (dto.amountBs) order.amountBs = dto.amountBs;
     if (dto.exchangeRate) order.exchangeRate = dto.exchangeRate;
 

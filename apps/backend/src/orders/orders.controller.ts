@@ -4,6 +4,16 @@ import { OrderStatus } from '@nutrideli/shared-types';
 
 @Controller('orders')
 export class OrdersController {
+  @Post(':id/abono')
+  addAbono(@Param('id') id: string, @Body('amount') amount: number) {
+    return this.ordersService.addAbono(id, amount);
+  }
+
+  @Delete(':id/abono/:index')
+  revertAbono(@Param('id') id: string, @Param('index') index: string) {
+    return this.ordersService.revertAbono(id, parseInt(index, 10));
+  }
+
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
