@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, Delete } from '@nestjs/common';
 import { OrdersService, CreateOrderDto, UpdatePaymentDto } from './orders.service';
 import { OrderStatus } from '@nutrideli/shared-types';
 

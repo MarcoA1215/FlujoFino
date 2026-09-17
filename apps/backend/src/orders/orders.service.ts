@@ -42,7 +42,7 @@ export class OrdersService {
   constructor(private dataSource: DataSource) {}
 
   async addAbono(orderId: string, amount: number) {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    const order = await this.dataSource.getRepository(Order).findOne({ where: { id: orderId } });
     if (!order) throw new Error("Order not found");
     const history = order.abonosHistory || [];
     history.push({ id: Date.now().toString(), amount, date: new Date().toISOString() });
@@ -51,11 +51,11 @@ export class OrdersService {
     if (order.abonosTotal >= order.totalAmount && order.paymentStatus === PaymentStatus.PENDING) {
       order.paymentStatus = PaymentStatus.PAID;
     }
-    return this.orderRepo.save(order);
+    return this.dataSource.getRepository(Order).save(order);
   }
 
   async revertAbono(orderId: string, index: number) {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    const order = await this.dataSource.getRepository(Order).findOne({ where: { id: orderId } });
     if (!order) throw new Error("Order not found");
     const history = order.abonosHistory || [];
     if (index >= 0 && index < history.length) {
@@ -65,7 +65,7 @@ export class OrdersService {
       if (order.abonosTotal < order.totalAmount && order.paymentStatus === PaymentStatus.PAID) {
         order.paymentStatus = PaymentStatus.PENDING;
       }
-      return this.orderRepo.save(order);
+      return this.dataSource.getRepository(Order).save(order);
     }
     return order;
   }
@@ -121,9 +121,14 @@ export class OrdersService {
         pagoMovilPhone: dto.pagoMovilPhone,
         pagoMovilCedula: dto.pagoMovilCedula,
         pagoMovilBank: dto.pagoMovilBank,
-        amountBs: dto.amountBs,
-        exchangeRate: dto.exchangeRate,
-      });
+          amountBs: dto.amountBs,
+          exchangeRate: dto.exchangeRate,
+          abonosTotal: dto.initialAbono || 0,
+          abonosHistory: (dto.initialAbono && dto.initialAbono > 0) ? [{ id: Date.now().toString(), amount: dto.initialAbono, date: new Date().toISOString() }] : []
+        });
+        if (order.abonosTotal >= totalAmount) {
+          order.paymentStatus = PaymentStatus.PAID;
+        }
       const savedOrder = await manager.save(Order, order);
 
       for (const itemDto of dto.items) {
@@ -200,13 +205,6 @@ export class OrdersService {
     if (dto.pagoMovilPhone) order.pagoMovilPhone = dto.pagoMovilPhone;
     if (dto.pagoMovilCedula) order.pagoMovilCedula = dto.pagoMovilCedula;
     if (dto.pagoMovilBank) order.pagoMovilBank = dto.pagoMovilBank;
-      order.abonosTotal = dto.initialAbono || 0;
-      if (dto.initialAbono && dto.initialAbono > 0) {
-        order.abonosHistory = [{ id: Date.now().toString(), amount: dto.initialAbono, date: new Date().toISOString() }];
-        if (order.abonosTotal >= totalAmount) {
-          order.paymentStatus = PaymentStatus.PAID;
-        }
-      }
     if (dto.amountBs) order.amountBs = dto.amountBs;
     if (dto.exchangeRate) order.exchangeRate = dto.exchangeRate;
 
