@@ -39,6 +39,7 @@ const Orders: React.FC = () => {
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<any>(null);
+  const [settings, setSettings] = useState<any>(null);
   const [abonoAmount, setAbonoAmount] = useState<string>('');
 
   const handleAddAbono = async () => {
@@ -447,7 +448,7 @@ const getStatusColor = (status: OrderStatus) => {
                 </IonList>
               </div>
 
-              {selectedOrderForDetails.paymentStatus === PaymentStatus.PENDING && (
+              {selectedOrderForDetails.paymentStatus === PaymentStatus.PENDING && settings?.allowPartialPayments && (
                 <div style={{ marginTop: '20px', borderTop: '1px solid #ccc', paddingTop: '10px' }}>
                   <h4>Registrar Nuevo Abono</h4>
                   <IonItem>
