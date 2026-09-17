@@ -283,7 +283,7 @@ const getStatusColor = (status: OrderStatus) => {
             <IonMenuButton />
           </IonButtons>
           <IonTitle>Tablero de Pedidos</IonTitle>
-          <IonButtons slot="end"><IonButton onClick={fetchOrders}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
+          <IonButtons slot="end"><IonButton onClick={() => { fetchOrders(); fetchSettings(); }}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
         </IonToolbar>
         <IonToolbar color="success">
           <IonSegment value={tab} onIonChange={e => setTab(e.detail.value as any)}>
