@@ -41,11 +41,16 @@ const Orders: React.FC = () => {
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<any>(null);
   const [settings, setSettings] = useState<any>(null);
   const [abonoAmount, setAbonoAmount] = useState<string>('');
+  const [abonoCurrency, setAbonoCurrency] = useState<'USD' | 'VES'>('USD');
 
   const handleAddAbono = async () => {
     if (!selectedOrderForDetails || !abonoAmount || isNaN(Number(abonoAmount))) return;
     try {
-      await apiClient.post('/orders/' + selectedOrderForDetails.id + '/abono', { amount: Number(abonoAmount) });
+      let finalAmount = Number(abonoAmount);
+      if (abonoCurrency === 'VES') {
+        finalAmount = finalAmount / exchangeRate;
+      }
+      await apiClient.post('/orders/' + selectedOrderForDetails.id + '/abono', { amount: finalAmount });
       presentToast({ message: 'Abono registrado', duration: 2000, color: 'success' });
       setAbonoAmount('');
       fetchOrders();
@@ -463,8 +468,14 @@ const getStatusColor = (status: OrderStatus) => {
                 <div style={{ marginTop: '20px', borderTop: '1px solid #ccc', paddingTop: '10px' }}>
                   <h4>Registrar Nuevo Abono</h4>
                   <IonItem>
-                    <IonLabel position="stacked">Monto ($)</IonLabel>
-                    <IonInput type="number" value={abonoAmount} onIonInput={e => setAbonoAmount(e.detail.value!)} placeholder="Ej. 5.00" />
+                    <IonLabel position="stacked" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <span>Monto del Abono</span>
+                        <IonSelect value={abonoCurrency} onIonChange={e => setAbonoCurrency(e.detail.value)} style={{ minHeight: 'auto', padding: '0', background: '#eee', borderRadius: '4px', paddingLeft: '5px', paddingRight: '5px' }}>
+                          <IonSelectOption value="USD">$ USD</IonSelectOption>
+                          <IonSelectOption value="VES">Bs. VES</IonSelectOption>
+                        </IonSelect>
+                      </IonLabel>
+                      <IonInput type="number" value={abonoAmount} onIonInput={e => setAbonoAmount(e.detail.value!)} placeholder={abonoCurrency === 'USD' ? "Ej. 5.00" : "Ej. 200.00"} />
                   </IonItem>
                   <IonButton expand="block" onClick={handleAddAbono} disabled={!abonoAmount} className="ion-margin-top">
                     Agregar Abono
