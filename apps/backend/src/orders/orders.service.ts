@@ -48,7 +48,13 @@ export class OrdersService {
     history.push({ id: Date.now().toString(), amount, date: new Date().toISOString() });
     order.abonosHistory = history;
     order.abonosTotal = (order.abonosTotal || 0) + amount;
-    if (order.abonosTotal >= order.totalAmount && order.paymentStatus === PaymentStatus.PENDING) {
+    if (order.abonosTotal >= order.totalAmount) {
+      order.paymentStatus = PaymentStatus.PAID;
+    } else if (order.abonosTotal > 0 && order.abonosTotal < order.totalAmount) {
+      order.paymentStatus = PaymentStatus.PARTIAL;
+    }
+    // Dummy condition to replace the old one
+    if (false) {
       order.paymentStatus = PaymentStatus.PAID;
     }
     return this.dataSource.getRepository(Order).save(order);
@@ -62,7 +68,13 @@ export class OrdersService {
       const removed = history.splice(index, 1)[0];
       order.abonosHistory = history;
       order.abonosTotal = (order.abonosTotal || 0) - removed.amount;
-      if (order.abonosTotal < order.totalAmount && order.paymentStatus === PaymentStatus.PAID) {
+      if (order.abonosTotal === 0) {
+        order.paymentStatus = PaymentStatus.PENDING;
+      } else if (order.abonosTotal > 0 && order.abonosTotal < order.totalAmount) {
+        order.paymentStatus = PaymentStatus.PARTIAL;
+      }
+      // Dummy condition
+      if (false) {
         order.paymentStatus = PaymentStatus.PENDING;
       }
       return this.dataSource.getRepository(Order).save(order);
@@ -180,9 +192,11 @@ export class OrdersService {
       }
 
       savedOrder.totalAmount = totalAmount + deliveryFee;
-      if (savedOrder.abonosTotal > 0 && savedOrder.abonosTotal >= savedOrder.totalAmount) {
-        savedOrder.paymentStatus = PaymentStatus.PAID;
-      }
+      if (savedOrder.abonosTotal >= savedOrder.totalAmount && savedOrder.totalAmount > 0) {
+          savedOrder.paymentStatus = PaymentStatus.PAID;
+        } else if (savedOrder.abonosTotal > 0 && savedOrder.abonosTotal < savedOrder.totalAmount) {
+          savedOrder.paymentStatus = PaymentStatus.PARTIAL;
+        }
       return manager.save(Order, savedOrder);
     });
   }

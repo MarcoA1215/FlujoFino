@@ -154,7 +154,8 @@ const Orders: React.FC = () => {
 
   const openPaymentAlert = (order: Order) => {
     if (order.status === OrderStatus.CANCELED) return;
-    const totalBs = (order.totalAmount * exchangeRate).toFixed(2);
+    const remaining = order.totalAmount - (order.abonosTotal || 0);
+    const totalBs = (remaining * exchangeRate).toFixed(2);
     presentAlert({
       header: "Confirmar Pago Móvil",
       subHeader: `Monto a cobrar: Bs. ${totalBs}`,
@@ -196,11 +197,12 @@ const Orders: React.FC = () => {
 
   const openUSDPaymentAlert = (order: Order) => {
     if (order.status === OrderStatus.CANCELED) return;
+    const remaining = order.totalAmount - (order.abonosTotal || 0);
     presentAlert({
       header: "Confirmar Pago Divisas",
-      subHeader: `Total del pedido: $${order.totalAmount.toFixed(2)}`,
+      subHeader: `Restante por cobrar: $${remaining.toFixed(2)}`,
       inputs: [
-        { name: "usdReceived", type: "number", placeholder: "Monto entregado por el cliente ($)", min: order.totalAmount }
+        { name: "usdReceived", type: "number", placeholder: "Monto entregado por el cliente ($)", min: remaining }
       ],
       buttons: [
         { text: "Cancelar", role: "cancel" },
@@ -208,25 +210,21 @@ const Orders: React.FC = () => {
           text: "Calcular y Confirmar",
           handler: async (data: any) => {
             const received = parseFloat(data.usdReceived);
-            if (!received || received < order.totalAmount) {
+            if (!received || received < remaining) {
               presentToast({ message: "El monto recibido debe ser mayor o igual al total", duration: 3000, color: "warning" });
               return false;
             }
-            const changeUsd = received - order.totalAmount;
+            const changeUsd = received - remaining;
             const changeBs = changeUsd * exchangeRate;
             try {
               await apiClient.patch(`/orders/${order.id}/payment`, {
                 status: PaymentStatus.PAID,
-                notes: `MÉTODO: Divisas (USD) | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
+                notes: (order.notes ? order.notes + '\n' : '') + `Pago USD (Restante): $${remaining.toFixed(2)} | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
               });
               fetchOrders();
-              presentAlert({
-                header: "Pago Confirmado",
-                message: `Dar Vuelto: <br><br><b>$${changeUsd.toFixed(2)}</b> ó <br><b>Bs. ${changeBs.toFixed(2)}</b>`,
-                buttons: ["OK"]
-              });
-            } catch (e) {
-              presentToast({ message: "Error al actualizar pago", duration: 3000, color: "danger" });
+              presentToast({ message: "Pago en USD registrado", duration: 2000, color: "success" });
+            } catch (e: any) {
+              presentToast({ message: "Error al registrar el pago", duration: 3000, color: "danger" });
             }
           }
         }
@@ -260,7 +258,7 @@ const getStatusColor = (status: OrderStatus) => {
   const filteredOrders = orders.filter(o => {
     const isActivo = o.status === OrderStatus.PENDING || o.status === OrderStatus.PREPARING;
     const isHistorial = o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED;
-    const isPorCobrar = o.paymentStatus === PaymentStatus.PENDING && o.status !== OrderStatus.CANCELED;
+    const isPorCobrar = [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED;
 
     if (tab === "activos" && !isActivo) return false;
     if (tab === "por_cobrar" && !isPorCobrar) return false;
@@ -354,7 +352,9 @@ const getStatusColor = (status: OrderStatus) => {
                         <h3 style={{ margin: 0, fontWeight: "bold" }}>Total: ${order.totalAmount.toFixed(2)}</h3>
                       </div>
                       
-                      {order.paymentStatus === PaymentStatus.PAID ? (
+                      {order.paymentStatus === PaymentStatus.PARTIAL ? (
+                          <IonBadge color="warning">Abono Parcial</IonBadge>
+                        ) : order.paymentStatus === PaymentStatus.PAID ? (
                         <IonBadge color="success">Pagado</IonBadge>
                       ) : order.paymentStatus === PaymentStatus.REFUNDED ? (
                         <IonBadge color="dark">Reembolsado</IonBadge>
@@ -459,7 +459,7 @@ const getStatusColor = (status: OrderStatus) => {
                 </IonList>
               </div>
 
-              {selectedOrderForDetails.paymentStatus === PaymentStatus.PENDING && settings?.allowPartialPayments && (
+              {[PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(selectedOrderForDetails.paymentStatus) && settings?.allowPartialPayments && (
                 <div style={{ marginTop: '20px', borderTop: '1px solid #ccc', paddingTop: '10px' }}>
                   <h4>Registrar Nuevo Abono</h4>
                   <IonItem>
