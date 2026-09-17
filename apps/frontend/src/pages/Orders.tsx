@@ -303,12 +303,12 @@ const getStatusColor = (status: OrderStatus) => {
             {filteredOrders.map(order => (
               <IonCol size="12" sizeMd="6" sizeLg="4" key={order.id}>
                 <IonCard color={order.status === OrderStatus.DELIVERED ? "light" : (order.status === OrderStatus.CANCELED ? "medium" : "white")}>
-                  <IonCardHeader style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <IonCardHeader style={{ position: 'relative', paddingRight: '70px' }}>
   <div>
     <IonCardTitle>{order.customerName}</IonCardTitle>
     <IonCardSubtitle>{new Date(order.createdAt).toLocaleString()}</IonCardSubtitle>
   </div>
-  <div style={{ display: 'flex', gap: '5px' }}>
+  <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '5px' }}>
     <IonButton fill="clear" size="small" onClick={() => handleCopyOrder(order)}>
       <IonIcon icon={copyOutline} slot="icon-only" />
     </IonButton>
