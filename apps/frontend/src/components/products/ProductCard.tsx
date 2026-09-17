@@ -31,9 +31,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3">
       <IonCard style={{ margin: '5px' }}>
         <IonCardContent>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: '0 0 5px 0', wordBreak: 'break-word' }}>{p.name}</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ flex: '1 1 150px', minWidth: '150px' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: '0 0 5px 0' }}>{p.name}</h2>
               {!isClientMode && (
                 <p style={{ margin: 0, color: 'gray', fontSize: '0.85rem' }}>
                   {p.category || 'Sin categoría'} - {p.isCombo ? 'Combo' : 'Base'}
