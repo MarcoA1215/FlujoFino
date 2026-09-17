@@ -180,6 +180,7 @@ const Products: React.FC = () => {
 
 
   const filteredData = products.filter(item => {
+    if (isClientMode && item.stockQuantity <= 0) return false;
     if (searchText.trim() === '') return true;
     return item.name.toLowerCase().includes(searchText.toLowerCase());
   });
@@ -221,7 +222,7 @@ const Products: React.FC = () => {
                     <IonItem key={p.id}>
                       <IonLabel>
                         <h2><strong>{p.name}</strong></h2>
-                        <p>Precio: $${p.salePrice.toFixed(2)}</p>
+                        <p>Precio: ${p.salePrice.toFixed(2)}</p>
                       </IonLabel>
                       <IonBadge slot="end" color={p.stockQuantity > 0 ? 'success' : 'danger'}>
                         Disponible: {p.stockQuantity}
