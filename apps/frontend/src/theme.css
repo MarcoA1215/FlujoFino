@@ -115,3 +115,8 @@ ion-badge, ion-button, th, td, ion-card-title, h1, h2, h3, p {
 .action-sheet-eliminar .action-sheet-icon {
   color: var(--ion-color-danger) !important;
 }
+
+/* Rounded Searchbars */
+ion-searchbar {
+  --border-radius: 10px;
+}
