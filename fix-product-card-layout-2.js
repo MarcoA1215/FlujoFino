@@ -1,59 +1,9 @@
-﻿import { pencilOutline, trashOutline, buildOutline, cubeOutline, swapHorizontalOutline, cutOutline, warningOutline, closeOutline } from 'ionicons/icons';
-import React from 'react';
-import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
-import type { Product } from '../../types';
+﻿const fs = require('fs');
 
-interface ProductCardProps {
-  product: Product;
-  onEdit: (p: Product) => void;
-  onDelete: (p: Product) => void;
-  onConfigure: (p: Product) => void;
-  onAdjustStock: (p: Product) => void;
-  onRegisterLoss: (p: Product) => void;
-  onToggleKitting?: (p: Product) => void;
-  onUnpackKit?: (p: Product) => void;
-  isClientMode?: boolean;
-}
+let p = fs.readFileSync('apps/frontend/src/components/products/ProductCard.tsx', 'utf8');
 
-export const ProductCard: React.FC<ProductCardProps> = ({
-  product: p,
-  onEdit,
-  onDelete,
-  onConfigure,
-  onAdjustStock,
-  onRegisterLoss,
-  onToggleKitting,
-  onUnpackKit,
-  isClientMode
-}) => {
-  const [present] = useIonActionSheet();
-
-  const openOptions = () => {
-    const buttons: any[] = [
-      { text: 'Editar Info / Precio', icon: pencilOutline, cssClass: 'action-sheet-editar', handler: () => onEdit(p) },
-      { text: p.isCombo ? 'Configurar Combo' : 'Configurar Receta', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) },
-      { text: 'Stock Inicial / Ajuste', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) }
-    ];
-
-    if (p.isCombo && onToggleKitting) {
-      buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Virtual' : 'Físico (Kitting)'}`, icon: swapHorizontalOutline, cssClass: 'action-sheet-cambiar', handler: () => onToggleKitting(p) });
-    }
-
-    if (p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) {
-      buttons.push({ text: 'Desarmar 1 Und', icon: cutOutline, cssClass: 'action-sheet-desarmar', handler: () => onUnpackKit(p) });
-    }
-
-    buttons.push({ text: 'Registrar Pérdida', icon: warningOutline, cssClass: 'action-sheet-eliminar', handler: () => onRegisterLoss(p) });
-    buttons.push({ text: 'Eliminar Producto', icon: trashOutline, role: 'destructive', handler: () => onDelete(p) });
-    buttons.push({ text: 'Cancelar', icon: closeOutline, role: 'cancel' });
-
-    present({
-      header: 'Opciones de Producto',
-      buttons
-    });
-  };
-  
-  return (
+const returnStart = p.indexOf('return (');
+const newReturn = `return (
     <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3" style={{ display: 'flex' }}>
       <IonCard style={{ margin: '5px', width: '100%', display: 'flex', flexDirection: 'column' }}>
         <IonCardContent style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '15px' }}>
@@ -63,12 +13,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             
             {!isClientMode && (
               <p style={{ margin: '0 0 8px 0', color: 'gray', fontSize: '0.85rem' }}>
-                {p.category || 'Sin categor\u00eda'} - {p.isCombo ? 'Combo' : 'Base'}
+                {p.category || 'Sin categor\\u00eda'} - {p.isCombo ? 'Combo' : 'Base'}
               </p>
             )}
             
             <p style={{ margin: '0 0 12px 0', fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--ion-color-dark)' }}>
-              Precio: ${p.salePrice.toFixed(2)}
+              Precio: \\${p.salePrice.toFixed(2)}
             </p>
 
             {isClientMode && (
@@ -82,7 +32,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 {(!p.isCombo || p.isPreAssembled) && (
                   <>
                     <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
-                      F\u00edsico: {p.physicalStock}
+                      F\\u00edsico: {p.physicalStock}
                     </IonBadge>
                     <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
                       Disp: {p.stockQuantity}
@@ -111,3 +61,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     </IonCol>
   );
 };
+`;
+
+p = p.substring(0, returnStart) + newReturn;
+
+fs.writeFileSync('apps/frontend/src/components/products/ProductCard.tsx', p);
+
+console.log('ProductCard layout fixed');
