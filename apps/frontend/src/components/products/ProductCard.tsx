@@ -40,6 +40,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 </p>
               )}
               <p style={{ margin: '5px 0 0 0', fontWeight: 'bold' }}>Precio: ${p.salePrice.toFixed(2)}</p>
+  {isClientMode && (
+    <p style={{ margin: '5px 0 0 0', color: p.stockQuantity > 0 ? 'green' : 'red', fontWeight: '500', fontSize: '0.9rem' }}>
+      Disponible: {p.stockQuantity}
+    </p>
+  )}
             </div>
             
             {!isClientMode && (

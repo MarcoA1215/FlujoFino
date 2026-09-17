@@ -204,10 +204,12 @@ const Products: React.FC = () => {
 
       <IonContent fullscreen className="ion-padding">
         <IonGrid>
-          <IonRow className="ion-margin-bottom">
-            <IonCol size="12" sizeSm="6" sizeMd="4"><IonButton expand="block" color="primary" onClick={() => openCreateAlert(false)}>+ Crear Producto Base</IonButton></IonCol>
-            <IonCol size="12" sizeSm="6" sizeMd="4"><IonButton expand="block" color="tertiary" onClick={() => openCreateAlert(true)}>+ Crear Combo</IonButton></IonCol>
-          </IonRow>
+          {!isClientMode && (
+  <IonRow className="ion-margin-bottom">
+    <IonCol size="12" sizeSm="6" sizeMd="4"><IonButton expand="block" color="primary" onClick={() => openCreateAlert(false)}>+ Crear Producto Base</IonButton></IonCol>
+    <IonCol size="12" sizeSm="6" sizeMd="4"><IonButton expand="block" color="tertiary" onClick={() => openCreateAlert(true)}>+ Crear Combo</IonButton></IonCol>
+  </IonRow>
+)}
 
           <IonRow>
             <IonCol size="12">

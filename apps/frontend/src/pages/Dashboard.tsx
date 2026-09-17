@@ -5,7 +5,7 @@ import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
 import {
   IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonIcon, IonText, useIonToast, IonList, IonItem, IonLabel, IonBadge, IonButton } from '@ionic/react';
-import { alertCircleOutline, trendingDownOutline, basketOutline, trendingUpOutline, pieChartOutline, walletOutline } from 'ionicons/icons';
+import { alertCircleOutline, trendingDownOutline, basketOutline, trendingUpOutline, pieChartOutline, walletOutline, cartOutline } from 'ionicons/icons';
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import type { DashboardSummary } from '../types';
