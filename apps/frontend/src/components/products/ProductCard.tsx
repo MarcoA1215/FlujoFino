@@ -1,4 +1,4 @@
-﻿import { pencilOutline, trashOutline } from 'ionicons/icons';
+﻿import { pencilOutline, trashOutline, buildOutline, cubeOutline, swapHorizontalOutline, cutOutline, warningOutline, closeOutline } from 'ionicons/icons';
 import { IonIcon } from '@ionic/react';
 import React from 'react';
 import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
@@ -31,20 +31,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const openOptions = () => {
     const buttons: any[] = [
-      { text: p.isCombo ? 'Configurar Combo' : 'Configurar Receta', handler: () => onConfigure(p) },
-      { text: 'Stock Inicial / Ajuste', handler: () => onAdjustStock(p) }
+      { text: p.isCombo ? 'Configurar Combo' : 'Configurar Receta', icon: buildOutline, handler: () => onConfigure(p) },
+      { text: 'Stock Inicial / Ajuste', icon: cubeOutline, handler: () => onAdjustStock(p) }
     ];
 
     if (p.isCombo && onToggleKitting) {
-      buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Virtual' : 'Físico (Kitting)'}`, handler: () => onToggleKitting(p) });
+      buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Virtual' : 'Físico (Kitting)'}`, icon: swapHorizontalOutline, handler: () => onToggleKitting(p) });
     }
 
     if (p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) {
-      buttons.push({ text: 'Desarmar 1 Und', handler: () => onUnpackKit(p) });
+      buttons.push({ text: 'Desarmar 1 Und', icon: cutOutline, handler: () => onUnpackKit(p) });
     }
 
-    buttons.push({ text: 'Registrar Pérdida', handler: () => onRegisterLoss(p) });
-    buttons.push({ text: 'Cancelar', role: 'cancel' });
+    buttons.push({ text: 'Registrar Pérdida', icon: warningOutline, handler: () => onRegisterLoss(p) });
+    buttons.push({ text: 'Cancelar', icon: closeOutline, role: 'cancel' });
 
     present({
       header: 'Opciones de Producto',

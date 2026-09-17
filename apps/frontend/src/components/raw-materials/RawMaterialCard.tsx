@@ -1,6 +1,6 @@
 import React from 'react';
 import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
-import { pencilOutline } from 'ionicons/icons';
+import { pencilOutline, cartOutline, warningOutline, timeOutline, archiveOutline, closeOutline } from 'ionicons/icons';
 import { IonIcon } from '@ionic/react';
 import type { RawMaterial } from '../../types';
 
@@ -27,11 +27,11 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
     present({
       header: 'Opciones de Insumo',
       buttons: [
-        { text: 'Comprar', handler: () => onRestock(m) },
-        { text: 'Registrar Pérdida', handler: () => onRegisterLoss(m) },
-        { text: 'Historial', handler: () => onViewHistory(m) },
-        { text: 'Archivar', role: 'destructive', handler: () => onArchive(m) },
-        { text: 'Cancelar', role: 'cancel' }
+        { text: 'Comprar', icon: cartOutline, handler: () => onRestock(m) },
+        { text: 'Registrar Pérdida', icon: warningOutline, handler: () => onRegisterLoss(m) },
+        { text: 'Historial', icon: timeOutline, handler: () => onViewHistory(m) },
+        { text: 'Archivar', icon: archiveOutline, role: 'destructive', handler: () => onArchive(m) },
+        { text: 'Cancelar', icon: closeOutline, role: 'cancel' }
       ]
     });
   };
