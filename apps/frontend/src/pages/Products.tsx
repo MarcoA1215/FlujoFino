@@ -1,4 +1,5 @@
 ﻿import { refreshOutline } from 'ionicons/icons';
+import { IonList, IonItem, IonLabel, IonBadge } from '@ionic/react';
 import React, { useEffect, useState } from 'react';
 import { IonToggle, IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonToast, IonIcon } from '@ionic/react';
 import { apiClient } from '../api/client';
@@ -213,23 +214,41 @@ const Products: React.FC = () => {
 
           <IonRow>
             <IonCol size="12">
-              <IonGrid className="ion-no-padding">
-                <IonRow>
+              
+              {isClientMode ? (
+                <IonList>
                   {filteredData.map(p => (
-                    <ProductCard isClientMode={isClientMode}
-                      key={p.id}
-                      product={p}
-                      onEdit={openEditProductAlert}
-                      onDelete={handleDeleteProduct}
-                      onConfigure={() => setSelectedProductForRecipe(p)}
-                      onAdjustStock={openAdjustStockAlert}
-                      onRegisterLoss={openLossAlert}
+                    <IonItem key={p.id}>
+                      <IonLabel>
+                        <h2><strong>{p.name}</strong></h2>
+                        <p>Precio: $${p.salePrice.toFixed(2)}</p>
+                      </IonLabel>
+                      <IonBadge slot="end" color={p.stockQuantity > 0 ? 'success' : 'danger'}>
+                        Disponible: {p.stockQuantity}
+                      </IonBadge>
+                    </IonItem>
+                  ))}
+                </IonList>
+              ) : (
+                <IonGrid className="ion-no-padding">
+                  <IonRow>
+                    {filteredData.map(p => (
+                      <ProductCard isClientMode={isClientMode}
+                        key={p.id}
+                        product={p}
+                        onEdit={openEditProductAlert}
+                        onDelete={handleDeleteProduct}
+                        onConfigure={() => setSelectedProductForRecipe(p)}
+                        onAdjustStock={openAdjustStockAlert}
+                        onRegisterLoss={openLossAlert}
                         onToggleKitting={handleToggleKitting}
                         onUnpackKit={handleUnpackKit}
-                    />
-                  ))}
-                </IonRow>
-              </IonGrid>
+                      />
+                    ))}
+                  </IonRow>
+                </IonGrid>
+              )}
+
             </IonCol>
           </IonRow>
         </IonGrid>
