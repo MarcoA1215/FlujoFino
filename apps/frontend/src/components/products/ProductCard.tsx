@@ -27,6 +27,31 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onUnpackKit,
   isClientMode
 }) => {
+  const [present] = useIonActionSheet();
+
+  const openOptions = () => {
+    const buttons: any[] = [
+      { text: p.isCombo ? 'Configurar Combo' : 'Configurar Receta', handler: () => onConfigure(p) },
+      { text: 'Stock Inicial / Ajuste', handler: () => onAdjustStock(p) }
+    ];
+
+    if (p.isCombo && onToggleKitting) {
+      buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Virtual' : 'Físico (Kitting)'}`, handler: () => onToggleKitting(p) });
+    }
+
+    if (p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) {
+      buttons.push({ text: 'Desarmar 1 Und', handler: () => onUnpackKit(p) });
+    }
+
+    buttons.push({ text: 'Registrar Pérdida', handler: () => onRegisterLoss(p) });
+    buttons.push({ text: 'Cancelar', role: 'cancel' });
+
+    present({
+      header: 'Opciones de Producto',
+      buttons
+    });
+  };
+  
   return (
     <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3">
       <IonCard style={{ margin: '5px' }}>

@@ -21,6 +21,21 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
   onViewHistory,
   onArchive
 }) => {
+  const [present] = useIonActionSheet();
+
+  const openOptions = () => {
+    present({
+      header: 'Opciones de Insumo',
+      buttons: [
+        { text: 'Comprar', handler: () => onRestock(m) },
+        { text: 'Registrar Pérdida', handler: () => onRegisterLoss(m) },
+        { text: 'Historial', handler: () => onViewHistory(m) },
+        { text: 'Archivar', role: 'destructive', handler: () => onArchive(m) },
+        { text: 'Cancelar', role: 'cancel' }
+      ]
+    });
+  };
+  
   return (
     <IonCol size="12" sizeSm="6" sizeLg="6">
       <IonCard style={{ margin: '5px' }}>
