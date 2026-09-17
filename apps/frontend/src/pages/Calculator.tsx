@@ -82,6 +82,9 @@ const Calculator: React.FC = () => {
   const passToPos = () => {
     if (cart.length === 0) return;
     localStorage.setItem('calculator_cart', JSON.stringify(cart));
+    if (selectedZoneId) {
+      localStorage.setItem('calculator_zone', selectedZoneId);
+    }
     window.location.href = '/pos';
   };
   

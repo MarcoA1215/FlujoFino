@@ -84,6 +84,12 @@ const Pos: React.FC = () => {
       try {
         setCart(JSON.parse(calcCart));
         localStorage.removeItem('calculator_cart');
+        const calcZone = localStorage.getItem('calculator_zone');
+        if (calcZone) {
+          setDeliveryMethod(DeliveryMethod.DELIVERY);
+          setDeliveryZoneId(calcZone);
+          localStorage.removeItem('calculator_zone');
+        }
       } catch (e) {}
     }
   }, []);
