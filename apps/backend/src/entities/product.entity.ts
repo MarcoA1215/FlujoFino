@@ -1,4 +1,5 @@
-import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
+import { Tenant } from './tenant.entity';
+import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { RecipeItem } from './recipe-item.entity';
 import { OrderItem } from './order-item.entity';
 import { ProductionBatch } from './production-batch.entity';
@@ -58,5 +59,12 @@ export class Product {
 
   @DeleteDateColumn()
   deletedAt: Date;
-}
 
+  @ManyToOne(() => Tenant)
+  @JoinColumn({ name: 'tenantId' })
+  tenant: Tenant;
+
+  @Column({ nullable: true }) // Temporarily nullable for safe migration
+  tenantId: string;
+
+}

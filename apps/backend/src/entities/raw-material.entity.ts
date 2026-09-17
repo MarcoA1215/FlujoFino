@@ -1,4 +1,5 @@
-import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
+import { Tenant } from './tenant.entity';
+import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { StockMovement } from './stock-movement.entity';
 import { RecipeItem } from './recipe-item.entity';
 
@@ -41,5 +42,12 @@ export class RawMaterial {
 
   @DeleteDateColumn()
   deletedAt: Date;
-}
 
+  @ManyToOne(() => Tenant)
+  @JoinColumn({ name: 'tenantId' })
+  tenant: Tenant;
+
+  @Column({ nullable: true }) // Temporarily nullable for safe migration
+  tenantId: string;
+
+}

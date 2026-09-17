@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { UserTenantAccess } from './user-tenant-access.entity';
+import { Entity, PrimaryGeneratedColumn, OneToMany, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { UserRole } from '@nutrideli/shared-types';
 
 @Entity('users')
@@ -20,4 +21,8 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => UserTenantAccess, access => access.user)
+  tenantAccess: UserTenantAccess[];
+
 }

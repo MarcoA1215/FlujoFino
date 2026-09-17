@@ -1,4 +1,5 @@
-﻿import { Entity, PrimaryColumn, Column } from 'typeorm';
+import { Tenant } from './tenant.entity';
+﻿import { Entity, PrimaryColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 
 @Entity()
 export class Settings {
@@ -16,4 +17,12 @@ export class Settings {
 
   @Column({ nullable: true })
   companyPhone: string;
+
+  @ManyToOne(() => Tenant)
+  @JoinColumn({ name: 'tenantId' })
+  tenant: Tenant;
+
+  @Column({ nullable: true }) // Temporarily nullable for safe migration
+  tenantId: string;
+
 }

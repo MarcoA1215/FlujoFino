@@ -1,3 +1,4 @@
+import { Tenant } from './tenant.entity';
 ﻿import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { OrderItem } from './order-item.entity';
 import { DeliveryZone } from './delivery-zone.entity';
@@ -80,4 +81,12 @@ export class Order {
 
   @OneToMany(() => OrderItem, item => item.order)
   items: OrderItem[];
+
+  @ManyToOne(() => Tenant)
+  @JoinColumn({ name: 'tenantId' })
+  tenant: Tenant;
+
+  @Column({ nullable: true }) // Temporarily nullable for safe migration
+  tenantId: string;
+
 }

@@ -1,3 +1,6 @@
+import { Tenant } from './entities/tenant.entity';
+import { UserTenantAccess } from './entities/user-tenant-access.entity';
+import { WorkSchedule } from './entities/work-schedule.entity';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
@@ -41,7 +44,7 @@ import { DeliveryZone } from './entities/delivery-zone.entity';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
-        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User],
+        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule],
         synchronize: true,
       }),
       inject: [ConfigService],
