@@ -37,30 +37,32 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
   };
   
   return (
-    <IonCol size="12" sizeSm="6" sizeLg="6">
-      <IonCard style={{ margin: '5px' }}>
-        <IonCardContent>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: '0 0 5px 0', wordBreak: 'break-word' }}>{m.name}</h2>
-              <p style={{ margin: 0, color: 'gray', fontSize: '0.9rem' }}>Costo prom: {m.costPerUnit.toFixed(2)} / {m.unit}</p>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, gap: '8px' }}>
-              <IonBadge color={m.stockQuantity <= m.minStockAlert ? 'danger' : 'success'} style={{ padding: '8px 10px', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
-                {m.stockQuantity.toFixed(2)} {m.unit}
+    <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3" style={{ display: 'flex' }}>
+      <IonCard style={{ margin: '5px', width: '100%', display: 'flex', flexDirection: 'column' }}>
+        <IonCardContent style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '15px' }}>
+          
+          <div style={{ flex: 1 }}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 5px 0', lineHeight: '1.3', wordBreak: 'break-word' }}>{m.name}</h2>
+            
+            <p style={{ margin: '0 0 12px 0', color: 'gray', fontSize: '0.9rem' }}>
+              Costo prom: {m.costPerUnit.toFixed(2)} / {m.unit}
+            </p>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+              <IonBadge color={m.stockQuantity <= m.minStockAlert ? 'danger' : 'success'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                Stock: {m.stockQuantity.toFixed(2)} {m.unit}
               </IonBadge>
-              
             </div>
           </div>
           
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '15px' }}>
-              <IonButton size="small" fill="solid" color="primary" onClick={openOptions}>
-                Opciones
-              </IonButton>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'auto', paddingTop: '10px' }}>
+            <IonButton size="small" fill="solid" color="primary" onClick={openOptions} style={{ margin: 0 }}>
+              Opciones
+            </IonButton>
+          </div>
+          
         </IonCardContent>
       </IonCard>
     </IonCol>
   );
 };
-

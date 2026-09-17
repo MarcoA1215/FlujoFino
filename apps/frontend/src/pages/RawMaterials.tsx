@@ -1,6 +1,6 @@
 import { refreshOutline } from 'ionicons/icons';
 ﻿import React, { useState, useEffect } from 'react';
-import { IonPage, IonHeader, IonContent, IonButtons, IonMenuButton, IonTitle, IonSearchbar, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton, IonLabel, useIonAlert, useIonToast, IonNote, IonIcon } from '@ionic/react';
+import { IonPage, IonHeader, IonContent, IonButtons, IonMenuButton, IonTitle, IonSearchbar, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton, IonLabel, useIonAlert, useIonToast, IonNote, IonIcon, IonModal } from '@ionic/react';
 import { apiClient } from '../api/client';
 import type { RawMaterial } from '../types';
 import { RawMaterialCard } from '../components/raw-materials/RawMaterialCard';
@@ -21,6 +21,7 @@ const RawMaterials: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [presentToast] = useIonToast();
   const [selectedMaterialForHistory, setSelectedMaterialForHistory] = useState<RawMaterial | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const [operationMaterial, setOperationMaterial] = useState<RawMaterial | null>(null);
   const [operationType, setOperationType] = useState<'restock' | 'loss' | null>(null);
@@ -95,6 +96,7 @@ const RawMaterials: React.FC = () => {
       setInputCost(undefined);
       fetchMaterials();
       presentToast({ message: 'Insumo creado', duration: 2000, color: 'success' });
+      setShowCreateModal(false);
     } catch (e) {
       presentToast({ message: 'Error', duration: 3000, color: 'danger' });
     }
@@ -154,11 +156,34 @@ const RawMaterials: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen className="ion-padding">
-        <IonGrid>
-          <IonRow>
-            <IonCol size="12" sizeMd="4">
+        
+    <IonRow className="ion-margin-bottom">
+      <IonCol size="12" sizeSm="6" sizeMd="4">
+        <IonButton expand="block" color="primary" onClick={() => setShowCreateModal(true)}>+ Agregar Insumo</IonButton>
+      </IonCol>
+    </IonRow>
+
+    <IonGrid className="ion-no-padding">
+      <IonRow>
+        {filteredData.map(m => (
+          <RawMaterialCard key={m.id} material={m} onEditName={openEditNameAlert} onRestock={openRestockAlert} onRegisterLoss={openLossAlert} onViewHistory={() => setSelectedMaterialForHistory(m)} onArchive={archiveRawMaterial} />
+        ))}
+      </IonRow>
+    </IonGrid>
+
+    <IonModal isOpen={showCreateModal} onDidDismiss={() => setShowCreateModal(false)}>
+      <IonHeader>
+        <IonToolbar color="success">
+          <IonTitle>Agregar Insumo</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={() => setShowCreateModal(false)}>Cerrar</IonButton>
+          </IonButtons>
+        </IonToolbar>
+      </IonHeader>
+      <IonContent className="ion-padding">
+        
               <IonCard>
-                <IonCardHeader><IonCardTitle>Agregar Insumo</IonCardTitle></IonCardHeader>
+                
                 <IonCardContent>
                   <IonItem>
                     <IonLabel position="stacked">Nombre</IonLabel>
@@ -202,18 +227,10 @@ const RawMaterials: React.FC = () => {
                   <IonButton expand="block" color="success" className="ion-margin-top" onClick={handleCreate}>Guardar</IonButton>
                 </IonCardContent>
               </IonCard>
-            </IonCol>
-            <IonCol size="12" sizeMd="8">
-              <IonGrid className="ion-no-padding">
-                <IonRow>
-                  {filteredData.map(m => (
-                    <RawMaterialCard key={m.id} material={m} onEditName={openEditNameAlert} onRestock={openRestockAlert} onRegisterLoss={openLossAlert} onViewHistory={() => setSelectedMaterialForHistory(m)} onArchive={archiveRawMaterial} />
-                  ))}
-                </IonRow>
-              </IonGrid>
-            </IonCol>
-          </IonRow>
-        </IonGrid>
+            
+      </IonContent>
+    </IonModal>
+  
         <MovementHistoryModal material={selectedMaterialForHistory} onClose={() => setSelectedMaterialForHistory(null)} onCorrected={fetchMaterials} />
         
         <StockOperationModal 
