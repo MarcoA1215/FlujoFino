@@ -1,11 +1,10 @@
 // @ts-nocheck
-﻿import { refreshOutline } from 'ionicons/icons';
-import { useContext } from 'react';
+﻿import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
 import {
   IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonIcon, IonText, useIonToast, IonList, IonItem, IonLabel, IonBadge, IonButton } from '@ionic/react';
-import { alertCircleOutline, trendingDownOutline, basketOutline, trendingUpOutline, pieChartOutline, walletOutline, cartOutline } from 'ionicons/icons';
+import { refreshOutline, alertCircleOutline, trendingDownOutline, basketOutline, trendingUpOutline, pieChartOutline, walletOutline, cartOutline } from 'ionicons/icons';
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import type { DashboardSummary } from '../types';
@@ -35,18 +34,19 @@ const Dashboard: React.FC = () => {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [presentToast] = useIonToast();
 
+  const fetchSummary = async () => {
+    try {
+      const res = await apiClient.get<DashboardSummary>('/dashboard/summary');
+      setSummary(res.data);
+    } catch (e) {
+      console.error(e);
+      presentToast({ message: 'Error cargando el resumen', duration: 3000, color: 'danger' });
+    }
+  };
+
   useEffect(() => {
-    const fetchSummary = async () => {
-      try {
-        const res = await apiClient.get<DashboardSummary>('/dashboard/summary');
-        setSummary(res.data);
-      } catch (e) {
-        console.error(e);
-        presentToast({ message: 'Error cargando el resumen', duration: 3000, color: 'danger' });
-      }
-    };
     fetchSummary();
-  }, [presentToast]);
+  }, []);
 
   return (
     <IonPage>
@@ -56,6 +56,11 @@ const Dashboard: React.FC = () => {
             <IonMenuButton />
           </IonButtons>
           <IonTitle>Tablero de Inventario y Alertas</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={fetchSummary}>
+              <IonIcon icon={refreshOutline} />
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
 
