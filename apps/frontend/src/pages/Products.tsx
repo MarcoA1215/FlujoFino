@@ -1,6 +1,7 @@
 ﻿import { refreshOutline } from 'ionicons/icons';
+import { IonList, IonItem, IonLabel, IonBadge } from '@ionic/react';
 import React, { useEffect, useState } from 'react';
-import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonToast, IonIcon } from '@ionic/react';
+import { IonToggle, IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonToast, IonIcon } from '@ionic/react';
 import { apiClient } from '../api/client';
 import type { Product } from '../types';
 import { ProductCard } from '../components/products/ProductCard';
@@ -10,6 +11,7 @@ const Products: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [presentAlert] = useIonAlert();
   const [searchText, setSearchText] = useState('');
+  const [isClientMode, setIsClientMode] = useState(false);
   const [presentToast] = useIonToast();
 
   const [selectedProductForRecipe, setSelectedProductForRecipe] = useState<Product | null>(null);
@@ -178,6 +180,7 @@ const Products: React.FC = () => {
 
 
   const filteredData = products.filter(item => {
+    if (isClientMode && item.stockQuantity <= 0) return false;
     if (searchText.trim() === '') return true;
     return item.name.toLowerCase().includes(searchText.toLowerCase());
   });
@@ -188,7 +191,13 @@ const Products: React.FC = () => {
         <IonToolbar color="success">
           <IonButtons slot="start"><IonMenuButton /></IonButtons>
           <IonTitle>Catálogo de Productos</IonTitle>
-          <IonButtons slot="end"><IonButton onClick={fetchData}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
+          <IonButtons slot="end">
+            <div style={{ display: 'flex', alignItems: 'center', marginRight: '10px' }}>
+              <span style={{ fontSize: '0.8rem', marginRight: '5px', color: 'white' }}>Modo Cliente</span>
+              <IonToggle checked={isClientMode} onIonChange={e => setIsClientMode(e.detail.checked)} color="light" />
+            </div>
+            <IonButton onClick={fetchData}><IonIcon icon={refreshOutline} /></IonButton>
+          </IonButtons>
         </IonToolbar>
         <IonToolbar color="success">
           <IonSearchbar value={searchText} debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} placeholder="Buscar..." animated />
@@ -197,30 +206,50 @@ const Products: React.FC = () => {
 
       <IonContent fullscreen className="ion-padding">
         <IonGrid>
-          <IonRow className="ion-margin-bottom">
-            <IonCol size="12" sizeSm="6" sizeMd="4"><IonButton expand="block" color="primary" onClick={() => openCreateAlert(false)}>+ Crear Producto Base</IonButton></IonCol>
-            <IonCol size="12" sizeSm="6" sizeMd="4"><IonButton expand="block" color="tertiary" onClick={() => openCreateAlert(true)}>+ Crear Combo</IonButton></IonCol>
-          </IonRow>
+          {!isClientMode && (
+  <IonRow className="ion-margin-bottom">
+    <IonCol size="12" sizeSm="6" sizeMd="4"><IonButton expand="block" color="primary" onClick={() => openCreateAlert(false)}>+ Crear Producto Base</IonButton></IonCol>
+    <IonCol size="12" sizeSm="6" sizeMd="4"><IonButton expand="block" color="tertiary" onClick={() => openCreateAlert(true)}>+ Crear Combo</IonButton></IonCol>
+  </IonRow>
+)}
 
           <IonRow>
             <IonCol size="12">
-              <IonGrid className="ion-no-padding">
-                <IonRow>
+              
+              {isClientMode ? (
+                <IonList>
                   {filteredData.map(p => (
-                    <ProductCard
-                      key={p.id}
-                      product={p}
-                      onEdit={openEditProductAlert}
-                      onDelete={handleDeleteProduct}
-                      onConfigure={() => setSelectedProductForRecipe(p)}
-                      onAdjustStock={openAdjustStockAlert}
-                      onRegisterLoss={openLossAlert}
+                    <IonItem key={p.id}>
+                      <IonLabel>
+                        <h2><strong>{p.name}</strong></h2>
+                        <p>Precio: ${p.salePrice.toFixed(2)}</p>
+                      </IonLabel>
+                      <IonBadge slot="end" color={p.stockQuantity > 0 ? 'success' : 'danger'}>
+                        Disponible: {p.stockQuantity}
+                      </IonBadge>
+                    </IonItem>
+                  ))}
+                </IonList>
+              ) : (
+                <IonGrid className="ion-no-padding">
+                  <IonRow>
+                    {filteredData.map(p => (
+                      <ProductCard isClientMode={isClientMode}
+                        key={p.id}
+                        product={p}
+                        onEdit={openEditProductAlert}
+                        onDelete={handleDeleteProduct}
+                        onConfigure={() => setSelectedProductForRecipe(p)}
+                        onAdjustStock={openAdjustStockAlert}
+                        onRegisterLoss={openLossAlert}
                         onToggleKitting={handleToggleKitting}
                         onUnpackKit={handleUnpackKit}
-                    />
-                  ))}
-                </IonRow>
-              </IonGrid>
+                      />
+                    ))}
+                  </IonRow>
+                </IonGrid>
+              )}
+
             </IonCol>
           </IonRow>
         </IonGrid>

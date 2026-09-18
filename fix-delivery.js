@@ -1,10 +1,34 @@
 ﻿const fs = require('fs');
-let orders = fs.readFileSync('apps/backend/src/orders/orders.service.ts', 'utf8');
 
-const regex = /if \(status === OrderStatus\.DELIVERED\) \{[\s\S]*?if \(status === OrderStatus\.CANCELED\)/;
-const replacement = `if (status === OrderStatus.CANCELED)`;
+// Calculator.tsx
+let c = fs.readFileSync('apps/frontend/src/pages/Calculator.tsx', 'utf8');
+c = c.replace(/const passToPos = \(\) => \{[\s\S]*?localStorage\.setItem\('calculator_cart', JSON\.stringify\(cart\)\);\s*window\.location\.href = '\/pos';\s*\};/,
+`const passToPos = () => {
+    if (cart.length === 0) return;
+    localStorage.setItem('calculator_cart', JSON.stringify(cart));
+    if (selectedZoneId) {
+      localStorage.setItem('calculator_zone', selectedZoneId);
+    }
+    window.location.href = '/pos';
+  };`);
+fs.writeFileSync('apps/frontend/src/pages/Calculator.tsx', c);
 
-if (orders.includes("if (status === OrderStatus.DELIVERED)")) {
-  orders = orders.replace(regex, replacement);
-  fs.writeFileSync('apps/backend/src/orders/orders.service.ts', orders, 'utf8');
-}
+// Pos.tsx
+let p = fs.readFileSync('apps/frontend/src/pages/Pos.tsx', 'utf8');
+p = p.replace(/const calcCart = localStorage\.getItem\('calculator_cart'\);\s*if \(calcCart\) \{\s*try \{\s*setCart\(JSON\.parse\(calcCart\)\);\s*localStorage\.removeItem\('calculator_cart'\);\s*\} catch \(e\) \{\}\s*\}/,
+`const calcCart = localStorage.getItem('calculator_cart');
+    if (calcCart) {
+      try {
+        setCart(JSON.parse(calcCart));
+        localStorage.removeItem('calculator_cart');
+        const calcZone = localStorage.getItem('calculator_zone');
+        if (calcZone) {
+          setDeliveryMethod(DeliveryMethod.DELIVERY);
+          setDeliveryZoneId(calcZone);
+          localStorage.removeItem('calculator_zone');
+        }
+      } catch (e) {}
+    }`);
+fs.writeFileSync('apps/frontend/src/pages/Pos.tsx', p);
+
+console.log('Fixed delivery passing');

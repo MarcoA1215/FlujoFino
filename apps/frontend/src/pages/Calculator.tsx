@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, IonInput, useIonToast, IonSelect, IonSelectOption } from '@ionic/react';
-import { calculatorOutline, addOutline, removeOutline, trashOutline, copyOutline } from 'ionicons/icons';
+import { calculatorOutline, addOutline, removeOutline, trashOutline, copyOutline, cartOutline } from 'ionicons/icons';
+
 import { apiClient } from '../api/client';
 import type { Product, DeliveryZone } from '../types';
 
@@ -25,6 +26,7 @@ const Calculator: React.FC = () => {
   const [selectedZoneId, setSelectedZoneId] = useState<string>('');
   
   const [presentToast] = useIonToast();
+  
   const [searchText, setSearchText] = useState('');
 
   useEffect(() => {
@@ -75,6 +77,16 @@ const Calculator: React.FC = () => {
     setSelectedZoneId('');
   };
 
+  
+  
+  const passToPos = () => {
+    if (cart.length === 0) return;
+    localStorage.setItem('calculator_cart', JSON.stringify(cart));
+    if (selectedZoneId) {
+      localStorage.setItem('calculator_zone', selectedZoneId);
+    }
+    window.location.href = '/pos';
+  };
   
   const handleCopyTicket = () => {
     if (cart.length === 0) {
@@ -285,10 +297,22 @@ const Calculator: React.FC = () => {
                       Limpiar
                     </IonButton>
                   </div>
-                  <IonButton expand="block" color="secondary" className="ion-margin-top" onClick={handleCopyTicket}>
-                            <IonIcon slot="start" icon={copyOutline} />
-                            Copiar para WhatsApp
-                          </IonButton>
+                  <IonGrid className="ion-no-padding ion-margin-top">
+  <IonRow>
+    <IonCol size="6" style={{ paddingRight: '5px' }}>
+      <IonButton expand="block" color="secondary" onClick={handleCopyTicket}>
+        <IonIcon slot="start" icon={copyOutline} />
+        Copiar
+      </IonButton>
+    </IonCol>
+    <IonCol size="6" style={{ paddingLeft: '5px' }}>
+      <IonButton expand="block" color="tertiary" onClick={passToPos}>
+        <IonIcon slot="start" icon={cartOutline} />
+        A Caja
+      </IonButton>
+    </IonCol>
+  </IonRow>
+</IonGrid>
                         </IonCardContent>
                       </IonCard>
                     </IonCol>

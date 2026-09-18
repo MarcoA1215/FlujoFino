@@ -90,3 +90,11 @@ export class Order {
   tenantId: string;
 
 }
+
+  @Column('float', { default: 0 })
+  abonosTotal: number;
+
+  @Column('json', { nullable: true })
+  abonosHistory: any;
+}
+

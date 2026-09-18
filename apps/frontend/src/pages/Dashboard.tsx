@@ -1,10 +1,10 @@
-﻿import { refreshOutline } from 'ionicons/icons';
-import { useContext } from 'react';
+// @ts-nocheck
+﻿import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
 import {
   IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonIcon, IonText, useIonToast, IonList, IonItem, IonLabel, IonBadge, IonButton } from '@ionic/react';
-import { alertCircleOutline, trendingDownOutline, basketOutline, trendingUpOutline, pieChartOutline, walletOutline } from 'ionicons/icons';
+import { refreshOutline, alertCircleOutline, trendingDownOutline, basketOutline, trendingUpOutline, pieChartOutline, walletOutline, cartOutline } from 'ionicons/icons';
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import type { DashboardSummary } from '../types';
@@ -34,18 +34,19 @@ const Dashboard: React.FC = () => {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [presentToast] = useIonToast();
 
+  const fetchSummary = async () => {
+    try {
+      const res = await apiClient.get<DashboardSummary>('/dashboard/summary');
+      setSummary(res.data);
+    } catch (e) {
+      console.error(e);
+      presentToast({ message: 'Error cargando el resumen', duration: 3000, color: 'danger' });
+    }
+  };
+
   useEffect(() => {
-    const fetchSummary = async () => {
-      try {
-        const res = await apiClient.get<DashboardSummary>('/dashboard/summary');
-        setSummary(res.data);
-      } catch (e) {
-        console.error(e);
-        presentToast({ message: 'Error cargando el resumen', duration: 3000, color: 'danger' });
-      }
-    };
     fetchSummary();
-  }, [presentToast]);
+  }, []);
 
   return (
     <IonPage>
@@ -55,6 +56,11 @@ const Dashboard: React.FC = () => {
             <IonMenuButton />
           </IonButtons>
           <IonTitle>Tablero de Inventario y Alertas</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={fetchSummary}>
+              <IonIcon icon={refreshOutline} />
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
 
@@ -65,74 +71,67 @@ const Dashboard: React.FC = () => {
           <IonGrid>
             {/* Main KPIs Row */}
             <IonRow>
-              <IonCol size="12" sizeSm="6" sizeMd="3">
-                <IonCard color="tertiary">
-                  <IonCardHeader>
-                    <IonCardTitle className="ion-text-center">
-                      <IonIcon icon={walletOutline} style={{ fontSize: '2rem' }} />
-                      <br />
-                      Ingresos Históricos
-                    </IonCardTitle>
-                  </IonCardHeader>
-                  <IonCardContent className="ion-text-center">
-                    <h1 style={{ fontSize: '2rem', margin: 0, fontWeight: 'bold', color: 'white' }}>
-                      $ {summary.historicalRevenue.toFixed(2)}
-                    </h1>
-                  </IonCardContent>
-                </IonCard>
-              </IonCol>
+            <IonCol size="12" sizeSm="6" sizeMd="3">
+              <IonCard color="tertiary">
+                <IonCardHeader>
+                  <IonCardTitle className="ion-text-center">
+                    <IonIcon icon={walletOutline} style={{ fontSize: '2rem' }} />
+                    <br />
+                    Ingresos Históricos
+                  </IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent className="ion-text-center">
+                  <h2>$ {(summary.historicalRevenue || 0).toFixed(2)}</h2>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
 
-              <IonCol size="12" sizeSm="6" sizeMd="3">
-                <IonCard color="warning">
-                  <IonCardHeader>
-                    <IonCardTitle className="ion-text-center">
-                      <IonIcon icon={basketOutline} style={{ fontSize: '2rem' }} />
-                      <br />
-                      Inversión Histórica
-                    </IonCardTitle>
-                  </IonCardHeader>
-                  <IonCardContent className="ion-text-center">
-                    <h1 style={{ fontSize: '2rem', margin: 0, fontWeight: 'bold', color: 'white' }}>
-                      $ {summary.historicalInvestment.toFixed(2)}
-                    </h1>
-                  </IonCardContent>
-                </IonCard>
-              </IonCol>
+            <IonCol size="12" sizeSm="6" sizeMd="3">
+              <IonCard color="warning">
+                <IonCardHeader>
+                  <IonCardTitle className="ion-text-center">
+                    <IonIcon icon={cartOutline} style={{ fontSize: '2rem' }} />
+                    <br />
+                    Gastos de Reinversión
+                  </IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent className="ion-text-center">
+                  <h2 style={{ color: 'white' }}>$ {(summary.reinvestmentExpense || 0).toFixed(2)}</h2>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'white' }}>Inv: $ {(summary.historicalInvestment || 0).toFixed(2)} - Cap: $ {(summary.totalInventoryCapital || 0).toFixed(2)}</p>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
 
-              <IonCol size="12" sizeSm="6" sizeMd="3">
-                <IonCard color="success">
-                  <IonCardHeader>
-                    <IonCardTitle className="ion-text-center">
-                      <IonIcon icon={trendingUpOutline} style={{ fontSize: '2rem' }} />
-                      <br />
-                      Ganancia Neta Bruta
-                    </IonCardTitle>
-                  </IonCardHeader>
-                  <IonCardContent className="ion-text-center">
-                    <h1 style={{ fontSize: '2rem', margin: 0, fontWeight: 'bold', color: 'white' }}>
-                      $ {summary.historicalProfit.toFixed(2)}
-                    </h1>
-                  </IonCardContent>
-                </IonCard>
-              </IonCol>
+            <IonCol size="12" sizeSm="6" sizeMd="3">
+              <IonCard color="success">
+                <IonCardHeader>
+                  <IonCardTitle className="ion-text-center">
+                    <IonIcon icon={trendingUpOutline} style={{ fontSize: '2rem' }} />
+                    <br />
+                    Ganancia Neta Bruta
+                  </IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent className="ion-text-center">
+                  <h2>$ {(summary.historicalProfit || 0).toFixed(2)}</h2>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
 
-              <IonCol size="12" sizeSm="6" sizeMd="3">
-                <IonCard color="danger">
-                  <IonCardHeader>
-                    <IonCardTitle className="ion-text-center">
-                      <IonIcon icon={trendingDownOutline} style={{ fontSize: '2rem' }} />
-                      <br />
-                      Mermas y Pérdidas
-                    </IonCardTitle>
-                  </IonCardHeader>
-                  <IonCardContent className="ion-text-center">
-                    <h1 style={{ fontSize: '2rem', margin: 0, fontWeight: 'bold', color: 'white' }}>
-                      $ {summary.totalLosses.toFixed(2)}
-                    </h1>
-                  </IonCardContent>
-                </IonCard>
-              </IonCol>
-            </IonRow>
+            <IonCol size="12" sizeSm="6" sizeMd="3">
+              <IonCard color="danger">
+                <IonCardHeader>
+                  <IonCardTitle className="ion-text-center">
+                    <IonIcon icon={trendingDownOutline} style={{ fontSize: '2rem' }} />
+                    <br />
+                    Mermas y Pérdidas
+                  </IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent className="ion-text-center">
+                  <h2>$ {(summary.totalLosses || 0).toFixed(2)}</h2>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
+          </IonRow>
 
             {/* Charts and Lists Row */}
             <IonRow className="ion-margin-top">

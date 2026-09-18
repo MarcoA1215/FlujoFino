@@ -1,7 +1,6 @@
-import { pencilOutline, trashOutline } from 'ionicons/icons';
-import { IonIcon } from '@ionic/react';
+﻿import { pencilOutline, trashOutline, buildOutline, cubeOutline, swapHorizontalOutline, cutOutline, warningOutline, closeOutline } from 'ionicons/icons';
 import React from 'react';
-import { IonCol, IonCard, IonCardContent, IonBadge, IonButton } from '@ionic/react';
+import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
 import type { Product } from '../../types';
 
 interface ProductCardProps {
@@ -13,6 +12,7 @@ interface ProductCardProps {
   onRegisterLoss: (p: Product) => void;
   onToggleKitting?: (p: Product) => void;
   onUnpackKit?: (p: Product) => void;
+  isClientMode?: boolean;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -23,69 +23,91 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onAdjustStock,
   onRegisterLoss,
   onToggleKitting,
-  onUnpackKit
+  onUnpackKit,
+  isClientMode
 }) => {
+  const [present] = useIonActionSheet();
+
+  const openOptions = () => {
+    const buttons: any[] = [
+      { text: 'Editar Info / Precio', icon: pencilOutline, cssClass: 'action-sheet-editar', handler: () => onEdit(p) },
+      { text: p.isCombo ? 'Configurar Combo' : 'Configurar Receta', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) },
+      { text: 'Stock Inicial / Ajuste', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) }
+    ];
+
+    if (p.isCombo && onToggleKitting) {
+      buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Virtual' : 'Físico (Kitting)'}`, icon: swapHorizontalOutline, cssClass: 'action-sheet-cambiar', handler: () => onToggleKitting(p) });
+    }
+
+    if (p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) {
+      buttons.push({ text: 'Desarmar 1 Und', icon: cutOutline, cssClass: 'action-sheet-desarmar', handler: () => onUnpackKit(p) });
+    }
+
+    buttons.push({ text: 'Registrar Pérdida', icon: warningOutline, cssClass: 'action-sheet-eliminar', handler: () => onRegisterLoss(p) });
+    buttons.push({ text: 'Eliminar Producto', icon: trashOutline, role: 'destructive', handler: () => onDelete(p) });
+    buttons.push({ text: 'Cancelar', icon: closeOutline, role: 'cancel' });
+
+    present({
+      header: 'Opciones de Producto',
+      buttons
+    });
+  };
+  
   return (
-    <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3">
-      <IonCard style={{ margin: '5px' }}>
-        <IonCardContent>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: '0 0 5px 0', wordBreak: 'break-word' }}>{p.name}</h2>
-              <p style={{ margin: 0, color: 'gray', fontSize: '0.85rem' }}>
-                {p.category || 'Sin categoría'} - {p.isCombo ? 'Combo' : 'Base'} - {p.isCombo ? 'Combo' : 'Base'}
+    <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3" style={{ display: 'flex' }}>
+      <IonCard style={{ margin: '5px', width: '100%', display: 'flex', flexDirection: 'column' }}>
+        <IonCardContent style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '15px' }}>
+          
+          <div style={{ flex: 1 }}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 5px 0', lineHeight: '1.3' }}>{p.name}</h2>
+            
+            {!isClientMode && (
+              <p style={{ margin: '0 0 8px 0', color: 'gray', fontSize: '0.85rem' }}>
+                {p.category || 'Sin categoría'} - {p.isCombo ? 'Combo' : 'Base'}
               </p>
-              <p style={{ margin: '5px 0 0 0', fontWeight: 'bold' }}>Precio: {p.salePrice.toFixed(2)}</p>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, gap: '8px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
-                  {(!p.isCombo || p.isPreAssembled) && (
-                    <>
-                      <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '8px 10px', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
-                        Físico: {p.physicalStock}
-                      </IonBadge>
-                      <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} style={{ padding: '8px 10px', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
-                        Disp: {p.stockQuantity}
-                      </IonBadge>
-                    </>
-                  )}
-                  {(p.isCombo && !p.isPreAssembled) && (
-                    <IonBadge color="tertiary" style={{ padding: '8px 10px', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
-                      Combo (Virtual)
+            )}
+            
+            <p style={{ margin: '0 0 12px 0', fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--ion-color-dark)' }}>
+              Precio: ${p.salePrice.toFixed(2)}
+            </p>
+
+            {isClientMode && (
+              <p style={{ margin: '0 0 12px 0', color: p.stockQuantity > 0 ? 'var(--ion-color-success)' : 'var(--ion-color-danger)', fontWeight: '500', fontSize: '0.9rem' }}>
+                Disponible: {p.stockQuantity}
+              </p>
+            )}
+
+            {!isClientMode && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+                {(!p.isCombo || p.isPreAssembled) && (
+                  <>
+                    <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                      Físico: {p.physicalStock}
                     </IonBadge>
-                  )}
-                </div>
-              <div style={{ display: 'flex', gap: '5px' }}>
-                <IonButton fill="clear" size="small" onClick={() => onEdit(p)} style={{ margin: 0, width: '30px', height: '30px' }}><IonIcon icon={pencilOutline} slot="icon-only" /></IonButton>
-                <IonButton fill="clear" size="small" color="danger" onClick={() => onDelete(p)} style={{ margin: 0, width: "30px", height: "30px" }}><IonIcon icon={trashOutline} slot="icon-only" /></IonButton>
+                    <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                      Disp: {p.stockQuantity}
+                    </IonBadge>
+                  </>
+                )}
+                {(p.isCombo && !p.isPreAssembled) && (
+                  <IonBadge color="tertiary" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                    Combo (Virtual)
+                  </IonBadge>
+                )}
               </div>
-            </div>
+            )}
           </div>
           
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '15px' }}>
-            <IonButton size="small" fill="outline" color={p.isCombo ? 'tertiary' : 'primary'} onClick={() => onConfigure(p)}>
-              {p.isCombo ? 'Configurar Combo' : 'Configurar Receta'}
-            </IonButton>
-            <IonButton size="small" fill="outline" color="medium" onClick={() => onAdjustStock(p)}>
-              Stock Inicial
-            </IonButton>
-              {p.isCombo && onToggleKitting && (
-                <IonButton size="small" fill="outline" color="warning" onClick={() => onToggleKitting(p)}>
-                  Hacer {p.isPreAssembled ? 'Virtual' : 'Físico (Kitting)'}
-                </IonButton>
-              )}
-              {(p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) && (
-                <IonButton size="small" fill="outline" color="secondary" onClick={() => onUnpackKit(p)}>
-                  Desarmar 1 Und
-                </IonButton>
-              )}
-            <IonButton size="small" fill="outline" color="danger" onClick={() => onRegisterLoss(p)}>
-              Pérdida
-            </IonButton>
-          </div>
+          {!isClientMode && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'auto', paddingTop: '10px' }}>
+              <IonButton size="small" fill="solid" color="primary" onClick={openOptions} style={{ margin: 0 }}>
+                Opciones
+              </IonButton>
+            </div>
+          )}
+          
         </IonCardContent>
       </IonCard>
     </IonCol>
   );
 };
-

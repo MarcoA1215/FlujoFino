@@ -12,7 +12,7 @@ import { useIonAlert } from '@ionic/react';
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
-import { peopleOutline, cubeOutline, cartOutline, constructOutline, cashOutline, listOutline, pieChartOutline, calculatorOutline, mapOutline, logOutOutline } from 'ionicons/icons';
+import { peopleOutline, settingsOutline, cubeOutline, cartOutline, constructOutline, cashOutline, listOutline, pieChartOutline, calculatorOutline, mapOutline, logOutOutline } from 'ionicons/icons';
 
 const Menu: React.FC = () => {
   const location = useLocation();
@@ -38,10 +38,11 @@ const Menu: React.FC = () => {
     { title: 'Productos', url: '/products', iosIcon: listOutline, mdIcon: listOutline },
     { title: 'Producción', url: '/production', iosIcon: constructOutline, mdIcon: constructOutline },
     { title: 'Calculadora', url: '/calculator', iosIcon: calculatorOutline, mdIcon: calculatorOutline },
-    { title: 'POS (Caja)', url: '/pos', iosIcon: cashOutline, mdIcon: cashOutline },
+    { title: 'Caja', url: '/pos', iosIcon: cashOutline, mdIcon: cashOutline },
     { title: 'Tablero Pedidos', url: '/orders', iosIcon: cartOutline, mdIcon: cartOutline },
     { title: 'Zonas Delivery', url: '/delivery-zones', iosIcon: mapOutline, mdIcon: mapOutline },
-    { title: 'Usuarios', url: '/users', iosIcon: peopleOutline, mdIcon: peopleOutline }
+    { title: 'Usuarios', url: '/users', iosIcon: peopleOutline, mdIcon: peopleOutline },
+      { title: 'Configuración', url: '/settings', iosIcon: settingsOutline, mdIcon: settingsOutline }
   ];
 
   let appPages = rawPages;

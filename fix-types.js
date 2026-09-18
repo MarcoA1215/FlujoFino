@@ -1,13 +1,9 @@
 ﻿const fs = require('fs');
+let c = fs.readFileSync('apps/frontend/src/pages/Users.tsx', 'utf8');
+c = c.replace(/IonInput/g, "IonInput, IonToggle");
+c = c.replace(/companyPhone\?: string;/, "companyPhone?: string;\n  allowPartialPayments?: boolean;");
+fs.writeFileSync('apps/frontend/src/pages/Users.tsx', c);
 
-let prod = fs.readFileSync('apps/frontend/src/pages/Production.tsx', 'utf8');
-if (!prod.includes("physicalStock?: number;")) {
-  prod = prod.replace("isCombo?: boolean;", "isCombo?: boolean;\n  physicalStock?: number;\n  reservedQuantity?: number;");
-  fs.writeFileSync('apps/frontend/src/pages/Production.tsx', prod, 'utf8');
-}
-
-let products = fs.readFileSync('apps/frontend/src/pages/Products.tsx', 'utf8');
-if (!products.includes("physicalStock?: number;")) {
-  products = products.replace("isCombo?: boolean;", "isCombo?: boolean;\n  physicalStock?: number;\n  reservedQuantity?: number;");
-  fs.writeFileSync('apps/frontend/src/pages/Products.tsx', products, 'utf8');
-}
+c = fs.readFileSync('apps/frontend/src/pages/Orders.tsx', 'utf8');
+c = c.replace(/deliveryFee\?: number;/, "deliveryFee?: number;\n  abonosTotal?: number;\n  abonosHistory?: any[];");
+fs.writeFileSync('apps/frontend/src/pages/Orders.tsx', c);

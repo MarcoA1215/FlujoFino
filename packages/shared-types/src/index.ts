@@ -6,6 +6,7 @@
 }
 
 export enum PaymentStatus {
+  PARTIAL = 'PARTIAL',
   PENDING = 'PENDING',
   PAID = 'PAID',
   REFUNDED = 'REFUNDED',

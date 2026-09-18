@@ -1,6 +1,6 @@
 import { refreshOutline } from 'ionicons/icons';
 ﻿import React, { useState, useEffect } from 'react';
-import { IonPage, IonHeader, IonContent, IonButtons, IonMenuButton, IonTitle, IonSearchbar, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton, IonLabel, useIonAlert, useIonToast, IonNote, IonIcon } from '@ionic/react';
+import { IonPage, IonHeader, IonContent, IonButtons, IonMenuButton, IonTitle, IonSearchbar, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton, IonLabel, useIonAlert, useIonToast, IonNote, IonIcon, IonModal } from '@ionic/react';
 import { apiClient } from '../api/client';
 import type { RawMaterial } from '../types';
 import { RawMaterialCard } from '../components/raw-materials/RawMaterialCard';
@@ -14,11 +14,14 @@ const RawMaterials: React.FC = () => {
   const [inputUnit, setInputUnit] = useState('Kg');
   const [inputQty, setInputQty] = useState<number>();
   const [inputCost, setInputCost] = useState<number>();
+  const [currency, setCurrency] = useState<'USD' | 'VES'>('USD');
+  const [exchangeRate, setExchangeRate] = useState<number>(36.5);
   
   const [presentAlert] = useIonAlert();
   const [searchText, setSearchText] = useState('');
   const [presentToast] = useIonToast();
   const [selectedMaterialForHistory, setSelectedMaterialForHistory] = useState<RawMaterial | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const [operationMaterial, setOperationMaterial] = useState<RawMaterial | null>(null);
   const [operationType, setOperationType] = useState<'restock' | 'loss' | null>(null);
@@ -52,8 +55,14 @@ const RawMaterials: React.FC = () => {
 
   const fetchMaterials = async () => {
     try {
-      const res = await apiClient.get<RawMaterial[]>('/raw-materials');
-      setMaterials(res.data);
+      const [matRes, setRes] = await Promise.all([
+        apiClient.get<RawMaterial[]>('/raw-materials'),
+        apiClient.get('/settings')
+      ]);
+      setMaterials(matRes.data);
+      if (setRes.data && setRes.data.exchangeRateBs) {
+        setExchangeRate(setRes.data.exchangeRateBs);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -87,6 +96,7 @@ const RawMaterials: React.FC = () => {
       setInputCost(undefined);
       fetchMaterials();
       presentToast({ message: 'Insumo creado', duration: 2000, color: 'success' });
+      setShowCreateModal(false);
     } catch (e) {
       presentToast({ message: 'Error', duration: 3000, color: 'danger' });
     }
@@ -104,20 +114,26 @@ const RawMaterials: React.FC = () => {
 
   const openEditNameAlert = (m: RawMaterial) => {
     presentAlert({
-      header: 'Editar Nombre',
-      inputs: [{ name: 'newName', type: 'text', value: m.name, placeholder: 'Nuevo nombre' }],
+      header: 'Editar Insumo',
+      inputs: [
+        { name: 'newName', type: 'text', value: m.name, placeholder: 'Nuevo nombre' },
+        { name: 'newMinStock', type: 'number', value: m.minStockAlert?.toString() || '5', placeholder: 'Alerta minima de stock' }
+      ],
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         {
           text: 'Guardar',
           handler: async (data) => {
-            if (!data.newName || data.newName === m.name) return true;
+            if (!data.newName) return;
             try {
-              await apiClient.put('/raw-materials/' + m.id, { name: data.newName });
+              await apiClient.put('/raw-materials/' + m.id, { 
+                name: data.newName, 
+                minStockAlert: parseFloat(data.newMinStock) || 0
+              });
+              presentToast({ message: 'Insumo actualizado', duration: 2000, color: 'success' });
               fetchMaterials();
-              presentToast({ message: 'Actualizado', duration: 2000, color: 'success' });
             } catch (e) {
-              presentToast({ message: 'Error', duration: 3000, color: 'danger' });
+              presentToast({ message: 'Error al actualizar', duration: 2000, color: 'danger' });
             }
           }
         }
@@ -140,11 +156,34 @@ const RawMaterials: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen className="ion-padding">
-        <IonGrid>
-          <IonRow>
-            <IonCol size="12" sizeMd="4">
+        
+    <IonRow className="ion-margin-bottom">
+      <IonCol size="12" sizeSm="6" sizeMd="4">
+        <IonButton expand="block" color="primary" onClick={() => setShowCreateModal(true)}>+ Agregar Insumo</IonButton>
+      </IonCol>
+    </IonRow>
+
+    <IonGrid className="ion-no-padding">
+      <IonRow>
+        {filteredData.map(m => (
+          <RawMaterialCard key={m.id} material={m} onEditName={openEditNameAlert} onRestock={openRestockAlert} onRegisterLoss={openLossAlert} onViewHistory={() => setSelectedMaterialForHistory(m)} onArchive={archiveRawMaterial} />
+        ))}
+      </IonRow>
+    </IonGrid>
+
+    <IonModal isOpen={showCreateModal} onDidDismiss={() => setShowCreateModal(false)}>
+      <IonHeader>
+        <IonToolbar color="success">
+          <IonTitle>Agregar Insumo</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={() => setShowCreateModal(false)}>Cerrar</IonButton>
+          </IonButtons>
+        </IonToolbar>
+      </IonHeader>
+      <IonContent className="ion-padding">
+        
               <IonCard>
-                <IonCardHeader><IonCardTitle>Agregar Insumo</IonCardTitle></IonCardHeader>
+                
                 <IonCardContent>
                   <IonItem>
                     <IonLabel position="stacked">Nombre</IonLabel>
@@ -171,7 +210,13 @@ const RawMaterials: React.FC = () => {
                     </IonSelect>
                   </IonItem>
                   <IonItem>
-                    <IonLabel position="stacked">Costo Total de esta compra ($)</IonLabel>
+                    <IonLabel position="stacked" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  <span>Costo Total de esta compra</span>
+  <IonSelect value={currency} onIonChange={e => setCurrency(e.detail.value)} style={{ minHeight: 'auto', padding: '0', background: '#eee', borderRadius: '4px', paddingLeft: '5px', paddingRight: '5px' }}>
+    <IonSelectOption value="USD">$ USD</IonSelectOption>
+    <IonSelectOption value="VES">Bs. VES</IonSelectOption>
+  </IonSelect>
+</IonLabel>
                     <IonInput type="number" step="any" value={inputCost} onIonInput={e => setInputCost(parseFloat(e.detail.value!) || undefined)} placeholder="Ej. 2.00" />
                   </IonItem>
                   {inputQty && (inputUnit === 'g' || inputUnit === 'ml') && (
@@ -182,18 +227,10 @@ const RawMaterials: React.FC = () => {
                   <IonButton expand="block" color="success" className="ion-margin-top" onClick={handleCreate}>Guardar</IonButton>
                 </IonCardContent>
               </IonCard>
-            </IonCol>
-            <IonCol size="12" sizeMd="8">
-              <IonGrid className="ion-no-padding">
-                <IonRow>
-                  {filteredData.map(m => (
-                    <RawMaterialCard key={m.id} material={m} onEditName={openEditNameAlert} onRestock={openRestockAlert} onRegisterLoss={openLossAlert} onViewHistory={() => setSelectedMaterialForHistory(m)} onArchive={archiveRawMaterial} />
-                  ))}
-                </IonRow>
-              </IonGrid>
-            </IonCol>
-          </IonRow>
-        </IonGrid>
+            
+      </IonContent>
+    </IonModal>
+  
         <MovementHistoryModal material={selectedMaterialForHistory} onClose={() => setSelectedMaterialForHistory(null)} onCorrected={fetchMaterials} />
         
         <StockOperationModal 
@@ -201,7 +238,7 @@ const RawMaterials: React.FC = () => {
           operationType={operationType} 
           onClose={() => { setOperationMaterial(null); setOperationType(null); }} 
           onSuccess={fetchMaterials} 
-        />
+         exchangeRate={exchangeRate} />
       </IonContent>
     </IonPage>
   );

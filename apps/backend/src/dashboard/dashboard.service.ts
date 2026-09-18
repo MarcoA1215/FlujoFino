@@ -60,7 +60,22 @@ export class DashboardService {
       }
     }
 
+    let totalFinishedProductCapital = 0;
+    
+    for (const p of products) {
+      if (p.stockQuantity > 0 && p.recipe) {
+        let costToProduce = 0;
+        for (const item of p.recipe) {
+          if (item.rawMaterial) {
+            costToProduce += item.quantity * item.rawMaterial.costPerUnit;
+          }
+        }
+        totalFinishedProductCapital += costToProduce * p.stockQuantity;
+      }
+    }
+
     const totalRawMaterialCapital = rawMaterials.reduce((acc, rm) => acc + (rm.stockQuantity * rm.costPerUnit), 0);
+    const totalInventoryCapital = totalRawMaterialCapital + totalFinishedProductCapital;
     
     const lowStockMaterials = rawMaterials.map(rm => {
       const debt = rawMaterialDebt[rm.id] || 0;
@@ -86,7 +101,9 @@ export class DashboardService {
       .reduce((acc, m) => acc + m.totalCost, 0);
 
     const historicalRevenue = orders.reduce((acc, o) => acc + o.totalAmount, 0);
-    const historicalProfit = historicalRevenue - historicalInvestment;
+    
+    const reinvestmentExpense = historicalInvestment - totalInventoryCapital;
+    const historicalProfit = historicalRevenue - reinvestmentExpense;
 
     // Calcular ventas de los ultimos 7 dias
     const last7Days = Array.from({length: 7}, (_, i) => {
@@ -128,6 +145,9 @@ export class DashboardService {
 
     return {
       totalRawMaterialCapital,
+      totalFinishedProductCapital,
+      totalInventoryCapital,
+      reinvestmentExpense,
       expectedRevenue,
       lowStockMaterials: lowStockMaterials.map(m => ({
         id: m.id,

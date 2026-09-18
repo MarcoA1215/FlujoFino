@@ -8,17 +8,19 @@ import { apiClient } from '../../api/client';
 import type { RawMaterial } from '../../types';
 
 interface Props {
+  exchangeRate?: number;
   material: RawMaterial | null;
   operationType: 'restock' | 'loss' | null;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export const StockOperationModal: React.FC<Props> = ({ material, operationType, onClose, onSuccess }) => {
+export const StockOperationModal: React.FC<Props> = ({ material, operationType, onClose, onSuccess, exchangeRate = 36.5 }) => {
   const [presentToast] = useIonToast();
   const [quantity, setQuantity] = useState<number | undefined>();
   const [unit, setUnit] = useState<string>('base');
   const [cost, setCost] = useState<number | undefined>();
+  const [currency, setCurrency] = useState<'USD' | 'VES'>('USD');
   const [reason, setReason] = useState<string>('');
 
   useEffect(() => {
@@ -46,9 +48,13 @@ export const StockOperationModal: React.FC<Props> = ({ material, operationType, 
           presentToast({ message: 'Ingresa el costo', duration: 2000, color: 'warning' });
           return;
         }
+        let totalUSD = cost;
+        if (currency === 'VES') {
+          totalUSD = cost / exchangeRate;
+        }
         await apiClient.post(`/raw-materials/${material.id}/restock`, {
           quantity: finalQuantity,
-          totalCost: cost
+          totalCost: totalUSD
         });
         presentToast({ message: 'Compra registrada', duration: 2000, color: 'success' });
       } else if (operationType === 'loss') {
@@ -113,7 +119,13 @@ export const StockOperationModal: React.FC<Props> = ({ material, operationType, 
 
             {operationType === 'restock' && (
               <IonItem>
-                <IonLabel position="stacked">Costo Total de la Compra ($)</IonLabel>
+                <IonLabel position="stacked" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+  <span>Costo Total de la Compra</span>
+  <IonSelect value={currency} onIonChange={e => setCurrency(e.detail.value)} style={{ minHeight: 'auto', padding: '0', background: '#eee', borderRadius: '4px', paddingLeft: '5px', paddingRight: '5px' }}>
+    <IonSelectOption value="USD">$ USD</IonSelectOption>
+    <IonSelectOption value="VES">Bs. VES</IonSelectOption>
+  </IonSelect>
+</IonLabel>
                 <IonInput 
                   type="number" step="any" 
                   value={cost} 

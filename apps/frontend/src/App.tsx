@@ -12,6 +12,7 @@ import Orders from './pages/Orders';
 import DeliveryZones from './pages/DeliveryZones';
 import Login from './pages/Login';
 import Users from './pages/Users';
+import SettingsPage from './pages/Settings';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
 import { useContext, useEffect } from 'react';
@@ -90,6 +91,7 @@ const App: React.FC = () => {
               <Route path="/orders" element={<PrivateRoute><Orders /></PrivateRoute>} />
               <Route path="/delivery-zones" element={<PrivateRoute><DeliveryZones /></PrivateRoute>} />
               <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
+              <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
             </IonRouterOutlet>
           </IonSplitPane>
         </IonReactRouter>
