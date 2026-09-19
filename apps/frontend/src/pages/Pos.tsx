@@ -4,9 +4,8 @@ import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, Io
 import { cartOutline, cashOutline, trashOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
 import type { DeliveryZone } from '../types';
-import { DeliveryMethod } from '@nutrideli/shared-types';
+import { DeliveryMethod, PaymentStatus, UserRole } from '@nutrideli/shared-types';
 import { apiClient } from '../api/client';
-import { PaymentStatus } from '@nutrideli/shared-types';
 
 type Product = {
   id: string;
@@ -257,7 +256,7 @@ const Pos: React.FC = () => {
           <IonTitle>POS / Caja</IonTitle>
           <IonButtons slot="end"><IonButton onClick={fetchProducts}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
           <IonButtons slot="end">
-            <IonButton onClick={openRateAlert}>
+            <IonButton onClick={() => user?.role === UserRole.ADMIN ? openRateAlert() : presentToast({message: 'Solo el administrador puede configurar la tasa', duration: 2000, color: 'warning'})}>
               <IonBadge color="light" style={{ padding: '8px', fontSize: '1rem', color: '#000' }}>
                 Tasa: Bs. {exchangeRate.toFixed(2)}
               </IonBadge>

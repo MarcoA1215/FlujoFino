@@ -1,8 +1,9 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonButton, useIonToast } from '@ionic/react';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import { useIonRouter } from '@ionic/react';
+import { useLocation } from 'react-router-dom';
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -10,6 +11,21 @@ const Login: React.FC = () => {
   const { login } = useContext(AuthContext);
   const [presentToast] = useIonToast();
   const router = useIonRouter();
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('expired') === 'true') {
+      presentToast({
+        message: 'Tu sesión ha expirado',
+        duration: 4000,
+        color: 'warning',
+        position: 'top'
+      });
+      // Limpiar URL
+      window.history.replaceState(null, '', '/login');
+    }
+  }, [location.search, presentToast]);
 
   const handleLogin = async () => {
     try {

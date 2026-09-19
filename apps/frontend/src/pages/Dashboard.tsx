@@ -12,25 +12,6 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 
 const Dashboard: React.FC = () => {
   const { user } = useContext(AuthContext);
-  if (user?.role !== UserRole.ADMIN) {
-    return (
-      <IonPage>
-        <IonHeader>
-          <IonToolbar color="primary">
-            <IonButtons slot="start"><IonMenuButton /></IonButtons>
-            <IonTitle>Bienvenido</IonTitle>
-          <IonButtons slot="end"><IonButton onClick={() => window.location.reload()}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
-          </IonToolbar>
-        </IonHeader>
-        <IonContent className="ion-padding ion-text-center">
-          <br /><br />
-          <h2>Hola, {user?.username}</h2>
-          <p>Selecciona una opción del menú lateral para comenzar a trabajar.</p>
-        </IonContent>
-      </IonPage>
-    );
-  }
-
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [presentToast] = useIonToast();
 
@@ -70,8 +51,9 @@ const Dashboard: React.FC = () => {
         ) : (
           <IonGrid>
             {/* Main KPIs Row */}
-            <IonRow>
-            <IonCol size="12" sizeSm="6" sizeMd="3">
+            {user?.role === UserRole.ADMIN && (
+              <IonRow>
+              <IonCol size="12" sizeSm="6" sizeMd="3">
               <IonCard color="tertiary">
                 <IonCardHeader>
                   <IonCardTitle className="ion-text-center">
@@ -132,58 +114,61 @@ const Dashboard: React.FC = () => {
               </IonCard>
             </IonCol>
           </IonRow>
+          )}
 
             {/* Charts and Lists Row */}
-            <IonRow className="ion-margin-top">
-              <IonCol size="12" sizeLg="8">
-                <IonCard style={{ height: '100%' }}>
-                  <IonCardHeader>
-                    <IonCardTitle style={{ fontSize: '1.2rem' }}>Ventas de los últimos 7 días</IonCardTitle>
-                  </IonCardHeader>
-                  <IonCardContent style={{ height: '300px' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={summary.salesChart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" fontSize={12} />
-                        <YAxis fontSize={12} />
-                        <Tooltip formatter={(value: any) => [`$ ${Number(value).toFixed(2)}`, 'Ventas']} />
-                        <Bar dataKey="total" fill="#2dd36f" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </IonCardContent>
-                </IonCard>
-              </IonCol>
+            {user?.role === UserRole.ADMIN && (
+              <IonRow className="ion-margin-top">
+                <IonCol size="12" sizeLg="8">
+                  <IonCard style={{ height: '100%' }}>
+                    <IonCardHeader>
+                      <IonCardTitle style={{ fontSize: '1.2rem' }}>Ventas de los últimos 7 días</IonCardTitle>
+                    </IonCardHeader>
+                    <IonCardContent style={{ height: '300px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={summary.salesChart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" fontSize={12} />
+                          <YAxis fontSize={12} />
+                          <Tooltip formatter={(value: any) => [`$ ${Number(value).toFixed(2)}`, 'Ventas']} />
+                          <Bar dataKey="total" fill="#2dd36f" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </IonCardContent>
+                  </IonCard>
+                </IonCol>
 
-              <IonCol size="12" sizeLg="4">
-                <IonCard style={{ height: '100%' }}>
-                  <IonCardHeader>
-                    <IonCardTitle style={{ fontSize: '1.2rem' }}>
-                      <IonIcon icon={pieChartOutline} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                      Productos más vendidos
-                    </IonCardTitle>
-                  </IonCardHeader>
-                  <IonCardContent>
-                    {summary.topProducts.length === 0 ? (
-                      <p style={{ color: 'gray', fontStyle: 'italic' }}>No hay ventas registradas aún.</p>
-                    ) : (
-                      <IonList>
-                        {summary.topProducts.map((p, i) => (
-                          <IonItem key={i}>
-                            <IonLabel>
-                              <h2>{p.name}</h2>
-                              <p>{parseFloat(Number(p.quantity).toFixed(4))} unidades vendidas</p>
-                            </IonLabel>
-                            <IonText slot="end" color="success">
-                              <strong>$ {p.revenue.toFixed(2)}</strong>
-                            </IonText>
-                          </IonItem>
-                        ))}
-                      </IonList>
-                    )}
-                  </IonCardContent>
-                </IonCard>
-              </IonCol>
-            </IonRow>
+                <IonCol size="12" sizeLg="4">
+                  <IonCard style={{ height: '100%' }}>
+                    <IonCardHeader>
+                      <IonCardTitle style={{ fontSize: '1.2rem' }}>
+                        <IonIcon icon={pieChartOutline} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
+                        Productos más vendidos
+                      </IonCardTitle>
+                    </IonCardHeader>
+                    <IonCardContent>
+                      {summary.topProducts.length === 0 ? (
+                        <p style={{ color: 'gray', fontStyle: 'italic' }}>No hay ventas registradas aún.</p>
+                      ) : (
+                        <IonList>
+                          {summary.topProducts.map((p, i) => (
+                            <IonItem key={i}>
+                              <IonLabel>
+                                <h2>{p.name}</h2>
+                                <p>{parseFloat(Number(p.quantity).toFixed(4))} unidades vendidas</p>
+                              </IonLabel>
+                              <IonText slot="end" color="success">
+                                <strong>$ {p.revenue.toFixed(2)}</strong>
+                              </IonText>
+                            </IonItem>
+                          ))}
+                        </IonList>
+                      )}
+                    </IonCardContent>
+                  </IonCard>
+                </IonCol>
+              </IonRow>
+            )}
 
             <IonRow className="ion-margin-top">
               <IonCol size="12" sizeMd="6">
