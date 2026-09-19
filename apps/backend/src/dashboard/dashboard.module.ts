@@ -1,4 +1,4 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
@@ -7,9 +7,10 @@ import { Product } from '../entities/product.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
+import { OperatingExpense } from '../entities/operating-expense.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([RawMaterial, Product, StockMovement, Order, OrderItem])],
+  imports: [TypeOrmModule.forFeature([RawMaterial, Product, StockMovement, Order, OrderItem, OperatingExpense])],
   controllers: [DashboardController],
   providers: [DashboardService],
 })

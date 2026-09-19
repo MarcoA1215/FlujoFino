@@ -29,6 +29,12 @@ export class UsersController {
     return this.usersService.create(req.user.tenantId, data);
   }
 
+  @Post(':id/pay')
+  @Roles(UserRole.ADMIN)
+  paySalary(@Request() req, @Param('id') id: string, @Body() data: any) {
+    return this.usersService.paySalary(req.user.tenantId, id, data);
+  }
+
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   delete(@Request() req, @Param('id') id: string) {

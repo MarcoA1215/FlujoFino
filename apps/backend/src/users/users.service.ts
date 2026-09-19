@@ -113,7 +113,9 @@ export class UsersService implements OnModuleInit {
         tenant: { id: tenantId },
         role: data.role || UserRole.POS,
         isActive: true,
-        status: status
+        status: status,
+        salaryAmount: data.salaryAmount ? Number(data.salaryAmount) : null,
+        salaryPeriod: data.salaryPeriod || null
       });
       await transactionalEntityManager.save(access);
 
@@ -128,6 +130,23 @@ export class UsersService implements OnModuleInit {
       `DELETE FROM "user_tenant_access" WHERE "userId" = $1 AND "tenantId" = $2`,
       [id, tenantId]
     );
+  }
+
+  async paySalary(tenantId: string, userId: string, data: any): Promise<void> {
+    if (!tenantId) throw new Error('Tenant ID required');
+    
+    await this.usersRepo.manager.transaction(async manager => {
+      // Create expense
+      const expense = manager.create('OperatingExpense', {
+        tenantId,
+        description: `Pago de Nómina - Empleado ${data.username || userId}`,
+        amount: Number(data.amount),
+        paymentMethod: data.method || 'CASH',
+        category: 'PAYROLL',
+        createdAt: data.date ? new Date(data.date) : new Date()
+      });
+      await manager.save(expense);
+    });
   }
 
   async acceptInvite(userId: string, tenantId: string): Promise<void> {

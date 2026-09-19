@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonButton, IonButtons, IonMenuButton, useIonToast, IonIcon, IonSelect, IonSelectOption, IonBadge } from '@ionic/react';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonButton, IonButtons, IonMenuButton, useIonToast, IonIcon, IonSelect, IonSelectOption, IonBadge, IonModal } from '@ionic/react';
 import { refreshOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
@@ -19,6 +19,13 @@ const Users: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>(UserRole.POS);
+  const [salaryAmount, setSalaryAmount] = useState('');
+  const [salaryPeriod, setSalaryPeriod] = useState('SEMANAL');
+  
+  const [selectedUserForPay, setSelectedUserForPay] = useState<UserData | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('USD');
+  const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   
   const [isChecked, setIsChecked] = useState(false);
   const [isExisting, setIsExisting] = useState(false);
@@ -64,21 +71,44 @@ const Users: React.FC = () => {
     setEmail('');
     setUsername('');
     setPassword('');
+    setSalaryAmount('');
+    setSalaryPeriod('SEMANAL');
     setIsChecked(false);
     setIsExisting(false);
   };
 
   const handleCreate = async () => {
     if (!email || !username || !password) {
-      return presentToast({ message: 'Todos los campos son requeridos', duration: 3000, color: 'warning' });
+      return presentToast({ message: 'Todos los campos obligatorios son requeridos', duration: 3000, color: 'warning' });
     }
     try {
-      await apiClient.post('/users', { username, email, password, role });
+      await apiClient.post('/users', { 
+        username, email, password, role, 
+        salaryAmount: salaryAmount ? Number(salaryAmount) : undefined, 
+        salaryPeriod 
+      });
       presentToast({ message: isExisting ? 'Usuario invitado exitosamente' : 'Usuario creado exitosamente', duration: 2000, color: 'success' });
       resetForm();
       fetchUsers();
     } catch (e: any) {
       presentToast({ message: 'Error al procesar: ' + (e.response?.data?.message || e.message), duration: 4000, color: 'danger' });
+    }
+  };
+
+  const handlePaySalary = async () => {
+    if (!selectedUserForPay || !payAmount) return;
+    try {
+      await apiClient.post(`/users/${selectedUserForPay.id}/pay`, {
+        username: selectedUserForPay.username,
+        amount: Number(payAmount),
+        method: payMethod,
+        date: payDate
+      });
+      presentToast({ message: 'Pago registrado como gasto de nómina', duration: 3000, color: 'success' });
+      setSelectedUserForPay(null);
+      setPayAmount('');
+    } catch (e: any) {
+      presentToast({ message: 'Error registrando pago: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
     }
   };
 
@@ -167,6 +197,18 @@ const Users: React.FC = () => {
                           <IonSelectOption value={UserRole.INVENTORY}>Reabastecedor (INVENTORY)</IonSelectOption>
                         </IonSelect>
                       </IonItem>
+                      <IonItem>
+                        <IonLabel position="stacked">Sueldo Acordado (USD)</IonLabel>
+                        <IonInput type="number" placeholder="Ej: 50" value={salaryAmount} onIonChange={e => setSalaryAmount(e.detail.value!)} />
+                      </IonItem>
+                      <IonItem>
+                        <IonLabel position="stacked">Frecuencia de Pago</IonLabel>
+                        <IonSelect value={salaryPeriod} onIonChange={e => setSalaryPeriod(e.detail.value)}>
+                          <IonSelectOption value="SEMANAL">Semanal</IonSelectOption>
+                          <IonSelectOption value="QUINCENAL">Quincenal</IonSelectOption>
+                          <IonSelectOption value="MENSUAL">Mensual</IonSelectOption>
+                        </IonSelect>
+                      </IonItem>
                       <IonButton expand="block" color="primary" className="ion-margin-top" onClick={handleCreate}>
                         {isExisting ? 'Invitar Usuario' : 'Crear Usuario'}
                       </IonButton>
@@ -209,6 +251,9 @@ const Users: React.FC = () => {
                             </td>
                             <td>{new Date(u.createdAt).toLocaleDateString()}</td>
                             <td>
+                              <IonButton size="small" color="success" fill="clear" onClick={() => setSelectedUserForPay(u)}>
+                                💵 Pagar
+                              </IonButton>
                               {u.username !== 'admin' && (
                                 <IonButton size="small" color="danger" fill="clear" onClick={() => handleDelete(u.id)}>
                                   Eliminar
@@ -229,6 +274,41 @@ const Users: React.FC = () => {
           </IonRow>
         </IonGrid>
       </IonContent>
+      
+      {/* Modal Pago de Nómina */}
+      {selectedUserForPay && (
+        <IonModal isOpen={!!selectedUserForPay} onDidDismiss={() => setSelectedUserForPay(null)}>
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>Registrar Pago a {selectedUserForPay.username}</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setSelectedUserForPay(null)}>Cerrar</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding">
+            <IonItem>
+              <IonLabel position="stacked">Monto a Pagar (USD)</IonLabel>
+              <IonInput type="number" placeholder="Ej. 20" value={payAmount} onIonChange={e => setPayAmount(e.detail.value!)} />
+            </IonItem>
+            <IonItem>
+              <IonLabel position="stacked">Método de Pago</IonLabel>
+              <IonSelect value={payMethod} onIonChange={e => setPayMethod(e.detail.value)}>
+                <IonSelectOption value="CASH_USD">Efectivo USD</IonSelectOption>
+                <IonSelectOption value="PAGO_MOVIL">Pago Móvil</IonSelectOption>
+              </IonSelect>
+            </IonItem>
+            <IonItem>
+              <IonLabel position="stacked">Fecha</IonLabel>
+              <IonInput type="date" value={payDate} onIonChange={e => setPayDate(e.detail.value!)} />
+            </IonItem>
+            
+            <IonButton expand="block" color="success" className="ion-margin-top" onClick={handlePaySalary}>
+              💵 Registrar Pago
+            </IonButton>
+          </IonContent>
+        </IonModal>
+      )}
     </IonPage>
   );
 };

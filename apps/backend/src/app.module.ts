@@ -32,6 +32,7 @@ import { Settings } from './entities/settings.entity';
 import { Reservation } from './entities/reservation.entity';
 import { ComboItem } from './entities/combo-item.entity';
 import { DeliveryZone } from './entities/delivery-zone.entity';
+import { OperatingExpense } from './entities/operating-expense.entity';
 
 @Module({
   imports: [
@@ -46,7 +47,7 @@ import { DeliveryZone } from './entities/delivery-zone.entity';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
-        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation],
+        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense],
         synchronize: true,
       }),
       inject: [ConfigService],

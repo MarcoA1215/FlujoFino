@@ -6,6 +6,7 @@ import { Product } from '../entities/product.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
+import { OperatingExpense } from '../entities/operating-expense.entity';
 import { MovementType, OrderStatus } from '@nutrideli/shared-types';
 
 @Injectable()
@@ -15,7 +16,8 @@ export class DashboardService {
     @InjectRepository(Product) private productRepo: Repository<Product>,
     @InjectRepository(StockMovement) private movementRepo: Repository<StockMovement>,
     @InjectRepository(Order) private orderRepo: Repository<Order>,
-    @InjectRepository(OrderItem) private orderItemRepo: Repository<OrderItem>
+    @InjectRepository(OrderItem) private orderItemRepo: Repository<OrderItem>,
+    @InjectRepository(OperatingExpense) private expenseRepo: Repository<OperatingExpense>
   ) {}
 
   async getSummary() {
@@ -102,8 +104,13 @@ export class DashboardService {
 
     const historicalRevenue = orders.reduce((acc, o) => acc + o.totalAmount, 0);
     
+    const expenses = await this.expenseRepo.find();
+    const payrollExpenses = expenses
+      .filter(e => e.category === 'PAYROLL')
+      .reduce((acc, e) => acc + e.amount, 0);
+    
     const reinvestmentExpense = historicalInvestment - totalInventoryCapital;
-    const historicalProfit = historicalRevenue - reinvestmentExpense;
+    const historicalProfit = historicalRevenue - reinvestmentExpense - payrollExpenses;
 
     // Calcular ventas de los ultimos 7 dias
     const last7Days = Array.from({length: 7}, (_, i) => {
@@ -162,6 +169,7 @@ export class DashboardService {
       historicalInvestment,
       historicalRevenue,
       historicalProfit,
+      payrollExpenses,
       salesChart,
       topProducts
     };

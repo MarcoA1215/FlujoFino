@@ -32,6 +32,12 @@ export class UserTenantAccess {
   @Column({ type: 'varchar', default: 'ACCEPTED' }) // 'PENDING', 'ACCEPTED', 'REJECTED'
   status: string;
 
+  @Column({ type: 'float', nullable: true })
+  salaryAmount: number;
+
+  @Column({ type: 'varchar', nullable: true }) // 'SEMANAL', 'QUINCENAL', 'MENSUAL'
+  salaryPeriod: string;
+
   @OneToMany(() => WorkSchedule, ws => ws.userTenantAccess)
   workSchedules: WorkSchedule[];
 }

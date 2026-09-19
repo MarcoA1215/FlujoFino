@@ -84,13 +84,13 @@ const Dashboard: React.FC = () => {
               </IonCard>
             </IonCol>
 
-            <IonCol size="12" sizeSm="6" sizeMd="3">
+            <IonCol size="12" sizeSm="6" sizeMd="4">
               <IonCard color="success">
                 <IonCardHeader>
                   <IonCardTitle className="ion-text-center">
                     <IonIcon icon={trendingUpOutline} style={{ fontSize: '2rem' }} />
                     <br />
-                    Ganancia Neta Bruta
+                    Ganancia Neta Real
                   </IonCardTitle>
                 </IonCardHeader>
                 <IonCardContent className="ion-text-center">
@@ -99,7 +99,22 @@ const Dashboard: React.FC = () => {
               </IonCard>
             </IonCol>
 
-            <IonCol size="12" sizeSm="6" sizeMd="3">
+            <IonCol size="12" sizeSm="6" sizeMd="4">
+              <IonCard color="tertiary">
+                <IonCardHeader>
+                  <IonCardTitle className="ion-text-center">
+                    <IonIcon icon={trendingDownOutline} style={{ fontSize: '2rem' }} />
+                    <br />
+                    Nómina y Sueldos
+                  </IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent className="ion-text-center">
+                  <h2>$ {(summary.payrollExpenses || 0).toFixed(2)}</h2>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
+
+            <IonCol size="12" sizeSm="6" sizeMd="4">
               <IonCard color="danger">
                 <IonCardHeader>
                   <IonCardTitle className="ion-text-center">
