@@ -161,26 +161,27 @@ export class OrdersService {
               await manager.save(Product, ci.component);
             }
           }
-          if (product.recipe && product.recipe.length > 0) {
-            for (const ri of product.recipe) {
-              if (ri.rawMaterial) {
-                ri.rawMaterial.stockQuantity -= (itemDto.quantity * ri.quantity);
-                await manager.save(RawMaterial, ri.rawMaterial);
-                const mov = manager.create(StockMovement, {
-                  rawMaterialId: ri.rawMaterial.id,
-                  type: MovementType.OUT_SALE,
-                  quantity: itemDto.quantity * ri.quantity,
-                  totalCost: (itemDto.quantity * ri.quantity) * ri.rawMaterial.costPerUnit,
-                  description: 'Venta de Combo: ' + product.name
-                });
-                await manager.save(StockMovement, mov);
-              }
-            }
-          }
         } else if (!product.isCombo || product.isPreAssembled) {
             product.stockQuantity -= itemDto.quantity;
             await manager.save(Product, product);
+        }
+
+        if (product.recipe && product.recipe.length > 0) {
+          for (const ri of product.recipe) {
+            if (ri.rawMaterial) {
+              ri.rawMaterial.stockQuantity -= (itemDto.quantity * ri.quantity);
+              await manager.save(RawMaterial, ri.rawMaterial);
+              const mov = manager.create(StockMovement, {
+                rawMaterialId: ri.rawMaterial.id,
+                type: MovementType.OUT_SALE,
+                quantity: itemDto.quantity * ri.quantity,
+                totalCost: (itemDto.quantity * ri.quantity) * ri.rawMaterial.costPerUnit,
+                description: 'Venta de Producto: ' + product.name
+              });
+              await manager.save(StockMovement, mov);
+            }
           }
+        }
 
         let unitCost = 0;
         if (product.isCombo && !product.isPreAssembled && product.comboItems) {

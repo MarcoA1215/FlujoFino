@@ -35,7 +35,7 @@ async function runTests() {
     res = await fetch(`${baseUrl}/raw-materials`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ name: 'Insumo Test', unit: 'ml', costPerUnit: 0.1, stockQuantity: 100, minStockAlert: 10 })
+      body: JSON.stringify({ name: 'Insumo Test', unit: 'ml', costPerUnit: 0.1, initialStock: 100, minStockAlert: 10 })
     });
     const rmData = await res.json();
     const rmId = rmData.id;
