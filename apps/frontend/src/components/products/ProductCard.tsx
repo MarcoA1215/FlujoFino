@@ -1,4 +1,4 @@
-﻿import { pencilOutline, trashOutline, buildOutline, cubeOutline, swapHorizontalOutline, cutOutline, warningOutline, closeOutline } from 'ionicons/icons';
+import { pencilOutline, trashOutline, buildOutline, cubeOutline, swapHorizontalOutline, cutOutline, warningOutline, closeOutline } from 'ionicons/icons';
 import React from 'react';
 import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
 import type { Product } from '../../types';
@@ -35,8 +35,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       { text: 'Stock Inicial / Ajuste', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) }
     ];
 
-    if (p.isCombo && onToggleKitting) {
-      buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Virtual' : 'Físico (Kitting)'}`, icon: swapHorizontalOutline, cssClass: 'action-sheet-cambiar', handler: () => onToggleKitting(p) });
+    if ((p.isCombo || (p.recipe && p.recipe.length > 0)) && onToggleKitting) {
+      buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Hecho al Instante' : 'Pre-Fabricado'}`, icon: swapHorizontalOutline, cssClass: 'action-sheet-cambiar', handler: () => onToggleKitting(p) });
     }
 
     if (p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) {
@@ -92,6 +92,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 {(p.isCombo && !p.isPreAssembled) && (
                   <IonBadge color="tertiary" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
                     Combo (Virtual)
+                  </IonBadge>
+                )}
+                {(p.recipe && p.recipe.length > 0 && !p.isCombo) && (
+                  <IonBadge color={p.isPreAssembled ? 'dark' : 'warning'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                    {p.isPreAssembled ? 'Pre-Fabricado' : 'Hecho al Instante'}
                   </IonBadge>
                 )}
               </div>

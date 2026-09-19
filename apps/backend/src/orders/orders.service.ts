@@ -161,12 +161,7 @@ export class OrdersService {
               await manager.save(Product, ci.component);
             }
           }
-        } else if (!product.isCombo || product.isPreAssembled) {
-            product.stockQuantity -= itemDto.quantity;
-            await manager.save(Product, product);
-        }
-
-        if (product.recipe && product.recipe.length > 0) {
+        } else if (product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
           for (const ri of product.recipe) {
             if (ri.rawMaterial) {
               ri.rawMaterial.stockQuantity -= (itemDto.quantity * ri.quantity);
@@ -181,6 +176,9 @@ export class OrdersService {
               await manager.save(StockMovement, mov);
             }
           }
+        } else if (!product.isCombo || product.isPreAssembled) {
+            product.stockQuantity -= itemDto.quantity;
+            await manager.save(Product, product);
         }
 
         let unitCost = 0;
@@ -316,21 +314,20 @@ export class OrdersService {
                   await manager.save(Product, ci.component);
                 }
               }
+            } else if (product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
               // Restore raw materials
-              if (product.recipe && product.recipe.length > 0) {
-                for (const ri of product.recipe) {
-                  if (ri.rawMaterial) {
-                    ri.rawMaterial.stockQuantity += (item.quantity * ri.quantity);
-                    await manager.save(RawMaterial, ri.rawMaterial);
-                    const mov = manager.create(StockMovement, {
-                      rawMaterialId: ri.rawMaterial.id,
-                      type: MovementType.IN,
-                      quantity: item.quantity * ri.quantity,
-                      totalCost: (item.quantity * ri.quantity) * ri.rawMaterial.costPerUnit,
-                      description: 'Reverso por Cancelación de Pedido: ' + order.id
-                    });
-                    await manager.save(StockMovement, mov);
-                  }
+              for (const ri of product.recipe) {
+                if (ri.rawMaterial) {
+                  ri.rawMaterial.stockQuantity += (item.quantity * ri.quantity);
+                  await manager.save(RawMaterial, ri.rawMaterial);
+                  const mov = manager.create(StockMovement, {
+                    rawMaterialId: ri.rawMaterial.id,
+                    type: MovementType.IN,
+                    quantity: item.quantity * ri.quantity,
+                    totalCost: (item.quantity * ri.quantity) * ri.rawMaterial.costPerUnit,
+                    description: 'Reverso por Cancelación de Pedido: ' + order.id
+                  });
+                  await manager.save(StockMovement, mov);
                 }
               }
             } else if (!product.isCombo || product.isPreAssembled) {
