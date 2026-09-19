@@ -58,6 +58,15 @@ export class Order {
   deliveryFee: number;
 
   @Column('float', { default: 0 })
+  discountAmount: number;
+
+  @Column('float', { default: 0 })
+  totalCost: number;
+
+  @Column('float', { default: 0 })
+  netProfit: number;
+
+  @Column('float', { default: 0 })
   totalAmount: number;
 
   @Column({ nullable: true })

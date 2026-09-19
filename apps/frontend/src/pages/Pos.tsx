@@ -13,6 +13,7 @@ type Product = {
   name: string;
   stockQuantity: number;
   salePrice: number;
+  baseCost: number;
 };
 
 type CartItem = {
@@ -34,6 +35,9 @@ const Pos: React.FC = () => {
   const [exchangeRate, setExchangeRate] = useState<number>(40.0);
   const [allowPartialPayments, setAllowPartialPayments] = useState<boolean>(false);
   const [initialAbono, setInitialAbono] = useState<string>('');
+  
+  const [discountType, setDiscountType] = useState<'FIXED' | 'PERCENTAGE'>('FIXED');
+  const [discountValue, setDiscountValue] = useState<string>('');
   
   // Pago Movil Fields
   const [pagoMovilRef, setPagoMovilRef] = useState('');
@@ -161,10 +165,23 @@ const Pos: React.FC = () => {
   };
 
   const cartSubtotal = cart.reduce((acc, item) => acc + (item.product.salePrice * item.quantity), 0);
+  const cartBaseCost = cart.reduce((acc, item) => acc + ((item.product.baseCost || 0) * item.quantity), 0);
+  
+  const discountValNum = parseFloat(discountValue) || 0;
+  const discountAmount = discountType === 'PERCENTAGE' 
+    ? cartSubtotal * (discountValNum / 100) 
+    : discountValNum;
+
   const deliveryFee = (deliveryMethod === DeliveryMethod.DELIVERY && deliveryZoneId) 
     ? (deliveryZones.find(z => z.id === deliveryZoneId)?.feePrice || 0) 
     : 0;
-  const totalCart = cartSubtotal + deliveryFee;
+    
+  const totalCart = (cartSubtotal - discountAmount) + deliveryFee;
+  
+  const regularMargin = cartSubtotal > 0 ? ((cartSubtotal - cartBaseCost) / cartSubtotal) * 100 : 0;
+  const discountedSubtotal = cartSubtotal - discountAmount;
+  const discountedMargin = discountedSubtotal > 0 ? ((discountedSubtotal - cartBaseCost) / discountedSubtotal) * 100 : 0;
+  const lossAmount = cartBaseCost - discountedSubtotal;
 
   const placeOrder = async () => {
     if (cart.length === 0) return presentToast({ message: 'Carrito vacío', duration: 2000, color: 'warning' });
@@ -185,6 +202,7 @@ const Pos: React.FC = () => {
     }
 
     try {
+      const initialAbonoVal = initialAbono ? Number(initialAbono) : undefined;
       await apiClient.post('/orders', {
         customerName,
         customerPhone,
@@ -195,13 +213,16 @@ const Pos: React.FC = () => {
         pagoMovilPhone: paymentMethod === 'PAGO_MOVIL' ? pagoMovilPhone : undefined,
         pagoMovilCedula: paymentMethod === 'PAGO_MOVIL' ? pagoMovilCedula : undefined,
         pagoMovilBank: paymentMethod === 'PAGO_MOVIL' ? pagoMovilBank : undefined,
-        amountBs: paymentMethod === 'PAGO_MOVIL' ? (totalCart * exchangeRate) : undefined,
-        exchangeRate: exchangeRate,
-        initialAbono: initialAbono ? Number(initialAbono) : undefined,
-        items: cart.map(item => ({
-          productId: item.product.id,
-          quantity: item.quantity,
-          unitPrice: item.product.salePrice,
+        amountBs: totalCart * exchangeRate,
+        exchangeRate,
+        deliveryMethod,
+        deliveryZoneId,
+        initialAbono: initialAbonoVal,
+        discountAmount,
+        items: cart.map(i => ({
+          productId: i.product.id,
+          quantity: i.quantity,
+          unitPrice: i.product.salePrice,
         }))
       });
       presentToast({ message: 'Pedido creado exitosamente', duration: 2000, color: 'success' });
@@ -427,10 +448,30 @@ const Pos: React.FC = () => {
                   {cart.length > 0 && (
                     <>
                       <hr className="ion-margin-vertical" />
+                      
+                      <div style={{ background: '#f8f9fa', padding: '10px', borderRadius: '8px', marginBottom: '15px' }}>
+                        <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: '#495057' }}>Descuento Comercial</h4>
+                        <IonItem color="light" lines="none">
+                          <IonSelect value={discountType} onIonChange={e => setDiscountType(e.detail.value)} slot="start" style={{ width: '80px' }}>
+                            <IonSelectOption value="FIXED">$</IonSelectOption>
+                            <IonSelectOption value="PERCENTAGE">%</IonSelectOption>
+                          </IonSelect>
+                          <IonInput type="number" value={discountValue} onIonInput={e => setDiscountValue(e.detail.value!)} placeholder="0.00" />
+                        </IonItem>
+                      </div>
+                      
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h4>Subtotal:</h4>
                         <h4>${cartSubtotal.toFixed(2)}</h4>
                       </div>
+                      
+                      {discountAmount > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'red' }}>
+                          <h4>Descuento:</h4>
+                          <h4>- ${discountAmount.toFixed(2)}</h4>
+                        </div>
+                      )}
+                      
                       {deliveryMethod === DeliveryMethod.DELIVERY && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'gray' }}>
                           <h4>Delivery:</h4>
@@ -441,6 +482,31 @@ const Pos: React.FC = () => {
                         <h2>Total a Pagar:</h2>
                         <h2 style={{ fontWeight: 'bold', color: '#2dd36f' }}>${totalCart.toFixed(2)}</h2>
                       </div>
+                      
+                      {cartBaseCost > 0 && (
+                        <div style={{ marginTop: '15px', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', background: lossAmount > 0 ? '#fff3cd' : '#f8f9fa' }}>
+                           <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: lossAmount > 0 ? '#856404' : '#6c757d' }}>Análisis de Rentabilidad</h4>
+                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                             <span>Costo Base Insumos:</span>
+                             <strong>${cartBaseCost.toFixed(2)}</strong>
+                           </div>
+                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                             <span>Margen Regular:</span>
+                             <strong>{regularMargin.toFixed(1)}%</strong>
+                           </div>
+                           {discountAmount > 0 && (
+                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: lossAmount > 0 ? '#dc3545' : '#000' }}>
+                               <span>Margen Post-Descuento:</span>
+                               <strong>{discountedMargin.toFixed(1)}%</strong>
+                             </div>
+                           )}
+                           {lossAmount > 0 && (
+                             <div style={{ marginTop: '8px', color: '#dc3545', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                               ⚠️ Venta por debajo del costo (Pérdida: ${lossAmount.toFixed(2)})
+                             </div>
+                           )}
+                        </div>
+                      )}
                       
                       <IonButton 
                         expand="block" 

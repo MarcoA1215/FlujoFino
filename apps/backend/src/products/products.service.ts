@@ -26,7 +26,7 @@ export class ProductsService {
   async findAll() {
     const products = await this.productRepo.find({
       relations: {
-        comboItems: { component: true },
+        comboItems: { component: { recipe: { rawMaterial: true } } },
         recipe: { rawMaterial: true }
       }
     });
@@ -54,12 +54,28 @@ export class ProductsService {
         quantity: ci.quantity
       })) || [];
 
+      let baseCost = 0;
+      if (p.isCombo && !p.isPreAssembled && p.comboItems) {
+        for (const ci of p.comboItems) {
+           if (ci.component && ci.component.recipe) {
+             for (const ri of ci.component.recipe) {
+               if (ri.rawMaterial) baseCost += ri.quantity * ri.rawMaterial.costPerUnit * ci.quantity;
+             }
+           }
+        }
+      }
+      if (p.recipe && p.recipe.length > 0) {
+        for (const ri of p.recipe) {
+           if (ri.rawMaterial) baseCost += ri.quantity * ri.rawMaterial.costPerUnit;
+        }
+      }
+
       return {
         ...p,
+        baseCost,
         stockQuantity: finalStock,
         physicalStock: finalPhysical,
-        comboItems: cleanedComboItems,
-        recipe: undefined
+        comboItems: cleanedComboItems
       };
     });
   }

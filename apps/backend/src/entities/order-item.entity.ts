@@ -25,6 +25,9 @@ export class OrderItem {
   @Column('float')
   unitPrice: number;
 
+  @Column('float', { default: 0 })
+  unitCost: number;
+
   @Column('float')
   subtotal: number;
 

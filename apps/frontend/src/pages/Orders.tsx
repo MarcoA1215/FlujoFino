@@ -85,11 +85,20 @@ const Orders: React.FC = () => {
     }
     if (order.customerAddress) text += 'Dir: ' + order.customerAddress + '\n';
     text += '-----------------------\n';
+    
+    let subtotal = 0;
     order.items.forEach((item: any) => {
+      subtotal += item.subtotal || 0;
       const price = item.subtotal ? ' ($' + item.subtotal.toFixed(2) + ')' : '';
       text += '- ' + parseFloat(Number(item.quantity).toFixed(4)) + 'x ' + (item.productName || item.product?.name) + price + '\n';
     });
     text += '-----------------------\n';
+    
+    if (order.discountAmount && order.discountAmount > 0) {
+      text += 'Subtotal: $' + subtotal.toFixed(2) + '\n';
+      text += 'Descuento: -$' + order.discountAmount.toFixed(2) + '\n';
+    }
+    
     if (order.deliveryFee && order.deliveryFee > 0) {
       text += '*Costo Delivery: $' + order.deliveryFee.toFixed(2) + '*\n';
     }
