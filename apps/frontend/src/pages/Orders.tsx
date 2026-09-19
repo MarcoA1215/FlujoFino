@@ -39,9 +39,40 @@ const Orders: React.FC = () => {
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<any>(null);
+  const [selectedOrderForPartial, setSelectedOrderForPartial] = useState<any>(null);
+  const [partialDeliveries, setPartialDeliveries] = useState<{ [key: string]: number }>({});
+  
   const [settings, setSettings] = useState<any>(null);
   const [abonoAmount, setAbonoAmount] = useState<string>('');
   const [abonoCurrency, setAbonoCurrency] = useState<'USD' | 'VES'>('USD');
+
+  const openPartialModal = (order: any) => {
+    setSelectedOrderForPartial(order);
+    const initial: { [key: string]: number } = {};
+    order.items.forEach((i: any) => {
+      initial[i.id] = 0;
+    });
+    setPartialDeliveries(initial);
+  };
+
+  const handleDeliverPartial = async () => {
+    if (!selectedOrderForPartial) return;
+    const deliveries = Object.keys(partialDeliveries)
+      .map(id => ({ orderItemId: id, quantityToDeliver: Number(partialDeliveries[id]) }))
+      .filter(d => d.quantityToDeliver > 0);
+      
+    if (deliveries.length === 0) return presentToast({ message: 'No hay cantidades a entregar', duration: 2000, color: 'warning' });
+    
+    try {
+        await apiClient.post(`/orders/${selectedOrderForPartial.id}/deliver-partial`, { deliveries });
+        presentToast({ message: 'Entrega parcial registrada', duration: 2000, color: 'success' });
+        setSelectedOrderForPartial(null);
+        setPartialDeliveries({});
+        fetchOrders();
+    } catch(e: any) {
+        presentToast({ message: e.response?.data?.message || 'Error registrando entrega', duration: 3000, color: 'danger' });
+    }
+  };
 
   const handleAddAbono = async () => {
     if (!selectedOrderForDetails || !abonoAmount || isNaN(Number(abonoAmount))) return;
@@ -392,10 +423,11 @@ const getStatusColor = (status: OrderStatus) => {
 
                     {order.status !== OrderStatus.CANCELED && order.status !== OrderStatus.DELIVERED && (
                       <div className="ion-margin-top" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                        
-                        
                         <IonButton style={{ flex: 1 }} color="success" onClick={() => updateStatus(order.id, OrderStatus.DELIVERED)}>
-                          Entregar Pedido
+                          Entregar Todo
+                        </IonButton>
+                        <IonButton style={{ flex: 1 }} color="tertiary" onClick={() => openPartialModal(order)}>
+                          Entrega Parcial
                         </IonButton>
                         <div style={{ width: '100%', textAlign: 'center', marginTop: '5px' }}>
                           <IonButton fill="clear" color="danger" size="small" onClick={() => updateStatus(order.id, OrderStatus.CANCELED)}>
@@ -501,12 +533,50 @@ const getStatusColor = (status: OrderStatus) => {
           )}
         </IonContent>
       </IonModal>
+
+      <IonModal isOpen={!!selectedOrderForPartial} onDidDismiss={() => setSelectedOrderForPartial(null)}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Entregas Parciales</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setSelectedOrderForPartial(null)}>Cerrar</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          {selectedOrderForPartial && (
+            <IonList>
+              {selectedOrderForPartial.items.map((item: any) => {
+                const pending = item.quantity - (item.deliveredQuantity || 0);
+                return (
+                  <IonItem key={item.id}>
+                    <IonLabel>
+                      <h2>{item.productName || item.product?.name}</h2>
+                      <p>Pedido: {item.quantity} | Entregado: {item.deliveredQuantity || 0} | <b>Pendiente: {pending}</b></p>
+                    </IonLabel>
+                    {pending > 0 && (
+                      <IonInput 
+                        type="number" 
+                        placeholder="Entregar..." 
+                        value={partialDeliveries[item.id] || ''}
+                        onIonChange={e => setPartialDeliveries({...partialDeliveries, [item.id]: Number(e.detail.value)})}
+                        style={{ maxWidth: '80px', textAlign: 'right' }}
+                      />
+                    )}
+                  </IonItem>
+                );
+              })}
+            </IonList>
+          )}
+          <IonButton expand="block" color="primary" onClick={handleDeliverPartial} className="ion-margin-top">
+            Registrar Entrega
+          </IonButton>
+        </IonContent>
+      </IonModal>
   
       </IonContent>
     </IonPage>
   );
 };
+
 export default Orders;
-
-
-
