@@ -3,6 +3,7 @@
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonInput, IonSelect, IonSelectOption, IonText, IonIcon, IonSearchbar } from '@ionic/react';
 import { cartOutline, cashOutline, trashOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
+import { useLocation, useHistory } from 'react-router-dom';
 import type { DeliveryZone } from '../types';
 import { DeliveryMethod, PaymentStatus, UserRole } from '@nutrideli/shared-types';
 import { apiClient } from '../api/client';
@@ -50,9 +51,12 @@ const Pos: React.FC = () => {
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
   const [deliveryZoneId, setDeliveryZoneId] = useState<string>('');
   const [customerAddress, setCustomerAddress] = useState<string>('');
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
+  const location = useLocation();
+  const history = useHistory();
 
   const fetchProducts = async () => {
     try {
@@ -79,6 +83,35 @@ const Pos: React.FC = () => {
     } catch(e) {}
   };
 
+  const loadOrderForEditing = async (id: string) => {
+    try {
+      const res = await apiClient.get(`/orders/${id}`);
+      const order = res.data;
+      setCustomerName(order.customerName || '');
+      setCustomerPhone(order.customerPhone || '');
+      setTableNumber(order.tableNumber || '');
+      setDeliveryMethod(order.deliveryMethod || DeliveryMethod.IN_STORE);
+      setCustomerAddress(order.customerAddress || '');
+      if (order.deliveryZone) setDeliveryZoneId(order.deliveryZone.id);
+      
+      const loadedCart = order.items.map((item: any) => ({
+        product: item.product,
+        quantity: item.quantity
+      }));
+      setCart(loadedCart);
+      
+      if (order.discountAmount > 0) {
+        setDiscountType('FIXED');
+        setDiscountValue(order.discountAmount.toString());
+      }
+      
+      presentToast({ message: `Cargando orden para editar`, color: 'primary', duration: 2000 });
+    } catch (e) {
+      console.error(e);
+      presentToast({ message: 'Error cargando orden', color: 'danger', duration: 3000 });
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
     fetchRate();
@@ -97,8 +130,16 @@ const Pos: React.FC = () => {
       } catch (e) {}
     }
 
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(location.search);
     const resId = urlParams.get('reservationId');
+    const editId = urlParams.get('edit');
+    
+    if (editId) {
+      setEditingOrderId(editId);
+      loadOrderForEditing(editId);
+    } else {
+      setEditingOrderId(null);
+    }
     if (resId) {
       apiClient.get(`/reservations`).then(res => {
         const found = res.data.find((r: any) => r.id === resId);
@@ -202,7 +243,7 @@ const Pos: React.FC = () => {
 
     try {
       const initialAbonoVal = initialAbono ? Number(initialAbono) : undefined;
-      await apiClient.post('/orders', {
+      const payload = {
         customerName,
         customerPhone,
         tableNumber,
@@ -223,8 +264,17 @@ const Pos: React.FC = () => {
           quantity: i.quantity,
           unitPrice: i.product.salePrice,
         }))
-      });
-      presentToast({ message: 'Pedido creado exitosamente', duration: 2000, color: 'success' });
+      };
+
+      if (editingOrderId) {
+        await apiClient.put(`/orders/${editingOrderId}`, payload);
+        presentToast({ message: 'Pedido actualizado exitosamente', duration: 2000, color: 'success' });
+        history.push('/orders');
+      } else {
+        await apiClient.post('/orders', payload);
+        presentToast({ message: 'Pedido creado exitosamente', duration: 2000, color: 'success' });
+      }
+
       setCart([]);
       setCustomerName('');
       setCustomerPhone('');
@@ -515,7 +565,7 @@ const Pos: React.FC = () => {
                         onClick={placeOrder}
                       >
                         <IonIcon icon={cashOutline} slot="start" />
-                        Confirmar Pedido
+                        {editingOrderId ? 'Actualizar Pedido' : 'Confirmar Pedido'}
                       </IonButton>
                     </>
                   )}

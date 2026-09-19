@@ -1,5 +1,5 @@
 // @ts-nocheck
-﻿import { refreshOutline, copyOutline, informationCircleOutline, trashOutline } from 'ionicons/icons';
+﻿import { refreshOutline, copyOutline, informationCircleOutline, trashOutline, createOutline } from 'ionicons/icons';
 import { IonModal, IonInput } from '@ionic/react';
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonText, IonSegment, IonSegmentButton, IonSearchbar, IonIcon } from '@ionic/react';
 import { useEffect, useState } from 'react';
@@ -333,6 +333,11 @@ const getStatusColor = (status: OrderStatus) => {
     {order.tableNumber && (<IonBadge color="primary" style={{ marginTop: '5px' }}>{order.tableNumber}</IonBadge>)}
   </div>
   <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '5px' }}>
+    {order.status !== OrderStatus.DELIVERED && order.status !== OrderStatus.CANCELED && (
+      <IonButton fill="clear" size="small" onClick={() => router.push(`/pos?edit=${order.id}`, 'forward')}>
+        <IonIcon icon={createOutline} slot="icon-only" />
+      </IonButton>
+    )}
     <IonButton fill="clear" size="small" onClick={() => handleCopyOrder(order)}>
       <IonIcon icon={copyOutline} slot="icon-only" />
     </IonButton>

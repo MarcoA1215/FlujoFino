@@ -238,6 +238,13 @@ export class OrdersService {
     });
   }
 
+  async getOrderById(id: string) {
+    return this.dataSource.getRepository(Order).findOne({
+      where: { id },
+      relations: { items: { product: true } }
+    });
+  }
+
   async updatePaymentStatus(id: string, dto: UpdatePaymentDto) {
     const orderRepo = this.dataSource.getRepository(Order);
     const order = await orderRepo.findOne({ where: { id } });

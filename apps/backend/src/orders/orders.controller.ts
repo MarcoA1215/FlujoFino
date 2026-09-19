@@ -26,6 +26,11 @@ export class OrdersController {
     return this.ordersService.getAllOrders();
   }
 
+  @Get(':id')
+  getOrderById(@Param('id') id: string) {
+    return this.ordersService.getOrderById(id);
+  }
+
   @Patch(':id/payment')
   updatePaymentStatus(@Param('id') id: string, @Body() dto: UpdatePaymentDto) {
     return this.ordersService.updatePaymentStatus(id, dto);
