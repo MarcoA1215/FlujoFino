@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, UseGuards, Request } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -12,19 +12,26 @@ export class UsersController {
 
   @Get()
   @Roles(UserRole.ADMIN)
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@Request() req) {
+    return this.usersService.findAll(req.user.tenantId);
+  }
+
+  @Get('check/:email')
+  @Roles(UserRole.ADMIN)
+  async checkEmail(@Param('email') email: string) {
+    const user = await this.usersService.findByUsername(email);
+    return { exists: !!user, username: user?.username };
   }
 
   @Post()
   @Roles(UserRole.ADMIN)
-  create(@Body() data: any) {
-    return this.usersService.create(data);
+  create(@Request() req, @Body() data: any) {
+    return this.usersService.create(req.user.tenantId, data);
   }
 
   @Delete(':id')
   @Roles(UserRole.ADMIN)
-  delete(@Param('id') id: string) {
-    return this.usersService.delete(id);
+  delete(@Request() req, @Param('id') id: string) {
+    return this.usersService.delete(req.user.tenantId, id);
   }
 }

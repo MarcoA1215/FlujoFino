@@ -19,6 +19,7 @@ import { RawMaterialsModule } from './raw-materials/raw-materials.module';
 import { ProductsModule } from './products/products.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { SettingsModule } from './settings/settings.module';
+import { ReservationsModule } from './reservations/reservations.module';
 
 import { RawMaterial } from './entities/raw-material.entity';
 import { StockMovement } from './entities/stock-movement.entity';
@@ -28,6 +29,7 @@ import { ProductionBatch } from './entities/production-batch.entity';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { Settings } from './entities/settings.entity';
+import { Reservation } from './entities/reservation.entity';
 import { ComboItem } from './entities/combo-item.entity';
 import { DeliveryZone } from './entities/delivery-zone.entity';
 
@@ -44,7 +46,7 @@ import { DeliveryZone } from './entities/delivery-zone.entity';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
-        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule],
+        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation],
         synchronize: true,
       }),
       inject: [ConfigService],
@@ -55,10 +57,9 @@ import { DeliveryZone } from './entities/delivery-zone.entity';
     ProductsModule,
     DashboardModule,
     SettingsModule,
+    ReservationsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: APP_GUARD, useClass: RolesGuard }],
 })
 export class AppModule {}
-
-

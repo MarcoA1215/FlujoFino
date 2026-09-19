@@ -6,7 +6,7 @@ export class WorkSchedule {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => UserTenantAccess, { onDelete: 'CASCADE' })
+  @ManyToOne(() => UserTenantAccess, uta => uta.workSchedules, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userTenantAccessId' })
   userTenantAccess: UserTenantAccess;
 

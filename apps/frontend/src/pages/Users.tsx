@@ -8,15 +8,22 @@ import { UserRole } from '@nutrideli/shared-types';
 interface UserData {
   id: string;
   username: string;
+  email: string;
   role: string;
   createdAt: string;
 }
 
 const Users: React.FC = () => {
   const [users, setUsers] = useState<UserData[]>([]);
+  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>(UserRole.POS);
+  
+  const [isChecked, setIsChecked] = useState(false);
+  const [isExisting, setIsExisting] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+  
   const [presentToast] = useIonToast();
   const { user } = useContext(AuthContext);
 
@@ -35,18 +42,43 @@ const Users: React.FC = () => {
     }
   }, [user]);
 
+  const handleCheckEmail = async () => {
+    if (!email) return presentToast({ message: 'Ingresa un correo electrónico', duration: 3000, color: 'warning' });
+    setIsChecking(true);
+    try {
+      const res = await apiClient.get(`/users/check/${email}`);
+      setIsExisting(res.data.exists);
+      if (res.data.exists) {
+        setUsername(res.data.username);
+        setPassword('***'); // dummy password to pass validation, backend ignores it
+      }
+      setIsChecked(true);
+    } catch (e) {
+      presentToast({ message: 'Error verificando correo', duration: 3000, color: 'danger' });
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const resetForm = () => {
+    setEmail('');
+    setUsername('');
+    setPassword('');
+    setIsChecked(false);
+    setIsExisting(false);
+  };
+
   const handleCreate = async () => {
-    if (!username || !password) {
-      return presentToast({ message: 'Usuario y contraseña son requeridos', duration: 3000, color: 'warning' });
+    if (!email || !username || !password) {
+      return presentToast({ message: 'Todos los campos son requeridos', duration: 3000, color: 'warning' });
     }
     try {
-      await apiClient.post('/users', { username, password, role });
-      presentToast({ message: 'Usuario creado exitosamente', duration: 2000, color: 'success' });
-      setUsername('');
-      setPassword('');
+      await apiClient.post('/users', { username, email, password, role });
+      presentToast({ message: isExisting ? 'Usuario invitado exitosamente' : 'Usuario creado exitosamente', duration: 2000, color: 'success' });
+      resetForm();
       fetchUsers();
     } catch (e: any) {
-      presentToast({ message: 'Error al crear usuario', duration: 4000, color: 'danger' });
+      presentToast({ message: 'Error al procesar: ' + (e.response?.data?.message || e.message), duration: 4000, color: 'danger' });
     }
   };
 
@@ -94,27 +126,55 @@ const Users: React.FC = () => {
                   <IonCardTitle>Crear Usuario</IonCardTitle>
                 </IonCardHeader>
                 <IonCardContent>
-                  <IonItem>
-                    <IonLabel position="stacked">Nombre de Usuario</IonLabel>
-                    <IonInput value={username} onIonInput={e => setUsername(e.detail.value!)} placeholder="Ej. juan_cajero" />
-                  </IonItem>
-                  <IonItem>
-                    <IonLabel position="stacked">Contraseña</IonLabel>
-                    <IonInput type="password" value={password} onIonInput={e => setPassword(e.detail.value!)} placeholder="***" />
-                  </IonItem>
-                  <IonItem>
-                    <IonLabel position="stacked">Rol / Permiso</IonLabel>
-                    <IonSelect value={role} onIonChange={e => setRole(e.detail.value)}>
-                      <IonSelectOption value={UserRole.ADMIN}>Administrador</IonSelectOption>
-                      <IonSelectOption value={UserRole.POS}>Cajero (POS)</IonSelectOption>
-                      <IonSelectOption value={UserRole.KITCHEN}>Cocina (KITCHEN)</IonSelectOption>
-                      <IonSelectOption value={UserRole.DELIVERY}>Repartidor (DELIVERY)</IonSelectOption>
-                      <IonSelectOption value={UserRole.INVENTORY}>Reabastecedor (INVENTORY)</IonSelectOption>
-                    </IonSelect>
-                  </IonItem>
-                  <IonButton expand="block" color="primary" className="ion-margin-top" onClick={handleCreate}>
-                    Crear Usuario
-                  </IonButton>
+                  {!isChecked ? (
+                    <>
+                      <IonItem>
+                        <IonLabel position="stacked">Correo Electrónico</IonLabel>
+                        <IonInput type="email" value={email} onIonInput={e => setEmail(e.detail.value!)} placeholder="Ej. juan@negocio.com" />
+                      </IonItem>
+                      <IonButton expand="block" color="primary" className="ion-margin-top" onClick={handleCheckEmail} disabled={isChecking}>
+                        {isChecking ? 'Verificando...' : 'Siguiente'}
+                      </IonButton>
+                    </>
+                  ) : (
+                    <>
+                      <IonItem>
+                        <IonLabel position="stacked">Correo Electrónico</IonLabel>
+                        <IonInput disabled value={email} />
+                      </IonItem>
+                      {isExisting && (
+                        <div className="ion-padding-top ion-padding-bottom">
+                          <IonBadge color="warning" className="ion-padding">Usuario existente. Se enviará invitación.</IonBadge>
+                        </div>
+                      )}
+                      <IonItem>
+                        <IonLabel position="stacked">Nombre de Usuario</IonLabel>
+                        <IonInput disabled={isExisting} value={username} onIonInput={e => setUsername(e.detail.value!)} placeholder="Ej. juan_cajero" />
+                      </IonItem>
+                      {!isExisting && (
+                        <IonItem>
+                          <IonLabel position="stacked">Contraseña</IonLabel>
+                          <IonInput type="password" value={password} onIonInput={e => setPassword(e.detail.value!)} placeholder="***" />
+                        </IonItem>
+                      )}
+                      <IonItem>
+                        <IonLabel position="stacked">Rol / Permiso</IonLabel>
+                        <IonSelect value={role} onIonChange={e => setRole(e.detail.value)}>
+                          <IonSelectOption value={UserRole.ADMIN}>Administrador</IonSelectOption>
+                          <IonSelectOption value={UserRole.POS}>Cajero (POS)</IonSelectOption>
+                          <IonSelectOption value={UserRole.KITCHEN}>Cocina (KITCHEN)</IonSelectOption>
+                          <IonSelectOption value={UserRole.DELIVERY}>Repartidor (DELIVERY)</IonSelectOption>
+                          <IonSelectOption value={UserRole.INVENTORY}>Reabastecedor (INVENTORY)</IonSelectOption>
+                        </IonSelect>
+                      </IonItem>
+                      <IonButton expand="block" color="primary" className="ion-margin-top" onClick={handleCreate}>
+                        {isExisting ? 'Invitar Usuario' : 'Crear Usuario'}
+                      </IonButton>
+                      <IonButton expand="block" fill="clear" color="medium" onClick={resetForm}>
+                        Cancelar
+                      </IonButton>
+                    </>
+                  )}
                 </IonCardContent>
               </IonCard>
             </IonCol>
@@ -127,17 +187,25 @@ const Users: React.FC = () => {
                       <thead>
                         <tr>
                           <th>Usuario</th>
+                          <th>Correo</th>
                           <th>Rol</th>
+                          <th>Estado</th>
                           <th>Fecha de Creación</th>
                           <th>Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {users.map(u => (
+                        {users.map((u: any) => (
                           <tr key={u.id}>
                             <td><strong>{u.username}</strong></td>
+                            <td>{u.email}</td>
                             <td>
                               <IonBadge color={u.role === UserRole.ADMIN ? 'danger' : 'primary'}>{u.role}</IonBadge>
+                            </td>
+                            <td>
+                              <IonBadge color={u.status === 'PENDING' ? 'warning' : 'success'}>
+                                {u.status === 'PENDING' ? 'Invitado' : 'Activo'}
+                              </IonBadge>
                             </td>
                             <td>{new Date(u.createdAt).toLocaleDateString()}</td>
                             <td>

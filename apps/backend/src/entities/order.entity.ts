@@ -21,6 +21,9 @@ export class Order {
   @Column({ nullable: true })
   notes: string;
 
+  @Column({ nullable: true })
+  tableNumber: string;
+
   @Index()
   @Column({
     type: 'enum',
@@ -89,12 +92,9 @@ export class Order {
   @Column({ nullable: true }) // Temporarily nullable for safe migration
   tenantId: string;
 
-}
-
   @Column('float', { default: 0 })
   abonosTotal: number;
 
   @Column('json', { nullable: true })
   abonosHistory: any;
 }
-

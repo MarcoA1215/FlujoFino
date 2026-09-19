@@ -1,4 +1,4 @@
-﻿import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { apiClient } from '../api/client';
 import { UserRole } from '@nutrideli/shared-types';
@@ -7,12 +7,15 @@ interface User {
   id: string;
   username: string;
   role: UserRole;
+  tenantId?: string;
+  tenantName?: string;
+  workspaces?: any[];
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (token: string, user: User) => void;
+  login: (token: string, user: User, workspaces?: any[]) => void;
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -37,12 +40,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(false);
   }, []);
 
-  const login = (newToken: string, newUser: User) => {
-    setToken(newToken);
-    setUser(newUser);
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(newUser));
-    apiClient.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+  const login = (token: string, user: User, workspaces?: any[]) => {
+    const fullUserData = { ...user, workspaces: workspaces || user.workspaces };
+    setToken(token);
+    setUser(fullUserData);
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(fullUserData));
+    apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   };
 
   const logout = () => {

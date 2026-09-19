@@ -1,6 +1,7 @@
-﻿export enum OrderStatus {
+export enum OrderStatus {
   PENDING = 'PENDING',
   PREPARING = 'PREPARING',
+  PARTIALLY_DELIVERED = 'PARTIALLY_DELIVERED',
   DELIVERED = 'DELIVERED',
   CANCELED = 'CANCELED',
 }
@@ -77,6 +78,7 @@ export interface OrderItemDTO {
   id?: string;
   productId: string;
   quantity: number;
+  deliveredQuantity?: number;
   unitPrice: number;
   subtotal: number;
 }
@@ -102,4 +104,45 @@ export enum UserRole {
   POS = 'POS',
   DELIVERY = 'DELIVERY',
   INVENTORY = 'INVENTORY'
+}
+
+export enum ReservationStatus {
+  PENDING = 'PENDING',
+  CONFIRMED = 'CONFIRMED',
+  COMPLETED = 'COMPLETED',
+  CANCELED = 'CANCELED',
+}
+
+export interface ReservationDTO {
+  id?: string;
+  customerName: string;
+  customerPhone?: string;
+  date: string;
+  time: string;
+  numberOfPeople?: number; // Optional now, since we have services
+  serviceId?: string; // New field for service-based booking
+  serviceName?: string;
+  tableNumber?: string;
+  status: ReservationStatus;
+  paymentStatus: PaymentStatus;
+  totalAmount?: number;
+  abonosTotal?: number;
+  notes?: string;
+}
+
+export interface BusinessHourDay {
+  isOpen: boolean;
+  startTime: string; // e.g. "09:00"
+  endTime: string;   // e.g. "18:00"
+}
+
+export interface BusinessHours {
+  [day: string]: BusinessHourDay; // '0' = Sunday, '1' = Monday, etc.
+}
+
+export interface BookingServiceDTO {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  price?: number;
 }

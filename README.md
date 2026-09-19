@@ -1,4 +1,4 @@
-﻿# Flujo Fino - SaaS POS & ERP Multi-Sucursal
+# Flujo Fino - SaaS POS & ERP Multi-Sucursal
 
 Plataforma de Punto de Venta (POS) y Gestión de Producción (ERP) diseñada bajo una arquitectura Multi-Tenant (Software as a Service) para franquicias y múltiples sucursales.
 
@@ -18,42 +18,38 @@ Para levantar este entorno en desarrollo, necesitas tener instalado:
 
 **1. Instalar dependencias globales**
 En la raíz del proyecto, ejecuta:
-`ash
+```bash
 yarn install
-`
+```
 
 **2. Configurar Variables de Entorno (Backend)**
-Ve a la carpeta pps/backend y copia el archivo .env.template a .env con las credenciales de tu base de datos:
-`env
-DB_HOST=localhost
-DB_PORT=5432
-DB_USERNAME=postgres
-DB_PASSWORD=tu_clave_postgres
-DB_DATABASE=flujo_fino_db
-JWT_SECRET=tu_secreto_super_seguro_jwt
-PORT=3000
-`
+Ve a la carpeta  pps/backend y copia el archivo .env.template a .env con las credenciales de tu base de datos:
+```env
+DATABASE_URL="postgresql://user:password@host:port/database"
+JWT_SECRET="tu_secreto_super_seguro_jwt"
+COTIZAVE_API_KEY="tu_api_key_de_cotizave"
+```
 
 **3. Configurar Variables de Entorno (Frontend)**
 Ve a la carpeta pps/frontend y copia el archivo .env.template a .env:
-`env
+```env
 VITE_API_URL=http://localhost:3000
-`
+```
 
 ## 💻 Levantar el Entorno de Desarrollo (Local)
 
 Para desarrollar, necesitas levantar ambos servidores en terminales separadas:
 
 **Terminal 1 (Backend):**
-`ash
+```bash
 cd apps/backend
 yarn start:dev
-`
+```
 
 **Terminal 2 (Frontend):**
-`ash
+```bash
 cd apps/frontend
 yarn dev
-`
+```
 
 La aplicación web estará disponible en http://localhost:5173.

@@ -21,6 +21,26 @@ export class Settings {
   @Column('boolean', { default: false })
   allowPartialPayments: boolean;
 
+  // Feature Flags / Onboarding
+  @Column('boolean', { default: false })
+  featureCustomerSchedules: boolean;
+
+  @Column('boolean', { default: false })
+  featureRecipes: boolean;
+
+  @Column('boolean', { default: false })
+  featureBuySell: boolean;
+
+  // --- Booking Configuration ---
+  @Column('jsonb', { nullable: true })
+  businessHours: any;
+
+  @Column('jsonb', { nullable: true })
+  services: any;
+
+  @Column('int', { default: 30 })
+  slotInterval: number; // e.g. 15, 30, 60 minutes
+
   @ManyToOne(() => Tenant)
   @JoinColumn({ name: 'tenantId' })
   tenant: Tenant;

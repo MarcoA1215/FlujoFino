@@ -13,6 +13,7 @@ export class CreateOrderDto {
   customerPhone?: string;
   customerAddress?: string;
   notes?: string;
+  tableNumber?: string;
   paymentStatus: PaymentStatus;
   deliveryMethod?: DeliveryMethod;
   deliveryZoneId?: string;
@@ -117,6 +118,7 @@ export class OrdersService {
         customerPhone: dto.customerPhone || '',
         customerAddress: dto.customerAddress || '',
         notes: dto.notes || '',
+        tableNumber: dto.tableNumber || '',
         paymentStatus: dto.paymentStatus,
         status: initialStatus,
         deliveryMethod: dto.deliveryMethod || DeliveryMethod.IN_STORE,
@@ -328,6 +330,7 @@ export class OrdersService {
     dto.customerPhone = order.customerPhone;
     dto.customerAddress = order.customerAddress;
     dto.notes = order.notes;
+    dto.tableNumber = order.tableNumber;
     dto.paymentStatus = order.paymentStatus === PaymentStatus.REFUNDED ? PaymentStatus.PAID : order.paymentStatus;
     dto.deliveryMethod = order.deliveryMethod;
     dto.deliveryZoneId = order.deliveryZoneId;

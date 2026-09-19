@@ -1,4 +1,4 @@
-/* Vibrant but Professional Color Palette (Green, Blue, White) */
+﻿/* Vibrant but Professional Color Palette (Green, Blue, White) */
 :root {
   /* Primary - Vibrant Blue */
   --ion-color-primary: #2563EB;
@@ -76,47 +76,56 @@ ion-badge, ion-button, th, td, ion-card-title, h1, h2, h3, p {
   word-break: normal !important;
   overflow-wrap: break-word !important;
 }
-.ion-text-wrap {
-  word-break: normal !important;
+
+/* FullCalendar Ionic Fixes */
+.fc table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+}
+.fc th, .fc td {
+  padding: 0;
+  vertical-align: top;
+}
+.fc .fc-scrollgrid-sync-table {
+  width: 100% !important;
+}
+.fc .fc-view-harness {
+  background-color: white;
 }
 
-/* Action Sheet Colors (Color Psychology) */
-.action-sheet-comprar {
-  color: var(--ion-color-success) !important;
-}
-.action-sheet-comprar .action-sheet-icon {
-  color: var(--ion-color-success) !important;
+.fc-wrapper { display: block; width: 100%; background: white; padding: 10px; border-radius: 8px; }
+.fc { --fc-page-bg-color: #fff; }
+
+/* Android Calendar Mobile Design */
+@media (max-width: 768px) {
+  /* Minimal header */
+  .fc .fc-toolbar.fc-header-toolbar {
+    margin-bottom: 0.5em !important;
+  }
+  .fc-toolbar-chunk:first-child {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+  }
+  .fc .fc-toolbar-title {
+    font-size: 1.2rem !important;
+    font-weight: bold;
+    text-transform: capitalize;
+  }
+  
+  /* Hide the desktop view buttons */
+  .fc-toolbar-chunk:nth-child(2), .fc-toolbar-chunk:nth-child(3) {
+    display: none !important;
+  }
+  
+  /* Soft borders */
+  .fc-theme-standard td, .fc-theme-standard th {
+    border-color: #f0f0f0 !important;
+  }
+  
+  /* Expand slot height */
+  .fc-timegrid-slot {
+    height: 3.5em !important;
+  }
 }
 
-.action-sheet-editar {
-  color: var(--ion-color-primary) !important;
-}
-.action-sheet-editar .action-sheet-icon {
-  color: var(--ion-color-primary) !important;
-}
-
-.action-sheet-cambiar {
-  color: var(--ion-color-tertiary) !important;
-}
-.action-sheet-cambiar .action-sheet-icon {
-  color: var(--ion-color-tertiary) !important;
-}
-
-.action-sheet-desarmar {
-  color: var(--ion-color-warning) !important;
-}
-.action-sheet-desarmar .action-sheet-icon {
-  color: var(--ion-color-warning) !important;
-}
-
-.action-sheet-eliminar {
-  color: var(--ion-color-danger) !important;
-}
-.action-sheet-eliminar .action-sheet-icon {
-  color: var(--ion-color-danger) !important;
-}
-
-/* Rounded Searchbars */
-ion-searchbar {
-  --border-radius: 20px !important;
-}

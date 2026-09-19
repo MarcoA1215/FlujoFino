@@ -321,6 +321,7 @@ const getStatusColor = (status: OrderStatus) => {
   <div>
     <IonCardTitle>{order.customerName}</IonCardTitle>
     <IonCardSubtitle>{new Date(order.createdAt).toLocaleString()}</IonCardSubtitle>
+    {order.tableNumber && (<IonBadge color="primary" style={{ marginTop: '5px' }}>{order.tableNumber}</IonBadge>)}
   </div>
   <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '5px' }}>
     <IonButton fill="clear" size="small" onClick={() => handleCopyOrder(order)}>

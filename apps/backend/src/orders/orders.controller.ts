@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Patch, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, Delete, Put } from '@nestjs/common';
 import { OrdersService, CreateOrderDto, UpdatePaymentDto } from './orders.service';
 import { OrderStatus } from '@nutrideli/shared-types';
 
@@ -39,6 +39,16 @@ export class OrdersController {
   @Post(':id/clone')
   clone(@Param('id') id: string) {
     return this.ordersService.cloneOrder(id);
+  }
+
+  @Put(':id')
+  editOrder(@Param('id') id: string, @Body() dto: CreateOrderDto) {
+    return this.ordersService.editOrder(id, dto);
+  }
+
+  @Post(':id/deliver-partial')
+  deliverPartial(@Param('id') id: string, @Body('deliveries') deliveries: { orderItemId: string, quantityToDeliver: number }[]) {
+    return this.ordersService.deliverPartial(id, deliveries);
   }
 
   @Get('auto-allocate')

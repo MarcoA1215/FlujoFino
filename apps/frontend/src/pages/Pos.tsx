@@ -28,6 +28,7 @@ const Pos: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [tableNumber, setTableNumber] = useState('');
   
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('PAGO_MOVIL');
   const [exchangeRate, setExchangeRate] = useState<number>(40.0);
@@ -91,6 +92,34 @@ const Pos: React.FC = () => {
           localStorage.removeItem('calculator_zone');
         }
       } catch (e) {}
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const resId = urlParams.get('reservationId');
+    if (resId) {
+      apiClient.get(`/reservations`).then(res => {
+        const found = res.data.find((r: any) => r.id === resId);
+        if (found) {
+          setCustomerName(found.customerName);
+          setCustomerPhone(found.customerPhone || '');
+          setTableNumber(found.tableNumber || '');
+          setPaymentMethod('PENDING');
+          if (found.abonosTotal && found.abonosTotal > 0) {
+            setInitialAbono(found.abonosTotal.toString());
+          }
+          
+          if (found.serviceName) {
+            apiClient.get('/products').then(pres => {
+              const prod = pres.data.find((p: any) => p.name === found.serviceName);
+              if (prod) {
+                setCart([{ product: prod, quantity: 1 }]);
+              } else {
+                presentToast({ message: 'El servicio no se encontró en los productos. Sincroniza configuraciones.', duration: 4000, color: 'warning' });
+              }
+            });
+          }
+        }
+      }).catch(() => {});
     }
   }, []);
 
@@ -159,6 +188,7 @@ const Pos: React.FC = () => {
       await apiClient.post('/orders', {
         customerName,
         customerPhone,
+        tableNumber,
         paymentStatus: paymentMethod === 'PENDING' ? PaymentStatus.PENDING : PaymentStatus.PAID,
         notes,
         pagoMovilRef: paymentMethod === 'PAGO_MOVIL' ? pagoMovilRef : undefined,
@@ -178,6 +208,7 @@ const Pos: React.FC = () => {
       setCart([]);
       setCustomerName('');
       setCustomerPhone('');
+      setTableNumber('');
       setCustomerAddress('');
       setInitialAbono('');
       setPagoMovilRef('');
@@ -275,6 +306,15 @@ const Pos: React.FC = () => {
                     />
                   </IonItem>
 
+                  <IonItem className="ion-margin-bottom">
+                    <IonLabel position="stacked">Mesa / Taburete (Opcional)</IonLabel>
+                    <IonInput 
+                      value={tableNumber} 
+                      onIonInput={e => setTableNumber(e.detail.value!)} 
+                      placeholder="Ej. Mesa 5" 
+                    />
+                  </IonItem>
+
                   
                   <IonItem className="ion-margin-bottom">
                     <IonLabel position="stacked">Método de Entrega</IonLabel>
@@ -312,9 +352,19 @@ const Pos: React.FC = () => {
                     <IonSelect value={paymentMethod} onIonChange={e => setPaymentMethod(e.detail.value)}>
                       <IonSelectOption value="PAGO_MOVIL">Pago Móvil Confirmado</IonSelectOption>
                       <IonSelectOption value="USD">Divisas (USD Efectivo)</IonSelectOption>
-                      <IonSelectOption value="PENDING">Por Pagar</IonSelectOption>
+                      <IonSelectOption value="PENDING">Por Pagar / Cuenta Abierta</IonSelectOption>
                     </IonSelect>
                   </IonItem>
+
+                  {paymentMethod === 'PENDING' && (
+                    <div style={{ background: '#e9ecef', padding: '10px', borderRadius: '8px', marginBottom: '15px' }}>
+                      <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: '#495057' }}>Abono Inicial (Opcional)</h4>
+                      <IonItem color="light">
+                        <IonLabel position="stacked">Monto (USD)</IonLabel>
+                        <IonInput type="number" value={initialAbono} onIonInput={e => setInitialAbono(e.detail.value!)} placeholder="Ej. 10.00" />
+                      </IonItem>
+                    </div>
+                  )}
 
                   {paymentMethod === 'PAGO_MOVIL' && (
                     <div style={{ background: '#f4f5f8', padding: '10px', borderRadius: '8px', marginBottom: '15px' }}>

@@ -1,4 +1,4 @@
-﻿import React, { useState, useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import { IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonButton, useIonToast } from '@ionic/react';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
@@ -14,8 +14,8 @@ const Login: React.FC = () => {
   const handleLogin = async () => {
     try {
       const res = await apiClient.post('/auth/login', { username, password });
-      login(res.data.access_token, res.data.user);
-      router.push('/', 'root', 'replace');
+      login(res.data.access_token, res.data.user, res.data.workspaces);
+      
     } catch (e: any) {
       presentToast({ message: 'Error: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
     }
@@ -27,13 +27,15 @@ const Login: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
           <IonCard style={{ width: '100%', maxWidth: '400px' }}>
             <IonCardHeader className="ion-text-center">
-              <img src="/assets/logo.png" alt="Nutri Deli" style={{ maxWidth: '200px', margin: '0 auto 15px auto', display: 'block' }} />
-              <IonCardTitle>Iniciar Sesión</IonCardTitle>
-              <p style={{ margin: '5px 0 0 0', color: 'gray' }}>Sistema de Gestión</p>
+              <div style={{ width: '60px', height: '60px', background: 'var(--ion-color-primary)', color: 'white', borderRadius: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '36px', fontWeight: '900', margin: '0 auto 15px auto', boxShadow: '0 4px 10px rgba(0,0,0,0.15)' }}>
+                F
+              </div>
+              <IonCardTitle style={{ fontWeight: 'bold' }}>Flujo Fino</IonCardTitle>
+              <p style={{ margin: '5px 0 0 0', color: 'gray' }}>Iniciar Sesión</p>
             </IonCardHeader>
             <IonCardContent>
               <IonItem>
-                <IonLabel position="stacked">Usuario</IonLabel>
+                <IonLabel position="stacked">Usuario o Correo</IonLabel>
                 <IonInput value={username} onIonInput={e => setUsername(e.detail.value!)} onKeyPress={e => e.key === 'Enter' && handleLogin()} />
               </IonItem>
               <IonItem>
@@ -44,7 +46,13 @@ const Login: React.FC = () => {
                 Entrar
               </IonButton>
               
-        </IonCardContent>
+              <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                <p style={{ color: 'gray', fontSize: '14px', margin: 0 }}>¿No tienes cuenta?</p>
+                <IonButton fill="clear" color="primary" onClick={() => router.push('/register', 'forward')} style={{ marginTop: '5px' }}>
+                  Registra tu negocio
+                </IonButton>
+              </div>
+            </IonCardContent>
           </IonCard>
         </div>
       </IonContent>

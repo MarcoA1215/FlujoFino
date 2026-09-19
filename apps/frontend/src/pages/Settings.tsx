@@ -4,12 +4,20 @@ import { saveOutline, refreshOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
+import { BookingSettings } from '../components/BookingSettings';
 
 interface Settings {
   companyBank?: string;
   companyCedula?: string;
   companyPhone?: string;
   allowPartialPayments?: boolean;
+  featureCustomerSchedules?: boolean;
+  featureRecipes?: boolean;
+  featureBuySell?: boolean;
+  publicToken?: string;
+  businessHours?: any;
+  services?: any[];
+  slotInterval?: number;
 }
 
 const SettingsPage: React.FC = () => {
@@ -38,7 +46,13 @@ const SettingsPage: React.FC = () => {
           companyBank: settings.companyBank, 
           companyCedula: settings.companyCedula, 
           companyPhone: settings.companyPhone,
-          allowPartialPayments: settings.allowPartialPayments
+          allowPartialPayments: settings.allowPartialPayments,
+          featureCustomerSchedules: settings.featureCustomerSchedules,
+          featureRecipes: settings.featureRecipes,
+          featureBuySell: settings.featureBuySell,
+          businessHours: settings.businessHours,
+          services: settings.services,
+          slotInterval: settings.slotInterval
         });
       presentToast({ message: 'Ajustes guardados', duration: 2000, color: 'success' });
       fetchSettings();
@@ -109,15 +123,81 @@ const SettingsPage: React.FC = () => {
                     <IonLabel>Permitir Pagos Parciales (Abonos)</IonLabel>
                     <IonToggle checked={settings.allowPartialPayments || false} onIonChange={e => setSettings({...settings, allowPartialPayments: e.detail.checked})} />
                   </IonItem>
-                  <IonButton expand="block" color="primary" onClick={handleSaveSettings} style={{marginTop: '25px'}}>
-                    <IonIcon slot="start" icon={saveOutline} />
-                    Guardar Ajustes
-                  </IonButton>
                 </IonCardContent>
               </IonCard>
             </IonCol>
           </IonRow>
+          
+          <IonRow>
+            <IonCol size="12">
+              <IonCard>
+                <IonCardHeader>
+                  <IonCardTitle>Módulos Activos</IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  <p style={{marginBottom: '15px'}}>Habilita o deshabilita funcionalidades de tu sucursal según el tipo de negocio.</p>
+                  
+                  <IonItem>
+                    <IonLabel className="ion-text-wrap">Control de Horarios (Clientes / Empleados)</IonLabel>
+                    <IonToggle checked={settings.featureCustomerSchedules || false} onIonChange={e => setSettings({...settings, featureCustomerSchedules: e.detail.checked})} />
+                  </IonItem>
+                  <IonItem>
+                    <IonLabel className="ion-text-wrap">Fórmulas y Control de Insumos (Despiece de materiales para servicios o productos)</IonLabel>
+                    <IonToggle checked={settings.featureRecipes || false} onIonChange={e => setSettings({...settings, featureRecipes: e.detail.checked})} />
+                  </IonItem>
+                  <IonItem>
+                    <IonLabel className="ion-text-wrap">Compra-Venta Directa (Retail)</IonLabel>
+                    <IonToggle checked={settings.featureBuySell || false} onIonChange={e => setSettings({...settings, featureBuySell: e.detail.checked})} />
+                  </IonItem>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
+          </IonRow>
+
+          {settings.featureCustomerSchedules && (
+            <BookingSettings settings={settings} setSettings={setSettings} />
+          )}
+
+          {settings.featureCustomerSchedules && (
+            <IonRow>
+              <IonCol size="12">
+                <IonCard>
+                  <IonCardContent>
+                    <div style={{ padding: '15px', backgroundColor: 'var(--ion-color-light)', borderRadius: '8px' }}>
+                      <h3 style={{ margin: '0 0 10px 0' }}>Enlace Público de Reservaciones</h3>
+                      <p style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#666' }}>
+                        Comparte este enlace con tus clientes en WhatsApp o Instagram para que puedan reservar directamente sin iniciar sesión.
+                      </p>
+                      <IonInput 
+                        readonly 
+                        value={`${window.location.origin}/book/${settings.publicToken || user?.tenantId}`} 
+                        style={{ backgroundColor: 'white', padding: '10px', borderRadius: '4px', marginBottom: '10px' }} 
+                      />
+                      <IonButton 
+                        size="small" 
+                        color="secondary" 
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/book/${settings.publicToken || user?.tenantId}`);
+                          presentToast({ message: '¡Enlace copiado!', duration: 2000, color: 'success' });
+                        }}
+                      >
+                        Copiar Enlace
+                      </IonButton>
+                    </div>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+            </IonRow>
+          )}
+
         </IonGrid>
+        
+        <div style={{ padding: '0 10px 20px 10px' }}>
+          <IonButton expand="block" color="primary" onClick={handleSaveSettings} style={{ margin: 0, height: '50px' }}>
+            <IonIcon slot="start" icon={saveOutline} />
+            Guardar Todos los Ajustes
+          </IonButton>
+        </div>
       </IonContent>
     </IonPage>
   );

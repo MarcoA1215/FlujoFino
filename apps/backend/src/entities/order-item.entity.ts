@@ -19,6 +19,9 @@ export class OrderItem {
   @Column('int')
   quantity: number;
 
+  @Column('int', { default: 0 })
+  deliveredQuantity: number;
+
   @Column('float')
   unitPrice: number;
 

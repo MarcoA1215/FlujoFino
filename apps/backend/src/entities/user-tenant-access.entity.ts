@@ -1,7 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { User } from './user.entity';
 import { Tenant } from './tenant.entity';
 import { UserRole } from '@nutrideli/shared-types';
+import { WorkSchedule } from './work-schedule.entity';
 
 @Entity()
 export class UserTenantAccess {
@@ -27,4 +28,10 @@ export class UserTenantAccess {
 
   @Column({ default: true })
   isActive: boolean;
+
+  @Column({ type: 'varchar', default: 'ACCEPTED' }) // 'PENDING', 'ACCEPTED', 'REJECTED'
+  status: string;
+
+  @OneToMany(() => WorkSchedule, ws => ws.userTenantAccess)
+  workSchedules: WorkSchedule[];
 }

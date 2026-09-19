@@ -1,7 +1,8 @@
-﻿import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Settings } from '../entities/settings.entity';
+import { Product } from '../entities/product.entity';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
@@ -11,6 +12,8 @@ export class SettingsService implements OnModuleInit {
   constructor(
     @InjectRepository(Settings)
     private settingsRepo: Repository<Settings>,
+    @InjectRepository(Product)
+    private productRepo: Repository<Product>,
     private configService: ConfigService,
   ) {}
 
@@ -27,14 +30,66 @@ export class SettingsService implements OnModuleInit {
     setTimeout(() => this.syncCotizave(), 5000);
   }
 
-  async getSettings() {
-    const settings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
-    return settings || { exchangeRateBs: 40.0 };
+  async getSettings(tenantId?: string) {
+    if (tenantId) {
+      const tenantSettings = await this.settingsRepo.findOne({ where: { tenantId } });
+      if (tenantSettings) {
+        const { encodeTenantId } = require('../utils/tenant-crypto');
+        return { ...tenantSettings, publicToken: encodeTenantId(tenantId) };
+      }
+    }
+    const globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+    return globalSettings || { exchangeRateBs: 40.0 };
   }
 
-  async updateSettings(dto: Partial<Settings>) {
-    await this.settingsRepo.update('GLOBAL', dto);
-    return this.getSettings();
+  async updateSettings(tenantId: string | undefined, payload: Partial<Settings>) {
+    let settings;
+    if (tenantId) {
+      settings = await this.settingsRepo.findOne({ where: { tenantId } });
+      if (!settings) {
+        const { randomUUID } = require('crypto');
+        settings = this.settingsRepo.create({ id: randomUUID(), tenantId });
+      }
+    } else {
+      settings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+      if (!settings) {
+        settings = this.settingsRepo.create({ id: 'GLOBAL' });
+      }
+    }
+    
+    if (payload.exchangeRateBs !== undefined) settings.exchangeRateBs = payload.exchangeRateBs;
+    if (payload.companyBank !== undefined) settings.companyBank = payload.companyBank;
+    if (payload.companyCedula !== undefined) settings.companyCedula = payload.companyCedula;
+    if (payload.companyPhone !== undefined) settings.companyPhone = payload.companyPhone;
+    if (payload.allowPartialPayments !== undefined) settings.allowPartialPayments = payload.allowPartialPayments;
+    
+    if (payload.featureCustomerSchedules !== undefined) settings.featureCustomerSchedules = payload.featureCustomerSchedules;
+    if (payload.featureRecipes !== undefined) settings.featureRecipes = payload.featureRecipes;
+    if (payload.featureBuySell !== undefined) settings.featureBuySell = payload.featureBuySell;
+
+    if (payload.businessHours !== undefined) settings.businessHours = payload.businessHours;
+    if (payload.services !== undefined) {
+      settings.services = payload.services;
+      // Sincronizar como productos para POS
+      for (const svc of payload.services) {
+        let p = await this.productRepo.findOne({ where: { name: svc.name, tenantId: tenantId || 'GLOBAL' } });
+        if (!p) {
+          p = this.productRepo.create({ 
+            name: svc.name, 
+            category: 'Servicios', 
+            salePrice: svc.price, 
+            tenantId: tenantId || 'GLOBAL' 
+          });
+        } else {
+          p.salePrice = svc.price;
+        }
+        await this.productRepo.save(p);
+      }
+    }
+    if (payload.slotInterval !== undefined) settings.slotInterval = payload.slotInterval;
+
+    await this.settingsRepo.save(settings);
+    return this.getSettings(tenantId);
   }
 
   async getExchangeRate() {
