@@ -20,19 +20,23 @@ export class DashboardService {
     @InjectRepository(OperatingExpense) private expenseRepo: Repository<OperatingExpense>
   ) {}
 
-  async getSummary() {
-    const rawMaterials = await this.rawMaterialRepo.find();
+  async getSummary(tenantId: string) {
+    const rawMaterials = await this.rawMaterialRepo.find({ where: { tenantId } });
     const products = await this.productRepo.find({
+      where: { tenantId },
       relations: { recipe: { rawMaterial: true } }
     });
-    const movements = await this.movementRepo.find();
+    const movements = await this.movementRepo.find({
+      relations: { rawMaterial: true },
+      where: { rawMaterial: { tenantId } } // Since stock movement is related to rawMaterial, we filter through relation
+    });
     
     // Solo tomamos en cuenta pedidos que no están cancelados
     const orders = await this.orderRepo.find({
       where: [
-        { status: OrderStatus.PENDING },
-        { status: OrderStatus.PREPARING },
-        { status: OrderStatus.DELIVERED }
+        { status: OrderStatus.PENDING, tenantId },
+        { status: OrderStatus.PREPARING, tenantId },
+        { status: OrderStatus.DELIVERED, tenantId }
       ],
       relations: { items: { product: true } },
       withDeleted: true
@@ -104,7 +108,7 @@ export class DashboardService {
 
     const historicalRevenue = orders.reduce((acc, o) => acc + o.totalAmount, 0);
     
-    const expenses = await this.expenseRepo.find();
+    const expenses = await this.expenseRepo.find({ where: { tenantId } });
     const payrollExpenses = expenses
       .filter(e => e.category === 'PAYROLL')
       .reduce((acc, e) => acc + e.amount, 0);

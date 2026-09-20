@@ -1,64 +1,53 @@
-import { Controller, Get, Post, Body, Param, Patch, Delete, Put } from '@nestjs/common';
+import { Controller, Request, Get, Post, Body, Param, Patch, Delete, Put } from '@nestjs/common';
 import { OrdersService, CreateOrderDto, UpdatePaymentDto } from './orders.service';
 import { OrderStatus } from '@nutrideli/shared-types';
 
 @Controller('orders')
 export class OrdersController {
   @Post(':id/abono')
-  addAbono(@Param('id') id: string, @Body('amount') amount: number) {
-    return this.ordersService.addAbono(id, amount);
-  }
+  addAbono(@Request() req: any, @Param('id') id: string, @Body('amount') amount: number) {
+    return this.ordersService.addAbono(req.user.tenantId, id, amount);}
 
   @Delete(':id/abono/:index')
-  revertAbono(@Param('id') id: string, @Param('index') index: string) {
-    return this.ordersService.revertAbono(id, parseInt(index, 10));
-  }
+  revertAbono(@Request() req: any, @Param('id') id: string, @Param('index') index: string) {
+    return this.ordersService.revertAbono(req.user.tenantId, id, parseInt(index, 10));}
 
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
-  createOrder(@Body() dto: CreateOrderDto) {
-    return this.ordersService.createOrder(dto);
-  }
+  createOrder(@Request() req: any, @Body() dto: CreateOrderDto) {
+    return this.ordersService.createOrder(req.user.tenantId, dto);}
 
   @Get()
-  getAllOrders() {
-    return this.ordersService.getAllOrders();
-  }
+  getAllOrders(@Request() req: any) {
+    return this.ordersService.getAllOrders(req.user.tenantId);}
 
   @Get(':id')
-  getOrderById(@Param('id') id: string) {
-    return this.ordersService.getOrderById(id);
-  }
+  getOrderById(@Request() req: any, @Param('id') id: string) {
+    return this.ordersService.getOrderById(req.user.tenantId, id);}
 
   @Patch(':id/payment')
-  updatePaymentStatus(@Param('id') id: string, @Body() dto: UpdatePaymentDto) {
-    return this.ordersService.updatePaymentStatus(id, dto);
-  }
+  updatePaymentStatus(@Request() req: any, @Param('id') id: string, @Body() dto: UpdatePaymentDto) {
+    return this.ordersService.updatePaymentStatus(req.user.tenantId, id, dto);}
 
   @Patch(':id/status')
-  updateOrderStatus(@Param('id') id: string, @Body('status') status: OrderStatus) {
-    return this.ordersService.updateOrderStatus(id, status);
-  }
+  updateOrderStatus(@Request() req: any, @Param('id') id: string, @Body('status') status: OrderStatus) {
+    return this.ordersService.updateOrderStatus(req.user.tenantId, id, status);}
 
   @Post(':id/clone')
-  clone(@Param('id') id: string) {
-    return this.ordersService.cloneOrder(id);
-  }
+  clone(@Request() req: any, @Param('id') id: string) {
+    return this.ordersService.cloneOrder(req.user.tenantId, id);}
 
   @Put(':id')
-  editOrder(@Param('id') id: string, @Body() dto: CreateOrderDto) {
-    return this.ordersService.editOrder(id, dto);
-  }
+  editOrder(@Request() req: any, @Param('id') id: string, @Body() dto: CreateOrderDto) {
+    return this.ordersService.editOrder(req.user.tenantId, id, dto);}
 
   @Post(':id/deliver-partial')
-  deliverPartial(@Param('id') id: string, @Body('deliveries') deliveries: { orderItemId: string, quantityToDeliver: number }[]) {
-    return this.ordersService.deliverPartial(id, deliveries);
-  }
+  deliverPartial(@Request() req: any, @Param('id') id: string, @Body('deliveries') deliveries: { orderItemId: string, quantityToDeliver: number }[]) {
+    return this.ordersService.deliverPartial(req.user.tenantId, id, deliveries);}
 
   @Get('auto-allocate')
-  autoAllocate() {
-    return this.ordersService.autoAllocatePhysicalStock();
-  }
+  autoAllocate(@Request() req: any) {
+    return this.ordersService.autoAllocatePhysicalStock(req.user.tenantId);}
 
 }

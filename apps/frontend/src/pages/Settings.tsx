@@ -18,6 +18,8 @@ interface Settings {
   businessHours?: any;
   services?: any[];
   slotInterval?: number;
+  themePrimaryColor?: string;
+  themeHeaderColor?: string;
 }
 
 const SettingsPage: React.FC = () => {
@@ -52,9 +54,12 @@ const SettingsPage: React.FC = () => {
           featureBuySell: settings.featureBuySell,
           businessHours: settings.businessHours,
           services: settings.services,
-          slotInterval: settings.slotInterval
+          slotInterval: settings.slotInterval,
+          themePrimaryColor: settings.themePrimaryColor,
+          themeHeaderColor: settings.themeHeaderColor
         });
-      presentToast({ message: 'Ajustes guardados', duration: 2000, color: 'success' });
+        presentToast({
+          message: 'Configuración guardada', duration: 2000, color: 'success' });
       fetchSettings();
     } catch(e: any) {
       presentToast({ message: 'Error guardando ajustes', duration: 3000, color: 'danger' });
@@ -148,6 +153,28 @@ const SettingsPage: React.FC = () => {
                   <IonItem>
                     <IonLabel className="ion-text-wrap">Compra-Venta Directa (Retail)</IonLabel>
                     <IonToggle checked={settings.featureBuySell || false} onIonChange={e => setSettings({...settings, featureBuySell: e.detail.checked})} />
+                  </IonItem>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
+          </IonRow>
+
+          <IonRow>
+            <IonCol size="12">
+              <IonCard>
+                <IonCardHeader>
+                  <IonCardTitle>Personalización de Interfaz</IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  <p style={{marginBottom: '15px'}}>Cambia los colores base de tu sucursal para que coincidan con tu marca.</p>
+                  
+                  <IonItem>
+                    <IonLabel position="stacked">Color Principal (Menú y Botones)</IonLabel>
+                    <IonInput type="text" placeholder="#1E293B" value={settings.themePrimaryColor || ''} onIonChange={e => setSettings({...settings, themePrimaryColor: e.detail.value!})} />
+                  </IonItem>
+                  <IonItem>
+                    <IonLabel position="stacked">Color Encabezados (Superior)</IonLabel>
+                    <IonInput type="text" placeholder="#334155" value={settings.themeHeaderColor || ''} onIonChange={e => setSettings({...settings, themeHeaderColor: e.detail.value!})} />
                   </IonItem>
                 </IonCardContent>
               </IonCard>

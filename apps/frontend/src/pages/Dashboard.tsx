@@ -12,7 +12,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 
 const Dashboard: React.FC = () => {
   const { user } = useContext(AuthContext);
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);`n  const [settings, setSettings] = useState<any>({});
   const [presentToast] = useIonToast();
 
   const fetchSummary = async () => {
@@ -26,7 +26,7 @@ const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchSummary();
+    fetchSummary(); apiClient.get('/settings').then(res => setSettings(res.data));
   }, []);
 
   return (
@@ -185,73 +185,75 @@ const Dashboard: React.FC = () => {
               </IonRow>
             )}
 
-            <IonRow className="ion-margin-top">
-              <IonCol size="12" sizeMd="6">
-                <IonCard>
-                  <IonCardHeader>
-                    <IonCardTitle style={{ fontSize: '1.2rem' }}>
-                      <IonIcon icon={alertCircleOutline} color="warning" style={{ verticalAlign: 'middle', marginRight: '8px' }} /> 
-                      Productos por Fabricar
-                    </IonCardTitle>
-                  </IonCardHeader>
-                  <IonCardContent>
-                    {summary.lowStockProducts.length === 0 ? (
-                      <p style={{ color: 'gray', fontStyle: 'italic' }}>No hay pedidos pendientes por fabricar.</p>
-                    ) : (
-                      <IonList>
-                        {summary.lowStockProducts.map(prod => (
-                          <IonItem key={'prod-' + prod.id}>
-                            <IonLabel>
-                              <IonText color="warning">
-                                <h2 style={{ fontWeight: 'bold' }}>{prod.name}</h2>
-                              </IonText>
-                            </IonLabel>
-                            <div slot="end" style={{ textAlign: 'right' }}>
-                              <IonBadge color="warning">Fabricar: {parseFloat(Number(prod.toProduce).toFixed(4))}</IonBadge>
-                              <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>Pendientes</div>
-                            </div>
-                          </IonItem>
-                        ))}
-                      </IonList>
-                    )}
-                  </IonCardContent>
-                </IonCard>
-              </IonCol>
+            {settings?.featureRecipes && (
+              <IonRow className="ion-margin-top">
+                <IonCol size="12" sizeMd={summary.lowStockProducts.length === 0 ? "12" : "6"}>
+                  <IonCard>
+                    <IonCardHeader>
+                      <IonCardTitle style={{ fontSize: '1.2rem' }}>
+                        <IonIcon icon={alertCircleOutline} color="warning" style={{ verticalAlign: 'middle', marginRight: '8px' }} /> 
+                        Productos por Fabricar
+                      </IonCardTitle>
+                    </IonCardHeader>
+                    <IonCardContent>
+                      {summary.lowStockProducts.length === 0 ? (
+                        <p style={{ color: 'gray', fontStyle: 'italic' }}>No hay pedidos pendientes por fabricar.</p>
+                      ) : (
+                        <IonList>
+                          {summary.lowStockProducts.map(prod => (
+                            <IonItem key={'prod-' + prod.id}>
+                              <IonLabel>
+                                <IonText color="warning">
+                                  <h2 style={{ fontWeight: 'bold' }}>{prod.name}</h2>
+                                </IonText>
+                              </IonLabel>
+                              <div slot="end" style={{ textAlign: 'right' }}>
+                                <IonBadge color="warning">Fabricar: {parseFloat(Number(prod.toProduce).toFixed(4))}</IonBadge>
+                                <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>Pendientes</div>
+                              </div>
+                            </IonItem>
+                          ))}
+                        </IonList>
+                      )}
+                    </IonCardContent>
+                  </IonCard>
+                </IonCol>
 
-<IonCol size="12" sizeMd="6">
-                <IonCard>
-                  <IonCardHeader>
-                    <IonCardTitle style={{ fontSize: '1.2rem' }}>
-                      <IonIcon icon={alertCircleOutline} color="danger" style={{ verticalAlign: 'middle', marginRight: '8px' }} /> 
-                      Insumos por Comprar
-                    </IonCardTitle>
-                  </IonCardHeader>
-                  <IonCardContent>
-                    {summary.lowStockMaterials.length === 0 ? (
-                      <p style={{ color: 'gray', fontStyle: 'italic' }}>Todos los insumos están en niveles óptimos.</p>
-                    ) : (
-                      <IonList>
-                        {summary.lowStockMaterials.map(alert => (
-                          <IonItem key={'mat-' + alert.id}>
-                            <IonLabel>
-                              <IonText color="danger">
-                                <h2 style={{ fontWeight: 'bold' }}>{alert.name}</h2>
-                              </IonText>
-                              <p style={{ fontSize: '0.85rem' }}>Stock físico: {parseFloat(Number(alert.realStock).toFixed(4))} {alert.unit}</p>
-                              {alert.debt > 0 && <p style={{ fontSize: '0.85rem', color: 'orange' }}>Reservado (Pedidos): -{parseFloat(Number(alert.debt).toFixed(4))} {alert.unit}</p>}
-                            </IonLabel>
-                            <div slot="end" style={{ textAlign: 'right' }}>
-                              <IonBadge color="danger">Efectivo: {parseFloat(Number(alert.effectiveStock).toFixed(4))} {alert.unit}</IonBadge>
-                              <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>¡Reabastecer!</div>
-                            </div>
-                          </IonItem>
-                        ))}
-                      </IonList>
-                    )}
-                  </IonCardContent>
-                </IonCard>
-              </IonCol>
-            </IonRow>
+                <IonCol size="12" sizeMd="6">
+                  <IonCard>
+                    <IonCardHeader>
+                      <IonCardTitle style={{ fontSize: '1.2rem' }}>
+                        <IonIcon icon={alertCircleOutline} color="danger" style={{ verticalAlign: 'middle', marginRight: '8px' }} /> 
+                        Insumos por Comprar
+                      </IonCardTitle>
+                    </IonCardHeader>
+                    <IonCardContent>
+                      {summary.lowStockMaterials.length === 0 ? (
+                        <p style={{ color: 'gray', fontStyle: 'italic' }}>Todos los insumos están en niveles óptimos.</p>
+                      ) : (
+                        <IonList>
+                          {summary.lowStockMaterials.map(alert => (
+                            <IonItem key={'mat-' + alert.id}>
+                              <IonLabel>
+                                <IonText color="danger">
+                                  <h2 style={{ fontWeight: 'bold' }}>{alert.name}</h2>
+                                </IonText>
+                                <p style={{ fontSize: '0.85rem' }}>Stock físico: {parseFloat(Number(alert.realStock).toFixed(4))} {alert.unit}</p>
+                                {alert.debt > 0 && <p style={{ fontSize: '0.85rem', color: 'orange' }}>Reservado (Pedidos): -{parseFloat(Number(alert.debt).toFixed(4))} {alert.unit}</p>}
+                              </IonLabel>
+                              <div slot="end" style={{ textAlign: 'right' }}>
+                                <IonBadge color="danger">Efectivo: {parseFloat(Number(alert.effectiveStock).toFixed(4))} {alert.unit}</IonBadge>
+                                <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>¡Reabastecer!</div>
+                              </div>
+                            </IonItem>
+                          ))}
+                        </IonList>
+                      )}
+                    </IonCardContent>
+                  </IonCard>
+                </IonCol>
+              </IonRow>
+            )}
           </IonGrid>
         )}
       </IonContent>

@@ -25,7 +25,17 @@ const Menu: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated && user?.tenantId) {
-      apiClient.get('/settings').then(res => setSettings(res.data)).catch(e => console.log(e));
+      apiClient.get('/settings').then(res => {
+        setSettings(res.data);
+        if (res.data.themePrimaryColor) {
+          document.documentElement.style.setProperty('--ion-color-primary', res.data.themePrimaryColor);
+          // Optionally set shade/tint or leave as is
+        }
+        if (res.data.themeHeaderColor) {
+          document.documentElement.style.setProperty('--ion-color-success', res.data.themeHeaderColor); // FlujoFino usually uses 'success' for headers like Dashboard
+          document.documentElement.style.setProperty('--ion-color-tertiary', res.data.themeHeaderColor);
+        }
+      }).catch(e => console.log(e));
     }
   }, [isAuthenticated, user]);
 

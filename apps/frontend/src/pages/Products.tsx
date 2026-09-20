@@ -1,4 +1,4 @@
-﻿import { refreshOutline } from 'ionicons/icons';
+import { refreshOutline } from 'ionicons/icons';
 import { IonList, IonItem, IonLabel, IonBadge } from '@ionic/react';
 import React, { useEffect, useState } from 'react';
 import { IonToggle, IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonToast, IonIcon } from '@ionic/react';
@@ -13,6 +13,7 @@ const Products: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [isClientMode, setIsClientMode] = useState(false);
   const [presentToast] = useIonToast();
+  const [settings, setSettings] = useState<any>({});
 
   const [selectedProductForRecipe, setSelectedProductForRecipe] = useState<Product | null>(null);
 
@@ -20,6 +21,8 @@ const Products: React.FC = () => {
     try {
       const res = await apiClient.get<Product[]>('/products');
       setProducts(res.data);
+      const setRes = await apiClient.get<any>('/settings');
+      setSettings(setRes.data);
     } catch (e) {
       console.error(e);
       presentToast({ message: 'Error cargando productos', duration: 3000, color: 'danger' });
@@ -235,6 +238,7 @@ const Products: React.FC = () => {
                   <IonRow>
                     {filteredData.map(p => (
                       <ProductCard isClientMode={isClientMode}
+                        featureRecipes={settings?.featureRecipes}
                         key={p.id}
                         product={p}
                         onEdit={openEditProductAlert}

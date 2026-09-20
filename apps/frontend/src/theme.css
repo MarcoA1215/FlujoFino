@@ -1,26 +1,26 @@
-﻿/* Vibrant but Professional Color Palette (Green, Blue, White) */
+/* Vibrant but Professional Color Palette (Green, Blue, White) */
 :root {
   /* Primary - Vibrant Blue */
-  --ion-color-primary: #2563EB;
-  --ion-color-primary-rgb: 37,99,235;
+  --ion-color-primary: #1E293B;
+  --ion-color-primary-rgb: 30,41,59;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255,255,255;
-  --ion-color-primary-shade: #2157ce;
-  --ion-color-primary-tint: #3b72ed;
+  --ion-color-primary-shade: #1a2434;
+  --ion-color-primary-tint: #354153;
 
   /* Secondary - Light Sky Blue */
-  --ion-color-secondary: #0EA5E9;
-  --ion-color-secondary-rgb: 14,165,233;
+  --ion-color-secondary: #475569;
+  --ion-color-secondary-rgb: 71,85,105;
   --ion-color-secondary-contrast: #ffffff;
   
   /* Tertiary - Teal / Blue-Green */
-  --ion-color-tertiary: #14B8A6;
-  --ion-color-tertiary-rgb: 20,184,166;
+  --ion-color-tertiary: #334155;
+  --ion-color-tertiary-rgb: 51,65,85;
   --ion-color-tertiary-contrast: #ffffff;
 
   /* Success - Vibrant Emerald Green (Used in App Headers) */
-  --ion-color-success: #10B981;
-  --ion-color-success-rgb: 16,185,129;
+  --ion-color-success: #0F766E;
+  --ion-color-success-rgb: 15,118,110;
   --ion-color-success-contrast: #ffffff;
 
   /* Warning - Amber (Kept for UI warnings) */

@@ -13,6 +13,7 @@ interface ProductCardProps {
   onToggleKitting?: (p: Product) => void;
   onUnpackKit?: (p: Product) => void;
   isClientMode?: boolean;
+  featureRecipes?: boolean;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -24,18 +25,25 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onRegisterLoss,
   onToggleKitting,
   onUnpackKit,
-  isClientMode
+  isClientMode,
+  featureRecipes
 }) => {
   const [present] = useIonActionSheet();
 
   const openOptions = () => {
     const buttons: any[] = [
-      { text: 'Editar Info / Precio', icon: pencilOutline, cssClass: 'action-sheet-editar', handler: () => onEdit(p) },
-      { text: p.isCombo ? 'Configurar Combo' : 'Configurar Receta', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) },
-      { text: 'Stock Inicial / Ajuste', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) }
+      { text: 'Editar Info / Precio', icon: pencilOutline, cssClass: 'action-sheet-editar', handler: () => onEdit(p) }
     ];
 
-    if ((p.isCombo || (p.recipe && p.recipe.length > 0)) && onToggleKitting) {
+    if (p.isCombo) {
+      buttons.push({ text: 'Configurar Combo', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
+    } else if (featureRecipes) {
+      buttons.push({ text: 'Configurar Fórmula', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
+    }
+
+    buttons.push({ text: 'Stock Inicial / Ajuste', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) });
+
+    if ((p.isCombo || (p.recipe && p.recipe.length > 0)) && onToggleKitting && (p.isCombo || featureRecipes)) {
       buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Hecho al Instante' : 'Pre-Fabricado'}`, icon: swapHorizontalOutline, cssClass: 'action-sheet-cambiar', handler: () => onToggleKitting(p) });
     }
 

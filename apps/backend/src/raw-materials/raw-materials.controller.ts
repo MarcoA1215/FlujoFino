@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Patch } from '@nestjs/common';
+import { Controller, Request, Get, Post, Put, Body, Param, Patch } from '@nestjs/common';
 import { RawMaterialsService } from './raw-materials.service';
 import { CreateRawMaterialDto } from './dto/create-raw-material.dto';
 import { RestockRawMaterialDto } from './dto/restock-raw-material.dto';
@@ -11,48 +11,40 @@ export class RawMaterialsController {
   constructor(private readonly rawMaterialsService: RawMaterialsService) {}
 
   @Get()
-  findAll() {
-    return this.rawMaterialsService.findAll();
-  }
+  findAll(@Request() req: any) {
+    return this.rawMaterialsService.findAll(req.user.tenantId);}
 
   @Post()
-  create(@Body() dto: CreateRawMaterialDto) {
-    return this.rawMaterialsService.create(dto);
-  }
+  create(@Request() req: any, @Body() dto: CreateRawMaterialDto) {
+    return this.rawMaterialsService.create(req.user.tenantId, dto);}
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateRawMaterialDto) {
-    return this.rawMaterialsService.update(id, dto);
-  }
+  update(@Request() req: any, @Param('id') id: string, @Body() dto: UpdateRawMaterialDto) {
+    return this.rawMaterialsService.update(req.user.tenantId, id, dto);}
 
   @Post(':id/restock')
-  restock(@Param('id') id: string, @Body() dto: RestockRawMaterialDto) {
-    return this.rawMaterialsService.restock(id, dto);
-  }
+  restock(@Request() req: any, @Param('id') id: string, @Body() dto: RestockRawMaterialDto) {
+    return this.rawMaterialsService.restock(req.user.tenantId, id, dto);}
 
   @Post(':id/loss')
-  registerLoss(@Param('id') id: string, @Body() dto: RegisterLossDto) {
-    return this.rawMaterialsService.registerLoss(id, dto);
-  }
+  registerLoss(@Request() req: any, @Param('id') id: string, @Body() dto: RegisterLossDto) {
+    return this.rawMaterialsService.registerLoss(req.user.tenantId, id, dto);}
 
   @Get(':id/movements')
-  getMovements(@Param('id') id: string) {
-    return this.rawMaterialsService.getMovements(id);
-  }
+  getMovements(@Request() req: any, @Param('id') id: string) {
+    return this.rawMaterialsService.getMovements(req.user.tenantId, id);}
 }
 
-// Podríamos ponerlo en su propio controller, pero por simplicidad de la Fase 2 lo dejamos aquí, en otra ruta
+// Podríamos ponerlo en su propio Controller, Request, pero por simplicidad de la Fase 2 lo dejamos aquí, en otra ruta
 @Controller('stock-movements')
 export class StockMovementsController {
   constructor(private readonly rawMaterialsService: RawMaterialsService) {}
 
   @Put(':id')
-  updateMovement(@Param('id') id: string, @Body() dto: UpdateMovementDto) {
-    return this.rawMaterialsService.updateMovement(id, dto);
-  }
+  updateMovement(@Request() req: any, @Param('id') id: string, @Body() dto: UpdateMovementDto) {
+    return this.rawMaterialsService.updateMovement(req.user.tenantId, id, dto);}
 
   @Patch(':id/archive')
-  archive(@Param('id') id: string) {
-    return this.rawMaterialsService.archive(id);
-  }
+  archive(@Request() req: any, @Param('id') id: string) {
+    return this.rawMaterialsService.archive(req.user.tenantId, id);}
 }
