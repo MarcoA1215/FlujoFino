@@ -199,7 +199,7 @@ const RawMaterials: React.FC = () => {
                   </IonItem>
                   <IonItem>
                     <IonLabel position="stacked">Cantidad a Cargar</IonLabel>
-                    <IonInput type="number" step="any" value={inputQty} onIonInput={e => setInputQty(parseFloat(e.detail.value!) || undefined)} placeholder="Ej. 100" />
+                    <IonInput type="number" min="0" step="any" value={inputQty} onIonInput={e => setInputQty(parseFloat(e.detail.value!) || undefined)} placeholder="Ej. 100" />
                   </IonItem>
                   <IonItem>
                     <IonLabel position="stacked">Unidad de Carga</IonLabel>
@@ -217,7 +217,7 @@ const RawMaterials: React.FC = () => {
     <IonSelectOption value="VES">Bs. VES</IonSelectOption>
   </IonSelect>
 </IonLabel>
-                    <IonInput type="number" step="any" value={inputCost} onIonInput={e => setInputCost(parseFloat(e.detail.value!) || undefined)} placeholder="Ej. 2.00" />
+                    <IonInput type="number" min="0" step="any" value={inputCost} onIonInput={e => setInputCost(parseFloat(e.detail.value!) || undefined)} placeholder="Ej. 2.00" />
                   </IonItem>
                   {inputQty && (inputUnit === 'g' || inputUnit === 'ml') && (
                     <IonNote color="medium" className="ion-margin-top ion-padding-horizontal" style={{display: 'block', fontSize: '12px'}}>

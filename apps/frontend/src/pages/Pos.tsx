@@ -224,7 +224,7 @@ const Pos: React.FC = () => {
   const lossAmount = cartBaseCost - discountedSubtotal;
 
   const placeOrder = async () => {
-    if (cart.length === 0) return presentToast({ message: 'Carrito vacío', duration: 2000, color: 'warning' });
+    if (cart.length === 0 && paymentMethod !== 'PENDING') return presentToast({ message: 'Carrito vacío', duration: 2000, color: 'warning' });
     if (!customerName.trim()) return presentToast({ message: 'Ingresa el nombre', duration: 2000, color: 'warning' });
 
     if (paymentMethod === 'PAGO_MOVIL') {
@@ -431,7 +431,7 @@ const Pos: React.FC = () => {
                       <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: '#495057' }}>Abono Inicial (Opcional)</h4>
                       <IonItem color="light">
                         <IonLabel position="stacked">Monto (USD)</IonLabel>
-                        <IonInput type="number" value={initialAbono} onIonInput={e => setInitialAbono(e.detail.value!)} placeholder="Ej. 10.00" />
+                        <IonInput type="number" min="0" value={initialAbono} onIonInput={e => setInitialAbono(e.detail.value!)} placeholder="Ej. 10.00" />
                       </IonItem>
                     </div>
                   )}
@@ -463,7 +463,7 @@ const Pos: React.FC = () => {
                       <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem' }}>Pago en Divisas</h4>
                       <IonItem color="light">
                         <IonLabel position="stacked">Monto Recibido ($)</IonLabel>
-                        <IonInput type="number" value={usdReceived} onIonInput={e => setUsdReceived(parseFloat(e.detail.value!) || '')} placeholder={`Mínimo: $${totalCart.toFixed(2)}`} />
+                        <IonInput type="number" min="0" value={usdReceived} onIonInput={e => setUsdReceived(parseFloat(e.detail.value!) || '')} placeholder={`Mínimo: $${totalCart.toFixed(2)}`} />
                       </IonItem>
                       
                       {typeof usdReceived === 'number' && usdReceived >= totalCart && (
@@ -505,7 +505,7 @@ const Pos: React.FC = () => {
                             <IonSelectOption value="FIXED">$</IonSelectOption>
                             <IonSelectOption value="PERCENTAGE">%</IonSelectOption>
                           </IonSelect>
-                          <IonInput type="number" value={discountValue} onIonInput={e => setDiscountValue(e.detail.value!)} placeholder="0.00" />
+                          <IonInput type="number" min="0" value={discountValue} onIonInput={e => setDiscountValue(e.detail.value!)} placeholder="0.00" />
                         </IonItem>
                       </div>
                       
@@ -556,19 +556,19 @@ const Pos: React.FC = () => {
                            )}
                         </div>
                       )}
-                      
-                      <IonButton 
-                        expand="block" 
-                        color="success" 
-                        className="ion-margin-top" 
-                        size="large"
-                        onClick={placeOrder}
-                      >
-                        <IonIcon icon={cashOutline} slot="start" />
-                        {editingOrderId ? 'Actualizar Pedido' : 'Confirmar Pedido'}
-                      </IonButton>
                     </>
                   )}
+                  
+                  <IonButton 
+                    expand="block" 
+                    color="success" 
+                    className="ion-margin-top" 
+                    size="large"
+                    onClick={placeOrder}
+                  >
+                    <IonIcon icon={cashOutline} slot="start" />
+                    {editingOrderId ? 'Actualizar Pedido' : 'Confirmar Pedido'}
+                  </IonButton>
                 </IonCardContent>
               </IonCard>
             </IonCol>

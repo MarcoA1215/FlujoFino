@@ -522,7 +522,7 @@ const getStatusColor = (status: OrderStatus) => {
                           <IonSelectOption value="VES">Bs. VES</IonSelectOption>
                         </IonSelect>
                       </IonLabel>
-                      <IonInput type="number" value={abonoAmount} onIonInput={e => setAbonoAmount(e.detail.value!)} placeholder={abonoCurrency === 'USD' ? "Ej. 5.00" : "Ej. 200.00"} />
+                      <IonInput type="number" min="0" value={abonoAmount} onIonInput={e => setAbonoAmount(e.detail.value!)} placeholder={abonoCurrency === 'USD' ? "Ej. 5.00" : "Ej. 200.00"} />
                   </IonItem>
                   <IonButton expand="block" onClick={handleAddAbono} disabled={!abonoAmount} className="ion-margin-top">
                     Agregar Abono
@@ -556,7 +556,7 @@ const getStatusColor = (status: OrderStatus) => {
                     </IonLabel>
                     {pending > 0 && (
                       <IonInput 
-                        type="number" 
+                        type="number" min="0" 
                         placeholder="Entregar..." 
                         value={partialDeliveries[item.id] || ''}
                         onIonChange={e => setPartialDeliveries({...partialDeliveries, [item.id]: Number(e.detail.value)})}

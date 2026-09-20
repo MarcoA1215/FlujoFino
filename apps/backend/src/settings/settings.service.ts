@@ -68,7 +68,7 @@ export class SettingsService implements OnModuleInit {
     if (payload.featureBuySell !== undefined) settings.featureBuySell = payload.featureBuySell;
 
     if (payload.businessHours !== undefined) settings.businessHours = payload.businessHours;
-    if (payload.services !== undefined) {
+    if (payload.services !== undefined && Array.isArray(payload.services)) {
       settings.services = payload.services;
       // Sincronizar como productos para POS
       for (const svc of payload.services) {

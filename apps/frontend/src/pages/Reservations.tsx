@@ -249,7 +249,7 @@ const Reservations: React.FC = () => {
         )}
       </IonHeader>
       
-      <IonContent className="ion-padding" style={{ '--background': '#f4f5f8' }}>
+      <IonContent className="ion-padding" style={{ 'backgroundColor': '#f4f5f8' }}>
         <div className="fc-wrapper">
           <FullCalendar
             ref={calendarRef}
@@ -364,7 +364,7 @@ const Reservations: React.FC = () => {
             )}
             <IonItem>
               <IonLabel position="stacked">Cantidad de Personas</IonLabel>
-              <IonInput type="number" value={numberOfPeople} onIonInput={e => setNumberOfPeople(parseInt(e.detail.value!, 10))} />
+              <IonInput type="number" min="0" value={numberOfPeople} onIonInput={e => setNumberOfPeople(parseInt(e.detail.value!, 10) || 1)} />
             </IonItem>
             <IonItem>
               <IonLabel position="stacked">Número de Mesa (Opcional)</IonLabel>
@@ -372,7 +372,7 @@ const Reservations: React.FC = () => {
             </IonItem>
             <IonItem>
               <IonLabel position="stacked">Total a Cobrar ($) (Opcional)</IonLabel>
-              <IonInput type="number" value={totalAmount} onIonInput={e => setTotalAmount(parseFloat(e.detail.value!))} />
+              <IonInput type="number" min="0" value={totalAmount} onIonInput={e => setTotalAmount(parseFloat(e.detail.value!) || 0)} />
             </IonItem>
             <IonItem>
               <IonLabel position="stacked">Notas</IonLabel>
@@ -429,7 +429,7 @@ const Reservations: React.FC = () => {
 
                       <IonItem className="ion-margin-top">
                         <IonLabel position="stacked">Monto a abonar ($)</IonLabel>
-                        <IonInput type="number" value={abonoAmount} onIonInput={e => setAbonoAmount(e.detail.value!)} />
+                        <IonInput type="number" min="0" value={abonoAmount} onIonInput={e => setAbonoAmount(e.detail.value!)} />
                       </IonItem>
                       <IonButton expand="block" size="small" color="primary" onClick={handleAddAbono}>
                         <IonIcon icon={cashOutline} slot="start" /> Registrar Abono

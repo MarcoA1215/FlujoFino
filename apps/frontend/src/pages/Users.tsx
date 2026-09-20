@@ -199,7 +199,7 @@ const Users: React.FC = () => {
                       </IonItem>
                       <IonItem>
                         <IonLabel position="stacked">Sueldo Acordado (USD)</IonLabel>
-                        <IonInput type="number" placeholder="Ej: 50" value={salaryAmount} onIonChange={e => setSalaryAmount(e.detail.value!)} />
+                        <IonInput type="number" min="0" placeholder="Ej: 50" value={salaryAmount} onIonChange={e => setSalaryAmount(e.detail.value!)} />
                       </IonItem>
                       <IonItem>
                         <IonLabel position="stacked">Frecuencia de Pago</IonLabel>
@@ -289,7 +289,7 @@ const Users: React.FC = () => {
           <IonContent className="ion-padding">
             <IonItem>
               <IonLabel position="stacked">Monto a Pagar (USD)</IonLabel>
-              <IonInput type="number" placeholder="Ej. 20" value={payAmount} onIonChange={e => setPayAmount(e.detail.value!)} />
+              <IonInput type="number" min="0" placeholder="Ej. 20" value={payAmount} onIonChange={e => setPayAmount(e.detail.value!)} />
             </IonItem>
             <IonItem>
               <IonLabel position="stacked">Método de Pago</IonLabel>

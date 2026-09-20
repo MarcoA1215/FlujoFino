@@ -1,8 +1,10 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, IonInput, useIonToast, IonSelect, IonSelectOption } from '@ionic/react';
 import { calculatorOutline, addOutline, removeOutline, trashOutline, copyOutline, cartOutline } from 'ionicons/icons';
 
 import { apiClient } from '../api/client';
+import { AuthContext } from '../context/AuthContext';
+import { useContext } from 'react';
 import type { Product, DeliveryZone } from '../types';
 
 type Settings = {
@@ -18,6 +20,7 @@ interface CartItem {
 }
 
 const Calculator: React.FC = () => {
+  const { user } = useContext(AuthContext);
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(36.5);
@@ -184,7 +187,7 @@ const Calculator: React.FC = () => {
                     fontSize: '1rem'
                   }}>
                     <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                      <h2 style={{ margin: 0, fontWeight: 'bold', fontSize: '1.5rem' }}>NUTRI DELI</h2>
+                      <h2 style={{ margin: 0, fontWeight: 'bold', fontSize: '1.5rem', textTransform: 'uppercase' }}>{user?.tenantName || 'NEGOCIO'}</h2>
                       <p style={{ margin: 0, color: '#666' }}>Cotización de Pedido</p>
                     </div>
                     
@@ -256,7 +259,7 @@ const Calculator: React.FC = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                               <span>Tasa (Bs):</span>
                               <IonInput 
-                                type="number" 
+                                type="number" min="0" 
                                 value={exchangeRate} 
                                 readonly
                                 style={{ border: '1px solid #ccc', borderRadius: '4px', padding: '0 5px', width: '80px', background: '#f9f9f9', opacity: 0.8 }}

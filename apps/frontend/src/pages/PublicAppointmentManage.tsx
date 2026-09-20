@@ -107,7 +107,7 @@ const PublicAppointmentManage: React.FC = () => {
 
   return (
     <IonPage>
-      <IonContent className="ion-padding" style={{ '--background': '#f4f5f8' }}>
+      <IonContent className="ion-padding" style={{ 'backgroundColor': '#f4f5f8' }}>
         <div style={{ maxWidth: '500px', margin: '20px auto' }}>
           
           <h2 style={{ fontWeight: 'bold', color: '#333', textAlign: 'center', marginBottom: '20px' }}>

@@ -119,7 +119,7 @@ const PublicBooking: React.FC = () => {
   if (success) {
     return (
       <IonPage>
-        <IonContent className="ion-padding" style={{ '--background': '#f4f5f8' }}>
+        <IonContent className="ion-padding" style={{ 'backgroundColor': '#f4f5f8' }}>
           <div style={{ maxWidth: '500px', margin: '50px auto', textAlign: 'center' }}>
             <IonCard>
               <IonCardContent>
@@ -164,7 +164,7 @@ const PublicBooking: React.FC = () => {
 
   return (
     <IonPage>
-      <IonContent className="ion-padding" style={{ '--background': '#f4f5f8' }}>
+      <IonContent className="ion-padding" style={{ 'backgroundColor': '#f4f5f8' }}>
         <div style={{ maxWidth: '500px', margin: '20px auto' }}>
           
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
