@@ -1,9 +1,9 @@
 // @ts-nocheck
 ﻿import { refreshOutline } from 'ionicons/icons';
-import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonInput, IonSelect, IonSelectOption, IonText, IonIcon, IonSearchbar } from '@ionic/react';
+import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonInput, IonSelect, IonSelectOption, IonText, IonIcon, IonSearchbar, useIonRouter } from '@ionic/react';
 import { cartOutline, cashOutline, trashOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
-import { useLocation, useHistory } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import type { DeliveryZone } from '../types';
 import { DeliveryMethod, PaymentStatus, UserRole } from '@nutrideli/shared-types';
 import { apiClient } from '../api/client';
@@ -56,7 +56,7 @@ const Pos: React.FC = () => {
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
   const location = useLocation();
-  const history = useHistory();
+  const router = useIonRouter();
 
   const fetchProducts = async () => {
     try {
@@ -269,7 +269,7 @@ const Pos: React.FC = () => {
       if (editingOrderId) {
         await apiClient.put(`/orders/${editingOrderId}`, payload);
         presentToast({ message: 'Pedido actualizado exitosamente', duration: 2000, color: 'success' });
-        history.push('/orders');
+        router.push('/orders');
       } else {
         await apiClient.post('/orders', payload);
         presentToast({ message: 'Pedido creado exitosamente', duration: 2000, color: 'success' });
