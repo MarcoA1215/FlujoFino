@@ -58,6 +58,8 @@ export class RawMaterialsService {
   }
 
   async restock(id: string, dto: RestockRawMaterialDto) {
+    if (dto.quantity <= 0) throw new BadRequestException('La cantidad debe ser mayor a 0');
+    if (dto.totalCost < 0) throw new BadRequestException('El costo no puede ser negativo');
     return this.dataSource.transaction(async (manager) => {
       const material = await manager.findOne(RawMaterial, { where: { id } });
       if (!material) throw new NotFoundException('Insumo no encontrado');
@@ -93,6 +95,7 @@ export class RawMaterialsService {
   }
 
   async registerLoss(id: string, dto: RegisterLossDto) {
+    if (dto.quantity <= 0) throw new BadRequestException('La cantidad debe ser mayor a 0');
     return this.dataSource.transaction(async (manager) => {
       const material = await manager.findOne(RawMaterial, { where: { id } });
       if (!material) throw new NotFoundException('Insumo no encontrado');

@@ -52,9 +52,14 @@ export class ReservationsService {
     if (dto.date && dto.time && !dto.force) {
       await this.validateBusinessHours(tenantId, dto.date, dto.time);
     }
+    if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
+    if (dto.totalAmount !== undefined && dto.totalAmount < 0) throw new BadRequestException('El monto total no puede ser negativo');
+    
     const reservation = new Reservation();
     Object.assign(reservation, dto);
     reservation.tenantId = tenantId;
+    delete (reservation as any).abonosTotal; // Security: do not allow setting abonos directly
+    delete (reservation as any).abonosHistory;
     this.recalculatePaymentStatus(reservation);
     return this.repo.save(reservation);
   }
@@ -63,9 +68,17 @@ export class ReservationsService {
     if (dto.date && dto.time && !dto.force) {
       await this.validateBusinessHours(tenantId, dto.date, dto.time);
     }
+    if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
+    if (dto.totalAmount !== undefined && dto.totalAmount < 0) throw new BadRequestException('El monto total no puede ser negativo');
+
     const reservation = await this.repo.findOne({ where: { id, tenantId } });
     if (!reservation) throw new BadRequestException('Reservación no encontrada');
 
+    delete dto.id; // Security: cannot change ID
+    delete dto.tenantId; // Security: cannot change tenant
+    delete dto.abonosTotal;
+    delete dto.abonosHistory;
+    
     Object.assign(reservation, dto);
     this.recalculatePaymentStatus(reservation);
     return this.repo.save(reservation);
@@ -86,6 +99,7 @@ export class ReservationsService {
   }
 
   async addAbono(tenantId: string, id: string, amount: number) {
+    if (amount <= 0) throw new BadRequestException('El abono debe ser mayor a 0');
     const res = await this.repo.findOne({ where: { id, tenantId } });
     if (!res) throw new BadRequestException('No encontrado');
     

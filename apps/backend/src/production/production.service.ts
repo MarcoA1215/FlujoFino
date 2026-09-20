@@ -14,6 +14,7 @@ export class ProductionService {
     private dataSource: DataSource) {}
 
   async createBatch(productId: string, quantityToProduce: number) {
+    if (quantityToProduce <= 0) throw new BadRequestException('La cantidad a producir debe ser mayor a cero');
     return this.dataSource.transaction(async (manager) => {
       const product = await manager.findOne(Product, {
         where: { id: productId },

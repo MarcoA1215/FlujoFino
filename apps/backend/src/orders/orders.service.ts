@@ -44,6 +44,7 @@ export class OrdersService {
   constructor(private dataSource: DataSource) {}
 
   async addAbono(orderId: string, amount: number) {
+    if (amount <= 0) throw new BadRequestException('El monto debe ser mayor a 0');
     const order = await this.dataSource.getRepository(Order).findOne({ where: { id: orderId } });
     if (!order) throw new Error("Order not found");
     const history = order.abonosHistory || [];
@@ -79,6 +80,15 @@ export class OrdersService {
   }
 
   async createOrder(dto: CreateOrderDto) {
+    if (!dto.items || (dto.items.length === 0 && dto.paymentStatus !== PaymentStatus.PENDING)) {
+      throw new BadRequestException('El carrito no puede estar vacío');
+    }
+    for (const item of dto.items || []) {
+      if (item.quantity <= 0) throw new BadRequestException('La cantidad de un producto debe ser mayor a cero');
+      if (item.unitPrice < 0) throw new BadRequestException('El precio no puede ser negativo');
+    }
+    if ((dto.discountAmount || 0) < 0) throw new BadRequestException('El descuento no puede ser negativo');
+
     return this.dataSource.transaction(async (manager) => {
       let totalAmount = 0;
       let totalCost = 0;
@@ -473,6 +483,15 @@ export class OrdersService {
   }
 
   async editOrder(id: string, dto: CreateOrderDto) {
+    if (!dto.items || (dto.items.length === 0 && dto.paymentStatus !== PaymentStatus.PENDING)) {
+      throw new BadRequestException('El carrito no puede estar vacío');
+    }
+    for (const item of dto.items || []) {
+      if (item.quantity <= 0) throw new BadRequestException('La cantidad de un producto debe ser mayor a cero');
+      if (item.unitPrice < 0) throw new BadRequestException('El precio no puede ser negativo');
+    }
+    if ((dto.discountAmount || 0) < 0) throw new BadRequestException('El descuento no puede ser negativo');
+
     return this.dataSource.transaction(async (manager) => {
       const order = await manager.findOne(Order, { 
         where: { id },
