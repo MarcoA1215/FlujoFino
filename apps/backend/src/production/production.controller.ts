@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Post, Body, Delete, Param } from '@nestjs/common';
+import { Controller, Request, Get, Post, Body, Delete, Param } from '@nestjs/common';
 import { ProductionService } from './production.service';
 
 export class CreateBatchDto {
@@ -9,20 +9,17 @@ export class CreateBatchDto {
 @Controller('production')
 export class ProductionController {
   @Delete(':id')
-  revertBatch(@Param('id') id: string) {
-    return this.productionService.revertBatch(id);
-  }
+  revertBatch(@Request() req: any, @Param('id') id: string) {
+    return this.productionService.revertBatch(req.user.tenantId, id);}
   @Get()
-  getBatches() {
-    return this.productionService.getBatches();
-  }
+  getBatches(@Request() req: any) {
+    return this.productionService.getBatches(req.user.tenantId);}
 
   constructor(private readonly productionService: ProductionService) {}
 
   @Post()
-  createBatch(@Body() dto: CreateBatchDto) {
-    return this.productionService.createBatch(dto.productId, dto.quantity);
-  }
+  createBatch(@Request() req: any, @Body() dto: CreateBatchDto) {
+    return this.productionService.createBatch(req.user.tenantId, dto.productId, dto.quantity);}
 }
 
 

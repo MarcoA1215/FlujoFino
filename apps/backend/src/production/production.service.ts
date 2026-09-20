@@ -13,11 +13,11 @@ export class ProductionService {
     private ordersService: OrdersService,
     private dataSource: DataSource) {}
 
-  async createBatch(productId: string, quantityToProduce: number) {
+  async createBatch(tenantId: string, productId: string, quantityToProduce: number) {
     if (quantityToProduce <= 0) throw new BadRequestException('La cantidad a producir debe ser mayor a cero');
     return this.dataSource.transaction(async (manager) => {
       const product = await manager.findOne(Product, {
-        where: { id: productId },
+        where: { tenantId, id: productId },
         relations: { recipe: { rawMaterial: true }, comboItems: { component: true } },
       });
 
@@ -94,7 +94,7 @@ export class ProductionService {
           await manager.save(RawMaterial, material);
 
           // Registrar movimiento OUT
-          const movement = manager.create(StockMovement, {
+          const movement = manager.create(StockMovement, { tenantId,
             rawMaterialId: material.id,
             type: MovementType.OUT_PRODUCTION,
             quantity: requiredAmount,
@@ -111,14 +111,14 @@ export class ProductionService {
       const updatedProduct = await manager.save(Product, product);
 
       // 4. Registrar el lote
-      const batch = manager.create(ProductionBatch, {
+      const batch = manager.create(ProductionBatch, { tenantId,
         productId,
         quantity: quantityToProduce,
         totalCost: totalBatchCost
       });
       await manager.save(ProductionBatch, batch);
 
-      await this.ordersService.autoAllocatePhysicalStock();
+      await this.ordersService.autoAllocatePhysicalStock(tenantId);
 
       return {
         product: updatedProduct,
@@ -127,22 +127,21 @@ export class ProductionService {
     });
   }
 
-  async getBatches() {
-    return this.dataSource.getRepository(ProductionBatch).find({
-      relations: { product: true },
+  async getBatches(tenantId: string) {
+    return this.dataSource.getRepository(ProductionBatch).find({ where: { tenantId }, relations: { product: true },
       order: { createdAt: 'DESC' },
     });
   }
 
-  async revertBatch(batchId: string) {
+  async revertBatch(tenantId: string, batchId: string) {
     return this.dataSource.transaction(async (manager) => {
       const batch = await manager.findOne(ProductionBatch, { 
-        where: { id: batchId },
+        where: { tenantId, id: batchId },
       });
       if (!batch) throw new BadRequestException('Lote no encontrado');
 
       const product = await manager.findOne(Product, { 
-        where: { id: batch.productId },
+        where: { tenantId, id: batch.productId },
         relations: { recipe: { rawMaterial: true }, comboItems: { component: true } }
       });
       if (!product) throw new BadRequestException('Producto asociado no encontrado');
@@ -173,7 +172,7 @@ export class ProductionService {
               ri.rawMaterial.stockQuantity += returnedAmount;
               await manager.save(RawMaterial, ri.rawMaterial);
               
-              const mov = manager.create(StockMovement, {
+              const mov = manager.create(StockMovement, { tenantId,
                 rawMaterialId: ri.rawMaterial.id,
                 type: MovementType.IN,
                 quantity: returnedAmount,
@@ -187,7 +186,7 @@ export class ProductionService {
       }
 
       await manager.remove(ProductionBatch, batch);
-      await this.ordersService.autoAllocatePhysicalStock();
+      await this.ordersService.autoAllocatePhysicalStock(tenantId);
       return { success: true, message: 'Lote revertido correctamente' };
     });
   }

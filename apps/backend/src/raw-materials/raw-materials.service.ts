@@ -20,13 +20,13 @@ export class RawMaterialsService {
     private dataSource: DataSource,
   ) {}
 
-  findAll() {
-    return this.rawMaterialRepo.find({ order: { name: 'ASC' } });
+  findAll(tenantId: string) {
+    return this.rawMaterialRepo.find({ where: { tenantId }, order: { name: 'ASC' } });
   }
 
-  async create(dto: CreateRawMaterialDto) {
+  async create(tenantId: string, dto: CreateRawMaterialDto) {
     return this.dataSource.transaction(async (manager) => {
-      const material = manager.create(RawMaterial, {
+      const material = manager.create(RawMaterial, { tenantId,
         name: dto.name,
         unit: dto.unit,
         costPerUnit: dto.costPerUnit,
@@ -36,7 +36,7 @@ export class RawMaterialsService {
       const savedMaterial = await manager.save(RawMaterial, material);
 
       if (dto.initialStock && dto.initialStock > 0) {
-        const movement = manager.create(StockMovement, {
+        const movement = manager.create(StockMovement, { tenantId,
           rawMaterialId: savedMaterial.id,
           type: MovementType.IN_PURCHASE,
           quantity: dto.initialStock,
@@ -49,19 +49,19 @@ export class RawMaterialsService {
     });
   }
 
-  async update(id: string, dto: UpdateRawMaterialDto) {
-    const material = await this.rawMaterialRepo.findOne({ where: { id } });
+  async update(tenantId: string, id: string, dto: UpdateRawMaterialDto) {
+    const material = await this.rawMaterialRepo.findOne({ where: { tenantId, id } });
     if (!material) throw new NotFoundException('Insumo no encontrado');
     
     Object.assign(material, dto);
     return this.rawMaterialRepo.save(material);
   }
 
-  async restock(id: string, dto: RestockRawMaterialDto) {
+  async restock(tenantId: string, id: string, dto: RestockRawMaterialDto) {
     if (dto.quantity <= 0) throw new BadRequestException('La cantidad debe ser mayor a 0');
     if (dto.totalCost < 0) throw new BadRequestException('El costo no puede ser negativo');
     return this.dataSource.transaction(async (manager) => {
-      const material = await manager.findOne(RawMaterial, { where: { id } });
+      const material = await manager.findOne(RawMaterial, { where: { tenantId, id } });
       if (!material) throw new NotFoundException('Insumo no encontrado');
 
       // Cálculo de Precio Promedio Ponderado (WAC)
@@ -81,7 +81,7 @@ export class RawMaterialsService {
       const updatedMaterial = await manager.save(RawMaterial, material);
 
       // Registrar el movimiento de entrada (Inversión)
-      const movement = manager.create(StockMovement, {
+      const movement = manager.create(StockMovement, { tenantId,
         rawMaterialId: id,
         type: MovementType.IN_PURCHASE,
         quantity: dto.quantity,
@@ -94,10 +94,10 @@ export class RawMaterialsService {
     });
   }
 
-  async registerLoss(id: string, dto: RegisterLossDto) {
+  async registerLoss(tenantId: string, id: string, dto: RegisterLossDto) {
     if (dto.quantity <= 0) throw new BadRequestException('La cantidad debe ser mayor a 0');
     return this.dataSource.transaction(async (manager) => {
-      const material = await manager.findOne(RawMaterial, { where: { id } });
+      const material = await manager.findOne(RawMaterial, { where: { tenantId, id } });
       if (!material) throw new NotFoundException('Insumo no encontrado');
 
       if (material.stockQuantity < dto.quantity) {
@@ -109,7 +109,7 @@ export class RawMaterialsService {
 
       const lossValue = dto.quantity * material.costPerUnit;
       
-      const movement = manager.create(StockMovement, {
+      const movement = manager.create(StockMovement, { tenantId,
         rawMaterialId: id,
         type: MovementType.LOSS,
         quantity: dto.quantity,
@@ -124,16 +124,16 @@ export class RawMaterialsService {
 
   // --- Movimientos ---
 
-  async getMovements(rawMaterialId: string) {
+  async getMovements(tenantId: string, rawMaterialId: string) {
     return this.stockMovementRepo.find({
-      where: { rawMaterialId },
+      where: { tenantId, rawMaterialId },
       order: { createdAt: 'DESC' }
     });
   }
 
-  async updateMovement(id: string, dto: UpdateMovementDto) {
+  async updateMovement(tenantId: string, id: string, dto: UpdateMovementDto) {
     return this.dataSource.transaction(async (manager) => {
-      const movement = await manager.findOne(StockMovement, { where: { id }, relations: { rawMaterial: true } });
+      const movement = await manager.findOne(StockMovement, { where: { tenantId, id }, relations: { rawMaterial: true } });
       if (!movement) throw new NotFoundException('Movimiento no encontrado');
 
       const material = movement.rawMaterial;
@@ -187,7 +187,7 @@ export class RawMaterialsService {
     });
   }
 
-  async archive(id: string) {
+  async archive(tenantId: string, id: string) {
     await this.rawMaterialRepo.update(id, { isActive: false });
   }
 }

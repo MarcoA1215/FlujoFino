@@ -23,9 +23,8 @@ export class ProductsService {
     private dataSource: DataSource,
   ) {}
 
-  async findAll() {
-    const products = await this.productRepo.find({
-      relations: {
+  async findAll(tenantId: string) {
+    const products = await this.productRepo.find({ where: { tenantId }, relations: {
         comboItems: { component: { recipe: { rawMaterial: true } } },
         recipe: { rawMaterial: true }
       }
@@ -80,21 +79,21 @@ export class ProductsService {
     });
   }
 
-  async findOne(id: string) {
-    const product = await this.productRepo.findOne({ where: { id } });
+  async findOne(tenantId: string, id: string) {
+    const product = await this.productRepo.findOne({ where: { tenantId, id } });
     if (!product) throw new NotFoundException('Producto no encontrado');
     return product;
   }
 
-  async create(dto: CreateProductDto) {
+  async create(tenantId: string, dto: CreateProductDto) {
     const product = this.productRepo.create(dto);
     return this.productRepo.save(product);
   }
 
-  async update(id: string, dto: any) {
+  async update(tenantId: string, id: string, dto: any) {
     return this.dataSource.transaction(async (manager) => {
-      const oldProduct = await manager.findOne(Product, { where: { id }, relations: { comboItems: { component: true } } });
-      const product = await manager.findOne(Product, { where: { id } });
+      const oldProduct = await manager.findOne(Product, { where: { tenantId, id }, relations: { comboItems: { component: true } } });
+      const product = await manager.findOne(Product, { where: { tenantId, id } });
       if (!product) throw new NotFoundException('Producto no encontrado');
 
       // Check if transitioning from PreAssembled to Virtual
@@ -124,17 +123,17 @@ export class ProductsService {
     });
   }
 
-  async remove(id: string) {
-    await this.findOne(id); // verifica que exista
-    await this.productRepo.softDelete(id);
+  async remove(tenantId: string, id: string) {
+    await this.findOne(tenantId, id); // verifica que exista
+    await this.productRepo.softDelete({ tenantId, id });
     return { success: true };
   }
 
   
-  async unpackKit(id: string) {
+  async unpackKit(tenantId: string, id: string) {
     return this.dataSource.transaction(async (manager) => {
       const product = await manager.findOne(Product, { 
-        where: { id },
+        where: { tenantId, id },
         relations: { comboItems: { component: true } }
       });
       
@@ -166,14 +165,14 @@ export class ProductsService {
     });
   }
 
-  async getRecipeAndCost(id: string) {
+  async getRecipeAndCost(tenantId: string, id: string) {
     const items = await this.recipeItemRepo.find({
-      where: { product: { id } },
+      where: { product: { tenantId, id } },
       relations: { rawMaterial: true }
     });
     
     const comboItems = await this.comboItemRepo.find({
-      where: { comboId: id },
+      where: { combo: { tenantId, id } },
       relations: { component: true }
     });
 
@@ -195,7 +194,7 @@ export class ProductsService {
     // Calcular los costos de los sub-productos (recursivo)
     const formattedComboItems = await Promise.all(comboItems.map(async item => {
       // Obtenemos el costo base del componente
-      const componentData = await this.getRecipeAndCost(item.componentId);
+      const componentData = await this.getRecipeAndCost(tenantId, item.componentId);
       const itemCost = item.quantity * componentData.totalRecipeCost;
       totalCost += itemCost;
 
@@ -216,10 +215,10 @@ export class ProductsService {
     };
   }
 
-  async updateCombo(id: string, dto: any) {
+  async updateCombo(tenantId: string, id: string, dto: any) {
     return this.dataSource.transaction(async (manager) => {
-      const oldProduct = await manager.findOne(Product, { where: { id }, relations: { comboItems: { component: true } } });
-      const product = await manager.findOne(Product, { where: { id } });
+      const oldProduct = await manager.findOne(Product, { where: { tenantId, id }, relations: { comboItems: { component: true } } });
+      const product = await manager.findOne(Product, { where: { tenantId, id } });
       if (!product) throw new NotFoundException('Producto no encontrado');
 
       // Validaciones de seguridad
@@ -227,7 +226,7 @@ export class ProductsService {
         if (item.componentId === id) {
           throw new BadRequestException('Un producto no puede ser componente de sí mismo');
         }
-        const component = await manager.findOne(Product, { where: { id: item.componentId } });
+        const component = await manager.findOne(Product, { where: { tenantId, id: item.componentId } });
         if (component?.isCombo) {
           throw new BadRequestException('No se pueden agregar combos dentro de otros combos');
         }
@@ -238,7 +237,7 @@ export class ProductsService {
 
       // Insertar combo nuevo
       const newItems = dto.comboItems.map((item: any) => {
-        return manager.create(ComboItem, {
+        return manager.create(ComboItem, { tenantId,
           combo: product,
           component: { id: item.componentId } as Product,
           quantity: item.quantity
@@ -252,9 +251,9 @@ export class ProductsService {
     });
   }
 
-  async updateRecipe(id: string, dto: UpdateRecipeDto) {
+  async updateRecipe(tenantId: string, id: string, dto: UpdateRecipeDto) {
     return this.dataSource.transaction(async (manager) => {
-      const product = await manager.findOne(Product, { where: { id } });
+      const product = await manager.findOne(Product, { where: { tenantId, id } });
       if (!product) throw new NotFoundException('Producto no encontrado');
 
       // Eliminar receta vieja
@@ -262,7 +261,7 @@ export class ProductsService {
 
       // Insertar receta nueva
       const newItems = dto.items.map(item => {
-        return manager.create(RecipeItem, {
+        return manager.create(RecipeItem, { tenantId,
           product: product,
           rawMaterial: { id: item.rawMaterialId } as RawMaterial,
           quantity: item.quantity
@@ -276,11 +275,11 @@ export class ProductsService {
     });
   }
 
-  async registerLoss(id: string, dto: RegisterLossDto) {
+  async registerLoss(tenantId: string, id: string, dto: RegisterLossDto) {
     // Para simplificar, en Producto podemos restar directo el stock y opcionalmente guardar en una tabla 'ProductStockMovement'.
     // Como Fase 2, descontamos stock. 
     return this.dataSource.transaction(async (manager) => {
-      const product = await manager.findOne(Product, { where: { id } });
+      const product = await manager.findOne(Product, { where: { tenantId, id } });
       if (!product) throw new NotFoundException('Producto no encontrado');
 
       if (product.stockQuantity < dto.quantity) {
@@ -296,13 +295,13 @@ export class ProductsService {
     });
   }
 
-  async adjustStock(id: string, quantity: number) {
-    const product = await this.findOne(id);
+  async adjustStock(tenantId: string, id: string, quantity: number) {
+    const product = await this.findOne(tenantId, id);
     product.stockQuantity += quantity;
     return this.productRepo.save(product);
   }
 
-  async migratePhysicalStock() {
+  async migratePhysicalStock(tenantId: string) {
     const reservedDirect = await this.dataSource.query(`
       SELECT i."productId", SUM(i.quantity) as reserved
       FROM order_item i
@@ -328,7 +327,7 @@ export class ProductsService {
       reservedMap[row.productId] = (reservedMap[row.productId] || 0) + Number(row.reserved);
     }
 
-    const products = await this.productRepo.find();
+    const products = await this.productRepo.find({ where: { tenantId } });
     for (const p of products) {
       const reserved = reservedMap[p.id] || 0;
       p.physicalStock = p.stockQuantity + reserved;

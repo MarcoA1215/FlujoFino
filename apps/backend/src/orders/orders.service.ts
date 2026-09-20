@@ -43,9 +43,9 @@ export class UpdatePaymentDto {
 export class OrdersService {
   constructor(private dataSource: DataSource) {}
 
-  async addAbono(orderId: string, amount: number) {
+  async addAbono(tenantId: string, orderId: string, amount: number) {
     if (amount <= 0) throw new BadRequestException('El monto debe ser mayor a 0');
-    const order = await this.dataSource.getRepository(Order).findOne({ where: { id: orderId } });
+    const order = await this.dataSource.getRepository(Order).findOne({ where: { tenantId, id: orderId } });
     if (!order) throw new Error("Order not found");
     const history = order.abonosHistory || [];
     history.push({ id: Date.now().toString(), amount, date: new Date().toISOString() });
@@ -60,8 +60,8 @@ export class OrdersService {
     return this.dataSource.getRepository(Order).save(order);
   }
 
-  async revertAbono(orderId: string, index: number) {
-    const order = await this.dataSource.getRepository(Order).findOne({ where: { id: orderId } });
+  async revertAbono(tenantId: string, orderId: string, index: number) {
+    const order = await this.dataSource.getRepository(Order).findOne({ where: { tenantId, id: orderId } });
     if (!order) throw new Error("Order not found");
     const history = order.abonosHistory || [];
     if (index >= 0 && index < history.length) {
@@ -79,7 +79,7 @@ export class OrdersService {
     return order;
   }
 
-  async createOrder(dto: CreateOrderDto) {
+  async createOrder(tenantId: string, dto: CreateOrderDto) {
     if (!dto.items || (dto.items.length === 0 && dto.paymentStatus !== PaymentStatus.PENDING)) {
       throw new BadRequestException('El carrito no puede estar vacío');
     }
@@ -96,7 +96,7 @@ export class OrdersService {
       const discountAmount = dto.discountAmount || 0;
 
       if (dto.deliveryMethod === DeliveryMethod.DELIVERY && dto.deliveryZoneId) {
-        const zone = await manager.findOne(DeliveryZone, { where: { id: dto.deliveryZoneId } });
+        const zone = await manager.findOne(DeliveryZone, { where: { tenantId, id: dto.deliveryZoneId } });
         if (zone) {
           deliveryFee = zone.feePrice;
         }
@@ -106,7 +106,7 @@ export class OrdersService {
       let requiresPreparation = false;
       for (const itemDto of dto.items) {
         const product = await manager.findOne(Product, { 
-          where: { id: itemDto.productId },
+          where: { tenantId, id: itemDto.productId },
           relations: { comboItems: { component: true } }
         });
         if (product) {
@@ -126,7 +126,7 @@ export class OrdersService {
 
       const initialStatus = requiresPreparation ? OrderStatus.PREPARING : OrderStatus.PENDING;
 
-        const order = manager.create(Order, {
+        const order = manager.create(Order, { tenantId,
           customerName: dto.customerName,
           customerPhone: dto.customerPhone || '',
           customerAddress: dto.customerAddress || '',
@@ -155,7 +155,7 @@ export class OrdersService {
 
       for (const itemDto of dto.items) {
         const product = await manager.findOne(Product, { 
-          where: { id: itemDto.productId },
+          where: { tenantId, id: itemDto.productId },
           relations: { comboItems: { component: true }, recipe: { rawMaterial: true } }
         });
         
@@ -176,7 +176,7 @@ export class OrdersService {
             if (ri.rawMaterial) {
               ri.rawMaterial.stockQuantity -= (itemDto.quantity * ri.quantity);
               await manager.save(RawMaterial, ri.rawMaterial);
-              const mov = manager.create(StockMovement, {
+              const mov = manager.create(StockMovement, { tenantId,
                 rawMaterialId: ri.rawMaterial.id,
                 type: MovementType.OUT_SALE,
                 quantity: itemDto.quantity * ri.quantity,
@@ -195,7 +195,7 @@ export class OrdersService {
         if (product.isCombo && !product.isPreAssembled && product.comboItems) {
             for (const ci of product.comboItems) {
                 if (ci.component) {
-                    const comp = await manager.findOne(Product, { where: { id: ci.component.id }, relations: { recipe: { rawMaterial: true } } });
+                    const comp = await manager.findOne(Product, { where: { tenantId, id: ci.component.id }, relations: { recipe: { rawMaterial: true } } });
                     if (comp && comp.recipe) {
                         for (const ri of comp.recipe) {
                             if (ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit * ci.quantity;
@@ -212,7 +212,7 @@ export class OrdersService {
         
         totalCost += unitCost * itemDto.quantity;
 
-        const orderItem = manager.create(OrderItem, {
+        const orderItem = manager.create(OrderItem, { tenantId,
           orderId: savedOrder.id,
           productId: product.id,
           productName: product.name,
@@ -241,23 +241,24 @@ export class OrdersService {
     });
   }
 
-  async getAllOrders() {
+  async getAllOrders(tenantId: string) {
     return this.dataSource.getRepository(Order).find({
+      where: { tenantId },
       relations: { items: { product: true }, deliveryZone: true },
       order: { createdAt: 'DESC' },
     });
   }
 
-  async getOrderById(id: string) {
+  async getOrderById(tenantId: string, id: string) {
     return this.dataSource.getRepository(Order).findOne({
-      where: { id },
+      where: { tenantId, id },
       relations: { items: { product: true } }
     });
   }
 
-  async updatePaymentStatus(id: string, dto: UpdatePaymentDto) {
+  async updatePaymentStatus(tenantId: string, id: string, dto: UpdatePaymentDto) {
     const orderRepo = this.dataSource.getRepository(Order);
-    const order = await orderRepo.findOne({ where: { id } });
+    const order = await orderRepo.findOne({ where: { tenantId, id } });
     if (!order) throw new BadRequestException('Pedido no encontrado');
     if (order.status === OrderStatus.CANCELED) throw new BadRequestException('El pedido está cancelado');
     
@@ -273,10 +274,10 @@ export class OrdersService {
     return orderRepo.save(order);
   }
 
-  async updateOrderStatus(id: string, status: OrderStatus) {
+  async updateOrderStatus(tenantId: string, id: string, status: OrderStatus) {
     return this.dataSource.transaction(async (manager) => {
       const order = await manager.findOne(Order, { 
-        where: { id },
+        where: { tenantId, id },
         relations: { items: true } 
       });
       
@@ -286,7 +287,7 @@ export class OrdersService {
       if (status === OrderStatus.DELIVERED) {
         for (const item of order.items) {
           const product = await manager.findOne(Product, { 
-            where: { id: item.productId },
+            where: { tenantId, id: item.productId },
             relations: { comboItems: { component: true } }
           });
           if (product) {
@@ -315,7 +316,7 @@ export class OrdersService {
         // Reverse inventory
         for (const item of order.items) {
           const product = await manager.findOne(Product, { 
-            where: { id: item.productId },
+            where: { tenantId, id: item.productId },
             relations: { comboItems: { component: true }, recipe: { rawMaterial: true } }
           });
           
@@ -337,7 +338,7 @@ export class OrdersService {
                 if (ri.rawMaterial) {
                   ri.rawMaterial.stockQuantity += (item.quantity * ri.quantity);
                   await manager.save(RawMaterial, ri.rawMaterial);
-                  const mov = manager.create(StockMovement, {
+                  const mov = manager.create(StockMovement, { tenantId,
                     rawMaterialId: ri.rawMaterial.id,
                     type: MovementType.IN,
                     quantity: item.quantity * ri.quantity,
@@ -367,10 +368,10 @@ export class OrdersService {
     });
   }
 
-  async cloneOrder(id: string) {
+  async cloneOrder(tenantId: string, id: string) {
     const orderRepo = this.dataSource.getRepository(Order);
     const order = await orderRepo.findOne({ 
-      where: { id },
+      where: { tenantId, id },
       relations: { items: true } 
     });
     if (!order) throw new BadRequestException('Pedido original no encontrado');
@@ -396,17 +397,17 @@ export class OrdersService {
       unitPrice: i.unitPrice
     }));
 
-    return this.createOrder(dto);
+    return this.createOrder(tenantId, dto);
   }
 
-  async autoAllocatePhysicalStock() {
+  async autoAllocatePhysicalStock(tenantId: string) {
     // This is the intelligent FIFO routing system
     return this.dataSource.transaction(async (manager) => {
       // 1. Get all active orders (PENDING and PREPARING) ordered by creation date (FIFO)
       const activeOrders = await manager.find(Order, {
         where: [
-          { status: OrderStatus.PENDING },
-          { status: OrderStatus.PREPARING }
+          { status: OrderStatus.PENDING, tenantId },
+          { status: OrderStatus.PREPARING, tenantId }
         ],
         order: { createdAt: 'ASC' },
         relations: { items: true }
@@ -414,6 +415,7 @@ export class OrdersService {
 
       // 2. We need a fast lookup for physical stock
       const products = await manager.find(Product, {
+        where: { tenantId },
         relations: { comboItems: { component: true } }
       });
       const physicalStockMap = new Map<string, number>();
@@ -482,7 +484,7 @@ export class OrdersService {
     });
   }
 
-  async editOrder(id: string, dto: CreateOrderDto) {
+  async editOrder(tenantId: string, id: string, dto: CreateOrderDto) {
     if (!dto.items || (dto.items.length === 0 && dto.paymentStatus !== PaymentStatus.PENDING)) {
       throw new BadRequestException('El carrito no puede estar vacío');
     }
@@ -494,7 +496,7 @@ export class OrdersService {
 
     return this.dataSource.transaction(async (manager) => {
       const order = await manager.findOne(Order, { 
-        where: { id },
+        where: { tenantId, id },
         relations: { items: true }
       });
       if (!order) throw new BadRequestException('Pedido no encontrado');
@@ -518,7 +520,7 @@ export class OrdersService {
       
       const adjustProductStock = async (productId: string, quantity: number, isDeduction: boolean) => {
         const product = await manager.findOne(Product, { 
-          where: { id: productId },
+          where: { tenantId, id: productId },
           relations: { recipe: { rawMaterial: true }, comboItems: { component: true } }
         });
         if (!product) return;
@@ -579,7 +581,7 @@ export class OrdersService {
           await adjustProductStock(productId, newItem.quantity, true);
           
           const product = await manager.findOne(Product, { 
-             where: { id: productId },
+             where: { tenantId, id: productId },
              relations: { comboItems: { component: { recipe: { rawMaterial: true } } }, recipe: { rawMaterial: true } }
           });
           
@@ -602,7 +604,7 @@ export class OrdersService {
           }
           
           const subtotal = newItem.quantity * newItem.unitPrice;
-          const orderItem = manager.create(OrderItem, {
+          const orderItem = manager.create(OrderItem, { tenantId,
             orderId: order.id,
             productId: productId,
             productName: product?.name || '',
@@ -635,10 +637,10 @@ export class OrdersService {
     });
   }
   
-  async deliverPartial(id: string, deliveries: { orderItemId: string, quantityToDeliver: number }[]) {
+  async deliverPartial(tenantId: string, id: string, deliveries: { orderItemId: string, quantityToDeliver: number }[]) {
     return this.dataSource.transaction(async (manager) => {
       const order = await manager.findOne(Order, { 
-        where: { id },
+        where: { tenantId, id },
         relations: { items: true } 
       });
       if (!order) throw new BadRequestException('Pedido no encontrado');
@@ -658,7 +660,7 @@ export class OrdersService {
           }
   
           const product = await manager.findOne(Product, { 
-            where: { id: item.productId },
+            where: { tenantId, id: item.productId },
             relations: { comboItems: { component: true } }
           });
           

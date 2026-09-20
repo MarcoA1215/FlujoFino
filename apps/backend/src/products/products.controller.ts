@@ -13,8 +13,9 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  findAll() {
-    return this.productsService.findAll(req.user.tenantId);}
+  findAll(@Request() req: any) {
+    return this.productsService.findAll(req.user.tenantId);
+  }
 
   @Post()
   create(@Request() req: any, @Body() dto: CreateProductDto) {
