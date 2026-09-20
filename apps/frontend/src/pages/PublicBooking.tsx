@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { IonPage, IonContent, IonCard, IonCardContent, IonInput, IonLabel, IonItem, IonButton, useIonToast, IonSpinner, IonIcon, IonGrid, IonRow, IonCol } from '@ionic/react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { checkmarkCircleOutline, calendarOutline, timeOutline, personOutline, chevronBackOutline } from 'ionicons/icons';
+import { checkmarkCircleOutline, timeOutline, chevronBackOutline } from 'ionicons/icons';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
