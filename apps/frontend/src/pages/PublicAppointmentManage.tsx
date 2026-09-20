@@ -100,7 +100,7 @@ const PublicAppointmentManage: React.FC = () => {
     for(let i=0; i<14; i++) {
       const d = new Date();
       d.setDate(today.getDate() + i);
-      dates.push(d.toISOString().split('T')[0]);
+      dates.push(new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0]);
     }
     return dates;
   };

@@ -55,7 +55,7 @@ const PublicBooking: React.FC = () => {
       const res = await axios.post(`${apiBase}/public/reservations/${tenantId}`, {
         customerName, 
         customerPhone, 
-        date: selectedDate?.toISOString().split('T')[0], 
+        date: (selectedDate ? new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : undefined), 
         time: selectedTime, 
         numberOfPeople, 
         notes,
@@ -101,7 +101,7 @@ const PublicBooking: React.FC = () => {
       if (!selectedDate || !tenantId) return;
       setLoadingSlots(true);
       try {
-        const dStr = selectedDate.toISOString().split('T')[0];
+        const dStr = new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
         const sId = selectedService ? `&serviceId=${selectedService.id}` : '';
         const res = await axios.get(`${apiBase}/public/reservations/tenant/${tenantId}/availability?date=${dStr}${sId}`);
         setAvailableSlots(res.data);

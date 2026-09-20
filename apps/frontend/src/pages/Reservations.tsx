@@ -51,7 +51,7 @@ const Reservations: React.FC = () => {
 
   const handleMassShift = async () => {
     if (!shiftTimeFrom || !shiftMinutes) return;
-    const dateStr = new Date().toISOString().split('T')[0]; // Current day by default
+    const dateStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]; // Current day by default
     
     try {
       const res = await apiClient.post('/reservations/shift', {

@@ -25,7 +25,7 @@ const Users: React.FC = () => {
   const [selectedUserForPay, setSelectedUserForPay] = useState<UserData | null>(null);
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('USD');
-  const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
+  const [payDate, setPayDate] = useState(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]);
   
   const [isChecked, setIsChecked] = useState(false);
   const [isExisting, setIsExisting] = useState(false);
