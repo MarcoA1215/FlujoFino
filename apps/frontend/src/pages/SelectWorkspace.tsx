@@ -6,7 +6,7 @@ import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 
 const SelectWorkspace: React.FC = () => {
-  const { user, login } = useContext(AuthContext);
+  const { user, login, logout } = useContext(AuthContext);
   const router = useIonRouter();
   const [presentToast] = useIonToast();
 
@@ -22,7 +22,7 @@ const SelectWorkspace: React.FC = () => {
         };
         localStorage.setItem('pendingAccessRequestId', res.data.requestId);
         localStorage.setItem('pendingAccessRequestInfo', JSON.stringify(info));
-        window.location.href = '/login';
+        await logout();
         return;
       }
       login(res.data.access_token, res.data.user, res.data.workspaces);

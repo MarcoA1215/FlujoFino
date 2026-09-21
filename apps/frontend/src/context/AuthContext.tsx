@@ -65,6 +65,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       };
       localStorage.setItem('pendingAccessRequestId', res.data.requestId);
       localStorage.setItem('pendingAccessRequestInfo', JSON.stringify(info));
+      setToken(null);
+      setUser(null);
+      await Preferences.remove({ key: 'token' });
+      await Preferences.remove({ key: 'user' });
+      delete apiClient.defaults.headers.common['Authorization'];
       window.location.href = '/login';
       return;
     }

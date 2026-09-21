@@ -53,7 +53,8 @@ const HomeRedirector: React.FC = () => {
 const LoginRoute: React.FC = () => {
   const { isAuthenticated, isLoading } = useContext(AuthContext);
   if (isLoading) return null;
-  if (isAuthenticated) return <HomeRedirector />;
+  const hasPending = !!localStorage.getItem('pendingAccessRequestId');
+  if (isAuthenticated && !hasPending) return <HomeRedirector />;
   return <Login />;
 };
 
