@@ -48,9 +48,19 @@ const Users: React.FC = () => {
   const [isChecked, setIsChecked] = useState(false);
   const [isExisting, setIsExisting] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
+  const [accessRequests, setAccessRequests] = useState<any[]>([]);
   
   const [presentToast] = useIonToast();
   const { user } = useContext(AuthContext);
+
+  const fetchAccessRequests = async () => {
+    try {
+      const res = await apiClient.get('/users/access-requests');
+      setAccessRequests(res.data || []);
+    } catch (e) {
+      console.error('Error cargando solicitudes de acceso', e);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -62,6 +72,7 @@ const Users: React.FC = () => {
       } catch (err) {
         console.error('Error cargando settings', err);
       }
+      fetchAccessRequests();
     } catch (e) {
       presentToast({ message: 'Error cargando usuarios', duration: 3000, color: 'danger' });
     }
@@ -70,8 +81,31 @@ const Users: React.FC = () => {
   useEffect(() => {
     if (user?.role === UserRole.ADMIN) {
       fetchUsers();
+      fetchAccessRequests();
+      const interval = setInterval(fetchAccessRequests, 15000);
+      return () => clearInterval(interval);
     }
   }, [user]);
+
+  const handleApproveAccess = async (id: string, userName: string) => {
+    try {
+      await apiClient.post(`/users/access-requests/${id}/approve`);
+      presentToast({ message: `Acceso aprobado para ${userName}`, duration: 2500, color: 'success' });
+      fetchAccessRequests();
+    } catch (e: any) {
+      presentToast({ message: 'Error al aprobar: ' + (e.response?.data?.message || e.message), duration: 3500, color: 'danger' });
+    }
+  };
+
+  const handleRejectAccess = async (id: string, userName: string) => {
+    try {
+      await apiClient.post(`/users/access-requests/${id}/reject`);
+      presentToast({ message: `Acceso rechazado para ${userName}`, duration: 2500, color: 'warning' });
+      fetchAccessRequests();
+    } catch (e: any) {
+      presentToast({ message: 'Error al rechazar: ' + (e.response?.data?.message || e.message), duration: 3500, color: 'danger' });
+    }
+  };
 
   const handleCheckEmail = async () => {
     if (!email) return presentToast({ message: 'Ingresa un correo electrónico', duration: 3000, color: 'warning' });
@@ -382,6 +416,104 @@ const Users: React.FC = () => {
                       </tbody>
                     </table>
                   </div>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
+          </IonRow>
+
+          {/* Solicitudes de Acceso Pendientes */}
+          <IonRow className="ion-margin-top">
+            <IonCol size="12">
+              <IonCard>
+                <IonCardHeader style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <IonCardTitle style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                      ⏳ Solicitudes de Acceso Pendientes
+                    </IonCardTitle>
+                    {accessRequests.length > 0 && (
+                      <IonBadge color="warning" style={{ fontSize: '0.85rem' }}>
+                        {accessRequests.length} pendientes
+                      </IonBadge>
+                    )}
+                  </div>
+                  <IonButton size="small" fill="outline" color="medium" onClick={fetchAccessRequests}>
+                    <IonIcon icon={refreshOutline} slot="start" />
+                    Actualizar
+                  </IonButton>
+                </IonCardHeader>
+                <IonCardContent style={{ padding: accessRequests.length === 0 ? '20px' : 0 }}>
+                  {accessRequests.length === 0 ? (
+                    <div className="ion-text-center" style={{ color: '#64748b', padding: '15px' }}>
+                      <p style={{ margin: 0 }}>No hay solicitudes de acceso pendientes en este momento.</p>
+                      <p style={{ margin: '5px 0 0 0', fontSize: '13px' }}>
+                        Cuando un empleado intente ingresar fuera de su horario asignado o si la política de aprobación está activa, aparecerá aquí.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="table-responsive">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Empleado / Cargo</th>
+                            <th>Hora Intento</th>
+                            <th>Horario Asignado</th>
+                            <th>Motivo</th>
+                            <th>Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {accessRequests.map((req: any) => (
+                            <tr key={req.id}>
+                              <td>
+                                <div><strong>{req.userName}</strong></div>
+                                {req.jobTitle && (
+                                  <div style={{ fontSize: '0.85em', color: '#64748b' }}>
+                                    {req.jobTitle}
+                                  </div>
+                                )}
+                                <IonBadge color="medium" style={{ fontSize: '0.75rem', marginTop: '3px' }}>
+                                  {req.role}
+                                </IonBadge>
+                              </td>
+                              <td>
+                                <strong style={{ color: '#b45309' }}>⏱️ {req.attemptTime}</strong>
+                              </td>
+                              <td>
+                                {req.entryTime && req.exitTime ? (
+                                  <span>{req.entryTime} - {req.exitTime}</span>
+                                ) : (
+                                  <span style={{ color: '#888' }}>Sin horario</span>
+                                )}
+                              </td>
+                              <td>
+                                <IonBadge color={req.reason === 'POLICY_ALWAYS_REQUIRE' ? 'tertiary' : 'warning'}>
+                                  {req.reason === 'POLICY_ALWAYS_REQUIRE' ? 'Aprobación Obligatoria' : 'Fuera de Horario'}
+                                </IonBadge>
+                              </td>
+                              <td>
+                                <IonButton 
+                                  size="small" 
+                                  color="success" 
+                                  onClick={() => handleApproveAccess(req.id, req.userName)}
+                                  style={{ marginRight: '6px' }}
+                                >
+                                  ✅ Aprobar
+                                </IonButton>
+                                <IonButton 
+                                  size="small" 
+                                  color="danger" 
+                                  fill="outline"
+                                  onClick={() => handleRejectAccess(req.id, req.userName)}
+                                >
+                                  ❌ Rechazar
+                                </IonButton>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </IonCardContent>
               </IonCard>
             </IonCol>

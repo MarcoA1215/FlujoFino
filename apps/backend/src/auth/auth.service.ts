@@ -1,8 +1,50 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { DataSource } from 'typeorm';
+import { Settings } from '../entities/settings.entity';
+import { AccessRequest, AccessRequestStatus } from '../entities/access-request.entity';
+
+function toMinutes(hhmm: string): number {
+  const parts = hhmm.split(':');
+  return (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+}
+
+function isWithinShiftWithTolerance(currentTimeStr: string, entryTimeStr: string, exitTimeStr: string, toleranceMinutes = 30): boolean {
+  const current = toMinutes(currentTimeStr);
+  const entry = toMinutes(entryTimeStr);
+  const exit = toMinutes(exitTimeStr);
+
+  if (entry <= exit) {
+    const allowedStart = entry - toleranceMinutes;
+    const allowedEnd = exit + toleranceMinutes;
+
+    if (allowedStart < 0) {
+      return current >= (allowedStart + 1440) || current <= allowedEnd;
+    }
+    if (allowedEnd >= 1440) {
+      return current >= allowedStart || current <= (allowedEnd - 1440);
+    }
+    return current >= allowedStart && current <= allowedEnd;
+  } else {
+    let allowedStart = entry - toleranceMinutes;
+    let allowedEnd = exit + toleranceMinutes;
+    if (allowedStart < 0) allowedStart += 1440;
+    if (allowedEnd >= 1440) allowedEnd -= 1440;
+    return current >= allowedStart || current <= allowedEnd;
+  }
+}
+
+function getVenezuelaTime(): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Caracas',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date());
+}
+
 
 @Injectable()
 export class AuthService {
@@ -54,25 +96,111 @@ export class AuthService {
       throw new UnauthorizedException('El usuario no tiene acceso a ninguna sucursal');
     }
 
-    if (access.workSchedules && access.workSchedules.length > 0) {
-      const now = new Date();
-      const currentDay = now.getDay();
-      const currentHour = now.getHours().toString().padStart(2, '0');
-      const currentMinute = now.getMinutes().toString().padStart(2, '0');
-      const currentTime = `${currentHour}:${currentMinute}:00`;
+    const effectiveRole = access.role || user.role;
+    const isAdmin = user.role === 'ADMIN' || effectiveRole === 'ADMIN';
 
-      const inSchedule = access.workSchedules.some(ws => {
-        if (ws.dayOfWeek !== currentDay) return false;
-        return currentTime >= ws.startTime && currentTime <= ws.endTime;
-      });
+    if (!isAdmin) {
+      const nowInVenezuela = getVenezuelaTime();
+      const settingsRepo = this.dataSource.getRepository(Settings);
+      const tenantSettings = await settingsRepo.findOne({ where: { tenantId: access.tenantId } });
+      const requireApprovalAlways = tenantSettings?.requireApprovalAlways || false;
 
-      if (!inSchedule) {
-        throw new UnauthorizedException('Acceso denegado: Fuera del horario de trabajo permitido');
+      let requiresApproval = false;
+      let reason: 'OUT_OF_SCHEDULE' | 'POLICY_ALWAYS_REQUIRE' = 'OUT_OF_SCHEDULE';
+
+      if (requireApprovalAlways) {
+        requiresApproval = true;
+        reason = 'POLICY_ALWAYS_REQUIRE';
+      } else if (access.entryTime && access.exitTime) {
+        const inside = isWithinShiftWithTolerance(nowInVenezuela, access.entryTime, access.exitTime, 30);
+        if (!inside) {
+          requiresApproval = true;
+          reason = 'OUT_OF_SCHEDULE';
+        }
+      }
+
+      if (requiresApproval) {
+        const accessReqRepo = this.dataSource.getRepository(AccessRequest);
+        let pendingReq = await accessReqRepo.findOne({
+          where: {
+            tenantId: access.tenantId,
+            userId: user.id,
+            status: AccessRequestStatus.PENDING,
+          },
+          order: { createdAt: 'DESC' },
+        });
+
+        if (!pendingReq) {
+          pendingReq = accessReqRepo.create({
+            tenantId: access.tenantId,
+            userId: user.id,
+            userName: user.username,
+            userEmail: user.email,
+            jobTitle: access.jobTitle || undefined,
+            role: effectiveRole,
+            status: AccessRequestStatus.PENDING,
+            reason,
+            entryTime: access.entryTime || undefined,
+            exitTime: access.exitTime || undefined,
+            attemptTime: nowInVenezuela,
+          });
+          await accessReqRepo.save(pendingReq);
+        } else {
+          pendingReq.attemptTime = nowInVenezuela;
+          pendingReq.reason = reason;
+          await accessReqRepo.save(pendingReq);
+        }
+
+        return {
+          requiresApproval: true,
+          requestId: pendingReq.id,
+          status: AccessRequestStatus.PENDING,
+          message: reason === 'POLICY_ALWAYS_REQUIRE'
+            ? 'Se requiere autorización de un administrador para ingresar (política activa).'
+            : `Intento de acceso fuera de horario (${access.entryTime} - ${access.exitTime}). Esperando aprobación de un administrador.`,
+          user: { id: user.id, username: user.username, jobTitle: access.jobTitle, role: effectiveRole },
+          attemptTime: nowInVenezuela,
+          workspaces,
+        } as any;
       }
     }
 
     const tenantName = access?.tenant?.name || 'Sistema Central';
-    return { user: result, tenantId: access?.tenantId || 'admin-system', role: access?.role || user.role, tenantName, workspaces };
+    return { user: result, tenantId: access?.tenantId || 'admin-system', role: effectiveRole, tenantName, workspaces };
+  }
+
+  async getAccessRequestStatus(requestId: string) {
+    const accessReqRepo = this.dataSource.getRepository(AccessRequest);
+    const req = await accessReqRepo.findOne({ where: { id: requestId } });
+    if (!req) {
+      throw new NotFoundException('Solicitud no encontrada');
+    }
+
+    if (req.status === AccessRequestStatus.APPROVED) {
+      const payload = req.approvedPayload ? JSON.parse(req.approvedPayload) : null;
+      return {
+        status: AccessRequestStatus.APPROVED,
+        access_token: req.approvedToken,
+        user: payload?.user,
+        workspaces: payload?.workspaces || [],
+        message: 'Acceso aprobado por el administrador',
+      };
+    }
+
+    if (req.status === AccessRequestStatus.REJECTED) {
+      return {
+        status: AccessRequestStatus.REJECTED,
+        message: 'Tu solicitud de acceso ha sido rechazada por el administrador.',
+      };
+    }
+
+    // PENDING (strictly never expose approvedToken here)
+    return {
+      status: AccessRequestStatus.PENDING,
+      message: 'Esperando que un administrador apruebe la solicitud...',
+      attemptTime: req.attemptTime,
+      userName: req.userName,
+    };
   }
 
   async validateUserToken(username: string, requestedTenantId: string): Promise<any> {

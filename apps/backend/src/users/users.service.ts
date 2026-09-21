@@ -1,9 +1,12 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
+import { Tenant } from '../entities/tenant.entity';
+import { AccessRequest, AccessRequestStatus } from '../entities/access-request.entity';
 import { UserRole } from '@nutrideli/shared-types';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -11,6 +14,7 @@ export class UsersService implements OnModuleInit {
   constructor(
     @InjectRepository(User)
     private usersRepo: Repository<User>,
+    private jwtService: JwtService,
   ) {}
 
   async onModuleInit() {
@@ -248,5 +252,57 @@ export class UsersService implements OnModuleInit {
     if (!access) throw new Error('Invitación no encontrada o ya procesada');
     access.status = 'REJECTED';
     await this.usersRepo.manager.save(access);
+  }
+
+  async getAccessRequests(tenantId: string): Promise<AccessRequest[]> {
+    if (!tenantId) return [];
+    const accessReqRepo = this.usersRepo.manager.getRepository(AccessRequest);
+    return accessReqRepo.find({
+      where: { tenantId, status: AccessRequestStatus.PENDING },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async approveAccessRequest(tenantId: string, requestId: string): Promise<AccessRequest> {
+    const accessReqRepo = this.usersRepo.manager.getRepository(AccessRequest);
+    const req = await accessReqRepo.findOne({ where: { id: requestId, tenantId } });
+    if (!req) throw new NotFoundException('Solicitud no encontrada');
+
+    const payload = {
+      username: req.userName,
+      sub: req.userId,
+      role: req.role,
+      tenantId: req.tenantId,
+      tenantName: 'Flujo Fino',
+    };
+
+    const tenant = await this.usersRepo.manager.findOne(Tenant, { where: { id: tenantId } });
+    if (tenant) {
+      payload.tenantName = tenant.name;
+    }
+
+    const token = this.jwtService.sign(payload);
+    req.status = AccessRequestStatus.APPROVED;
+    req.approvedToken = token;
+    req.approvedPayload = JSON.stringify({
+      user: payload,
+      workspaces: [{
+        tenantId: req.tenantId,
+        name: payload.tenantName,
+        role: req.role,
+        status: 'ACCEPTED',
+      }],
+    });
+
+    return accessReqRepo.save(req);
+  }
+
+  async rejectAccessRequest(tenantId: string, requestId: string): Promise<AccessRequest> {
+    const accessReqRepo = this.usersRepo.manager.getRepository(AccessRequest);
+    const req = await accessReqRepo.findOne({ where: { id: requestId, tenantId } });
+    if (!req) throw new NotFoundException('Solicitud no encontrada');
+
+    req.status = AccessRequestStatus.REJECTED;
+    return accessReqRepo.save(req);
   }
 }

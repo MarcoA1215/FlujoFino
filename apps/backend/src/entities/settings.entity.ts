@@ -31,6 +31,9 @@ export class Settings {
   @Column('boolean', { default: false })
   featureBuySell: boolean;
 
+  @Column('boolean', { default: false })
+  requireApprovalAlways: boolean;
+
   // --- Booking Configuration ---
   @Column('jsonb', { nullable: true })
   businessHours: any;

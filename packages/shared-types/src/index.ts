@@ -168,3 +168,26 @@ export interface BookingServiceDTO {
   durationMinutes: number;
   price?: number;
 }
+
+export enum AccessRequestStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
+
+export interface AccessRequestDTO {
+  id: string;
+  tenantId: string;
+  userId: string;
+  userName: string;
+  userEmail?: string;
+  jobTitle?: string;
+  role: UserRole;
+  status: AccessRequestStatus;
+  reason: 'OUT_OF_SCHEDULE' | 'POLICY_ALWAYS_REQUIRE';
+  entryTime?: string;
+  exitTime?: string;
+  attemptTime: string;
+  createdAt: string;
+}
+

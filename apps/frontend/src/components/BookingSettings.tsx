@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonSelect, IonSelectOption, IonButton, IonIcon, IonRow, IonCol, IonGrid, IonToggle } from '@ionic/react';
-import { timeOutline, checkmarkCircleOutline } from 'ionicons/icons';
+import { checkmarkCircleOutline } from 'ionicons/icons';
 
 const DAYS_OF_WEEK = [
   { id: '1', name: 'Lunes' },

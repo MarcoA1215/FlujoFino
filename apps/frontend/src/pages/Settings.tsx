@@ -11,6 +11,7 @@ interface Settings {
   companyCedula?: string;
   companyPhone?: string;
   allowPartialPayments?: boolean;
+  requireApprovalAlways?: boolean;
   featureCustomerSchedules?: boolean;
   featureRecipes?: boolean;
   featureBuySell?: boolean;
@@ -49,6 +50,7 @@ const SettingsPage: React.FC = () => {
           companyCedula: settings.companyCedula, 
           companyPhone: settings.companyPhone,
           allowPartialPayments: settings.allowPartialPayments,
+          requireApprovalAlways: settings.requireApprovalAlways,
           featureCustomerSchedules: settings.featureCustomerSchedules,
           featureRecipes: settings.featureRecipes,
           featureBuySell: settings.featureBuySell,
@@ -127,6 +129,18 @@ const SettingsPage: React.FC = () => {
                   <IonItem>
                     <IonLabel>Permitir Pagos Parciales (Abonos)</IonLabel>
                     <IonToggle checked={settings.allowPartialPayments || false} onIonChange={e => setSettings({...settings, allowPartialPayments: e.detail.checked})} />
+                  </IonItem>
+                  <IonItem>
+                    <IonLabel className="ion-text-wrap">
+                      <h2>Siempre solicitar aprobación de entrada a empleados</h2>
+                      <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
+                        Incluso si el empleado está dentro de su horario habitual, deberá ser aprobado por un administrador antes de ingresar.
+                      </p>
+                    </IonLabel>
+                    <IonToggle 
+                      checked={settings.requireApprovalAlways || false} 
+                      onIonChange={e => setSettings({...settings, requireApprovalAlways: e.detail.checked})} 
+                    />
                   </IonItem>
                 </IonCardContent>
               </IonCard>

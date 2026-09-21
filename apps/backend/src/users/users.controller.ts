@@ -15,6 +15,24 @@ export class UsersController {
     return this.usersService.findActiveEmployees(req.user.tenantId);
   }
 
+  @Get('access-requests')
+  @Roles(UserRole.ADMIN)
+  getAccessRequests(@Request() req: any) {
+    return this.usersService.getAccessRequests(req.user.tenantId);
+  }
+
+  @Post('access-requests/:id/approve')
+  @Roles(UserRole.ADMIN)
+  approveAccessRequest(@Request() req: any, @Param('id') id: string) {
+    return this.usersService.approveAccessRequest(req.user.tenantId, id);
+  }
+
+  @Post('access-requests/:id/reject')
+  @Roles(UserRole.ADMIN)
+  rejectAccessRequest(@Request() req: any, @Param('id') id: string) {
+    return this.usersService.rejectAccessRequest(req.user.tenantId, id);
+  }
+
   @Get()
   @Roles(UserRole.ADMIN)
   findAll(@Request() req: any) {

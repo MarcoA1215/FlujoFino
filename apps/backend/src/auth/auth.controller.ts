@@ -12,11 +12,21 @@ export class AuthController {
   async login(@Body() body: any) {
     const result = await this.authService.validateUser(body.username, body.password, body.tenantId);
     if (!result) {
-      throw new UnauthorizedException('Credenciales inválidas o fuera de horario');
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+    if ((result as any).requiresApproval) {
+      return result;
     }
     const tokenData = await this.authService.login(result.user, result.tenantId || '', result.role, result.tenantName);
     return { ...tokenData, workspaces: result.workspaces };
   }
+
+  @Public()
+  @Get('access-request/:id')
+  async getAccessRequestStatus(@Param('id') id: string) {
+    return this.authService.getAccessRequestStatus(id);
+  }
+
   @Public()
   @Post('register')
   async register(@Body() body: any) {
