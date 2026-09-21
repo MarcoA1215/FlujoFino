@@ -56,6 +56,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const switchWorkspace = async (tenantId: string) => {
     const res = await apiClient.post('/auth/select-workspace', { tenantId });
+    if (res.data.requiresApproval) {
+      const info = {
+        requestId: res.data.requestId,
+        username: res.data.user?.username || user?.username,
+        attemptTime: res.data.attemptTime,
+        message: res.data.message,
+      };
+      localStorage.setItem('pendingAccessRequestId', res.data.requestId);
+      localStorage.setItem('pendingAccessRequestInfo', JSON.stringify(info));
+      window.location.href = '/login';
+      return;
+    }
     await login(res.data.access_token, res.data.user, res.data.workspaces);
     window.location.href = '/dashboard';
   };

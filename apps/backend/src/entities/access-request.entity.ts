@@ -57,3 +57,4 @@ export class AccessRequest {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
+

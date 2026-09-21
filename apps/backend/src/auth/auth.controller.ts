@@ -72,6 +72,9 @@ export class AuthController {
   async selectWorkspace(@Request() req, @Body() body: { tenantId: string }) {
     // Re-validate to get specific tenant details
     const result = await this.authService.validateUserToken(req.user.username, body.tenantId);
+    if (result.requiresApproval) {
+      return result;
+    }
     const tokenData = await this.authService.login(result.user, result.tenantId, result.role, result.tenantName);
     return { ...tokenData, workspaces: result.workspaces };
   }

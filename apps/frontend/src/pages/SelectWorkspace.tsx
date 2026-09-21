@@ -13,6 +13,18 @@ const SelectWorkspace: React.FC = () => {
   const handleSelect = async (tenantId: string) => {
     try {
       const res = await apiClient.post('/auth/select-workspace', { tenantId });
+      if (res.data.requiresApproval) {
+        const info = {
+          requestId: res.data.requestId,
+          username: res.data.user?.username || user?.username,
+          attemptTime: res.data.attemptTime,
+          message: res.data.message,
+        };
+        localStorage.setItem('pendingAccessRequestId', res.data.requestId);
+        localStorage.setItem('pendingAccessRequestInfo', JSON.stringify(info));
+        window.location.href = '/login';
+        return;
+      }
       login(res.data.access_token, res.data.user, res.data.workspaces);
       router.push('/', 'root', 'replace');
     } catch (e: any) {
@@ -83,7 +95,12 @@ const SelectWorkspace: React.FC = () => {
                   {active.map((w: any) => (
                     <IonItem button key={w.tenantId} onClick={() => handleSelect(w.tenantId)}>
                       <IonIcon icon={businessOutline} slot="start" />
-                      <IonLabel>{w.name}</IonLabel>
+                      <IonLabel>
+                        <h2><strong>{w.name}</strong></h2>
+                        <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                          Rol: <strong>{w.role}</strong>
+                        </p>
+                      </IonLabel>
                     </IonItem>
                   ))}
                 </IonList>

@@ -96,77 +96,95 @@ export class AuthService {
       throw new UnauthorizedException('El usuario no tiene acceso a ninguna sucursal');
     }
 
+    const approvalCheck = await this.checkEmployeeAccess(user, access, workspaces);
+    if (approvalCheck) {
+      return approvalCheck as any;
+    }
+
+    const effectiveRole = access.role || user.role;
+    const tenantName = access?.tenant?.name || 'Sistema Central';
+    return { user: result, tenantId: access?.tenantId || 'admin-system', role: effectiveRole, tenantName, workspaces };
+  }
+
+  async checkEmployeeAccess(
+    user: any,
+    access: any,
+    workspaces: any[],
+  ): Promise<{ requiresApproval: boolean; [key: string]: any } | null> {
     const effectiveRole = access.role || user.role;
     const isAdmin = user.role === 'ADMIN' || effectiveRole === 'ADMIN';
 
-    if (!isAdmin) {
-      const nowInVenezuela = getVenezuelaTime();
-      const settingsRepo = this.dataSource.getRepository(Settings);
-      const tenantSettings = await settingsRepo.findOne({ where: { tenantId: access.tenantId } });
-      const requireApprovalAlways = tenantSettings?.requireApprovalAlways || false;
+    if (isAdmin) {
+      return null;
+    }
 
-      let requiresApproval = false;
-      let reason: 'OUT_OF_SCHEDULE' | 'POLICY_ALWAYS_REQUIRE' = 'OUT_OF_SCHEDULE';
+    const nowInVenezuela = getVenezuelaTime();
+    const settingsRepo = this.dataSource.getRepository(Settings);
+    const tenantSettings = await settingsRepo.findOne({ where: { tenantId: access.tenantId } });
+    const requireApprovalAlways = tenantSettings?.requireApprovalAlways || false;
 
-      if (requireApprovalAlways) {
+    let requiresApproval = false;
+    let reason: 'OUT_OF_SCHEDULE' | 'POLICY_ALWAYS_REQUIRE' = 'OUT_OF_SCHEDULE';
+
+    if (requireApprovalAlways) {
+      requiresApproval = true;
+      reason = 'POLICY_ALWAYS_REQUIRE';
+    } else if (access.entryTime && access.exitTime) {
+      const inside = isWithinShiftWithTolerance(nowInVenezuela, access.entryTime, access.exitTime, 30);
+      if (!inside) {
         requiresApproval = true;
-        reason = 'POLICY_ALWAYS_REQUIRE';
-      } else if (access.entryTime && access.exitTime) {
-        const inside = isWithinShiftWithTolerance(nowInVenezuela, access.entryTime, access.exitTime, 30);
-        if (!inside) {
-          requiresApproval = true;
-          reason = 'OUT_OF_SCHEDULE';
-        }
-      }
-
-      if (requiresApproval) {
-        const accessReqRepo = this.dataSource.getRepository(AccessRequest);
-        let pendingReq = await accessReqRepo.findOne({
-          where: {
-            tenantId: access.tenantId,
-            userId: user.id,
-            status: AccessRequestStatus.PENDING,
-          },
-          order: { createdAt: 'DESC' },
-        });
-
-        if (!pendingReq) {
-          pendingReq = accessReqRepo.create({
-            tenantId: access.tenantId,
-            userId: user.id,
-            userName: user.username,
-            userEmail: user.email,
-            jobTitle: access.jobTitle || undefined,
-            role: effectiveRole,
-            status: AccessRequestStatus.PENDING,
-            reason,
-            entryTime: access.entryTime || undefined,
-            exitTime: access.exitTime || undefined,
-            attemptTime: nowInVenezuela,
-          });
-          await accessReqRepo.save(pendingReq);
-        } else {
-          pendingReq.attemptTime = nowInVenezuela;
-          pendingReq.reason = reason;
-          await accessReqRepo.save(pendingReq);
-        }
-
-        return {
-          requiresApproval: true,
-          requestId: pendingReq.id,
-          status: AccessRequestStatus.PENDING,
-          message: reason === 'POLICY_ALWAYS_REQUIRE'
-            ? 'Se requiere autorización de un administrador para ingresar (política activa).'
-            : `Intento de acceso fuera de horario (${access.entryTime} - ${access.exitTime}). Esperando aprobación de un administrador.`,
-          user: { id: user.id, username: user.username, jobTitle: access.jobTitle, role: effectiveRole },
-          attemptTime: nowInVenezuela,
-          workspaces,
-        } as any;
+        reason = 'OUT_OF_SCHEDULE';
       }
     }
 
-    const tenantName = access?.tenant?.name || 'Sistema Central';
-    return { user: result, tenantId: access?.tenantId || 'admin-system', role: effectiveRole, tenantName, workspaces };
+    if (!requiresApproval) {
+      return null;
+    }
+
+    const accessReqRepo = this.dataSource.getRepository(AccessRequest);
+    let pendingReq = await accessReqRepo.findOne({
+      where: {
+        tenantId: access.tenantId,
+        userId: user.id,
+        status: AccessRequestStatus.PENDING,
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!pendingReq) {
+      pendingReq = accessReqRepo.create({
+        tenantId: access.tenantId,
+        userId: user.id,
+        userName: user.username,
+        userEmail: user.email,
+        jobTitle: access.jobTitle || undefined,
+        role: effectiveRole,
+        status: AccessRequestStatus.PENDING,
+        reason,
+        entryTime: access.entryTime || undefined,
+        exitTime: access.exitTime || undefined,
+        attemptTime: nowInVenezuela,
+      });
+      await accessReqRepo.save(pendingReq);
+    } else {
+      pendingReq.attemptTime = nowInVenezuela;
+      pendingReq.reason = reason;
+      await accessReqRepo.save(pendingReq);
+    }
+
+    return {
+      requiresApproval: true,
+      requestId: pendingReq.id,
+      status: AccessRequestStatus.PENDING,
+      tenantId: access.tenantId,
+      tenantName: access.tenant?.name || 'Sucursal',
+      message: reason === 'POLICY_ALWAYS_REQUIRE'
+        ? 'Se requiere autorización de un administrador para ingresar (política activa).'
+        : `Intento de acceso fuera de horario (${access.entryTime} - ${access.exitTime}). Esperando aprobación de un administrador.`,
+      user: { id: user.id, username: user.username, jobTitle: access.jobTitle, role: effectiveRole },
+      attemptTime: nowInVenezuela,
+      workspaces,
+    };
   }
 
   async getAccessRequestStatus(requestId: string) {
@@ -217,7 +235,13 @@ export class AuthService {
       role: a.role,
       status: a.status
     }));
-    return { user: result, tenantId: access.tenantId, role: access.role, tenantName: access.tenant.name, workspaces };
+
+    const approvalCheck = await this.checkEmployeeAccess(user, access, workspaces);
+    if (approvalCheck) {
+      return approvalCheck;
+    }
+
+    return { user: result, tenantId: access.tenantId, role: access.role, tenantName: access.tenant?.name || 'Sucursal', workspaces };
   }
 
   async login(user: any, tenantId: string, role: string, tenantName?: string) {
