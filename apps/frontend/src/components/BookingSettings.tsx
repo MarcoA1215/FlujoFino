@@ -32,7 +32,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
   };
 
   const handleAddService = () => {
-    const newService = { id: Date.now().toString(), name: 'Nuevo Servicio', durationMinutes: 60, price: 0 };
+    const newService = { id: Date.now().toString(), name: '', durationMinutes: 60, price: '' };
     setSettings({ ...settings, services: [...services, newService] });
   };
 
@@ -117,15 +117,32 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                 <IonRow key={svc.id} className="ion-align-items-center" style={{ backgroundColor: '#f9f9f9', padding: '10px', borderRadius: '8px', marginBottom: '10px' }}>
                   <IonCol size="12" sizeMd="5">
                     <IonLabel position="stacked" style={{fontSize: '12px'}}>Nombre</IonLabel>
-                    <IonInput value={svc.name} onIonInput={e => handleUpdateService(svc.id, 'name', e.detail.value)} style={{backgroundColor: 'white', border: '1px solid #ddd'}} />
+                    <IonInput 
+                      value={svc.name} 
+                      placeholder="Ej. Manicura, Corte de Cabello" 
+                      onIonInput={e => handleUpdateService(svc.id, 'name', e.detail.value)} 
+                      style={{backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '4px', paddingLeft: '8px'}} 
+                    />
                   </IonCol>
                   <IonCol size="5" sizeMd="3">
                     <IonLabel position="stacked" style={{fontSize: '12px'}}>Duración (Mins)</IonLabel>
-                    <IonInput type="number" value={svc.durationMinutes} onIonInput={e => handleUpdateService(svc.id, 'durationMinutes', parseInt(e.detail.value as string))} style={{backgroundColor: 'white', border: '1px solid #ddd'}} />
+                    <IonInput 
+                      type="number" 
+                      value={svc.durationMinutes ?? ''} 
+                      placeholder="60" 
+                      onIonInput={e => handleUpdateService(svc.id, 'durationMinutes', e.detail.value === '' ? '' : parseInt(e.detail.value as string, 10))} 
+                      style={{backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '4px', paddingLeft: '8px'}} 
+                    />
                   </IonCol>
                   <IonCol size="5" sizeMd="3">
                     <IonLabel position="stacked" style={{fontSize: '12px'}}>Precio (Opcional)</IonLabel>
-                    <IonInput type="number" value={svc.price} onIonInput={e => handleUpdateService(svc.id, 'price', parseFloat(e.detail.value as string))} style={{backgroundColor: 'white', border: '1px solid #ddd'}} />
+                    <IonInput 
+                      type="number" 
+                      value={svc.price !== undefined && svc.price !== '' ? svc.price : ''} 
+                      placeholder="0.00" 
+                      onIonInput={e => handleUpdateService(svc.id, 'price', e.detail.value === '' ? '' : parseFloat(e.detail.value as string))} 
+                      style={{backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '4px', paddingLeft: '8px'}} 
+                    />
                   </IonCol>
                   <IonCol size="2" sizeMd="1" className="ion-text-right">
                     <IonButton fill="clear" color="danger" onClick={() => handleDeleteService(svc.id)} style={{marginTop: '15px'}}>
