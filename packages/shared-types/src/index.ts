@@ -89,12 +89,20 @@ export interface OrderDTO {
   customerPhone?: string;
   customerAddress?: string;
   notes?: string;
+  tableNumber?: string;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   deliveryMethod?: DeliveryMethod;
   deliveryZoneId?: string;
   deliveryFee?: number;
   totalAmount: number;
+  employeeId?: string;
+  employee?: {
+    id: string;
+    username: string;
+    email?: string;
+    role?: UserRole;
+  };
   items: OrderItemDTO[];
 }
 

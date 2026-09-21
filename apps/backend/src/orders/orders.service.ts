@@ -4,9 +4,11 @@ import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Product } from '../entities/product.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
-import { PaymentStatus, OrderStatus, MovementType, DeliveryMethod } from '@nutrideli/shared-types';
+import { PaymentStatus, OrderStatus, MovementType, DeliveryMethod, UserRole } from '@nutrideli/shared-types';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { DeliveryZone } from '../entities/delivery-zone.entity';
+import { User } from '../entities/user.entity';
+import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 
 export class CreateOrderDto {
   customerName: string;
@@ -17,6 +19,8 @@ export class CreateOrderDto {
   paymentStatus: PaymentStatus;
   deliveryMethod?: DeliveryMethod;
   deliveryZoneId?: string;
+  employeeId?: string;
+  employee_id?: string;
   pagoMovilRef?: string;
   pagoMovilPhone?: string;
   pagoMovilCedula?: string;
@@ -79,7 +83,7 @@ export class OrdersService {
     return order;
   }
 
-  async createOrder(tenantId: string, dto: CreateOrderDto) {
+  async createOrder(tenantId: string, dto: CreateOrderDto, authUserId?: string) {
     if (!dto.items || (dto.items.length === 0 && dto.paymentStatus !== PaymentStatus.PENDING)) {
       throw new BadRequestException('El carrito no puede estar vacío');
     }
@@ -94,6 +98,22 @@ export class OrdersService {
       let totalCost = 0;
       let deliveryFee = 0;
       const discountAmount = dto.discountAmount || 0;
+
+      const targetEmployeeId = dto.employeeId || dto.employee_id || authUserId || null;
+      let employeeIdToSave: string | undefined = undefined;
+      if (targetEmployeeId) {
+        const user = await manager.findOne(User, { where: { id: targetEmployeeId } });
+        if (!user) {
+          throw new BadRequestException('El empleado asignado no existe');
+        }
+        const access = await manager.findOne(UserTenantAccess, {
+          where: { userId: targetEmployeeId, tenantId, isActive: true }
+        });
+        if (!access && user.role !== UserRole.ADMIN) {
+          throw new BadRequestException('El empleado seleccionado no pertenece o no está activo en esta sucursal');
+        }
+        employeeIdToSave = user.id;
+      }
 
       if (dto.deliveryMethod === DeliveryMethod.DELIVERY && dto.deliveryZoneId) {
         const zone = await manager.findOne(DeliveryZone, { where: { tenantId, id: dto.deliveryZoneId } });
@@ -126,30 +146,31 @@ export class OrdersService {
 
       const initialStatus = requiresPreparation ? OrderStatus.PREPARING : OrderStatus.PENDING;
 
-        const order = manager.create(Order, { tenantId,
-          customerName: dto.customerName,
-          customerPhone: dto.customerPhone || '',
-          customerAddress: dto.customerAddress || '',
-          notes: dto.notes || '',
-          tableNumber: dto.tableNumber || '',
-          paymentStatus: dto.paymentStatus,
-          status: initialStatus,
-          deliveryMethod: dto.deliveryMethod || DeliveryMethod.IN_STORE,
-          deliveryZoneId: dto.deliveryZoneId,
-          deliveryFee: deliveryFee,
-          discountAmount: discountAmount,
-          totalCost: 0,
-          netProfit: 0,
-          totalAmount: 0,
+      const order = manager.create(Order, { tenantId,
+        customerName: dto.customerName,
+        customerPhone: dto.customerPhone || '',
+        customerAddress: dto.customerAddress || '',
+        notes: dto.notes || '',
+        tableNumber: dto.tableNumber || '',
+        paymentStatus: dto.paymentStatus,
+        status: initialStatus,
+        deliveryMethod: dto.deliveryMethod || DeliveryMethod.IN_STORE,
+        deliveryZoneId: dto.deliveryZoneId,
+        deliveryFee: deliveryFee,
+        discountAmount: discountAmount,
+        totalCost: 0,
+        netProfit: 0,
+        totalAmount: 0,
+        employeeId: employeeIdToSave,
         pagoMovilRef: dto.pagoMovilRef,
         pagoMovilPhone: dto.pagoMovilPhone,
         pagoMovilCedula: dto.pagoMovilCedula,
         pagoMovilBank: dto.pagoMovilBank,
-          amountBs: dto.amountBs,
-          exchangeRate: dto.exchangeRate,
-          abonosTotal: dto.initialAbono || 0,
-          abonosHistory: (dto.initialAbono && dto.initialAbono > 0) ? [{ id: Date.now().toString(), amount: dto.initialAbono, date: new Date().toISOString() }] : []
-        });
+        amountBs: dto.amountBs,
+        exchangeRate: dto.exchangeRate,
+        abonosTotal: dto.initialAbono || 0,
+        abonosHistory: (dto.initialAbono && dto.initialAbono > 0) ? [{ id: Date.now().toString(), amount: dto.initialAbono, date: new Date().toISOString() }] : []
+      });
         
       const savedOrder = await manager.save(Order, order);
 
@@ -244,7 +265,7 @@ export class OrdersService {
   async getAllOrders(tenantId: string) {
     return this.dataSource.getRepository(Order).find({
       where: { tenantId },
-      relations: { items: { product: true }, deliveryZone: true },
+      relations: { items: { product: true }, deliveryZone: true, employee: true },
       order: { createdAt: 'DESC' },
     });
   }
@@ -252,7 +273,7 @@ export class OrdersService {
   async getOrderById(tenantId: string, id: string) {
     return this.dataSource.getRepository(Order).findOne({
       where: { tenantId, id },
-      relations: { items: { product: true } }
+      relations: { items: { product: true }, deliveryZone: true, employee: true }
     });
   }
 
@@ -484,7 +505,7 @@ export class OrdersService {
     });
   }
 
-  async editOrder(tenantId: string, id: string, dto: CreateOrderDto) {
+  async editOrder(tenantId: string, id: string, dto: CreateOrderDto, authUserId?: string) {
     if (!dto.items || (dto.items.length === 0 && dto.paymentStatus !== PaymentStatus.PENDING)) {
       throw new BadRequestException('El carrito no puede estar vacío');
     }
@@ -622,6 +643,25 @@ export class OrdersService {
   
       const effectiveTotalEdit = totalAmount + order.deliveryFee;
       const cappedDiscountEdit = Math.min(discountAmount, effectiveTotalEdit);
+
+      const targetEmployeeId = dto.employeeId !== undefined ? dto.employeeId : (dto.employee_id !== undefined ? dto.employee_id : undefined);
+      if (targetEmployeeId !== undefined) {
+        if (targetEmployeeId) {
+          const user = await manager.findOne(User, { where: { id: targetEmployeeId } });
+          if (!user) {
+            throw new BadRequestException('El empleado asignado no existe');
+          }
+          const access = await manager.findOne(UserTenantAccess, {
+            where: { userId: targetEmployeeId, tenantId, isActive: true }
+          });
+          if (!access && user.role !== UserRole.ADMIN) {
+            throw new BadRequestException('El empleado seleccionado no pertenece o no está activo en esta sucursal');
+          }
+          order.employeeId = user.id;
+        } else {
+          order.employeeId = null as any;
+        }
+      }
 
       order.customerName = dto.customerName;
       order.customerPhone = dto.customerPhone || '';

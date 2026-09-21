@@ -16,7 +16,8 @@ export class OrdersController {
 
   @Post()
   createOrder(@Request() req: any, @Body() dto: CreateOrderDto) {
-    return this.ordersService.createOrder(req.user.tenantId, dto);}
+    return this.ordersService.createOrder(req.user.tenantId, dto, req.user?.id);
+  }
 
   @Get()
   getAllOrders(@Request() req: any) {
@@ -40,7 +41,8 @@ export class OrdersController {
 
   @Put(':id')
   editOrder(@Request() req: any, @Param('id') id: string, @Body() dto: CreateOrderDto) {
-    return this.ordersService.editOrder(req.user.tenantId, id, dto);}
+    return this.ordersService.editOrder(req.user.tenantId, id, dto, req.user?.id);
+  }
 
   @Post(':id/deliver-partial')
   deliverPartial(@Request() req: any, @Param('id') id: string, @Body('deliveries') deliveries: { orderItemId: string, quantityToDeliver: number }[]) {

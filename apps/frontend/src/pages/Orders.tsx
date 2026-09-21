@@ -1,7 +1,6 @@
-// @ts-nocheck
-﻿import { refreshOutline, copyOutline, informationCircleOutline, trashOutline, createOutline } from 'ionicons/icons';
-import { IonModal, IonInput } from '@ionic/react';
-import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonText, IonSegment, IonSegmentButton, IonSearchbar, IonIcon } from '@ionic/react';
+import { refreshOutline, copyOutline, informationCircleOutline, trashOutline, createOutline, personOutline } from 'ionicons/icons';
+import { IonModal, IonInput, IonSelect, IonSelectOption } from '@ionic/react';
+import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, useIonRouter, IonText, IonSegment, IonSegmentButton, IonSearchbar, IonIcon } from '@ionic/react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';
@@ -22,6 +21,7 @@ type Order = {
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   notes?: string;
+  tableNumber?: string;
   items: OrderItem[];
   createdAt: string;
   deliveryMethod?: DeliveryMethod;
@@ -29,9 +29,17 @@ type Order = {
   deliveryFee?: number;
   abonosTotal?: number;
   abonosHistory?: any[];
+  employeeId?: string;
+  employee?: {
+    id: string;
+    username: string;
+    name?: string;
+    email?: string;
+  };
 };
 
 const Orders: React.FC = () => {
+  const router = useIonRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [tab, setTab] = useState<"activos" | "por_cobrar" | "historial">("activos");
   const [searchText, setSearchText] = useState("");
@@ -43,6 +51,8 @@ const Orders: React.FC = () => {
   const [partialDeliveries, setPartialDeliveries] = useState<{ [key: string]: number }>({});
   
   const [settings, setSettings] = useState<any>(null);
+  const [employees, setEmployees] = useState<{ id: string; username: string }[]>([]);
+  const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('');
   const [abonoAmount, setAbonoAmount] = useState<string>('');
   const [abonoCurrency, setAbonoCurrency] = useState<'USD' | 'VES'>('USD');
 
@@ -108,7 +118,11 @@ const Orders: React.FC = () => {
   };
 
   const handleCopyOrder = (order: any) => {
-    let text = '*NutriDeli - Pedido ' + order.customerName + '*\n';
+    const brandName = settings?.companyName || 'FlujoFino';
+    let text = '*' + brandName + ' - Pedido ' + order.customerName + '*\n';
+    if (order.employee?.username || order.employee?.name) {
+      text += 'Atendido por: ' + (order.employee?.username || order.employee?.name) + '\n';
+    }
     if (order.customerPhone) text += 'Tel: ' + order.customerPhone + '\n';
     text += 'Tipo: ' + (order.deliveryMethod === DeliveryMethod.DELIVERY ? 'Delivery' : (order.deliveryMethod === DeliveryMethod.PICKUP ? 'Pickup' : 'Local')) + '\n';
     if (order.deliveryMethod === DeliveryMethod.DELIVERY && order.deliveryZone) {
@@ -151,9 +165,17 @@ const Orders: React.FC = () => {
       setSettings(res.data);
     } catch(e) {}
   };
+
+  const fetchEmployees = async () => {
+    try {
+      const res = await apiClient.get<any[]>('/users/employees');
+      setEmployees(res.data);
+    } catch(e) {}
+  };
   
   useEffect(() => {
     fetchSettings();
+    fetchEmployees();
   }, []);
   
   const fetchOrders = async () => {
@@ -172,7 +194,13 @@ const Orders: React.FC = () => {
     } catch (e) {}
   };
 
-  useEffect(() => { fetchOrders(); fetchRate(); const interval = setInterval(() => { fetchOrders(); }, 15000); return () => clearInterval(interval); }, []);
+  useEffect(() => { 
+    fetchOrders(); 
+    fetchRate(); 
+    fetchEmployees(); 
+    const interval = setInterval(() => { fetchOrders(); }, 15000); 
+    return () => clearInterval(interval); 
+  }, []);
 
   const updateStatus = async (id: string, status: OrderStatus) => {
     try {
@@ -309,12 +337,18 @@ const getStatusColor = (status: OrderStatus) => {
     if (tab === "por_cobrar" && !isPorCobrar) return false;
     if (tab === "historial" && !isHistorial) return false;
 
+    if (selectedEmployeeFilter && o.employeeId !== selectedEmployeeFilter && o.employee?.id !== selectedEmployeeFilter) {
+      return false;
+    }
+
     if (searchText.trim() === "") return true;
     const search = searchText.toLowerCase();
     return (
       o.customerName.toLowerCase().includes(search) || 
       (o.id && o.id.toLowerCase().includes(search)) || 
-      (o.notes && o.notes.toLowerCase().includes(search))
+      (o.notes && o.notes.toLowerCase().includes(search)) ||
+      (o.employee?.username && o.employee.username.toLowerCase().includes(search)) ||
+      (o.employee?.name && o.employee.name.toLowerCase().includes(search))
     );
   });
 
@@ -326,7 +360,7 @@ const getStatusColor = (status: OrderStatus) => {
             <IonMenuButton />
           </IonButtons>
           <IonTitle>Tablero de Pedidos</IonTitle>
-          <IonButtons slot="end"><IonButton onClick={() => { fetchOrders(); fetchSettings(); }}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
+          <IonButtons slot="end"><IonButton onClick={() => { fetchOrders(); fetchSettings(); fetchEmployees(); }}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
         </IonToolbar>
         <IonToolbar color="success">
           <IonSegment value={tab} onIonChange={e => setTab(e.detail.value as any)}>
@@ -342,12 +376,34 @@ const getStatusColor = (status: OrderStatus) => {
           </IonSegment>
         </IonToolbar>
         <IonToolbar color="success">
-          <IonSearchbar 
-            value={searchText} 
-            debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} 
-            placeholder="Buscar por cliente o ref..."
-            animated 
-          />
+          <IonGrid className="ion-no-padding">
+            <IonRow>
+              <IonCol size="12" sizeMd="8">
+                <IonSearchbar 
+                  value={searchText} 
+                  debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} 
+                  placeholder="Buscar por cliente, empleado o ref..."
+                  animated 
+                />
+              </IonCol>
+              <IonCol size="12" sizeMd="4">
+                <IonItem color="success" lines="none" style={{ borderRadius: '8px', margin: '4px 8px' }}>
+                  <IonSelect 
+                    value={selectedEmployeeFilter} 
+                    onIonChange={e => setSelectedEmployeeFilter(e.detail.value)}
+                    placeholder="Filtrar por empleado..."
+                    interface="popover"
+                    style={{ width: '100%' }}
+                  >
+                    <IonSelectOption value="">Todos los empleados</IonSelectOption>
+                    {employees.map(emp => (
+                      <IonSelectOption key={emp.id} value={emp.id}>{emp.username}</IonSelectOption>
+                    ))}
+                  </IonSelect>
+                </IonItem>
+              </IonCol>
+            </IonRow>
+          </IonGrid>
         </IonToolbar>
       </IonHeader>
 
@@ -361,7 +417,15 @@ const getStatusColor = (status: OrderStatus) => {
   <div>
     <IonCardTitle>{order.customerName}</IonCardTitle>
     <IonCardSubtitle>{new Date(order.createdAt).toLocaleString()}</IonCardSubtitle>
-    {order.tableNumber && (<IonBadge color="primary" style={{ marginTop: '5px' }}>{order.tableNumber}</IonBadge>)}
+    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px', alignItems: 'center' }}>
+      {order.tableNumber && (<IonBadge color="primary">{order.tableNumber}</IonBadge>)}
+      {order.employee && (
+        <IonBadge color="light" style={{ border: '1px solid #ddd', color: '#444', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}>
+          <IonIcon icon={personOutline} style={{ fontSize: '0.85rem' }} />
+          Atendido por: {order.employee.username || order.employee.name}
+        </IonBadge>
+      )}
+    </div>
   </div>
   <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '5px' }}>
     {order.status !== OrderStatus.DELIVERED && order.status !== OrderStatus.CANCELED && (
@@ -478,6 +542,7 @@ const getStatusColor = (status: OrderStatus) => {
           {selectedOrderForDetails && (
             <>
               <h3>Cliente: {selectedOrderForDetails.customerName}</h3>
+              <p>Atendido por: <strong>{selectedOrderForDetails.employee?.username || selectedOrderForDetails.employee?.name || 'Sin asignar'}</strong></p>
               <p>Total del Pedido: <strong>${selectedOrderForDetails.totalAmount.toFixed(2)}</strong></p>
               
               <IonList>

@@ -10,9 +10,14 @@ import { UserRole } from '@nutrideli/shared-types';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Get('employees')
+  findActiveEmployees(@Request() req: any) {
+    return this.usersService.findActiveEmployees(req.user.tenantId);
+  }
+
   @Get()
   @Roles(UserRole.ADMIN)
-  findAll(@Request() req) {
+  findAll(@Request() req: any) {
     return this.usersService.findAll(req.user.tenantId);
   }
 

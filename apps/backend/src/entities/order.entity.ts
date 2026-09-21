@@ -1,5 +1,6 @@
 import { Tenant } from './tenant.entity';
-﻿import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { User } from './user.entity';
+import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { OrderItem } from './order-item.entity';
 import { DeliveryZone } from './delivery-zone.entity';
 import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';
@@ -106,4 +107,11 @@ export class Order {
 
   @Column('json', { nullable: true })
   abonosHistory: any;
+
+  @Column({ nullable: true })
+  employeeId: string;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'employeeId' })
+  employee: User;
 }

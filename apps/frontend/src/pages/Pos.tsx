@@ -1,12 +1,13 @@
 // @ts-nocheck
 ﻿import { refreshOutline } from 'ionicons/icons';
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonInput, IonSelect, IonSelectOption, IonText, IonIcon, IonSearchbar, useIonRouter } from '@ionic/react';
-import { cartOutline, cashOutline, trashOutline } from 'ionicons/icons';
-import { useEffect, useState } from 'react';
+import { cartOutline, cashOutline, trashOutline, personOutline } from 'ionicons/icons';
+import { useEffect, useState, useContext } from 'react';
 import { useLocation } from 'react-router-dom';
 import type { DeliveryZone } from '../types';
 import { DeliveryMethod, PaymentStatus, UserRole } from '@nutrideli/shared-types';
 import { apiClient } from '../api/client';
+import { AuthContext } from '../context/AuthContext';
 
 type Product = {
   id: string;
@@ -53,6 +54,10 @@ const Pos: React.FC = () => {
   const [customerAddress, setCustomerAddress] = useState<string>('');
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   
+  const { user } = useContext(AuthContext);
+  const [employees, setEmployees] = useState<{ id: string; username: string; name?: string; role?: string }[]>([]);
+  const [employeeId, setEmployeeId] = useState<string>('');
+
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
   const location = useLocation();
@@ -83,6 +88,15 @@ const Pos: React.FC = () => {
     } catch(e) {}
   };
 
+  const fetchEmployees = async () => {
+    try {
+      const res = await apiClient.get<any[]>('/users/employees');
+      setEmployees(res.data);
+    } catch(e) {
+      console.error('Error cargando empleados', e);
+    }
+  };
+
   const loadOrderForEditing = async (id: string) => {
     try {
       const res = await apiClient.get(`/orders/${id}`);
@@ -93,6 +107,11 @@ const Pos: React.FC = () => {
       setDeliveryMethod(order.deliveryMethod || DeliveryMethod.IN_STORE);
       setCustomerAddress(order.customerAddress || '');
       if (order.deliveryZone) setDeliveryZoneId(order.deliveryZone.id);
+      if (order.employeeId) {
+        setEmployeeId(order.employeeId);
+      } else if (order.employee?.id) {
+        setEmployeeId(order.employee.id);
+      }
       
       const loadedCart = order.items.map((item: any) => ({
         product: item.product,
@@ -116,6 +135,10 @@ const Pos: React.FC = () => {
     fetchProducts();
     fetchRate();
     fetchZones();
+    fetchEmployees();
+    if (user?.id && !editingOrderId) {
+      setEmployeeId(user.id);
+    }
     const calcCart = localStorage.getItem('calculator_cart');
     if (calcCart) {
       try {
@@ -257,6 +280,7 @@ const Pos: React.FC = () => {
         exchangeRate,
         deliveryMethod,
         deliveryZoneId,
+        employeeId: employeeId || undefined,
         initialAbono: initialAbonoVal,
         discountAmount,
         items: cart.map(i => ({
@@ -280,6 +304,7 @@ const Pos: React.FC = () => {
       setCustomerPhone('');
       setTableNumber('');
       setCustomerAddress('');
+      setEmployeeId(user?.id || '');
       setInitialAbono('');
       setPagoMovilRef('');
       setPagoMovilPhone('');
@@ -385,7 +410,22 @@ const Pos: React.FC = () => {
                     />
                   </IonItem>
 
-                  
+                  <IonItem className="ion-margin-bottom">
+                    <IonLabel position="stacked">Atendido por:</IonLabel>
+                    <IonSelect 
+                      value={employeeId} 
+                      onIonChange={e => setEmployeeId(e.detail.value)}
+                      interface="popover"
+                      placeholder="Seleccionar empleado"
+                    >
+                      {employees.map(emp => (
+                        <IonSelectOption key={emp.id} value={emp.id}>
+                          {emp.username || emp.name} {emp.id === user?.id ? '(Yo)' : ''}
+                        </IonSelectOption>
+                      ))}
+                    </IonSelect>
+                  </IonItem>
+
                   <IonItem className="ion-margin-bottom">
                     <IonLabel position="stacked">Método de Entrega</IonLabel>
                     <IonSelect value={deliveryMethod} onIonChange={e => setDeliveryMethod(e.detail.value)}>

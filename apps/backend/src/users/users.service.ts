@@ -57,13 +57,43 @@ export class UsersService implements OnModuleInit {
       
     // Because a user can have different roles in different tenants, map the tenant's specific role to the user object
     return users.map(user => {
-      const access = user.tenantAccess.find(a => a.tenantId === tenantId);
+      const access = user.tenantAccess?.find(a => a.tenantId === tenantId);
       if (access) {
         user.role = access.role as UserRole;
         (user as any).status = access.status;
       }
+      delete (user as any).passwordHash;
       return user;
     });
+  }
+
+  async findActiveEmployees(tenantId?: string): Promise<{ id: string; username: string; name: string; role: UserRole }[]> {
+    if (!tenantId) return [];
+
+    const accesses = await this.usersRepo.manager.find(UserTenantAccess, {
+      where: {
+        tenantId,
+        isActive: true,
+        status: 'ACCEPTED',
+      },
+      relations: {
+        user: true,
+      },
+      order: {
+        user: {
+          username: 'ASC',
+        },
+      },
+    });
+
+    return accesses
+      .filter(a => !!a.user)
+      .map(a => ({
+        id: a.user.id,
+        username: a.user.username,
+        name: a.user.username,
+        role: a.role,
+      }));
   }
 
   async create(tenantId: string, data: any): Promise<User> {

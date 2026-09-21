@@ -12,7 +12,8 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 
 const Dashboard: React.FC = () => {
   const { user } = useContext(AuthContext);
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);`n  const [settings, setSettings] = useState<any>({});
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [settings, setSettings] = useState<any>({});
   const [presentToast] = useIonToast();
 
   const fetchSummary = async () => {
@@ -145,7 +146,7 @@ const Dashboard: React.FC = () => {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="date" fontSize={12} />
                           <YAxis fontSize={12} />
-                          <Tooltip formatter={(value: any) => [`$ ${Number(value).toFixed(2)}`, 'Ventas']} />
+                          <Tooltip formatter={(value: any) => ['$ ' + Number(value).toFixed(2), 'Ventas']} />
                           <Bar dataKey="total" fill="#2dd36f" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>

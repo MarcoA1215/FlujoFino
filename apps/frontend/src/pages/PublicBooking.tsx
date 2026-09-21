@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { IonPage, IonContent, IonCard, IonCardContent, IonInput, IonLabel, IonItem, IonButton, useIonToast, IonSpinner, IonIcon, IonGrid, IonRow, IonCol } from '@ionic/react';
+import { IonPage, IonContent, IonCard, IonCardContent, IonInput, IonLabel, IonItem, IonButton, useIonToast, IonSpinner, IonIcon } from '@ionic/react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { checkmarkCircleOutline, timeOutline, chevronBackOutline } from 'ionicons/icons';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-const DAYS_OF_WEEK = ['0', '1', '2', '3', '4', '5', '6'];
 
 const PublicBooking: React.FC = () => {
   const { tenantId } = useParams<{ tenantId: string }>();
