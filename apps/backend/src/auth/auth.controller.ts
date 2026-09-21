@@ -52,6 +52,12 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('workspaces')
+  async getWorkspaces(@Request() req) {
+    return this.authService.getWorkspaces(req.user.username);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('select-workspace')
   async selectWorkspace(@Request() req, @Body() body: { tenantId: string }) {
     // Re-validate to get specific tenant details

@@ -143,7 +143,7 @@ const SettingsPage: React.FC = () => {
                   <p style={{marginBottom: '15px'}}>Habilita o deshabilita funcionalidades de tu sucursal según el tipo de negocio.</p>
                   
                   <IonItem>
-                    <IonLabel className="ion-text-wrap">Control de Horarios (Clientes / Empleados)</IonLabel>
+                    <IonLabel className="ion-text-wrap">Sistema de Citas y Reservaciones de Clientes</IonLabel>
                     <IonToggle checked={settings.featureCustomerSchedules || false} onIonChange={e => setSettings({...settings, featureCustomerSchedules: e.detail.checked})} />
                   </IonItem>
                   <IonItem>

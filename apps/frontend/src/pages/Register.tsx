@@ -101,10 +101,10 @@ const Register: React.FC = () => {
                   <IonCard style={{ margin: '0 0 15px 0', boxShadow: 'none', border: '1px solid #ddd' }}>
                     <IonItem lines="none">
                       <IonLabel className="ion-text-wrap" style={{ fontSize: '14px' }}>
-                        ¿Tu negocio requiere control de horarios de empleados/clientes?
+                        ¿Tu negocio ofrece servicios con citas y reservaciones de clientes?
                       </IonLabel>
                       <IonToggle checked={featureCustomerSchedules} onIonChange={e => setFeatureCustomerSchedules(e.detail.checked)} />
-                      <IonButton fill="clear" slot="end" onClick={() => showInfo('Horarios', 'Activa la gestión avanzada de turnos y agendas.')}>
+                      <IonButton fill="clear" slot="end" onClick={() => showInfo('Citas y Reservaciones', 'Permite que tus clientes reserven citas y turnos de atención para tus servicios.')}>
                         <IonIcon slot="icon-only" icon={informationCircleOutline} />
                       </IonButton>
                     </IonItem>

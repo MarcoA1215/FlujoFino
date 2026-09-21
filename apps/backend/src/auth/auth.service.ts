@@ -149,12 +149,34 @@ export class AuthService {
 
       // Return auto-login
       const { passwordHash, ...userResult } = savedUser;
-      return this.login(userResult, savedTenant.id, 'ADMIN', savedTenant.name);
+      const loginRes = await this.login(userResult, savedTenant.id, 'ADMIN', savedTenant.name);
+      return {
+        ...loginRes,
+        workspaces: [
+          {
+            tenantId: savedTenant.id,
+            name: savedTenant.name,
+            role: 'ADMIN',
+            status: 'ACCEPTED'
+          }
+        ]
+      };
     } catch (err) {
       await queryRunner.rollbackTransaction();
       throw err;
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async getWorkspaces(username: string): Promise<any[]> {
+    const user = await this.usersService.findByUsername(username);
+    if (!user || !user.tenantAccess) return [];
+    return user.tenantAccess.map(a => ({
+      tenantId: a.tenantId,
+      name: a.tenant?.name || 'Sucursal',
+      role: a.role,
+      status: a.status
+    }));
   }
 }

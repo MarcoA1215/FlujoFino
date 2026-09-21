@@ -18,6 +18,7 @@ interface AuthContextType {
   token: string | null;
   login: (token: string, user: User, workspaces?: any[]) => Promise<void>;
   logout: () => Promise<void>;
+  switchWorkspace: (tenantId: string) => Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
@@ -53,6 +54,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   };
 
+  const switchWorkspace = async (tenantId: string) => {
+    const res = await apiClient.post('/auth/select-workspace', { tenantId });
+    await login(res.data.access_token, res.data.user, res.data.workspaces);
+    window.location.href = '/dashboard';
+  };
+
   const logout = async () => {
     setToken(null);
     setUser(null);
@@ -65,7 +72,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, switchWorkspace, isAuthenticated: !!token, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
