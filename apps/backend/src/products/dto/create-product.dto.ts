@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsBoolean } from 'class-validator';
 
 export class CreateProductDto {
   @IsString() name: string;
@@ -6,6 +6,7 @@ export class CreateProductDto {
   @IsOptional() @IsString() category?: string;
   @IsNumber() salePrice: number;
   @IsOptional() @IsNumber() durationMinutes?: number;
-  @IsOptional() isCombo?: boolean;
+  @IsOptional() @IsBoolean() isCombo?: boolean;
+  @IsOptional() @IsBoolean() isPreAssembled?: boolean;
 }
 
