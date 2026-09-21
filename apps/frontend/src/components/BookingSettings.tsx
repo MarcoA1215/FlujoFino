@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonSelect, IonSelectOption, IonButton, IonIcon, IonRow, IonCol, IonGrid, IonToggle } from '@ionic/react';
-import { addOutline, trashOutline } from 'ionicons/icons';
+import { timeOutline, checkmarkCircleOutline } from 'ionicons/icons';
 
 const DAYS_OF_WEEK = [
   { id: '1', name: 'Lunes' },
@@ -19,30 +19,31 @@ interface BookingSettingsProps {
 
 export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setSettings }) => {
   const businessHours = settings.businessHours || {};
-  const services = settings.services || [];
   const slotInterval = settings.slotInterval || 30;
+
+  const [bulkStart, setBulkStart] = useState('08:00');
+  const [bulkEnd, setBulkEnd] = useState('18:00');
 
   const handleDayChange = (dayId: string, field: string, value: any) => {
     const newHours = { ...businessHours };
     if (!newHours[dayId]) {
-      newHours[dayId] = { isOpen: false, startTime: '09:00', endTime: '18:00' };
+      newHours[dayId] = { isOpen: false, startTime: '08:00', endTime: '18:00' };
     }
     newHours[dayId][field] = value;
     setSettings({ ...settings, businessHours: newHours });
   };
 
-  const handleAddService = () => {
-    const newService = { id: Date.now().toString(), name: '', durationMinutes: 60, price: '' };
-    setSettings({ ...settings, services: [...services, newService] });
-  };
-
-  const handleUpdateService = (id: string, field: string, value: any) => {
-    const updated = services.map((s: any) => s.id === id ? { ...s, [field]: value } : s);
-    setSettings({ ...settings, services: updated });
-  };
-
-  const handleDeleteService = (id: string) => {
-    setSettings({ ...settings, services: services.filter((s: any) => s.id !== id) });
+  const handleApplyBulkHours = () => {
+    const newHours = { ...businessHours };
+    DAYS_OF_WEEK.forEach(day => {
+      if (!newHours[day.id]) {
+        newHours[day.id] = { isOpen: true, startTime: bulkStart, endTime: bulkEnd };
+      } else if (newHours[day.id].isOpen) {
+        newHours[day.id].startTime = bulkStart;
+        newHours[day.id].endTime = bulkEnd;
+      }
+    });
+    setSettings({ ...settings, businessHours: newHours });
   };
 
   return (
@@ -55,16 +56,17 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
             </IonCardHeader>
             <IonCardContent>
               <IonItem>
-                <IonLabel>Intervalos de Horario (Minutos)</IonLabel>
+                <IonLabel>Intervalos de Horario de Citas</IonLabel>
                 <IonSelect value={slotInterval} onIonChange={e => setSettings({...settings, slotInterval: e.detail.value})}>
                   <IonSelectOption value={15}>Cada 15 minutos</IonSelectOption>
-                  <IonSelectOption value={30}>Cada 30 minutos</IonSelectOption>
+                  <IonSelectOption value={30}>Cada 30 minutos (Recomendado)</IonSelectOption>
+                  <IonSelectOption value={45}>Cada 45 minutos</IonSelectOption>
                   <IonSelectOption value={60}>Cada 1 hora</IonSelectOption>
                   <IonSelectOption value={120}>Cada 2 horas</IonSelectOption>
                 </IonSelect>
               </IonItem>
-              <p style={{fontSize: '13px', color: '#666', marginLeft: '16px'}}>
-                Esto define en qué bloques de tiempo se divide tu calendario (ej. si elijes 30 mins, las citas solo se pueden agendar a las 9:00, 9:30, 10:00, etc.)
+              <p style={{fontSize: '13px', color: '#64748b', marginLeft: '16px', marginTop: '8px'}}>
+                Esto define los bloques de turno en tu calendario (ej. si eliges 30 mins, las citas solo se agendarán a las 8:00, 8:30, 9:00, etc.).
               </p>
             </IonCardContent>
           </IonCard>
@@ -72,89 +74,98 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
       </IonRow>
 
       <IonRow>
-        <IonCol size="12" sizeMd="6">
+        <IonCol size="12">
           <IonCard>
             <IonCardHeader>
-              <IonCardTitle>Horario de Trabajo</IonCardTitle>
+              <IonCardTitle>Horario de Trabajo y Apertura del Negocio</IonCardTitle>
             </IonCardHeader>
             <IonCardContent>
+              <p style={{marginBottom: '16px', fontSize: '14px', color: '#64748b'}}>
+                Define los días en que el local abre y sus horas reales de atención. El motor de reservaciones públicas solo permitirá agendar dentro de estos rangos.
+              </p>
+
+              {/* Ajuste masivo rápido */}
+              <div style={{ backgroundColor: '#f1f5f9', padding: '12px 16px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontWeight: '600', color: '#1e293b', marginBottom: '8px', fontSize: '13px' }}>
+                  ⚡ Ajuste Rápido de Horario (Aplica a todos los días abiertos):
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '13px', color: '#475569' }}>Apertura:</span>
+                    <IonInput 
+                      type="time" 
+                      value={bulkStart} 
+                      onIonInput={e => setBulkStart(e.detail.value!)} 
+                      style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '110px' }} 
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '13px', color: '#475569' }}>Cierre:</span>
+                    <IonInput 
+                      type="time" 
+                      value={bulkEnd} 
+                      onIonInput={e => setBulkEnd(e.detail.value!)} 
+                      style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '110px' }} 
+                    />
+                  </div>
+                  <IonButton size="small" color="primary" fill="outline" onClick={handleApplyBulkHours}>
+                    <IonIcon slot="start" icon={checkmarkCircleOutline} />
+                    Aplicar a Días Activos
+                  </IonButton>
+                </div>
+              </div>
+
+              {/* Tabla detallada de días */}
               <IonGrid className="ion-no-padding">
+                <IonRow style={{ fontWeight: '600', color: '#64748b', fontSize: '13px', borderBottom: '2px solid #e2e8f0', paddingBottom: '8px', marginBottom: '8px' }}>
+                  <IonCol size="4" sizeMd="3">Día de la Semana</IonCol>
+                  <IonCol size="8" sizeMd="9">Horario de Atención (Apertura - Cierre)</IonCol>
+                </IonRow>
+
                 {DAYS_OF_WEEK.map(day => {
-                  const dayData = businessHours[day.id] || { isOpen: false, startTime: '09:00', endTime: '18:00' };
+                  const dayData = businessHours[day.id] || { isOpen: false, startTime: '08:00', endTime: '18:00' };
                   return (
-                    <IonRow key={day.id} className="ion-align-items-center" style={{ borderBottom: '1px solid #eee', padding: '10px 0' }}>
-                      <IonCol size="4">
+                    <IonRow key={day.id} className="ion-align-items-center" style={{ borderBottom: '1px solid #f1f5f9', padding: '10px 0' }}>
+                      <IonCol size="12" sizeSm="4" sizeMd="3">
                         <IonToggle checked={dayData.isOpen} onIonChange={e => handleDayChange(day.id, 'isOpen', e.detail.checked)}>
-                          <span style={{fontSize:'14px'}}>{day.name}</span>
+                          <span style={{ fontSize: '14px', fontWeight: dayData.isOpen ? '600' : 'normal', color: dayData.isOpen ? '#0f172a' : '#64748b' }}>
+                            {day.name}
+                          </span>
                         </IonToggle>
                       </IonCol>
-                      <IonCol size="8">
-                        {dayData.isOpen && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <IonInput type="time" value={dayData.startTime} onIonInput={e => handleDayChange(day.id, 'startTime', e.detail.value)} style={{border: '1px solid #ccc', borderRadius: '4px', padding: '5px'}} />
+                      <IonCol size="12" sizeSm="8" sizeMd="9">
+                        {dayData.isOpen ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '12px', color: '#64748b' }}>Abre:</span>
+                              <IonInput 
+                                type="time" 
+                                value={dayData.startTime || '08:00'} 
+                                onIonInput={e => handleDayChange(day.id, 'startTime', e.detail.value)} 
+                                style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '120px' }} 
+                              />
+                            </div>
                             <span>-</span>
-                            <IonInput type="time" value={dayData.endTime} onIonInput={e => handleDayChange(day.id, 'endTime', e.detail.value)} style={{border: '1px solid #ccc', borderRadius: '4px', padding: '5px'}} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '12px', color: '#64748b' }}>Cierra:</span>
+                              <IonInput 
+                                type="time" 
+                                value={dayData.endTime || '18:00'} 
+                                onIonInput={e => handleDayChange(day.id, 'endTime', e.detail.value)} 
+                                style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '120px' }} 
+                              />
+                            </div>
                           </div>
+                        ) : (
+                          <span style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>
+                            Cerrado todo el día
+                          </span>
                         )}
                       </IonCol>
                     </IonRow>
                   );
                 })}
               </IonGrid>
-            </IonCardContent>
-          </IonCard>
-        </IonCol>
-
-        <IonCol size="12" sizeMd="6">
-          <IonCard>
-            <IonCardHeader>
-              <IonCardTitle>Tipos de Trabajo (Servicios)</IonCardTitle>
-            </IonCardHeader>
-            <IonCardContent>
-              <p style={{marginBottom: '15px', fontSize: '14px', color: '#666'}}>Agrega los servicios que ofreces y su duración. Si no agregas ninguno, la reserva pública pedirá bloques simples.</p>
-              
-              {services.map((svc: any) => (
-                <IonRow key={svc.id} className="ion-align-items-center" style={{ backgroundColor: '#f9f9f9', padding: '10px', borderRadius: '8px', marginBottom: '10px' }}>
-                  <IonCol size="12" sizeMd="5">
-                    <IonLabel position="stacked" style={{fontSize: '12px'}}>Nombre</IonLabel>
-                    <IonInput 
-                      value={svc.name} 
-                      placeholder="Ej. Manicura, Corte de Cabello" 
-                      onIonInput={e => handleUpdateService(svc.id, 'name', e.detail.value)} 
-                      style={{backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '4px', paddingLeft: '8px'}} 
-                    />
-                  </IonCol>
-                  <IonCol size="5" sizeMd="3">
-                    <IonLabel position="stacked" style={{fontSize: '12px'}}>Duración (Mins)</IonLabel>
-                    <IonInput 
-                      type="number" 
-                      value={svc.durationMinutes ?? ''} 
-                      placeholder="60" 
-                      onIonInput={e => handleUpdateService(svc.id, 'durationMinutes', e.detail.value === '' ? '' : parseInt(e.detail.value as string, 10))} 
-                      style={{backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '4px', paddingLeft: '8px'}} 
-                    />
-                  </IonCol>
-                  <IonCol size="5" sizeMd="3">
-                    <IonLabel position="stacked" style={{fontSize: '12px'}}>Precio (Opcional)</IonLabel>
-                    <IonInput 
-                      type="number" 
-                      value={svc.price !== undefined && svc.price !== '' ? svc.price : ''} 
-                      placeholder="0.00" 
-                      onIonInput={e => handleUpdateService(svc.id, 'price', e.detail.value === '' ? '' : parseFloat(e.detail.value as string))} 
-                      style={{backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '4px', paddingLeft: '8px'}} 
-                    />
-                  </IonCol>
-                  <IonCol size="2" sizeMd="1" className="ion-text-right">
-                    <IonButton fill="clear" color="danger" onClick={() => handleDeleteService(svc.id)} style={{marginTop: '15px'}}>
-                      <IonIcon icon={trashOutline} />
-                    </IonButton>
-                  </IonCol>
-                </IonRow>
-              ))}
-              <IonButton expand="block" fill="outline" onClick={handleAddService}>
-                <IonIcon slot="start" icon={addOutline} />
-                Agregar Servicio
-              </IonButton>
             </IonCardContent>
           </IonCard>
         </IonCol>

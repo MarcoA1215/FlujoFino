@@ -39,7 +39,8 @@ const Products: React.FC = () => {
       inputs: [
         { name: 'name', type: 'text', placeholder: 'Nombre' },
         { name: 'category', type: 'text', placeholder: 'Categoría' },
-        { name: 'salePrice', type: 'number', placeholder: 'Precio Venta' }
+        { name: 'salePrice', type: 'number', placeholder: 'Precio Venta ($)' },
+        { name: 'durationMinutes', type: 'number', placeholder: 'Duración estimada en minutos (Ej. 45)' }
       ],
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
@@ -49,7 +50,13 @@ const Products: React.FC = () => {
             if (!data.name || !data.salePrice) return false;
             try {
               await apiClient.post('/products', {
-                name: data.name, category: data.category, salePrice: parseFloat(data.salePrice), isCombo, isPreAssembled: false });
+                name: data.name,
+                category: data.category,
+                salePrice: parseFloat(data.salePrice),
+                durationMinutes: data.durationMinutes ? parseInt(data.durationMinutes, 10) : 30,
+                isCombo,
+                isPreAssembled: false
+              });
               fetchData();
               presentToast({ message: 'Creado', duration: 2000, color: 'success' });
             } catch (e) {
@@ -137,7 +144,8 @@ const Products: React.FC = () => {
       inputs: [
         { name: 'name', type: 'text', value: p.name, placeholder: 'Nombre' },
         { name: 'category', type: 'text', value: p.category, placeholder: 'Categoría' },
-        { name: 'salePrice', type: 'number', value: p.salePrice, placeholder: 'Precio Venta ($)' }
+        { name: 'salePrice', type: 'number', value: p.salePrice, placeholder: 'Precio Venta ($)' },
+        { name: 'durationMinutes', type: 'number', value: p.durationMinutes ?? 30, placeholder: 'Duración estimada en minutos (Ej. 45)' }
       ],
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
@@ -146,7 +154,12 @@ const Products: React.FC = () => {
           handler: async (data) => {
             if (!data.name || !data.salePrice) return false;
             try {
-              await apiClient.put('/products/' + p.id, { name: data.name, category: data.category, salePrice: parseFloat(data.salePrice) });
+              await apiClient.put('/products/' + p.id, {
+                name: data.name,
+                category: data.category,
+                salePrice: parseFloat(data.salePrice),
+                durationMinutes: data.durationMinutes ? parseInt(data.durationMinutes, 10) : null
+              });
               fetchData();
               presentToast({ message: 'Actualizado', duration: 2000, color: 'success' });
             } catch (e) {

@@ -1,10 +1,11 @@
 import { Controller, Post, Body, Param, Get, NotFoundException, BadRequestException, Put, Query } from '@nestjs/common';
 import { ReservationsService } from './reservations.service';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThanOrEqual } from 'typeorm';
+import { Repository, MoreThanOrEqual, In } from 'typeorm';
 import { Tenant } from '../entities/tenant.entity';
 import { Settings } from '../entities/settings.entity';
 import { Reservation } from '../entities/reservation.entity';
+import { Product } from '../entities/product.entity';
 import { ReservationStatus } from '@nutrideli/shared-types';
 import { decodeTenantId } from '../utils/tenant-crypto';
 import { Public } from '../auth/public.decorator';
@@ -31,11 +32,25 @@ export class PublicReservationsController {
     const settingsRepo = this.tenantRepo.manager.getRepository(Settings);
     const settings = await settingsRepo.findOne({ where: { tenantId: id } });
 
+    const productRepo = this.tenantRepo.manager.getRepository(Product);
+    const products = await productRepo.find({
+      where: { tenantId: id },
+      order: { name: 'ASC' }
+    });
+
+    const services = products.map(p => ({
+      id: p.id,
+      name: p.name,
+      price: p.salePrice,
+      durationMinutes: p.durationMinutes || settings?.slotInterval || 30,
+      category: p.category
+    }));
+
     return { 
       id: token, 
       name: tenant.name,
       businessHours: settings?.businessHours || null,
-      services: settings?.services || [],
+      services: services,
       slotInterval: settings?.slotInterval || 30
     };
   }
@@ -70,9 +85,13 @@ export class PublicReservationsController {
     const settingsRepo = this.tenantRepo.manager.getRepository(Settings);
     const settings = await settingsRepo.findOne({ where: { tenantId: reservation.tenantId } });
 
+    const productRepo = this.tenantRepo.manager.getRepository(Product);
     let serviceDetails: any = null;
-    if (reservation.serviceId && settings?.services) {
-      serviceDetails = settings.services.find((s: any) => s.id === reservation.serviceId);
+    if (reservation.serviceId) {
+      const p = await productRepo.findOne({ where: { id: reservation.serviceId } });
+      if (p) {
+        serviceDetails = { price: p.salePrice, durationMinutes: p.durationMinutes };
+      }
     }
 
     return {
@@ -160,11 +179,6 @@ export class PublicReservationsController {
     if (!dayConfig || !dayConfig.isOpen) return [];
 
     const interval = settings?.slotInterval || 30;
-    let duration = interval;
-    if (serviceId && settings?.services) {
-      const svc = settings.services.find((s: any) => s.id === serviceId);
-      if (svc && svc.durationMinutes) duration = svc.durationMinutes;
-    }
 
     const [sh, sm] = dayConfig.startTime.split(':').map(Number);
     const [eh, em] = dayConfig.endTime.split(':').map(Number);
@@ -182,13 +196,27 @@ export class PublicReservationsController {
     }
     const existing = await qb.getMany();
 
+    // Query products for service durations
+    const productRepo = this.tenantRepo.manager.getRepository(Product);
+    const serviceIds = [serviceId, ...existing.map(r => r.serviceId)].filter((sid): sid is string => !!sid);
+    const products = serviceIds.length > 0 
+      ? await productRepo.find({ where: { id: In(serviceIds) } }) 
+      : [];
+    const productMap = new Map<string, Product>(products.map(p => [p.id, p]));
+
+    let duration = interval;
+    if (serviceId && productMap.has(serviceId)) {
+      const sp = productMap.get(serviceId);
+      if (sp && sp.durationMinutes) duration = sp.durationMinutes;
+    }
+
     // Map existing into busy intervals [startMins, endMins]
     const busyIntervals = existing.map(r => {
       const [rh, rm] = r.time.split(':').map(Number);
       const startMins = rh * 60 + rm;
       let rDuration = interval;
-      if (r.serviceId && settings?.services) {
-        const s = settings.services.find((x: any) => x.id === r.serviceId);
+      if (r.serviceId && productMap.has(r.serviceId)) {
+        const s = productMap.get(r.serviceId);
         if (s && s.durationMinutes) rDuration = s.durationMinutes;
       }
       return { start: startMins, end: startMins + rDuration };

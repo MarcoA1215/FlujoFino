@@ -13,6 +13,8 @@ interface UserData {
   jobTitle?: string;
   entryTime?: string;
   exitTime?: string;
+  salaryAmount?: number;
+  salaryPeriod?: string;
   status?: string;
   createdAt: string;
 }
@@ -34,6 +36,14 @@ const Users: React.FC = () => {
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('USD');
   const [payDate, setPayDate] = useState(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]);
+
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserData | null>(null);
+  const [editRole, setEditRole] = useState<UserRole>(UserRole.POS);
+  const [editJobTitle, setEditJobTitle] = useState('');
+  const [editEntryTime, setEditEntryTime] = useState('');
+  const [editExitTime, setEditExitTime] = useState('');
+  const [editSalaryAmount, setEditSalaryAmount] = useState('');
+  const [editSalaryPeriod, setEditSalaryPeriod] = useState('SEMANAL');
   
   const [isChecked, setIsChecked] = useState(false);
   const [isExisting, setIsExisting] = useState(false);
@@ -129,6 +139,35 @@ const Users: React.FC = () => {
       setPayAmount('');
     } catch (e: any) {
       presentToast({ message: 'Error registrando pago: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
+    }
+  };
+
+  const handleOpenEdit = (u: UserData) => {
+    setSelectedUserForEdit(u);
+    setEditRole((u.role as UserRole) || UserRole.POS);
+    setEditJobTitle(u.jobTitle || '');
+    setEditEntryTime(u.entryTime || '');
+    setEditExitTime(u.exitTime || '');
+    setEditSalaryAmount(u.salaryAmount !== undefined && u.salaryAmount !== null ? String(u.salaryAmount) : '');
+    setEditSalaryPeriod(u.salaryPeriod || 'SEMANAL');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedUserForEdit) return;
+    try {
+      await apiClient.put(`/users/${selectedUserForEdit.id}`, {
+        role: editRole,
+        jobTitle: editJobTitle.trim() || null,
+        entryTime: editEntryTime || null,
+        exitTime: editExitTime || null,
+        salaryAmount: editSalaryAmount ? Number(editSalaryAmount) : null,
+        salaryPeriod: editSalaryPeriod || 'SEMANAL',
+      });
+      presentToast({ message: 'Usuario actualizado exitosamente', duration: 2000, color: 'success' });
+      setSelectedUserForEdit(null);
+      fetchUsers();
+    } catch (e: any) {
+      presentToast({ message: 'Error al actualizar: ' + (e.response?.data?.message || e.message), duration: 4000, color: 'danger' });
     }
   };
 
@@ -322,6 +361,9 @@ const Users: React.FC = () => {
                               </td>
                               <td>{new Date(u.createdAt).toLocaleDateString()}</td>
                               <td>
+                                <IonButton size="small" color="primary" fill="clear" onClick={() => handleOpenEdit(u)}>
+                                  ✏️ Editar
+                                </IonButton>
                                 <IonButton size="small" color="success" fill="clear" onClick={() => setSelectedUserForPay(u)}>
                                   💵 Pagar
                                 </IonButton>
@@ -347,6 +389,102 @@ const Users: React.FC = () => {
         </IonGrid>
       </IonContent>
       
+      {/* Modal Editar Usuario */}
+      {selectedUserForEdit && (
+        <IonModal isOpen={!!selectedUserForEdit} onDidDismiss={() => setSelectedUserForEdit(null)}>
+          <IonHeader>
+            <IonToolbar color="dark">
+              <IonTitle>Editar: {selectedUserForEdit.username}</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setSelectedUserForEdit(null)}>Cerrar</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding">
+            <IonItem>
+              <IonLabel position="stacked">Correo Electrónico</IonLabel>
+              <IonInput disabled value={selectedUserForEdit.email} />
+            </IonItem>
+            
+            <IonItem>
+              <IonLabel position="stacked">Rol / Permiso</IonLabel>
+              <IonSelect value={editRole} onIonChange={e => setEditRole(e.detail.value)}>
+                <IonSelectOption value={UserRole.ADMIN}>Administrador</IonSelectOption>
+                <IonSelectOption value={UserRole.POS}>Cajero (POS)</IonSelectOption>
+                {settings?.featureRecipes !== false && (
+                  <IonSelectOption value={UserRole.KITCHEN}>Cocina (KITCHEN)</IonSelectOption>
+                )}
+                {settings?.featureBuySell !== false && (
+                  <IonSelectOption value={UserRole.DELIVERY}>Repartidor (DELIVERY)</IonSelectOption>
+                )}
+                <IonSelectOption value={UserRole.INVENTORY}>Reabastecedor (INVENTORY)</IonSelectOption>
+              </IonSelect>
+            </IonItem>
+
+            <IonItem>
+              <IonLabel position="stacked">Cargo / Puesto (Opcional)</IonLabel>
+              <IonInput 
+                value={editJobTitle} 
+                onIonInput={e => setEditJobTitle(e.detail.value!)} 
+                placeholder="Ej. Manicurista, Estilista, Mesero, Vendedora" 
+              />
+            </IonItem>
+
+            <IonRow style={{ padding: 0 }}>
+              <IonCol size="6" style={{ paddingLeft: 0, paddingRight: '4px' }}>
+                <IonItem>
+                  <IonLabel position="stacked">Hora Entrada</IonLabel>
+                  <IonInput 
+                    type="time" 
+                    value={editEntryTime} 
+                    onIonInput={e => setEditEntryTime(e.detail.value!)} 
+                  />
+                </IonItem>
+              </IonCol>
+              <IonCol size="6" style={{ paddingLeft: '4px', paddingRight: 0 }}>
+                <IonItem>
+                  <IonLabel position="stacked">Hora Salida</IonLabel>
+                  <IonInput 
+                    type="time" 
+                    value={editExitTime} 
+                    onIonInput={e => setEditExitTime(e.detail.value!)} 
+                  />
+                </IonItem>
+              </IonCol>
+            </IonRow>
+
+            <IonItem>
+              <IonLabel position="stacked">Sueldo Acordado (USD)</IonLabel>
+              <IonInput 
+                type="number" 
+                min="0" 
+                placeholder="Ej: 50" 
+                value={editSalaryAmount} 
+                onIonChange={e => setEditSalaryAmount(e.detail.value!)} 
+              />
+            </IonItem>
+
+            <IonItem>
+              <IonLabel position="stacked">Frecuencia de Pago</IonLabel>
+              <IonSelect value={editSalaryPeriod} onIonChange={e => setEditSalaryPeriod(e.detail.value)}>
+                <IonSelectOption value="SEMANAL">Semanal</IonSelectOption>
+                <IonSelectOption value="QUINCENAL">Quincenal</IonSelectOption>
+                <IonSelectOption value="MENSUAL">Mensual</IonSelectOption>
+              </IonSelect>
+            </IonItem>
+
+            <div className="ion-margin-top">
+              <IonButton expand="block" color="primary" onClick={handleSaveEdit}>
+                💾 Guardar Cambios
+              </IonButton>
+              <IonButton expand="block" fill="clear" color="medium" onClick={() => setSelectedUserForEdit(null)}>
+                Cancelar
+              </IonButton>
+            </div>
+          </IonContent>
+        </IonModal>
+      )}
+
       {/* Modal Pago de Nómina */}
       {selectedUserForPay && (
         <IonModal isOpen={!!selectedUserForPay} onDidDismiss={() => setSelectedUserForPay(null)}>

@@ -1,9 +1,10 @@
-﻿export type Product = {
+export type Product = {
   id: string;
   name: string;
   category?: string;
   salePrice: number;
   stockQuantity: number;
+  durationMinutes?: number;
   isCombo?: boolean;
   isPreAssembled?: boolean;
   comboItems?: { id: string; componentId: string; quantity: number; component?: any }[];

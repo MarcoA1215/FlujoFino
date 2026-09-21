@@ -98,9 +98,9 @@ export class UsersService implements OnModuleInit {
         username: a.user.username,
         name: a.user.username,
         role: a.role,
-        jobTitle: a.jobTitle,
-        entryTime: a.entryTime,
-        exitTime: a.exitTime,
+        jobTitle: a.jobTitle || undefined,
+        entryTime: a.entryTime || undefined,
+        exitTime: a.exitTime || undefined,
       }));
   }
 
@@ -162,6 +162,48 @@ export class UsersService implements OnModuleInit {
 
       return savedUser;
     });
+  }
+
+  async update(tenantId: string, userId: string, data: any): Promise<any> {
+    if (!tenantId) throw new Error('Tenant ID required');
+
+    let access = await this.usersRepo.manager.findOne(UserTenantAccess, {
+      where: { userId, tenantId }
+    });
+
+    if (!access) {
+      const user = await this.usersRepo.findOne({ where: { id: userId } });
+      if (!user) throw new Error('Usuario no encontrado');
+      access = this.usersRepo.manager.create(UserTenantAccess, {
+        userId,
+        tenantId,
+        isActive: true,
+        status: 'ACCEPTED',
+        role: data.role || user.role || UserRole.POS
+      });
+    }
+
+    if (data.role !== undefined) {
+      access.role = data.role;
+    }
+    if (data.jobTitle !== undefined || data.job_title !== undefined) {
+      access.jobTitle = (data.jobTitle !== undefined ? data.jobTitle : data.job_title) || null;
+    }
+    if (data.entryTime !== undefined || data.entry_time !== undefined) {
+      access.entryTime = (data.entryTime !== undefined ? data.entryTime : data.entry_time) || null;
+    }
+    if (data.exitTime !== undefined || data.exit_time !== undefined) {
+      access.exitTime = (data.exitTime !== undefined ? data.exitTime : data.exit_time) || null;
+    }
+    if (data.salaryAmount !== undefined) {
+      access.salaryAmount = data.salaryAmount ? Number(data.salaryAmount) : null;
+    }
+    if (data.salaryPeriod !== undefined) {
+      access.salaryPeriod = data.salaryPeriod || null;
+    }
+
+    await this.usersRepo.manager.save(access);
+    return { success: true, access };
   }
 
   async delete(tenantId: string, id: string): Promise<void> {

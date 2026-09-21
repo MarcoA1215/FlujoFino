@@ -107,6 +107,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                     {p.isPreAssembled ? 'Pre-Fabricado' : 'Hecho al Instante'}
                   </IonBadge>
                 )}
+                {p.durationMinutes ? (
+                  <IonBadge color="light" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal', border: '1px solid #ddd' }}>
+                    ⏱️ {p.durationMinutes} min
+                  </IonBadge>
+                ) : null}
               </div>
             )}
           </div>

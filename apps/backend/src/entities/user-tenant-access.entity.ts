@@ -33,19 +33,19 @@ export class UserTenantAccess {
   status: string;
 
   @Column({ type: 'float', nullable: true })
-  salaryAmount: number;
+  salaryAmount: number | null;
 
   @Column({ type: 'varchar', nullable: true }) // 'SEMANAL', 'QUINCENAL', 'MENSUAL'
-  salaryPeriod: string;
+  salaryPeriod: string | null;
 
   @Column({ name: 'job_title', type: 'varchar', nullable: true })
-  jobTitle: string;
+  jobTitle: string | null;
 
   @Column({ name: 'entry_time', type: 'varchar', nullable: true })
-  entryTime: string;
+  entryTime: string | null;
 
   @Column({ name: 'exit_time', type: 'varchar', nullable: true })
-  exitTime: string;
+  exitTime: string | null;
 
   @OneToMany(() => WorkSchedule, ws => ws.userTenantAccess)
   workSchedules: WorkSchedule[];

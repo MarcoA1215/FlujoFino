@@ -24,6 +24,9 @@ export class Product {
   @Column('float')
   salePrice: number;
 
+  @Column('int', { name: 'duration_minutes', nullable: true, default: 30 })
+  durationMinutes: number | null;
+
   @Column('float', { default: 0 })
   stockQuantity: number;
 

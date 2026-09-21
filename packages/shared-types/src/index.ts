@@ -66,6 +66,7 @@ export interface ProductDTO {
   category?: string;
   salePrice: number;
   stockQuantity: number;
+  durationMinutes?: number;
   isCombo?: boolean;
   isPreAssembled?: boolean;
   physicalStock?: number;
