@@ -55,7 +55,7 @@ const Pos: React.FC = () => {
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   
   const { user } = useContext(AuthContext);
-  const [employees, setEmployees] = useState<{ id: string; username: string; name?: string; role?: string }[]>([]);
+  const [employees, setEmployees] = useState<{ id: string; username: string; name?: string; role?: string; jobTitle?: string }[]>([]);
   const [employeeId, setEmployeeId] = useState<string>('');
 
   const [presentToast] = useIonToast();
@@ -420,7 +420,7 @@ const Pos: React.FC = () => {
                     >
                       {employees.map(emp => (
                         <IonSelectOption key={emp.id} value={emp.id}>
-                          {emp.username || emp.name} {emp.id === user?.id ? '(Yo)' : ''}
+                          {emp.username || emp.name}{emp.jobTitle ? ` (${emp.jobTitle})` : ''} {emp.id === user?.id ? '(Yo)' : ''}
                         </IonSelectOption>
                       ))}
                     </IonSelect>

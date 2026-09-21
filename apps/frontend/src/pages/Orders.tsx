@@ -35,6 +35,7 @@ type Order = {
     username: string;
     name?: string;
     email?: string;
+    jobTitle?: string;
   };
 };
 
@@ -51,7 +52,7 @@ const Orders: React.FC = () => {
   const [partialDeliveries, setPartialDeliveries] = useState<{ [key: string]: number }>({});
   
   const [settings, setSettings] = useState<any>(null);
-  const [employees, setEmployees] = useState<{ id: string; username: string }[]>([]);
+  const [employees, setEmployees] = useState<{ id: string; username: string; jobTitle?: string }[]>([]);
   const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('');
   const [abonoAmount, setAbonoAmount] = useState<string>('');
   const [abonoCurrency, setAbonoCurrency] = useState<'USD' | 'VES'>('USD');
@@ -121,7 +122,9 @@ const Orders: React.FC = () => {
     const brandName = settings?.companyName || 'FlujoFino';
     let text = '*' + brandName + ' - Pedido ' + order.customerName + '*\n';
     if (order.employee?.username || order.employee?.name) {
-      text += 'Atendido por: ' + (order.employee?.username || order.employee?.name) + '\n';
+      const empName = order.employee?.username || order.employee?.name;
+      const empTitle = order.employee?.jobTitle ? ` (${order.employee.jobTitle})` : '';
+      text += 'Atendido por: ' + empName + empTitle + '\n';
     }
     if (order.customerPhone) text += 'Tel: ' + order.customerPhone + '\n';
     text += 'Tipo: ' + (order.deliveryMethod === DeliveryMethod.DELIVERY ? 'Delivery' : (order.deliveryMethod === DeliveryMethod.PICKUP ? 'Pickup' : 'Local')) + '\n';
@@ -397,7 +400,7 @@ const getStatusColor = (status: OrderStatus) => {
                   >
                     <IonSelectOption value="">Todos los empleados</IonSelectOption>
                     {employees.map(emp => (
-                      <IonSelectOption key={emp.id} value={emp.id}>{emp.username}</IonSelectOption>
+                      <IonSelectOption key={emp.id} value={emp.id}>{emp.username}{emp.jobTitle ? ` (${emp.jobTitle})` : ''}</IonSelectOption>
                     ))}
                   </IonSelect>
                 </IonItem>
@@ -422,7 +425,7 @@ const getStatusColor = (status: OrderStatus) => {
       {order.employee && (
         <IonBadge color="light" style={{ border: '1px solid #ddd', color: '#444', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}>
           <IonIcon icon={personOutline} style={{ fontSize: '0.85rem' }} />
-          Atendido por: {order.employee.username || order.employee.name}
+          Atendido por: {order.employee.username || order.employee.name}{order.employee.jobTitle ? ` (${order.employee.jobTitle})` : ''}
         </IonBadge>
       )}
     </div>
@@ -542,7 +545,7 @@ const getStatusColor = (status: OrderStatus) => {
           {selectedOrderForDetails && (
             <>
               <h3>Cliente: {selectedOrderForDetails.customerName}</h3>
-              <p>Atendido por: <strong>{selectedOrderForDetails.employee?.username || selectedOrderForDetails.employee?.name || 'Sin asignar'}</strong></p>
+              <p>Atendido por: <strong>{selectedOrderForDetails.employee?.username || selectedOrderForDetails.employee?.name || 'Sin asignar'}{selectedOrderForDetails.employee?.jobTitle ? ` (${selectedOrderForDetails.employee.jobTitle})` : ''}</strong></p>
               <p>Total del Pedido: <strong>${selectedOrderForDetails.totalAmount.toFixed(2)}</strong></p>
               
               <IonList>

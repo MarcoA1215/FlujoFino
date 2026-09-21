@@ -262,19 +262,38 @@ export class OrdersService {
     });
   }
 
+  private mapOrderEmployee(order: Order, tenantId: string): Order {
+    if (order && order.employee) {
+      const access = order.employee.tenantAccess?.find(a => a.tenantId === tenantId);
+      if (access) {
+        if (access.jobTitle) {
+          (order.employee as any).jobTitle = access.jobTitle;
+        }
+        if (access.role) {
+          order.employee.role = access.role as any;
+        }
+      }
+      delete (order.employee as any).passwordHash;
+      delete (order.employee as any).tenantAccess;
+    }
+    return order;
+  }
+
   async getAllOrders(tenantId: string) {
-    return this.dataSource.getRepository(Order).find({
+    const orders = await this.dataSource.getRepository(Order).find({
       where: { tenantId },
-      relations: { items: { product: true }, deliveryZone: true, employee: true },
+      relations: { items: { product: true }, deliveryZone: true, employee: { tenantAccess: true } },
       order: { createdAt: 'DESC' },
     });
+    return orders.map(order => this.mapOrderEmployee(order, tenantId));
   }
 
   async getOrderById(tenantId: string, id: string) {
-    return this.dataSource.getRepository(Order).findOne({
+    const order = await this.dataSource.getRepository(Order).findOne({
       where: { tenantId, id },
-      relations: { items: { product: true }, deliveryZone: true, employee: true }
+      relations: { items: { product: true }, deliveryZone: true, employee: { tenantAccess: true } }
     });
+    return order ? this.mapOrderEmployee(order, tenantId) : null;
   }
 
   async updatePaymentStatus(tenantId: string, id: string, dto: UpdatePaymentDto) {

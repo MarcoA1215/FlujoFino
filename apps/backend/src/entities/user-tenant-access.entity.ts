@@ -38,6 +38,15 @@ export class UserTenantAccess {
   @Column({ type: 'varchar', nullable: true }) // 'SEMANAL', 'QUINCENAL', 'MENSUAL'
   salaryPeriod: string;
 
+  @Column({ name: 'job_title', type: 'varchar', nullable: true })
+  jobTitle: string;
+
+  @Column({ name: 'entry_time', type: 'varchar', nullable: true })
+  entryTime: string;
+
+  @Column({ name: 'exit_time', type: 'varchar', nullable: true })
+  exitTime: string;
+
   @OneToMany(() => WorkSchedule, ws => ws.userTenantAccess)
   workSchedules: WorkSchedule[];
 }

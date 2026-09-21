@@ -102,8 +102,21 @@ export interface OrderDTO {
     username: string;
     email?: string;
     role?: UserRole;
+    jobTitle?: string;
+    entryTime?: string;
+    exitTime?: string;
   };
   items: OrderItemDTO[];
+}
+
+export interface EmployeeDTO {
+  id: string;
+  username: string;
+  name?: string;
+  role: UserRole;
+  jobTitle?: string;
+  entryTime?: string;
+  exitTime?: string;
 }
 
 export enum UserRole {

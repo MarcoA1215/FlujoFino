@@ -10,6 +10,10 @@ interface UserData {
   username: string;
   email: string;
   role: string;
+  jobTitle?: string;
+  entryTime?: string;
+  exitTime?: string;
+  status?: string;
   createdAt: string;
 }
 
@@ -19,6 +23,10 @@ const Users: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>(UserRole.POS);
+  const [jobTitle, setJobTitle] = useState('');
+  const [entryTime, setEntryTime] = useState('');
+  const [exitTime, setExitTime] = useState('');
+  const [settings, setSettings] = useState<any>({});
   const [salaryAmount, setSalaryAmount] = useState('');
   const [salaryPeriod, setSalaryPeriod] = useState('SEMANAL');
   
@@ -38,6 +46,12 @@ const Users: React.FC = () => {
     try {
       const res = await apiClient.get<UserData[]>('/users');
       setUsers(res.data);
+      try {
+        const setRes = await apiClient.get<any>('/settings');
+        setSettings(setRes.data || {});
+      } catch (err) {
+        console.error('Error cargando settings', err);
+      }
     } catch (e) {
       presentToast({ message: 'Error cargando usuarios', duration: 3000, color: 'danger' });
     }
@@ -71,6 +85,9 @@ const Users: React.FC = () => {
     setEmail('');
     setUsername('');
     setPassword('');
+    setJobTitle('');
+    setEntryTime('');
+    setExitTime('');
     setSalaryAmount('');
     setSalaryPeriod('SEMANAL');
     setIsChecked(false);
@@ -84,6 +101,9 @@ const Users: React.FC = () => {
     try {
       await apiClient.post('/users', { 
         username, email, password, role, 
+        jobTitle: jobTitle.trim() || undefined,
+        entryTime: entryTime || undefined,
+        exitTime: exitTime || undefined,
         salaryAmount: salaryAmount ? Number(salaryAmount) : undefined, 
         salaryPeriod 
       });
@@ -192,11 +212,45 @@ const Users: React.FC = () => {
                         <IonSelect value={role} onIonChange={e => setRole(e.detail.value)}>
                           <IonSelectOption value={UserRole.ADMIN}>Administrador</IonSelectOption>
                           <IonSelectOption value={UserRole.POS}>Cajero (POS)</IonSelectOption>
-                          <IonSelectOption value={UserRole.KITCHEN}>Cocina (KITCHEN)</IonSelectOption>
-                          <IonSelectOption value={UserRole.DELIVERY}>Repartidor (DELIVERY)</IonSelectOption>
+                          {settings?.featureRecipes !== false && (
+                            <IonSelectOption value={UserRole.KITCHEN}>Cocina (KITCHEN)</IonSelectOption>
+                          )}
+                          {settings?.featureBuySell !== false && (
+                            <IonSelectOption value={UserRole.DELIVERY}>Repartidor (DELIVERY)</IonSelectOption>
+                          )}
                           <IonSelectOption value={UserRole.INVENTORY}>Reabastecedor (INVENTORY)</IonSelectOption>
                         </IonSelect>
                       </IonItem>
+                      <IonItem>
+                        <IonLabel position="stacked">Cargo / Puesto (Opcional)</IonLabel>
+                        <IonInput 
+                          value={jobTitle} 
+                          onIonInput={e => setJobTitle(e.detail.value!)} 
+                          placeholder="Ej. Manicurista, Estilista, Mesero, Vendedora" 
+                        />
+                      </IonItem>
+                      <IonRow style={{ padding: 0 }}>
+                        <IonCol size="6" style={{ paddingLeft: 0, paddingRight: '4px' }}>
+                          <IonItem>
+                            <IonLabel position="stacked">Hora Entrada</IonLabel>
+                            <IonInput 
+                              type="time" 
+                              value={entryTime} 
+                              onIonInput={e => setEntryTime(e.detail.value!)} 
+                            />
+                          </IonItem>
+                        </IonCol>
+                        <IonCol size="6" style={{ paddingLeft: '4px', paddingRight: 0 }}>
+                          <IonItem>
+                            <IonLabel position="stacked">Hora Salida</IonLabel>
+                            <IonInput 
+                              type="time" 
+                              value={exitTime} 
+                              onIonInput={e => setExitTime(e.detail.value!)} 
+                            />
+                          </IonItem>
+                        </IonCol>
+                      </IonRow>
                       <IonItem>
                         <IonLabel position="stacked">Sueldo Acordado (USD)</IonLabel>
                         <IonInput type="number" min="0" placeholder="Ej: 50" value={salaryAmount} onIonChange={e => setSalaryAmount(e.detail.value!)} />
@@ -228,42 +282,60 @@ const Users: React.FC = () => {
                     <table>
                       <thead>
                         <tr>
-                          <th>Usuario</th>
+                          <th>Usuario / Cargo</th>
                           <th>Correo</th>
                           <th>Rol</th>
+                          <th>Horario</th>
                           <th>Estado</th>
                           <th>Fecha de Creación</th>
                           <th>Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {users.map((u: any) => (
-                          <tr key={u.id}>
-                            <td><strong>{u.username}</strong></td>
-                            <td>{u.email}</td>
-                            <td>
-                              <IonBadge color={u.role === UserRole.ADMIN ? 'danger' : 'primary'}>{u.role}</IonBadge>
-                            </td>
-                            <td>
-                              <IonBadge color={u.status === 'PENDING' ? 'warning' : 'success'}>
-                                {u.status === 'PENDING' ? 'Invitado' : 'Activo'}
-                              </IonBadge>
-                            </td>
-                            <td>{new Date(u.createdAt).toLocaleDateString()}</td>
-                            <td>
-                              <IonButton size="small" color="success" fill="clear" onClick={() => setSelectedUserForPay(u)}>
-                                💵 Pagar
-                              </IonButton>
-                              {u.username !== 'admin' && (
-                                <IonButton size="small" color="danger" fill="clear" onClick={() => handleDelete(u.id)}>
-                                  Eliminar
+                        {users.map((u: any) => {
+                          const isCurrentUser = (user?.id && user.id === u.id) || (user?.username && user.username === u.username);
+                          return (
+                            <tr key={u.id}>
+                              <td>
+                                <div><strong>{u.username}</strong></div>
+                                {u.jobTitle && (
+                                  <div style={{ fontSize: '0.85em', color: '#92949c' }}>
+                                    {u.jobTitle}
+                                  </div>
+                                )}
+                              </td>
+                              <td>{u.email}</td>
+                              <td>
+                                <IonBadge color={u.role === UserRole.ADMIN ? 'danger' : 'primary'}>{u.role}</IonBadge>
+                              </td>
+                              <td>
+                                {u.entryTime && u.exitTime ? (
+                                  <span style={{ fontSize: '0.85rem' }}>{u.entryTime} - {u.exitTime}</span>
+                                ) : (
+                                  <span style={{ fontSize: '0.85rem', color: '#888' }}>Sin definir</span>
+                                )}
+                              </td>
+                              <td>
+                                <IonBadge color={u.status === 'PENDING' ? 'warning' : 'success'}>
+                                  {u.status === 'PENDING' ? 'Invitado' : 'Activo'}
+                                </IonBadge>
+                              </td>
+                              <td>{new Date(u.createdAt).toLocaleDateString()}</td>
+                              <td>
+                                <IonButton size="small" color="success" fill="clear" onClick={() => setSelectedUserForPay(u)}>
+                                  💵 Pagar
                                 </IonButton>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                                {u.username !== 'admin' && !isCurrentUser && (
+                                  <IonButton size="small" color="danger" fill="clear" onClick={() => handleDelete(u.id)}>
+                                    Eliminar
+                                  </IonButton>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                         {users.length === 0 && (
-                          <tr><td colSpan={4} className="ion-text-center">Cargando...</td></tr>
+                          <tr><td colSpan={7} className="ion-text-center">Cargando...</td></tr>
                         )}
                       </tbody>
                     </table>

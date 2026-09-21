@@ -61,13 +61,18 @@ export class UsersService implements OnModuleInit {
       if (access) {
         user.role = access.role as UserRole;
         (user as any).status = access.status;
+        (user as any).jobTitle = access.jobTitle;
+        (user as any).entryTime = access.entryTime;
+        (user as any).exitTime = access.exitTime;
+        (user as any).salaryAmount = access.salaryAmount;
+        (user as any).salaryPeriod = access.salaryPeriod;
       }
       delete (user as any).passwordHash;
       return user;
     });
   }
 
-  async findActiveEmployees(tenantId?: string): Promise<{ id: string; username: string; name: string; role: UserRole }[]> {
+  async findActiveEmployees(tenantId?: string): Promise<{ id: string; username: string; name: string; role: UserRole; jobTitle?: string; entryTime?: string; exitTime?: string }[]> {
     if (!tenantId) return [];
 
     const accesses = await this.usersRepo.manager.find(UserTenantAccess, {
@@ -93,6 +98,9 @@ export class UsersService implements OnModuleInit {
         username: a.user.username,
         name: a.user.username,
         role: a.role,
+        jobTitle: a.jobTitle,
+        entryTime: a.entryTime,
+        exitTime: a.exitTime,
       }));
   }
 
@@ -145,7 +153,10 @@ export class UsersService implements OnModuleInit {
         isActive: true,
         status: status,
         salaryAmount: data.salaryAmount ? Number(data.salaryAmount) : null,
-        salaryPeriod: data.salaryPeriod || null
+        salaryPeriod: data.salaryPeriod || null,
+        jobTitle: data.jobTitle || data.job_title || null,
+        entryTime: data.entryTime || data.entry_time || null,
+        exitTime: data.exitTime || data.exit_time || null,
       });
       await transactionalEntityManager.save(access);
 
