@@ -28,7 +28,7 @@ export class DashboardService {
     });
     const movements = await this.movementRepo.find({
       relations: { rawMaterial: true },
-      where: { rawMaterial: { tenantId } } // Since stock movement is related to rawMaterial, we filter through relation
+      where: { tenantId }
     });
     
     // Solo tomamos en cuenta pedidos que no están cancelados

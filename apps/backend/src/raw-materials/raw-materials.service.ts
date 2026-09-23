@@ -188,6 +188,6 @@ export class RawMaterialsService {
   }
 
   async archive(tenantId: string, id: string) {
-    await this.rawMaterialRepo.update(id, { isActive: false });
+    await this.rawMaterialRepo.update({ id, tenantId }, { isActive: false });
   }
 }

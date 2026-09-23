@@ -224,9 +224,9 @@ export class PublicReservationsController {
 
     const slots: string[] = [];
     let currentMins = sh * 60 + sm;
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    const currentRealMins = now.getHours() * 60 + now.getMinutes();
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Caracas', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const [vzH, vzM] = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Caracas', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).split(':').map(Number);
+    const currentRealMins = vzH * 60 + vzM;
 
     while (currentMins + duration <= closeMinutes) {
       // If it's today, filter out past slots

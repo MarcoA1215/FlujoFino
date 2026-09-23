@@ -86,6 +86,7 @@ export class ProductsService {
   }
 
   async create(tenantId: string, dto: CreateProductDto) {
+    const product = this.productRepo.create(dto);
     const product = this.productRepo.create({ ...dto, tenantId });
     return this.productRepo.save(product);
   }
@@ -306,18 +307,18 @@ export class ProductsService {
       SELECT i."productId", SUM(i.quantity) as reserved
       FROM order_item i
       JOIN "order" o ON o.id = i."orderId"
-      WHERE o.status IN ('PENDING', 'PREPARING')
+      WHERE o.status IN ('PENDING', 'PREPARING') AND o."tenantId" = $1
       GROUP BY i."productId"
-    `);
+    `, [tenantId]);
     
     const reservedCombos = await this.dataSource.query(`
       SELECT ci."componentId" as "productId", SUM(i.quantity * ci.quantity) as reserved
       FROM order_item i
       JOIN "order" o ON o.id = i."orderId"
       JOIN combo_item ci ON ci."comboId" = i."productId"
-      WHERE o.status IN ('PENDING', 'PREPARING')
+      WHERE o.status IN ('PENDING', 'PREPARING') AND o."tenantId" = $1
       GROUP BY ci."componentId"
-    `);
+    `, [tenantId]);
 
     const reservedMap: Record<string, number> = {};
     for (const row of reservedDirect) {
