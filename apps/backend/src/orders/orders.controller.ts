@@ -1,5 +1,7 @@
-import { Controller, Request, Get, Post, Body, Param, Patch, Delete, Put } from '@nestjs/common';
+import { Controller, Request, Get, Post, Body, Param, Patch, Delete, Put, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { OrdersService, CreateOrderDto, UpdatePaymentDto } from './orders.service';
+import { StorageService } from '../storage/storage.service';
 import { OrderStatus } from '@nutrideli/shared-types';
 
 @Controller('orders')
@@ -12,7 +14,21 @@ export class OrdersController {
   revertAbono(@Request() req: any, @Param('id') id: string, @Param('index') index: string) {
     return this.ordersService.revertAbono(req.user.tenantId, id, parseInt(index, 10));}
 
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly ordersService: OrdersService,
+    private readonly storageService: StorageService
+  ) {}
+
+  @Post('items/:itemId/media')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadMedia(@Request() req: any, @Param('itemId') itemId: string, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('File is required');
+    
+    const url = await this.storageService.uploadFile(file, `tenant-${req.user.tenantId}/orders`);
+    await this.ordersService.addMediaToOrderItem(req.user.tenantId, itemId, url);
+
+    return { url };
+  }
 
   @Post()
   createOrder(@Request() req: any, @Body() dto: CreateOrderDto) {

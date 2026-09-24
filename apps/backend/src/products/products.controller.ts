@@ -1,16 +1,42 @@
-import { Controller, Request, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
+import { Controller, Request, Get, Post, Put, Delete, Body, Param, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
 import { RegisterLossDto } from '../raw-materials/dto/register-loss.dto';
 
+import { StorageService } from '../storage/storage.service';
+
 @Controller('products')
 export class ProductsController {
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly storageService: StorageService
+  ) {}
+
+  @Post(':id/image')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadImage(@Request() req: any, @Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('File is required');
+    
+    // Check if product exists first
+    const product = await this.productsService.findOne(req.user.tenantId, id);
+    if (!product) throw new BadRequestException('Product not found');
+
+    const url = await this.storageService.uploadFile(file, `tenant-${req.user.tenantId}/products`);
+    
+    // Add image URL to product
+    const images = product.images || [];
+    images.push(url);
+    await this.productsService.update(req.user.tenantId, id, { images } as any);
+
+    return { url };
+  }
+
   @Post(':id/unpack')
   unpackKit(@Request() req: any, @Param('id') id: string) {
-    return this.productsService.unpackKit(req.user.tenantId, id);}
-
-  constructor(private readonly productsService: ProductsService) {}
+    return this.productsService.unpackKit(req.user.tenantId, id);
+  }
 
   @Get()
   findAll(@Request() req: any) {

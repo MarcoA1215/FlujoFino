@@ -1,4 +1,4 @@
-import { refreshOutline, copyOutline, informationCircleOutline, trashOutline, createOutline, personOutline } from 'ionicons/icons';
+import { refreshOutline, copyOutline, informationCircleOutline, trashOutline, createOutline, personOutline, imageOutline } from 'ionicons/icons';
 import { IonModal, IonInput, IonSelect, IonSelectOption } from '@ionic/react';
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, useIonRouter, IonText, IonSegment, IonSegmentButton, IonSearchbar, IonIcon } from '@ionic/react';
 import { useEffect, useState } from 'react';
@@ -550,11 +550,40 @@ const getStatusColor = (status: OrderStatus) => {
               
               <IonList>
                 {selectedOrderForDetails.items.map((item: any, idxx: number) => (
-                  <IonItem key={item.id || idxx}>
-                    <IonLabel>
-                      {parseFloat(Number(item.quantity).toFixed(4))}x {item.productName || item.product?.name}
-                    </IonLabel>
-                    <IonText color="primary">{item.subtotal ? "$"+item.subtotal.toFixed(2) : ''}</IonText>
+                  <IonItem key={item.id || idxx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                      <IonLabel>
+                        {parseFloat(Number(item.quantity).toFixed(4))}x {item.productName || item.product?.name}
+                      </IonLabel>
+                      <IonText color="primary">{item.subtotal ? "$"+item.subtotal.toFixed(2) : ''}</IonText>
+                      <IonButton fill="clear" size="small" onClick={() => document.getElementById(`upload-orderitem-${item.id}`)?.click()}>
+                        <IonIcon icon={imageOutline} slot="icon-only" />
+                      </IonButton>
+                    </div>
+                    {item.media && item.media.length > 0 && (
+                      <div style={{ marginTop: '10px', display: 'flex', gap: '5px', overflowX: 'auto' }}>
+                        {item.media.map((m: any) => (
+                          <img key={m.id} src={m.imageUrl} style={{ height: '80px', borderRadius: '4px' }} alt="Media" />
+                        ))}
+                      </div>
+                    )}
+                    <input type="file" id={`upload-orderitem-${item.id}`} style={{ display: 'none' }} accept="image/*" onChange={async (e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        const file = e.target.files[0];
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        try {
+                          await apiClient.post(`/orders/items/${item.id}/media`, formData, {
+                            headers: { 'Content-Type': 'multipart/form-data' }
+                          });
+                          presentToast({ message: 'Foto subida con éxito', duration: 2000, color: 'success' });
+                          fetchOrders();
+                          setSelectedOrderForDetails(null); // Close modal and let them reopen to see it
+                        } catch (err) {
+                          presentToast({ message: 'Error al subir foto', duration: 3000, color: 'danger' });
+                        }
+                      }
+                    }} />
                   </IonItem>
                 ))}
               </IonList>

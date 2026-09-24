@@ -52,6 +52,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     }
 
     buttons.push({ text: 'Registrar Pérdida', icon: warningOutline, cssClass: 'action-sheet-eliminar', handler: () => onRegisterLoss(p) });
+    buttons.push({ text: 'Subir Imagen', icon: 'image-outline', handler: () => document.getElementById(`upload-${p.id}`)?.click() });
     buttons.push({ text: 'Eliminar Producto', icon: trashOutline, role: 'destructive', handler: () => onDelete(p) });
     buttons.push({ text: 'Cancelar', icon: closeOutline, role: 'cancel' });
 
@@ -60,13 +61,35 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       buttons
     });
   };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const { apiClient } = await import('../../api/client');
+        await apiClient.post(`/products/${p.id}/image`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        alert('Imagen subida con éxito');
+        window.location.reload(); // Quick refresh to show it, or trigger a fetch
+      } catch (err) {
+        alert('Error al subir la imagen');
+      }
+    }
+  };
   
   return (
     <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3" style={{ display: 'flex' }}>
+      <input type="file" id={`upload-${p.id}`} style={{ display: 'none' }} accept="image/*" onChange={handleFileChange} />
       <IonCard style={{ margin: '5px', width: '100%', display: 'flex', flexDirection: 'column' }}>
         <IonCardContent style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '15px' }}>
           
           <div style={{ flex: 1 }}>
+            {p.images && p.images.length > 0 && (
+              <img src={p.images[p.images.length - 1]} alt={p.name} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '10px' }} />
+            )}
             <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 5px 0', lineHeight: '1.3' }}>{p.name}</h2>
             
             {!isClientMode && (

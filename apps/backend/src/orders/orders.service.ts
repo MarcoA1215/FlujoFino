@@ -282,7 +282,7 @@ export class OrdersService {
   async getAllOrders(tenantId: string) {
     const orders = await this.dataSource.getRepository(Order).find({
       where: { tenantId },
-      relations: { items: { product: true }, deliveryZone: true, employee: { tenantAccess: true } },
+      relations: { items: { product: true, media: true }, deliveryZone: true, employee: { tenantAccess: true } },
       order: { createdAt: 'DESC' },
     });
     return orders.map(order => this.mapOrderEmployee(order, tenantId));
@@ -291,7 +291,7 @@ export class OrdersService {
   async getOrderById(tenantId: string, id: string) {
     const order = await this.dataSource.getRepository(Order).findOne({
       where: { tenantId, id },
-      relations: { items: { product: true }, deliveryZone: true, employee: { tenantAccess: true } }
+      relations: { items: { product: true, media: true }, deliveryZone: true, employee: { tenantAccess: true } }
     });
     return order ? this.mapOrderEmployee(order, tenantId) : null;
   }
@@ -756,6 +756,26 @@ export class OrdersService {
       }
       
       return manager.save(Order, order);
+    });
+  }
+
+  async addMediaToOrderItem(tenantId: string, orderItemId: string, imageUrl: string) {
+    const OrderItemMedia = require('../entities/order-item-media.entity').OrderItemMedia; // Avoid circular/direct import issues if any
+    return this.dataSource.transaction(async (manager) => {
+      const orderItem = await manager.findOne(OrderItem, { 
+        where: { tenantId, id: orderItemId },
+        relations: { order: true }
+      });
+      if (!orderItem) throw new BadRequestException('Order Item no encontrado');
+
+      const media = manager.create(OrderItemMedia, {
+        tenantId,
+        orderItemId: orderItem.id,
+        imageUrl: imageUrl
+      });
+      
+      await manager.save(OrderItemMedia, media);
+      return media;
     });
   }
 }

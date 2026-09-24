@@ -3,11 +3,12 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
+import * as sharp from 'sharp';
 
 @Injectable()
 export class StorageService {
   private s3Client: S3Client;
-  private bucket: string = 'storage'; // We can use the default or configurable bucket
+  private bucket: string = 'img_catalogo'; // We can use the default or configurable bucket
 
   constructor(private configService: ConfigService) {
     this.s3Client = new S3Client({
@@ -22,18 +23,34 @@ export class StorageService {
   }
 
   /**
-   * Submits a file buffer directly to S3 storage bucket.
+   * Submits a file buffer directly to S3 storage bucket, compressing it if it's an image.
    * Supabase expects the bucket name as part of the S3 URL configuration or as bucket parameter.
    */
   async uploadFile(file: Express.Multer.File, path: string = 'images'): Promise<string> {
     try {
-      const fileName = `${path}/${uuidv4()}-${file.originalname}`;
+      const isImage = file.mimetype.startsWith('image/');
+      let fileBuffer = file.buffer;
+      let contentType = file.mimetype;
+      let extension = file.originalname.split('.').pop() || 'jpg';
+
+      if (isImage) {
+        // Compress the image using sharp
+        fileBuffer = await sharp(file.buffer)
+          .resize({ width: 1200, withoutEnlargement: true }) // Max width 1200px
+          .webp({ quality: 80 }) // Convert to WebP with 80% quality
+          .toBuffer();
+        
+        contentType = 'image/webp';
+        extension = 'webp';
+      }
+
+      const fileName = `${path}/${uuidv4()}.${extension}`;
       
       const command = new PutObjectCommand({
-        Bucket: this.bucket, // Supabase storage bucket name. E.g., 'images' or 'public'
+        Bucket: this.bucket, // Supabase storage bucket name. E.g., 'img_catalogo'
         Key: fileName,
-        Body: file.buffer,
-        ContentType: file.mimetype,
+        Body: fileBuffer,
+        ContentType: contentType,
       });
 
       await this.s3Client.send(command);
@@ -66,3 +83,4 @@ export class StorageService {
     }
   }
 }
+
