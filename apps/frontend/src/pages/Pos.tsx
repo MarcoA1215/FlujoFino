@@ -35,6 +35,7 @@ const Pos: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('PAGO_MOVIL');
   const [exchangeRate, setExchangeRate] = useState<number>(40.0);
   const [allowPartialPayments, setAllowPartialPayments] = useState<boolean>(false);
+  const [settings, setSettings] = useState<any>({});
   const [initialAbono, setInitialAbono] = useState<string>('');
   
   const [discountType, setDiscountType] = useState<'FIXED' | 'PERCENTAGE'>('FIXED');
@@ -76,6 +77,7 @@ const Pos: React.FC = () => {
   const fetchRate = async () => {
     try {
       const res = await apiClient.get<any>('/settings');
+      setSettings(res.data);
       setExchangeRate(res.data.exchangeRateBs || 40.0);
       setAllowPartialPayments(res.data.allowPartialPayments || false);
     } catch (e) {}
@@ -354,21 +356,46 @@ const Pos: React.FC = () => {
 
                   <IonGrid>
                     <IonRow>
-                      {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
-                        <IonCol size="6" sizeMd="4" key={p.id}>
-                          <IonCard button onClick={() => addToCart(p)} color={p.stockQuantity <= 0 ? 'light' : 'white'} style={{ margin: 0, height: '100%' }}>
-                            <IonCardHeader>
-                              <IonCardTitle style={{ fontSize: '1.1rem' }}>{p.name}</IonCardTitle>
-                            </IonCardHeader>
-                            <IonCardContent>
-                              <IonText color="primary"><h2>${p.salePrice.toFixed(2)}</h2></IonText>
-                              <IonBadge color={p.stockQuantity <= 0 ? 'danger' : 'success'}>
-                                Stock: {p.stockQuantity}
-                              </IonBadge>
-                            </IonCardContent>
-                          </IonCard>
-                        </IonCol>
-                      ))}
+                      {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(p => {
+                        const isService = settings?.featureProduction === false || p.category === 'Servicios';
+                        const img = Array.isArray(p.images) && p.images.length > 0 
+                          ? p.images[p.images.length - 1] 
+                          : (typeof p.images === 'string' && p.images ? (p.images as string).split(',').pop()?.trim() : null);
+
+                        return (
+                          <IonCol size="6" sizeMd="4" key={p.id}>
+                            <IonCard 
+                              button 
+                              onClick={() => addToCart(p)} 
+                              color={!isService && p.stockQuantity <= 0 ? 'light' : 'white'} 
+                              style={{ margin: 0, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+                            >
+                              {img && (
+                                <img 
+                                  src={img} 
+                                  alt={p.name} 
+                                  style={{ width: '100%', height: '85px', objectFit: 'cover' }} 
+                                />
+                              )}
+                              <IonCardHeader style={{ padding: '10px 12px 4px 12px' }}>
+                                <IonCardTitle style={{ fontSize: '1rem', fontWeight: 'bold', lineHeight: '1.2' }}>{p.name}</IonCardTitle>
+                              </IonCardHeader>
+                              <IonCardContent style={{ marginTop: 'auto', padding: '0 12px 10px 12px' }}>
+                                <IonText color="primary"><h2 style={{ margin: '4px 0', fontSize: '1.2rem', fontWeight: 'bold' }}>${p.salePrice.toFixed(2)}</h2></IonText>
+                                {isService ? (
+                                  <IonBadge color="success">
+                                    {p.durationMinutes ? `⏱️ ${p.durationMinutes} min` : 'Disponible'}
+                                  </IonBadge>
+                                ) : (
+                                  <IonBadge color={p.stockQuantity <= 0 ? 'danger' : 'success'}>
+                                    Stock: {p.stockQuantity}
+                                  </IonBadge>
+                                )}
+                              </IonCardContent>
+                            </IonCard>
+                          </IonCol>
+                        );
+                      })}
                     </IonRow>
                   </IonGrid>
                 </IonCardContent>

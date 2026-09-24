@@ -10,8 +10,6 @@ import { ReservationStatus } from '@nutrideli/shared-types';
 import { decodeTenantId } from '../utils/tenant-crypto';
 import { Public } from '../auth/public.decorator';
 import { OrderItem } from '../entities/order-item.entity';
-import { UserTenantAccess } from '../entities/user-tenant-access.entity';
-import { User } from '../entities/user.entity';
 
 @Public()
 @Controller('public/reservations')
@@ -41,35 +39,12 @@ export class PublicReservationsController {
       order: { name: 'ASC' }
     });
 
-    let services = products.map(p => ({
+    const services = products.map(p => ({
       id: p.id,
       name: p.name,
       price: p.salePrice,
       durationMinutes: p.durationMinutes || settings?.slotInterval || 30,
-      category: p.category,
-      image: (p.images && p.images.length > 0) ? (Array.isArray(p.images) ? p.images[0] : (typeof p.images === 'string' ? (p.images as string).split(',')[0].trim() : null)) : null
-    }));
-
-    if (services.length === 0 && settings?.services && Array.isArray(settings.services) && settings.services.length > 0) {
-      services = settings.services.map((s: any, idx: number) => ({
-        id: s.id || `svc-${idx}`,
-        name: s.name,
-        price: s.price || 0,
-        durationMinutes: s.durationMinutes || settings?.slotInterval || 30,
-        category: 'Servicios',
-        image: null
-      }));
-    }
-
-    const accessRepo = this.tenantRepo.manager.getRepository(UserTenantAccess);
-    const staffAccesses = await accessRepo.find({
-      where: { tenantId: id, status: 'ACCEPTED', isActive: true },
-      relations: { user: true }
-    });
-    const staff = staffAccesses.map(a => ({
-      id: a.user.id,
-      name: a.user.username,
-      jobTitle: a.jobTitle || 'Especialista'
+      category: p.category
     }));
 
     return { 
@@ -77,11 +52,8 @@ export class PublicReservationsController {
       name: tenant.name,
       businessHours: settings?.businessHours || null,
       services: services,
-      staff: staff,
       slotInterval: settings?.slotInterval || 30,
-      featureShowCatalog: settings?.featureShowCatalog || false,
-      bookingRequireService: settings?.bookingRequireService || false,
-      bookingAllowStaffSelection: settings?.bookingAllowStaffSelection || false,
+      featureShowCatalog: settings?.featureShowCatalog || false
     };
   }
 
@@ -97,15 +69,9 @@ export class PublicReservationsController {
     if (!tenant) throw new NotFoundException('Negocio no encontrado');
     
     // Check overlap using new logic
-    const isAvailable = await this.checkSlotAvailability(id, dto.date, dto.time, dto.serviceId, undefined, dto.employeeId);
+    const isAvailable = await this.checkSlotAvailability(id, dto.date, dto.time, dto.serviceId);
     if (!isAvailable) {
       throw new BadRequestException('El horario seleccionado ya no está disponible.');
-    }
-
-    if (dto.employeeId && !dto.employeeName) {
-      const userRepo = this.tenantRepo.manager.getRepository(User);
-      const emp = await userRepo.findOne({ where: { id: dto.employeeId } });
-      if (emp) dto.employeeName = emp.username;
     }
 
     // Create reservation natively
@@ -137,12 +103,10 @@ export class PublicReservationsController {
       time: reservation.time.substring(0, 5),
       serviceId: reservation.serviceId,
       serviceName: reservation.serviceName,
-      employeeId: reservation.employeeId,
-      employeeName: reservation.employeeName,
       status: reservation.status,
       tenantName: reservation.tenant.name,
       tenantId: reservation.tenantId, // Real tenant UUID is OK to return here since they already have the appointment UUID
-      servicePrice: serviceDetails?.price || reservation.totalAmount || 0,
+      servicePrice: serviceDetails?.price || 0,
       bankInfo: settings?.companyBank,
       companyCedula: settings?.companyCedula,
       companyPhone: settings?.companyPhone,
@@ -154,7 +118,6 @@ export class PublicReservationsController {
     @Param('tenantId') tenantToken: string, 
     @Query('date') date: string, 
     @Query('serviceId') serviceId: string,
-    @Query('employeeId') employeeId?: string,
     @Query('exclude') excludeReservationId?: string
   ) {
     let id: string;
@@ -163,7 +126,7 @@ export class PublicReservationsController {
     } catch {
       throw new NotFoundException('Negocio no encontrado o enlace inválido');
     }
-    return this.calculateAvailableSlots(id, date, serviceId, excludeReservationId, employeeId);
+    return this.calculateAvailableSlots(id, date, serviceId, excludeReservationId);
   }
 
   @Get('tenant/:tenantId/catalog')
@@ -303,59 +266,22 @@ export class PublicReservationsController {
 
   // --- Helper Methods ---
 
-  private async calculateAvailableSlots(
-    tenantId: string, 
-    date: string, 
-    serviceId?: string, 
-    excludeReservationId?: string,
-    employeeId?: string
-  ) {
+  private async calculateAvailableSlots(tenantId: string, date: string, serviceId?: string, excludeReservationId?: string) {
     const settingsRepo = this.tenantRepo.manager.getRepository(Settings);
     const settings = await settingsRepo.findOne({ where: { tenantId } });
 
     const bHours = settings?.businessHours || {};
     const d = new Date(date + 'T12:00:00Z');
-    const dayOfWeek = d.getUTCDay();
-    const dayOfWeekStr = dayOfWeek.toString();
-    const dayConfig = bHours[dayOfWeekStr];
+    const dayOfWeek = d.getUTCDay().toString();
+    const dayConfig = bHours[dayOfWeek];
 
     if (!dayConfig || !dayConfig.isOpen) return [];
 
     const interval = settings?.slotInterval || 30;
 
-    let [sh, sm] = dayConfig.startTime.split(':').map(Number);
-    let [eh, em] = dayConfig.endTime.split(':').map(Number);
-
-    // If employeeId is specified, check their specific work schedule
-    if (employeeId) {
-      const accessRepo = this.tenantRepo.manager.getRepository(UserTenantAccess);
-      const access = await accessRepo.findOne({
-        where: { tenantId, userId: employeeId },
-        relations: { workSchedules: true }
-      });
-      if (access) {
-        const schedule = access.workSchedules?.find(ws => ws.dayOfWeek === dayOfWeek);
-        if (schedule) {
-          const [esh, esm] = schedule.startTime.split(':').map(Number);
-          const [eeh, eem] = schedule.endTime.split(':').map(Number);
-          sh = Math.max(sh, esh);
-          sm = esm;
-          eh = Math.min(eh, eeh);
-          em = eem;
-        } else if (access.entryTime && access.exitTime) {
-          const [esh, esm] = access.entryTime.split(':').map(Number);
-          const [eeh, eem] = access.exitTime.split(':').map(Number);
-          sh = Math.max(sh, esh);
-          sm = esm;
-          eh = Math.min(eh, eeh);
-          em = eem;
-        }
-      }
-    }
-
-    const openMinutes = sh * 60 + sm;
+    const [sh, sm] = dayConfig.startTime.split(':').map(Number);
+    const [eh, em] = dayConfig.endTime.split(':').map(Number);
     const closeMinutes = eh * 60 + em;
-    if (openMinutes >= closeMinutes) return [];
 
     // Fetch existing reservations
     const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
@@ -366,9 +292,6 @@ export class PublicReservationsController {
       
     if (excludeReservationId) {
       qb.andWhere('res.id != :exclude', { exclude: excludeReservationId });
-    }
-    if (employeeId) {
-      qb.andWhere('res.employeeId = :employeeId', { employeeId });
     }
     const existing = await qb.getMany();
 
@@ -399,7 +322,7 @@ export class PublicReservationsController {
     });
 
     const slots: string[] = [];
-    let currentMins = openMinutes;
+    let currentMins = sh * 60 + sm;
     const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Caracas', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
     const [vzH, vzM] = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Caracas', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).split(':').map(Number);
     const currentRealMins = vzH * 60 + vzM;
@@ -414,6 +337,7 @@ export class PublicReservationsController {
       // Check overlap
       const slotEnd = currentMins + duration;
       const overlaps = busyIntervals.some(busy => {
+        // Overlap condition: start < busy.end AND end > busy.start
         return currentMins < busy.end && slotEnd > busy.start;
       });
 
@@ -427,15 +351,8 @@ export class PublicReservationsController {
     return slots;
   }
 
-  private async checkSlotAvailability(
-    tenantId: string, 
-    date: string, 
-    time: string, 
-    serviceId?: string, 
-    excludeReservationId?: string,
-    employeeId?: string
-  ) {
-    const slots = await this.calculateAvailableSlots(tenantId, date, serviceId, excludeReservationId, employeeId);
+  private async checkSlotAvailability(tenantId: string, date: string, time: string, serviceId?: string, excludeReservationId?: string) {
+    const slots = await this.calculateAvailableSlots(tenantId, date, serviceId, excludeReservationId);
     return slots.includes(time.substring(0, 5));
   }
 
