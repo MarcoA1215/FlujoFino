@@ -7,9 +7,13 @@ import { Reservation } from '../entities/reservation.entity';
 import { Tenant } from '../entities/tenant.entity';
 
 import { Settings } from '../entities/settings.entity';
+import { CustomersModule } from '../customers/customers.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Reservation, Tenant, Settings])],
+  imports: [
+    TypeOrmModule.forFeature([Reservation, Tenant, Settings]),
+    CustomersModule,
+  ],
   controllers: [ReservationsController, PublicReservationsController],
   providers: [ReservationsService],
   exports: [ReservationsService],

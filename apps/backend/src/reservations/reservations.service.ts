@@ -3,12 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Reservation } from '../entities/reservation.entity';
 import { ReservationStatus, PaymentStatus } from '@nutrideli/shared-types';
+import { CustomersService } from '../customers/customers.service';
 
 @Injectable()
 export class ReservationsService {
   constructor(
     @InjectRepository(Reservation)
-    private repo: Repository<Reservation>
+    private repo: Repository<Reservation>,
+    private readonly customersService: CustomersService,
   ) {}
 
   findAll(tenantId: string) {
@@ -126,6 +128,23 @@ export class ReservationsService {
     const reservation = new Reservation();
     Object.assign(reservation, dto);
     reservation.tenantId = tenantId;
+
+    if (dto.customerName && dto.customerPhone && !dto.customerId) {
+      try {
+        const customer = await this.customersService.findOrCreateOrUpdate(tenantId, {
+          name: dto.customerName,
+          phone: dto.customerPhone,
+          identification: dto.identification
+        });
+        reservation.customerId = customer.id;
+        if (!reservation.identification && customer.identification) {
+          reservation.identification = customer.identification;
+        }
+      } catch (err) {
+        console.error('Customer sync error in ReservationsService.create:', err);
+      }
+    }
+
     delete (reservation as any).abonosTotal; // Security: do not allow setting abonos directly
     delete (reservation as any).abonosHistory;
     this.recalculatePaymentStatus(reservation);

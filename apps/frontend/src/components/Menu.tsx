@@ -37,7 +37,8 @@ import {
   businessOutline,
   chevronDownOutline,
   checkmarkCircleOutline,
-  chatbubbleOutline
+  chatbubbleOutline,
+  personCircleOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 
@@ -123,6 +124,7 @@ const Menu: React.FC = () => {
     { title: 'Caja', url: '/pos', iosIcon: cashOutline, mdIcon: cashOutline },
     { title: 'Pedidos / Tickets', url: '/orders', iosIcon: cartOutline, mdIcon: cartOutline },
     { title: 'Reservaciones', url: '/reservations', iosIcon: calendarOutline, mdIcon: calendarOutline, conditional: 'featureCustomerSchedules' },
+    { title: 'Clientes', url: '/customers', iosIcon: personCircleOutline, mdIcon: personCircleOutline },
     { title: 'Zonas Delivery', url: '/delivery-zones', iosIcon: mapOutline, mdIcon: mapOutline, conditional: 'featureBuySell' },
     { title: 'Usuarios', url: '/users', iosIcon: peopleOutline, mdIcon: peopleOutline },
     { title: 'Ayuda y Comentarios', url: '/feedback', iosIcon: chatbubbleOutline, mdIcon: chatbubbleOutline },
@@ -134,7 +136,7 @@ const Menu: React.FC = () => {
   if (!user?.tenantId) {
     appPages = [];
   } else if (user?.role === UserRole.POS) {
-    appPages = appPages.filter(p => ['/pos', '/orders', '/calculator', '/reservations'].includes(p.url));
+    appPages = appPages.filter(p => ['/pos', '/orders', '/calculator', '/reservations', '/customers'].includes(p.url));
   } else if (user?.role === UserRole.KITCHEN) {
     appPages = appPages.filter(p => settings?.featureProduction === false ? ['/orders'].includes(p.url) : ['/orders', '/production'].includes(p.url));
   } else if (user?.role === UserRole.DELIVERY) {

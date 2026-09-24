@@ -38,6 +38,8 @@ import { OperatingExpense } from './entities/operating-expense.entity';
 import { AccessRequest } from './entities/access-request.entity';
 import { Feedback } from './entities/feedback.entity';
 import { OrderItemMedia } from './entities/order-item-media.entity';
+import { Customer } from './entities/customer.entity';
+import { CustomersModule } from './customers/customers.module';
 
 @Module({
   imports: [
@@ -52,7 +54,7 @@ import { OrderItemMedia } from './entities/order-item-media.entity';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
-        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia],
+        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer],
         synchronize: true,
       }),
       inject: [ConfigService],
@@ -66,6 +68,7 @@ import { OrderItemMedia } from './entities/order-item-media.entity';
     ReservationsModule,
     StorageModule,
     FeedbackModule,
+    CustomersModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: APP_GUARD, useClass: RolesGuard }],

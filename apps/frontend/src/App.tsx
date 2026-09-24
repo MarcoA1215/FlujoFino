@@ -16,6 +16,7 @@ import Users from './pages/Users';
 import SettingsPage from './pages/Settings';
 import SelectWorkspace from './pages/SelectWorkspace';
 import Reservations from './pages/Reservations';
+import Customers from './pages/Customers';
 import PublicBooking from './pages/PublicBooking';
 import PublicAppointmentManage from './pages/PublicAppointmentManage';
 import FeedbackPage from './pages/Feedback';
@@ -122,6 +123,7 @@ const MainLayout: React.FC = () => {
         <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
         <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
         <Route path="/reservations" element={<PrivateRoute><Reservations /></PrivateRoute>} />
+        <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
         <Route path="/feedback" element={<PrivateRoute><FeedbackPage /></PrivateRoute>} />
       </IonRouterOutlet>
     </IonSplitPane>

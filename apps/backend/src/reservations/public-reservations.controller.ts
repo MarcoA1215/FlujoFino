@@ -11,12 +11,14 @@ import { decodeTenantId } from '../utils/tenant-crypto';
 import { Public } from '../auth/public.decorator';
 import { OrderItem } from '../entities/order-item.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
+import { CustomersService } from '../customers/customers.service';
 
 @Public()
 @Controller('public/reservations')
 export class PublicReservationsController {
   constructor(
     private readonly reservationsService: ReservationsService,
+    private readonly customersService: CustomersService,
     @InjectRepository(Tenant) private tenantRepo: Repository<Tenant>
   ) {}
 
@@ -79,6 +81,20 @@ export class PublicReservationsController {
     };
   }
 
+  @Get('tenant/:tenantId/customer-lookup')
+  async customerLookup(
+    @Param('tenantId') token: string,
+    @Query('query') query: string
+  ) {
+    let id: string;
+    try {
+      id = decodeTenantId(token);
+    } catch {
+      throw new NotFoundException('Negocio no encontrado');
+    }
+    return this.customersService.lookup(id, query);
+  }
+
   @Post(':tenantId')
   async createPublicReservation(@Param('tenantId') token: string, @Body() dto: any) {
     let id: string;
@@ -94,6 +110,23 @@ export class PublicReservationsController {
     const isAvailable = await this.checkSlotAvailability(id, dto.date, dto.time, dto.serviceId, undefined, dto.employeeId);
     if (!isAvailable) {
       throw new BadRequestException('El horario seleccionado ya no está disponible.');
+    }
+
+    // Synchronize customer profile
+    if (dto.customerName && dto.customerPhone) {
+      try {
+        const customer = await this.customersService.findOrCreateOrUpdate(id, {
+          name: dto.customerName,
+          phone: dto.customerPhone,
+          identification: dto.identification
+        });
+        dto.customerId = customer.id;
+        if (!dto.identification && customer.identification) {
+          dto.identification = customer.identification;
+        }
+      } catch (err) {
+        console.error('Customer sync error in public reservation:', err);
+      }
     }
 
     // Create reservation natively

@@ -20,11 +20,33 @@ const PublicBooking: React.FC = () => {
 
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [identification, setIdentification] = useState('');
+  const [lookupQuery, setLookupQuery] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [recognizedCustomer, setRecognizedCustomer] = useState<{ name: string; phone: string; identification?: string } | null>(null);
+  const [lookupMessage, setLookupMessage] = useState<string | null>(null);
+
   const [numberOfPeople, setNumberOfPeople] = useState<number>(1);
   const [notes, setNotes] = useState('');
   const [referralSource, setReferralSource] = useState('');
   const [success, setSuccess] = useState(false);
   const [magicLink, setMagicLink] = useState('');
+
+  // Preload returning customer data from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('lastBookingCustomer');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.name) setCustomerName(parsed.name);
+        if (parsed.phone) setCustomerPhone(parsed.phone);
+        if (parsed.identification) setIdentification(parsed.identification);
+        setRecognizedCustomer(parsed);
+      }
+    } catch (e) {
+      console.warn('Failed reading lastBookingCustomer', e);
+    }
+  }, []);
 
   const [showCatalog, setShowCatalog] = useState(false);
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
@@ -82,9 +104,36 @@ const PublicBooking: React.FC = () => {
     if (tenantId) fetchTenant();
   }, [tenantId]);
 
+  const handleLookup = async (q?: string) => {
+    const queryToUse = q !== undefined ? q : lookupQuery;
+    if (!queryToUse || !queryToUse.trim() || !tenantId) return;
+    setLookupLoading(true);
+    setLookupMessage(null);
+    try {
+      const res = await axios.get(`${apiBase}/public/reservations/tenant/${tenantId}/customer-lookup?query=${encodeURIComponent(queryToUse.trim())}`);
+      if (res.data && res.data.exists) {
+        setCustomerName(res.data.name || '');
+        setCustomerPhone(res.data.phone || '');
+        if (res.data.identification) setIdentification(res.data.identification);
+        setRecognizedCustomer(res.data);
+        presentToast({ message: `¡Hola de nuevo, ${res.data.name}! Hemos cargado tus datos.`, duration: 3000, color: 'success' });
+      } else {
+        setLookupMessage('No encontramos citas anteriores con este dato. Puedes completar tus datos a continuación.');
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!customerName) {
       presentToast({ message: 'Por favor, ingresa tu nombre', duration: 2000, color: 'warning' });
+      return;
+    }
+    if (!customerPhone) {
+      presentToast({ message: 'Por favor, ingresa tu teléfono', duration: 2000, color: 'warning' });
       return;
     }
 
@@ -92,6 +141,7 @@ const PublicBooking: React.FC = () => {
       const res = await axios.post(`${apiBase}/public/reservations/${tenantId}`, {
         customerName, 
         customerPhone, 
+        identification: identification || undefined,
         date: (selectedDate ? new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : undefined), 
         time: selectedTime, 
         numberOfPeople: (tenantInfo?.bookingRequireService || selectedService) ? 1 : numberOfPeople, 
@@ -103,6 +153,18 @@ const PublicBooking: React.FC = () => {
         employeeName: selectedStaff?.name || undefined,
         totalAmount: selectedService?.price || 0
       });
+
+      // Persist customer profile locally for recurring visits
+      try {
+        localStorage.setItem('lastBookingCustomer', JSON.stringify({
+          name: customerName,
+          phone: customerPhone,
+          identification: identification || undefined
+        }));
+      } catch (e) {
+        console.warn('Could not save to localStorage', e);
+      }
+
       const appointmentId = res.data.id;
       setMagicLink(`${window.location.origin}/appointment/${appointmentId}`);
       setSuccess(true);
@@ -481,14 +543,54 @@ const PublicBooking: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Returning Customer Lookup */}
+                  <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '10px', marginBottom: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <IonIcon icon={sparklesOutline} color="primary" />
+                      ¿Ya te has atendido con nosotros?
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>
+                      Ingresa tu Cédula o Teléfono para autocompletar tus datos al instante.
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <IonInput 
+                        value={lookupQuery}
+                        placeholder="Ej. 28123456 o 04141234567"
+                        onIonInput={e => setLookupQuery(e.detail.value!)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleLookup(); }}
+                        onBlur={() => { if (lookupQuery && !recognizedCustomer) handleLookup(); }}
+                        style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0 8px', backgroundColor: '#fff', fontSize: '13px', minHeight: '38px' }}
+                      />
+                      <IonButton size="small" fill="outline" color="primary" onClick={() => handleLookup()} disabled={lookupLoading}>
+                        {lookupLoading ? <IonSpinner name="dots" style={{ width: '20px' }} /> : 'Buscar'}
+                      </IonButton>
+                    </div>
+                    {recognizedCustomer && (
+                      <div style={{ marginTop: '10px', padding: '8px 12px', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', fontSize: '12px', color: '#065f46', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <IonIcon icon={checkmarkCircleOutline} color="success" style={{ fontSize: '16px' }} />
+                        <span>¡Hola de nuevo, <b>{recognizedCustomer.name}</b>! Tus datos han sido cargados.</span>
+                      </div>
+                    )}
+                    {lookupMessage && !recognizedCustomer && (
+                      <div style={{ marginTop: '8px', fontSize: '12px', color: '#64748b' }}>
+                        {lookupMessage}
+                      </div>
+                    )}
+                  </div>
+
                   <IonItem lines="none" style={{ marginBottom: '10px', border: '1px solid #ddd', borderRadius: '8px' }}>
                     <IonLabel position="stacked">Nombre Completo *</IonLabel>
                     <IonInput value={customerName} onIonInput={e => setCustomerName(e.detail.value!)} placeholder="Ej. Ana Pérez" />
                   </IonItem>
                   
                   <IonItem lines="none" style={{ marginBottom: '10px', border: '1px solid #ddd', borderRadius: '8px' }}>
-                    <IonLabel position="stacked">Teléfono *</IonLabel>
-                    <IonInput value={customerPhone} onIonInput={e => setCustomerPhone(e.detail.value!)} placeholder="Ej. +58 414..." />
+                    <IonLabel position="stacked">Teléfono (WhatsApp) *</IonLabel>
+                    <IonInput value={customerPhone} onIonInput={e => setCustomerPhone(e.detail.value!)} placeholder="Ej. 04141234567" />
+                  </IonItem>
+
+                  <IonItem lines="none" style={{ marginBottom: '10px', border: '1px solid #ddd', borderRadius: '8px' }}>
+                    <IonLabel position="stacked">Cédula / Documento de Identidad (Opcional)</IonLabel>
+                    <IonInput value={identification} onIonInput={e => setIdentification(e.detail.value!)} placeholder="Ej. V-28123456" />
                   </IonItem>
 
                   {/* Only show "Cantidad de Personas" if it's NOT a required service mode and no service was picked */}

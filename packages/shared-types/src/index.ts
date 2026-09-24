@@ -97,6 +97,8 @@ export interface OrderDTO {
   deliveryZoneId?: string;
   deliveryFee?: number;
   totalAmount: number;
+  customerId?: string;
+  identification?: string;
   employeeId?: string;
   employee?: {
     id: string;
@@ -139,6 +141,8 @@ export interface ReservationDTO {
   id?: string;
   customerName: string;
   customerPhone?: string;
+  customerId?: string;
+  identification?: string;
   date: string;
   time: string;
   numberOfPeople?: number; // Optional now, since we have services
@@ -189,5 +193,24 @@ export interface AccessRequestDTO {
   exitTime?: string;
   attemptTime: string;
   createdAt: string;
+}
+
+export interface CustomerDTO {
+  id?: string;
+  tenantId: string;
+  name: string;
+  phone: string;
+  identification?: string;
+  notes?: string;
+  totalVisits: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CustomerLookupResponse {
+  exists: boolean;
+  name?: string;
+  phone?: string;
+  identification?: string;
 }
 

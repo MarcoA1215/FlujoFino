@@ -43,9 +43,14 @@ export class UpdatePaymentDto {
   exchangeRate?: number;
 }
 
+import { CustomersService } from '../customers/customers.service';
+
 @Injectable()
 export class OrdersService {
-  constructor(private dataSource: DataSource) {}
+  constructor(
+    private dataSource: DataSource,
+    private readonly customersService: CustomersService,
+  ) {}
 
   async addAbono(tenantId: string, orderId: string, amount: number) {
     if (amount <= 0) throw new BadRequestException('El monto debe ser mayor a 0');
@@ -146,7 +151,27 @@ export class OrdersService {
 
       const initialStatus = requiresPreparation ? OrderStatus.PREPARING : OrderStatus.PENDING;
 
+      let customerId: string | undefined = undefined;
+      let identification: string | undefined = dto.pagoMovilCedula;
+      if (dto.customerName && dto.customerPhone) {
+        try {
+          const customer = await this.customersService.findOrCreateOrUpdate(tenantId, {
+            name: dto.customerName,
+            phone: dto.customerPhone,
+            identification: dto.pagoMovilCedula
+          });
+          customerId = customer.id;
+          if (!identification && customer.identification) {
+            identification = customer.identification;
+          }
+        } catch (err) {
+          console.error('Customer sync error in OrdersService.create:', err);
+        }
+      }
+
       const order = manager.create(Order, { tenantId,
+        customerId,
+        identification,
         customerName: dto.customerName,
         customerPhone: dto.customerPhone || '',
         customerAddress: dto.customerAddress || '',

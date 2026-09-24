@@ -1,6 +1,7 @@
 import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Tenant } from './tenant.entity';
 import { User } from './user.entity';
+import { Customer } from './customer.entity';
 import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { OrderItem } from './order-item.entity';
 import { DeliveryZone } from './delivery-zone.entity';
@@ -16,6 +17,16 @@ export class Order {
 
   @Column()
   customerPhone: string;
+
+  @Column({ nullable: true })
+  identification: string;
+
+  @Column({ nullable: true })
+  customerId: string;
+
+  @ManyToOne(() => Customer, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'customerId' })
+  customer: Customer;
 
   @Column({ nullable: true })
   customerAddress: string;

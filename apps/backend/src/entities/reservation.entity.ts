@@ -3,6 +3,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { ReservationStatus, PaymentStatus } from '@nutrideli/shared-types';
 import { Tenant } from './tenant.entity';
 import { User } from './user.entity';
+import { Customer } from './customer.entity';
 
 @Entity()
 export class Reservation {
@@ -14,6 +15,16 @@ export class Reservation {
 
   @Column({ nullable: true })
   customerPhone: string;
+
+  @Column({ nullable: true })
+  identification: string;
+
+  @Column({ nullable: true })
+  customerId: string;
+
+  @ManyToOne(() => Customer, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'customerId' })
+  customer: Customer;
 
   @Column({ type: 'date' })
   date: string;

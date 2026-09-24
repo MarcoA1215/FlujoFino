@@ -8,9 +8,10 @@ import { Product } from '../entities/product.entity';
 
 import { OrderItemMedia } from '../entities/order-item-media.entity';
 import { StorageModule } from '../storage/storage.module';
+import { CustomersModule } from '../customers/customers.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, OrderItem, Product, OrderItemMedia]), StorageModule],
+  imports: [TypeOrmModule.forFeature([Order, OrderItem, Product, OrderItemMedia]), StorageModule, CustomersModule],
   controllers: [OrdersController],
   providers: [OrdersService],
   exports: [OrdersService],
