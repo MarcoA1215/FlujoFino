@@ -1,3 +1,4 @@
+import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Tenant } from './tenant.entity';
 import { User } from './user.entity';
 import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
@@ -55,19 +56,19 @@ export class Order {
   @JoinColumn({ name: 'deliveryZoneId' })
   deliveryZone: DeliveryZone;
 
-  @Column('float', { default: 0 })
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   deliveryFee: number;
 
-  @Column('float', { default: 0 })
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   discountAmount: number;
 
-  @Column('float', { default: 0 })
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   totalCost: number;
 
-  @Column('float', { default: 0 })
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   netProfit: number;
 
-  @Column('float', { default: 0 })
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   totalAmount: number;
 
   @Column({ nullable: true })
@@ -82,10 +83,10 @@ export class Order {
   @Column({ nullable: true })
   pagoMovilBank: string;
 
-  @Column('float', { nullable: true })
+  @Column('decimal', { nullable: true , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   amountBs: number;
 
-  @Column('float', { nullable: true })
+  @Column('decimal', { nullable: true , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   exchangeRate: number;
 
   @Index()
@@ -102,7 +103,7 @@ export class Order {
   @Column({ nullable: true }) // Temporarily nullable for safe migration
   tenantId: string;
 
-  @Column('float', { default: 0 })
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   abonosTotal: number;
 
   @Column('json', { nullable: true })

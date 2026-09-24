@@ -1,3 +1,4 @@
+import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
 import { Order } from './order.entity';
 import { Product } from './product.entity';
@@ -23,13 +24,13 @@ export class OrderItem {
   @Column('int', { default: 0 })
   deliveredQuantity: number;
 
-  @Column('float')
+  @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
   unitPrice: number;
 
-  @Column('float', { default: 0 })
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   unitCost: number;
 
-  @Column('float')
+  @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
   subtotal: number;
 
   @ManyToOne(() => Order, order => order.items, { onDelete: 'CASCADE' })

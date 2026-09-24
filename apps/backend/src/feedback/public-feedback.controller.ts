@@ -19,3 +19,4 @@ export class PublicFeedbackController {
     return this.feedbackService.createClientFeedback(tenantId, dto);
   }
 }
+

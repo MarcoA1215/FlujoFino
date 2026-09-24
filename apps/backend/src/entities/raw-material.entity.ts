@@ -1,3 +1,4 @@
+import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Tenant } from './tenant.entity';
 import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { StockMovement } from './stock-movement.entity';
@@ -15,13 +16,13 @@ export class RawMaterial {
   @Column()
   unit: string;
 
-  @Column('float')
+  @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
   costPerUnit: number;
 
-  @Column('float', { default: 0 })
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   stockQuantity: number;
 
-  @Column('float', { default: 5 })
+  @Column('decimal', { default: 5 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   minStockAlert: number;
 
   @OneToMany(() => StockMovement, movement => movement.rawMaterial)

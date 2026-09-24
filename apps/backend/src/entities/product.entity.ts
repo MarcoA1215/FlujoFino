@@ -1,3 +1,4 @@
+import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Tenant } from './tenant.entity';
 import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { RecipeItem } from './recipe-item.entity';
@@ -24,16 +25,16 @@ export class Product {
   @Column('simple-array', { nullable: true })
   images: string[];
 
-  @Column('float')
+  @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
   salePrice: number;
 
   @Column('int', { name: 'duration_minutes', nullable: true, default: 30 })
   durationMinutes: number | null;
 
-  @Column('float', { default: 0 })
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   stockQuantity: number;
 
-  @Column('float', { default: 0 })
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   physicalStock: number;
 
   @Column({ default: false })

@@ -163,7 +163,7 @@ export class PublicReservationsController {
       })));
 
     const orderItems = await orderItemRepo.find({
-      where: { tenantId: id },
+      where: { order: { tenantId: id } },
       relations: { media: true, order: true }
     });
     

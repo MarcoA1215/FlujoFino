@@ -1,3 +1,4 @@
+import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { ReservationStatus, PaymentStatus } from '@nutrideli/shared-types';
 import { Tenant } from './tenant.entity';
@@ -37,10 +38,10 @@ export class Reservation {
   @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING })
   paymentStatus: PaymentStatus;
 
-  @Column('float', { default: 0 })
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   totalAmount: number;
 
-  @Column('float', { default: 0 })
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   abonosTotal: number;
 
   @Column('jsonb', { nullable: true })

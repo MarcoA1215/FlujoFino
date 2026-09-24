@@ -763,7 +763,7 @@ export class OrdersService {
     const OrderItemMedia = require('../entities/order-item-media.entity').OrderItemMedia; // Avoid circular/direct import issues if any
     return this.dataSource.transaction(async (manager) => {
       const orderItem = await manager.findOne(OrderItem, { 
-        where: { tenantId, id: orderItemId },
+        where: { id: orderItemId, order: { tenantId } },
         relations: { order: true }
       });
       if (!orderItem) throw new BadRequestException('Order Item no encontrado');

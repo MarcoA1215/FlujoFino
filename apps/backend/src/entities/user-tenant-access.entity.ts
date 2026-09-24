@@ -1,3 +1,4 @@
+import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { User } from './user.entity';
 import { Tenant } from './tenant.entity';
@@ -32,7 +33,7 @@ export class UserTenantAccess {
   @Column({ type: 'varchar', default: 'ACCEPTED' }) // 'PENDING', 'ACCEPTED', 'REJECTED'
   status: string;
 
-  @Column({ type: 'float', nullable: true })
+  @Column({ type: 'decimal', nullable: true , precision: 12, scale: 2, transformer: new ColumnNumericTransformer() })
   salaryAmount: number | null;
 
   @Column({ type: 'varchar', nullable: true }) // 'SEMANAL', 'QUINCENAL', 'MENSUAL'
