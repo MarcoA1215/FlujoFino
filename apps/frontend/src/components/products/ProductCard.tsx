@@ -124,8 +124,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             )}
 
             {isClientMode && (
-              <p style={{ margin: '0 0 12px 0', color: p.stockQuantity > 0 ? 'var(--ion-color-success)' : 'var(--ion-color-danger)', fontWeight: '500', fontSize: '0.9rem' }}>
-                Disponible: {p.stockQuantity}
+              <p style={{ margin: '0 0 12px 0', color: (featureProduction === false || p.category === 'Servicios' || p.stockQuantity > 0) ? 'var(--ion-color-success)' : 'var(--ion-color-danger)', fontWeight: '500', fontSize: '0.9rem' }}>
+                {(featureProduction === false || p.category === 'Servicios') ? 'Disponible' : (p.stockQuantity > 0 ? `Disponible: ${p.stockQuantity}` : 'Agotado')}
               </p>
             )}
 

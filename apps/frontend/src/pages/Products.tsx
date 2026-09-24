@@ -199,10 +199,15 @@ const Products: React.FC = () => {
   };
 
 
+  const isServiceOrNoProduction = (p: Product) => {
+    return settings?.featureProduction === false || p.category === 'Servicios';
+  };
+
   const filteredData = products.filter(item => {
-    if (isClientMode && item.stockQuantity <= 0) return false;
+    if (isClientMode && !isServiceOrNoProduction(item) && item.stockQuantity <= 0) return false;
     if (searchText.trim() === '') return true;
-    return item.name.toLowerCase().includes(searchText.toLowerCase());
+    return item.name.toLowerCase().includes(searchText.toLowerCase()) || 
+      (item.category && item.category.toLowerCase().includes(searchText.toLowerCase()));
   });
   
   return (
@@ -238,17 +243,43 @@ const Products: React.FC = () => {
               
               {isClientMode ? (
                 <IonList>
-                  {filteredData.map(p => (
-                    <IonItem key={p.id}>
-                      <IonLabel>
-                        <h2><strong>{p.name}</strong></h2>
-                        <p>Precio: ${p.salePrice.toFixed(2)}</p>
-                      </IonLabel>
-                      <IonBadge slot="end" color={p.stockQuantity > 0 ? 'success' : 'danger'}>
-                        Disponible: {p.stockQuantity}
-                      </IonBadge>
-                    </IonItem>
-                  ))}
+                  {filteredData.map(p => {
+                    const img = Array.isArray(p.images) && p.images.length > 0 
+                      ? p.images[p.images.length - 1] 
+                      : (typeof p.images === 'string' && p.images ? (p.images as string).split(',').pop()?.trim() : null);
+                    const isService = isServiceOrNoProduction(p);
+                    return (
+                      <IonItem key={p.id} style={{ '--padding-top': '10px', '--padding-bottom': '10px' }}>
+                        {img && (
+                          <img 
+                            src={img} 
+                            alt={p.name} 
+                            slot="start" 
+                            style={{ width: '60px', height: '60px', borderRadius: '10px', objectFit: 'cover', marginRight: '14px' }} 
+                          />
+                        )}
+                        <IonLabel>
+                          <h2 style={{ fontSize: '1.05rem', fontWeight: 'bold' }}>{p.name}</h2>
+                          <p style={{ fontSize: '0.95rem', color: '#16a34a', fontWeight: '700', marginTop: '2px' }}>
+                            ${p.salePrice.toFixed(2)}
+                          </p>
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                            {p.category ? <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{p.category}</span> : null}
+                            {p.durationMinutes ? <span style={{ fontSize: '0.8rem', color: '#64748b' }}>&bull; ⏱️ {p.durationMinutes} min</span> : null}
+                          </div>
+                        </IonLabel>
+                        {isService ? (
+                          <IonBadge slot="end" color="success" style={{ padding: '6px 10px', fontSize: '0.85rem' }}>
+                            Disponible
+                          </IonBadge>
+                        ) : (
+                          <IonBadge slot="end" color={p.stockQuantity > 0 ? 'success' : 'danger'} style={{ padding: '6px 10px', fontSize: '0.85rem' }}>
+                            {p.stockQuantity > 0 ? `Stock: ${p.stockQuantity}` : 'Agotado'}
+                          </IonBadge>
+                        )}
+                      </IonItem>
+                    );
+                  })}
                 </IonList>
               ) : (
                 <IonGrid className="ion-no-padding">
