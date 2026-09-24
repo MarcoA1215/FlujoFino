@@ -310,7 +310,7 @@ const Users: React.FC = () => {
                         <IonInput 
                           value={jobTitle} 
                           onIonInput={e => setJobTitle(e.detail.value!)} 
-                          placeholder="Ej. Especialista, Terapeuta, Encargado, Vendedor, etc." 
+                          placeholder="Ej. Especialista, Profesional, Terapeuta, etc." 
                         />
                       </IonItem>
                       <IonRow style={{ padding: 0 }}>
@@ -569,7 +569,7 @@ const Users: React.FC = () => {
               <IonInput 
                 value={editJobTitle} 
                 onIonInput={e => setEditJobTitle(e.detail.value!)} 
-                placeholder="Ej. Especialista, Terapeuta, Encargado, Vendedor, etc." 
+                placeholder="Ej. Especialista, Profesional, Terapeuta, etc." 
               />
             </IonItem>
 
