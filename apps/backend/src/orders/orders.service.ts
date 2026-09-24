@@ -180,7 +180,7 @@ export class OrdersService {
         paymentStatus: dto.paymentStatus,
         status: initialStatus,
         deliveryMethod: dto.deliveryMethod || DeliveryMethod.IN_STORE,
-        deliveryZoneId: dto.deliveryZoneId,
+        deliveryZoneId: (dto.deliveryMethod === DeliveryMethod.DELIVERY && dto.deliveryZoneId && dto.deliveryZoneId.trim() !== '') ? dto.deliveryZoneId : undefined,
         deliveryFee: deliveryFee,
         discountAmount: discountAmount,
         totalCost: 0,

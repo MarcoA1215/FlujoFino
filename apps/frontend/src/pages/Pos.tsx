@@ -281,7 +281,7 @@ const Pos: React.FC = () => {
         amountBs: totalCart * exchangeRate,
         exchangeRate,
         deliveryMethod,
-        deliveryZoneId,
+        deliveryZoneId: (deliveryMethod === DeliveryMethod.DELIVERY && deliveryZoneId) ? deliveryZoneId : undefined,
         employeeId: employeeId || undefined,
         initialAbono: initialAbonoVal,
         discountAmount,
