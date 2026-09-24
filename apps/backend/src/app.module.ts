@@ -21,6 +21,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { SettingsModule } from './settings/settings.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { StorageModule } from './storage/storage.module';
+import { FeedbackModule } from './feedback/feedback.module';
 
 import { RawMaterial } from './entities/raw-material.entity';
 import { StockMovement } from './entities/stock-movement.entity';
@@ -64,6 +65,7 @@ import { OrderItemMedia } from './entities/order-item-media.entity';
     SettingsModule,
     ReservationsModule,
     StorageModule,
+    FeedbackModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: APP_GUARD, useClass: RolesGuard }],

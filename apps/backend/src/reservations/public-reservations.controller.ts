@@ -238,6 +238,26 @@ export class PublicReservationsController {
     return { success: true };
   }
 
+  @Post('appointment/:id/feedback')
+  async submitAppointmentFeedback(@Param('id') id: string, @Body() dto: { content: string; clientName?: string }) {
+    const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
+    const reservation = await reservationRepo.findOne({ where: { id } });
+    if (!reservation) throw new NotFoundException('Cita no encontrada');
+    
+    // We will save this feedback. It requires importing Feedback entity and FeedbackType from entities.
+    // We can also just use manager.
+    const feedbackRepo = this.tenantRepo.manager.getRepository('Feedback');
+    const feedback = feedbackRepo.create({
+      tenantId: reservation.tenantId,
+      type: 'CLIENT_TO_BUSINESS',
+      content: dto.content,
+      clientName: dto.clientName || reservation.customerName,
+      clientPhone: reservation.customerPhone
+    });
+    await feedbackRepo.save(feedback);
+    return { success: true };
+  }
+
   // --- Helper Methods ---
 
   private async calculateAvailableSlots(tenantId: string, date: string, serviceId?: string, excludeReservationId?: string) {

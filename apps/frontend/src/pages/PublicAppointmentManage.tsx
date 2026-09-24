@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IonPage, IonContent, IonSpinner, IonCard, IonCardContent, IonButton, IonIcon, useIonToast, IonItem, IonLabel, IonSelect, IonSelectOption, IonGrid, IonRow, IonCol } from '@ionic/react';
+import { IonPage, IonContent, IonSpinner, IonCard, IonCardContent, IonButton, IonIcon, useIonToast, IonItem, IonLabel, IonSelect, IonSelectOption, IonGrid, IonRow, IonCol, IonTextarea } from '@ionic/react';
 import { useParams } from 'react-router-dom';
 import { calendarOutline, closeCircleOutline, timeOutline, checkmarkCircleOutline, walletOutline } from 'ionicons/icons';
 import axios from 'axios';
@@ -16,6 +16,9 @@ const PublicAppointmentManage: React.FC = () => {
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedTime, setSelectedTime] = useState<string>('');
+  
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackSent, setFeedbackSent] = useState(false);
   
   const [presentToast] = useIonToast();
 
@@ -78,6 +81,26 @@ const PublicAppointmentManage: React.FC = () => {
       fetchAppointment();
     } catch (e: any) {
       presentToast({ message: e.response?.data?.message || 'Error al reprogramar', duration: 3000, color: 'danger' });
+    }
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!feedbackText.trim()) return;
+    try {
+      // In getAppointment we return tenantId which is the raw uuid. 
+      // But the endpoint /public/feedback/:tenantToken expects the tokenized tenant ID.
+      // Wait, appointment doesn't give us the tokenized ID, but we can pass the raw UUID and the public endpoint will fail decodeTenantId if it's a raw UUID.
+      // Let's modify public feedback controller to accept raw UUID or token! Or we can use `appointment.tenantId` if the endpoint is not tokenized.
+      // Actually, since this is an authenticated-like view (they have the appointment ID), we can add a specific endpoint for appointment feedback or use the public one.
+      // Let's create an endpoint in public-reservations.controller.ts: POST /public/reservations/appointment/:id/feedback
+      await axios.post(`${apiBase}/public/reservations/appointment/${id}/feedback`, {
+        content: feedbackText,
+        clientName: appointment.customerName,
+      });
+      setFeedbackSent(true);
+      presentToast({ message: '¡Gracias por tus comentarios!', duration: 3000, color: 'success' });
+    } catch (e: any) {
+      presentToast({ message: 'Error al enviar comentarios', duration: 3000, color: 'danger' });
     }
   };
 
@@ -186,9 +209,33 @@ const PublicAppointmentManage: React.FC = () => {
                 )}
 
                 {isPastOrClosed && (
-                  <IonButton expand="block" color="primary" fill="outline" style={{ marginTop: '20px' }} onClick={() => window.location.href = `/book/${appointment.tenantId}`}>
-                    Reservar de nuevo
-                  </IonButton>
+                  <div style={{ marginTop: '20px' }}>
+                    <IonButton expand="block" color="primary" fill="outline" onClick={() => window.location.href = `/book/${appointment.tenantId}`}>
+                      Reservar de nuevo
+                    </IonButton>
+                    
+                    {!feedbackSent ? (
+                      <div style={{ marginTop: '30px', backgroundColor: '#fff', border: '1px solid #ddd', padding: '15px', borderRadius: '8px' }}>
+                        <h3 style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: 'bold' }}>¿Qué te pareció el servicio?</h3>
+                        <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#666' }}>Ayúdanos a mejorar dejándonos un comentario o queja.</p>
+                        <IonTextarea 
+                          value={feedbackText} 
+                          onIonInput={e => setFeedbackText(e.detail.value!)} 
+                          placeholder="Escribe tu comentario aquí..." 
+                          rows={4}
+                          style={{ border: '1px solid #ccc', borderRadius: '4px', padding: '8px', marginBottom: '10px' }}
+                        />
+                        <IonButton expand="block" onClick={handleSubmitFeedback} disabled={!feedbackText.trim()}>
+                          Enviar Comentario
+                        </IonButton>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '30px', backgroundColor: '#ddffdd', border: '1px solid #0a0', padding: '15px', borderRadius: '8px', textAlign: 'center', color: '#0a0' }}>
+                        <IonIcon icon={checkmarkCircleOutline} style={{ fontSize: '32px' }} />
+                        <h3 style={{ margin: '10px 0 0 0', fontSize: '15px', fontWeight: 'bold' }}>¡Comentario enviado!</h3>
+                      </div>
+                    )}
+                  </div>
                 )}
 
               </IonCardContent>

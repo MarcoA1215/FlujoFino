@@ -18,6 +18,7 @@ import SelectWorkspace from './pages/SelectWorkspace';
 import Reservations from './pages/Reservations';
 import PublicBooking from './pages/PublicBooking';
 import PublicAppointmentManage from './pages/PublicAppointmentManage';
+import FeedbackPage from './pages/Feedback';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
 import { useContext, useEffect } from 'react';
@@ -121,6 +122,7 @@ const MainLayout: React.FC = () => {
         <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
         <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
         <Route path="/reservations" element={<PrivateRoute><Reservations /></PrivateRoute>} />
+        <Route path="/feedback" element={<PrivateRoute><FeedbackPage /></PrivateRoute>} />
       </IonRouterOutlet>
     </IonSplitPane>
   );

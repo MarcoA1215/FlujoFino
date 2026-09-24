@@ -36,7 +36,8 @@ import {
   logOutOutline,
   businessOutline,
   chevronDownOutline,
-  checkmarkCircleOutline
+  checkmarkCircleOutline,
+  chatbubbleOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 
@@ -124,6 +125,7 @@ const Menu: React.FC = () => {
     { title: 'Reservaciones', url: '/reservations', iosIcon: calendarOutline, mdIcon: calendarOutline, conditional: 'featureCustomerSchedules' },
     { title: 'Zonas Delivery', url: '/delivery-zones', iosIcon: mapOutline, mdIcon: mapOutline, conditional: 'featureBuySell' },
     { title: 'Usuarios', url: '/users', iosIcon: peopleOutline, mdIcon: peopleOutline },
+    { title: 'Ayuda y Comentarios', url: '/feedback', iosIcon: chatbubbleOutline, mdIcon: chatbubbleOutline },
     { title: 'Configuración', url: '/settings', iosIcon: settingsOutline, mdIcon: settingsOutline }
   ];
 
