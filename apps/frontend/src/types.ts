@@ -14,6 +14,7 @@ export type Product = {
   images?: string[];
   estimatedCost?: number;
   baseCost?: number;
+  assignedStaffIds?: string[];
 };
 
 export type RawMaterial = {

@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsBoolean, IsArray } from 'class-validator';
 
 export class CreateProductDto {
   @IsString() name: string;
@@ -9,4 +9,5 @@ export class CreateProductDto {
   @IsOptional() @IsNumber() durationMinutes?: number;
   @IsOptional() @IsBoolean() isCombo?: boolean;
   @IsOptional() @IsBoolean() isPreAssembled?: boolean;
+  @IsOptional() @IsArray() assignedStaffIds?: string[];
 }

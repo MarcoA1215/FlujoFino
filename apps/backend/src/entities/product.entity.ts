@@ -34,6 +34,9 @@ export class Product {
   @Column('int', { name: 'duration_minutes', nullable: true, default: 30 })
   durationMinutes: number | null;
 
+  @Column('simple-array', { nullable: true })
+  assignedStaffIds: string[];
+
   @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   stockQuantity: number;
 

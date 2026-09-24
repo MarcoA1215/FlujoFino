@@ -158,6 +158,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                     ⏱️ {p.durationMinutes} min
                   </IonBadge>
                 ) : null}
+                {p.assignedStaffIds && (Array.isArray(p.assignedStaffIds) ? p.assignedStaffIds.length > 0 : String(p.assignedStaffIds).trim().length > 0) && (
+                  <IonBadge color="secondary" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                    👤 {(Array.isArray(p.assignedStaffIds) ? p.assignedStaffIds.length : String(p.assignedStaffIds).split(',').filter(Boolean).length)} especial.
+                  </IonBadge>
+                )}
               </div>
             )}
           </div>

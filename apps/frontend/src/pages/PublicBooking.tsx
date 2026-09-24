@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { IonPage, IonContent, IonCard, IonCardContent, IonInput, IonLabel, IonItem, IonButton, useIonToast, IonSpinner, IonIcon, IonSelect, IonSelectOption, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
@@ -17,6 +17,30 @@ const PublicBooking: React.FC = () => {
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string>('');
+
+  // Specialists available specifically for the currently selected service
+  const availableStaffForService = useMemo(() => {
+    if (!tenantInfo?.staff || !tenantInfo?.bookingAllowStaffSelection || !selectedService) return [];
+    const assigned = selectedService.assignedStaffIds;
+    if (Array.isArray(assigned) && assigned.length > 0) {
+      return tenantInfo.staff.filter((st: any) => assigned.includes(st.id));
+    } else if (typeof assigned === 'string' && (assigned as string).trim().length > 0) {
+      const ids = (assigned as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+      return tenantInfo.staff.filter((st: any) => ids.includes(st.id));
+    }
+    // If no specific staff is restricted, all staff in tenant can perform it
+    return tenantInfo.staff;
+  }, [tenantInfo?.staff, tenantInfo?.bookingAllowStaffSelection, selectedService]);
+
+  // When selected service changes, reset staff if current staff cannot do this service
+  useEffect(() => {
+    if (selectedStaff && availableStaffForService.length > 0) {
+      const isStillAvailable = availableStaffForService.some((st: any) => st.id === selectedStaff.id);
+      if (!isStillAvailable) {
+        setSelectedStaff(null);
+      }
+    }
+  }, [selectedService, availableStaffForService]);
 
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -313,61 +337,6 @@ const PublicBooking: React.FC = () => {
                       : 'Elige un servicio o avanza directamente para reservar'}
                   </p>
 
-                  {/* Specialist Selection if enabled */}
-                  {tenantInfo?.bookingAllowStaffSelection && tenantInfo?.staff && tenantInfo.staff.length > 0 && (
-                    <div style={{ marginBottom: '20px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <IonIcon icon={personOutline} color="primary" />
-                        ¿Con quién deseas atenderte?
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-                        <div 
-                          onClick={() => setSelectedStaff(null)}
-                          style={{
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            whiteSpace: 'nowrap',
-                            border: !selectedStaff ? '2px solid var(--ion-color-primary)' : '1px solid #cbd5e1',
-                            backgroundColor: !selectedStaff ? '#eff6ff' : '#ffffff',
-                            color: !selectedStaff ? 'var(--ion-color-primary)' : '#475569',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}
-                        >
-                          <IonIcon icon={sparklesOutline} />
-                          Cualquiera disponible
-                        </div>
-                        {tenantInfo.staff.map((st: any) => (
-                          <div 
-                            key={st.id}
-                            onClick={() => setSelectedStaff(st)}
-                            style={{
-                              padding: '8px 12px',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              fontWeight: '600',
-                              whiteSpace: 'nowrap',
-                              border: selectedStaff?.id === st.id ? '2px solid var(--ion-color-primary)' : '1px solid #cbd5e1',
-                              backgroundColor: selectedStaff?.id === st.id ? '#eff6ff' : '#ffffff',
-                              color: selectedStaff?.id === st.id ? 'var(--ion-color-primary)' : '#475569',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <IonIcon icon={personOutline} />
-                            {st.name} {st.jobTitle ? `(${st.jobTitle})` : ''}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Services List */}
                   {hasServices ? (
                     <div>
@@ -424,6 +393,66 @@ const PublicBooking: React.FC = () => {
                         );
                       })}
 
+                      {/* Specialist Selection: Exclusively shown once a service is selected */}
+                      {selectedService && tenantInfo?.bookingAllowStaffSelection && availableStaffForService.length > 0 && (
+                        <div style={{ marginTop: '16px', marginBottom: '8px', backgroundColor: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                          <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <IonIcon icon={personOutline} color="primary" />
+                            ¿Con quién deseas atenderte para {selectedService.name}?
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '10px' }}>
+                            {selectedService.assignedStaffIds && (Array.isArray(selectedService.assignedStaffIds) ? selectedService.assignedStaffIds.length > 0 : String(selectedService.assignedStaffIds).trim().length > 0)
+                              ? 'Personal especialista capacitado para este servicio:'
+                              : 'Personal disponible:'}
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                            <div 
+                              onClick={() => setSelectedStaff(null)}
+                              style={{
+                                padding: '8px 14px',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                whiteSpace: 'nowrap',
+                                border: !selectedStaff ? '2px solid var(--ion-color-primary)' : '1px solid #cbd5e1',
+                                backgroundColor: !selectedStaff ? '#eff6ff' : '#ffffff',
+                                color: !selectedStaff ? 'var(--ion-color-primary)' : '#475569',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px'
+                              }}
+                            >
+                              <IonIcon icon={sparklesOutline} />
+                              Cualquiera disponible
+                            </div>
+                            {availableStaffForService.map((st: any) => (
+                              <div 
+                                key={st.id}
+                                onClick={() => setSelectedStaff(st)}
+                                style={{
+                                  padding: '8px 14px',
+                                  borderRadius: '8px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  fontWeight: '600',
+                                  whiteSpace: 'nowrap',
+                                  border: selectedStaff?.id === st.id ? '2px solid var(--ion-color-primary)' : '1px solid #cbd5e1',
+                                  backgroundColor: selectedStaff?.id === st.id ? '#eff6ff' : '#ffffff',
+                                  color: selectedStaff?.id === st.id ? 'var(--ion-color-primary)' : '#475569',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '5px'
+                                }}
+                              >
+                                <IonIcon icon={personOutline} />
+                                {st.name} {st.jobTitle ? `(${st.jobTitle})` : ''}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <IonButton 
                         expand="block" 
                         color="primary" 
@@ -436,6 +465,59 @@ const PublicBooking: React.FC = () => {
                     </div>
                   ) : (
                     <div style={{ textAlign: 'center', padding: '20px 10px', color: '#64748b' }}>
+                      {tenantInfo?.bookingAllowStaffSelection && tenantInfo?.staff && tenantInfo.staff.length > 0 && (
+                        <div style={{ marginBottom: '20px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0', textAlign: 'left' }}>
+                          <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <IonIcon icon={personOutline} color="primary" />
+                            ¿Con quién deseas atenderte?
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                            <div 
+                              onClick={() => setSelectedStaff(null)}
+                              style={{
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                whiteSpace: 'nowrap',
+                                border: !selectedStaff ? '2px solid var(--ion-color-primary)' : '1px solid #cbd5e1',
+                                backgroundColor: !selectedStaff ? '#eff6ff' : '#ffffff',
+                                color: !selectedStaff ? 'var(--ion-color-primary)' : '#475569',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <IonIcon icon={sparklesOutline} />
+                              Cualquiera disponible
+                            </div>
+                            {tenantInfo.staff.map((st: any) => (
+                              <div 
+                                key={st.id}
+                                onClick={() => setSelectedStaff(st)}
+                                style={{
+                                  padding: '8px 12px',
+                                  borderRadius: '8px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  fontWeight: '600',
+                                  whiteSpace: 'nowrap',
+                                  border: selectedStaff?.id === st.id ? '2px solid var(--ion-color-primary)' : '1px solid #cbd5e1',
+                                  backgroundColor: selectedStaff?.id === st.id ? '#eff6ff' : '#ffffff',
+                                  color: selectedStaff?.id === st.id ? 'var(--ion-color-primary)' : '#475569',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                <IonIcon icon={personOutline} />
+                                {st.name} {st.jobTitle ? `(${st.jobTitle})` : ''}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       <p style={{ margin: '0 0 16px 0', fontSize: '14px' }}>
                         No hay servicios cargados en este momento. Puedes continuar para reservar una mesa o consultar con el local.
                       </p>

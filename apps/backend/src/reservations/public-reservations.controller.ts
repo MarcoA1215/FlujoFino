@@ -47,7 +47,8 @@ export class PublicReservationsController {
       name: p.name,
       price: p.salePrice,
       durationMinutes: p.durationMinutes || settings?.slotInterval || 30,
-      category: p.category
+      category: p.category,
+      assignedStaffIds: p.assignedStaffIds || []
     }));
 
     // Fetch active staff if staff selection is allowed

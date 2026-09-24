@@ -73,6 +73,7 @@ export interface ProductDTO {
   reservedQuantity?: number;
   recipe?: RecipeItemDTO[];
   comboItems?: ComboItemDTO[];
+  assignedStaffIds?: string[];
 }
 
 export interface OrderItemDTO {

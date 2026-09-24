@@ -6,9 +6,11 @@ import { apiClient } from '../api/client';
 import type { Product } from '../types';
 import { ProductCard } from '../components/products/ProductCard';
 import { RecipeModal } from '../components/products/RecipeModal';
+import { ProductFormModal } from '../components/products/ProductFormModal';
 
 const Products: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [presentAlert] = useIonAlert();
   const [searchText, setSearchText] = useState('');
   const [isClientMode, setIsClientMode] = useState(false);
@@ -16,6 +18,9 @@ const Products: React.FC = () => {
   const [settings, setSettings] = useState<any>({});
 
   const [selectedProductForRecipe, setSelectedProductForRecipe] = useState<Product | null>(null);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+  const [isCreatingCombo, setIsCreatingCombo] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -29,45 +34,30 @@ const Products: React.FC = () => {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const res = await apiClient.get<any[]>('/users');
+      setUsers(res.data || []);
+    } catch (e) {
+      console.error('Error cargando usuarios', e);
+    }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchUsers();
   }, []);
 
-  const openCreateAlert = (isCombo: boolean) => {
-    presentAlert({
-      header: isCombo ? 'Nuevo Combo' : 'Nuevo Producto Base',
-      inputs: [
-        { name: 'name', type: 'text', placeholder: 'Nombre' },
-        { name: 'category', type: 'text', placeholder: 'Categoría' },
-        { name: 'salePrice', type: 'number', placeholder: 'Precio Venta ($)' },
-        { name: 'estimatedCost', type: 'number', placeholder: 'Costo Estimado Insumos ($) (Opcional)' },
-        { name: 'durationMinutes', type: 'number', placeholder: 'Duración estimada en minutos (Ej. 45)' }
-      ],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Crear',
-          handler: async (data) => {
-            if (!data.name || !data.salePrice) return false;
-            try {
-              await apiClient.post('/products', {
-                name: data.name,
-                category: data.category,
-                salePrice: parseFloat(data.salePrice),
-                estimatedCost: data.estimatedCost ? parseFloat(data.estimatedCost) : 0,
-                durationMinutes: data.durationMinutes ? parseInt(data.durationMinutes, 10) : 30,
-                isCombo,
-                isPreAssembled: false
-              });
-              fetchData();
-              presentToast({ message: 'Creado', duration: 2000, color: 'success' });
-            } catch (e) {
-              presentToast({ message: 'Error', duration: 3000, color: 'danger' });
-            }
-          }
-        }
-      ]
-    });
+  const openCreateModal = (isCombo: boolean) => {
+    setProductToEdit(null);
+    setIsCreatingCombo(isCombo);
+    setShowProductModal(true);
+  };
+
+  const openEditModal = (p: Product) => {
+    setProductToEdit(p);
+    setIsCreatingCombo(!!p.isCombo);
+    setShowProductModal(true);
   };
 
   const openAdjustStockAlert = (p: Product) => {
@@ -139,41 +129,6 @@ const Products: React.FC = () => {
       alert(e.response?.data?.message || 'Error al cambiar modo');
     }
   };
-  
-  const openEditProductAlert = (p: Product) => {
-    presentAlert({
-      header: 'Editar Producto',
-      inputs: [
-        { name: 'name', type: 'text', value: p.name, placeholder: 'Nombre' },
-        { name: 'category', type: 'text', value: p.category, placeholder: 'Categoría' },
-        { name: 'salePrice', type: 'number', value: p.salePrice, placeholder: 'Precio Venta ($)' },
-        { name: 'estimatedCost', type: 'number', value: p.estimatedCost ?? 0, placeholder: 'Costo Estimado Insumos ($)' },
-        { name: 'durationMinutes', type: 'number', value: p.durationMinutes ?? 30, placeholder: 'Duración estimada en minutos (Ej. 45)' }
-      ],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Guardar',
-          handler: async (data) => {
-            if (!data.name || !data.salePrice) return false;
-            try {
-              await apiClient.put('/products/' + p.id, {
-                name: data.name,
-                category: data.category,
-                salePrice: parseFloat(data.salePrice),
-                estimatedCost: data.estimatedCost ? parseFloat(data.estimatedCost) : 0,
-                durationMinutes: data.durationMinutes ? parseInt(data.durationMinutes, 10) : null
-              });
-              fetchData();
-              presentToast({ message: 'Actualizado', duration: 2000, color: 'success' });
-            } catch (e) {
-              presentToast({ message: 'Error', duration: 3000, color: 'danger' });
-            }
-          }
-        }
-      ]
-    });
-  };
 
   const handleDeleteProduct = (p: Product) => {
     presentAlert({
@@ -233,8 +188,8 @@ const Products: React.FC = () => {
         <IonGrid>
           {!isClientMode && (
   <IonRow className="ion-margin-bottom">
-    <IonCol size="12" sizeSm="6" sizeMd="4"><IonButton expand="block" color="primary" onClick={() => openCreateAlert(false)}>+ Crear Producto Base</IonButton></IonCol>
-    <IonCol size="12" sizeSm="6" sizeMd="4"><IonButton expand="block" color="tertiary" onClick={() => openCreateAlert(true)}>+ Crear Combo</IonButton></IonCol>
+    <IonCol size="12" sizeSm="6" sizeMd="4"><IonButton expand="block" color="primary" onClick={() => openCreateModal(false)}>+ Crear Producto / Servicio</IonButton></IonCol>
+    <IonCol size="12" sizeSm="6" sizeMd="4"><IonButton expand="block" color="tertiary" onClick={() => openCreateModal(true)}>+ Crear Combo</IonButton></IonCol>
   </IonRow>
 )}
 
@@ -290,7 +245,7 @@ const Products: React.FC = () => {
                         featureProduction={settings?.featureProduction !== false}
                         key={p.id}
                         product={p}
-                        onEdit={openEditProductAlert}
+                        onEdit={openEditModal}
                         onDelete={handleDeleteProduct}
                         onConfigure={() => setSelectedProductForRecipe(p)}
                         onAdjustStock={openAdjustStockAlert}
@@ -307,6 +262,19 @@ const Products: React.FC = () => {
           </IonRow>
         </IonGrid>
         <RecipeModal product={selectedProductForRecipe} onClose={() => setSelectedProductForRecipe(null)} onSaved={() => { setSelectedProductForRecipe(null); fetchData(); }} />
+        <ProductFormModal 
+          isOpen={showProductModal}
+          onClose={() => {
+            setShowProductModal(false);
+            setProductToEdit(null);
+          }}
+          onSaved={() => {
+            fetchData();
+          }}
+          product={productToEdit}
+          isCombo={isCreatingCombo}
+          users={users}
+        />
       </IonContent>
     </IonPage>
   );
