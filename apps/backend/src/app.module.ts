@@ -40,7 +40,6 @@ import { Feedback } from './entities/feedback.entity';
 import { OrderItemMedia } from './entities/order-item-media.entity';
 import { Customer } from './entities/customer.entity';
 import { CustomersModule } from './customers/customers.module';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
 @Module({
   imports: [
@@ -70,17 +69,8 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
     StorageModule,
     FeedbackModule,
     CustomersModule,
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 60,
-    }]),
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
-    { provide: APP_GUARD, useClass: JwtAuthGuard },
-    { provide: APP_GUARD, useClass: RolesGuard },
-  ],
+  providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: APP_GUARD, useClass: RolesGuard }],
 })
 export class AppModule {}
