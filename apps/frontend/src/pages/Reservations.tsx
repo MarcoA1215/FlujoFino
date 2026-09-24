@@ -34,6 +34,7 @@ const Reservations: React.FC = () => {
   const [shiftTimeFrom, setShiftTimeFrom] = useState('');
   const [shiftMinutes, setShiftMinutes] = useState(30);
   const [shiftAffected, setShiftAffected] = useState<any[]>([]);
+  const [settings, setSettings] = useState<any>({});
 
   const fetchReservations = async () => {
     try {
@@ -53,9 +54,19 @@ const Reservations: React.FC = () => {
     }
   };
 
+  const fetchSettings = async () => {
+    try {
+      const res = await apiClient.get('/settings');
+      setSettings(res.data || {});
+    } catch (e) {
+      console.error('Error fetching settings', e);
+    }
+  };
+
   useEffect(() => {
     fetchReservations();
     fetchProducts();
+    fetchSettings();
     setTimeout(() => {
       window.dispatchEvent(new Event('resize'));
     }, 500);
@@ -256,6 +267,57 @@ const Reservations: React.FC = () => {
     };
   });
 
+  // Calculate calendar visible hours based on business hours with 1h grace before and after
+  const { slotMinTime, slotMaxTime, scrollTime } = React.useMemo(() => {
+    const bHours = settings?.businessHours;
+    let minHour = 8;
+    let maxHour = 19;
+    let foundOpenDay = false;
+
+    if (bHours && typeof bHours === 'object') {
+      let earliestMinutes = 24 * 60;
+      let latestMinutes = 0;
+
+      Object.values(bHours).forEach((d: any) => {
+        if (d && d.isOpen && d.startTime && d.endTime) {
+          foundOpenDay = true;
+          const [sh, sm] = String(d.startTime).split(':').map(Number);
+          const [eh, em] = String(d.endTime).split(':').map(Number);
+          const startM = (sh || 0) * 60 + (sm || 0);
+          const endM = (eh || 0) * 60 + (em || 0);
+          if (startM < earliestMinutes) earliestMinutes = startM;
+          if (endM > latestMinutes) latestMinutes = endM;
+        }
+      });
+
+      if (foundOpenDay) {
+        minHour = Math.floor(earliestMinutes / 60);
+        maxHour = Math.ceil(latestMinutes / 60);
+      }
+    }
+
+    // 1 hora de antelación y 1 hora de margen posterior
+    let slotMin = Math.max(0, minHour - 1);
+    let slotMax = Math.min(24, maxHour + 1);
+
+    // Si existen citas fuera de este rango, expandir dinámicamente para no ocultar nada
+    reservations.forEach(r => {
+      if (r.time) {
+        const [h] = String(r.time).split(':').map(Number);
+        if (!isNaN(h)) {
+          if (h < slotMin) slotMin = Math.max(0, h - 1);
+          if (h + 1 > slotMax) slotMax = Math.min(24, h + 2);
+        }
+      }
+    });
+
+    return {
+      slotMinTime: `${String(slotMin).padStart(2, '0')}:00:00`,
+      slotMaxTime: `${String(slotMax).padStart(2, '0')}:00:00`,
+      scrollTime: `${String(Math.max(slotMin, minHour)).padStart(2, '0')}:00:00`
+    };
+  }, [settings?.businessHours, reservations]);
+
   const calendarRef = React.useRef<FullCalendar>(null);
   const isMobile = window.innerWidth < 768;
   const [mobileView, setMobileView] = useState('listWeek');
@@ -317,6 +379,10 @@ const Reservations: React.FC = () => {
             events={events}
             eventClick={handleEventClick}
             height="80vh"
+            allDaySlot={false}
+            slotMinTime={slotMinTime}
+            slotMaxTime={slotMaxTime}
+            scrollTime={scrollTime}
           />
         </div>
 
