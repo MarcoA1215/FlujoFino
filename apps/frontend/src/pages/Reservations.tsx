@@ -405,6 +405,7 @@ const Reservations: React.FC = () => {
                     <p><b>Personas:</b> {selectedEvent.numberOfPeople}</p>
                     {selectedEvent.tableNumber && <p><b>Mesa:</b> {selectedEvent.tableNumber}</p>}
                     {selectedEvent.notes && <p><b>Notas:</b> {selectedEvent.notes}</p>}
+                    {selectedEvent.referralSource && <p><b>Origen:</b> {selectedEvent.referralSource}</p>}
                     <p><b>Estado Actual:</b> {selectedEvent.status}</p>
                     <p><b>Monto Total:</b> ${selectedEvent.totalAmount.toFixed(2)}</p>
                     

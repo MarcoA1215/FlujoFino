@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IonPage, IonContent, IonCard, IonCardContent, IonInput, IonLabel, IonItem, IonButton, useIonToast, IonSpinner, IonIcon } from '@ionic/react';
+import { IonPage, IonContent, IonCard, IonCardContent, IonInput, IonLabel, IonItem, IonButton, useIonToast, IonSpinner, IonIcon, IonSelect, IonSelectOption } from '@ionic/react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { checkmarkCircleOutline, timeOutline, chevronBackOutline } from 'ionicons/icons';
@@ -21,6 +21,7 @@ const PublicBooking: React.FC = () => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [numberOfPeople, setNumberOfPeople] = useState<number>(1);
   const [notes, setNotes] = useState('');
+  const [referralSource, setReferralSource] = useState('');
   const [success, setSuccess] = useState(false);
   const [magicLink, setMagicLink] = useState('');
 
@@ -57,6 +58,7 @@ const PublicBooking: React.FC = () => {
         time: selectedTime, 
         numberOfPeople, 
         notes,
+        referralSource,
         serviceId: selectedService?.id,
         serviceName: selectedService?.name
       });
@@ -302,9 +304,21 @@ const PublicBooking: React.FC = () => {
                     </IonItem>
                   )}
                   
-                  <IonItem lines="none" style={{ marginBottom: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
+                  <IonItem lines="none" style={{ marginBottom: '10px', border: '1px solid #ddd', borderRadius: '8px' }}>
                     <IonLabel position="stacked">Notas Especiales</IonLabel>
                     <IonInput value={notes} onIonInput={e => setNotes(e.detail.value!)} placeholder="Ej. Retiro de acrílico..." />
+                  </IonItem>
+
+                  <IonItem lines="none" style={{ marginBottom: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
+                    <IonLabel position="stacked">¿Cómo nos conociste?</IonLabel>
+                    <IonSelect value={referralSource} onIonChange={e => setReferralSource(e.detail.value)} placeholder="Selecciona una opción">
+                      <IonSelectOption value="Instagram">Instagram</IonSelectOption>
+                      <IonSelectOption value="Facebook">Facebook</IonSelectOption>
+                      <IonSelectOption value="Tiktok">Tiktok</IonSelectOption>
+                      <IonSelectOption value="Recomendacion">Recomendación de un amigo</IonSelectOption>
+                      <IonSelectOption value="Local">Pasaba por el local</IonSelectOption>
+                      <IonSelectOption value="Otro">Otro</IonSelectOption>
+                    </IonSelect>
                   </IonItem>
                   
                   <IonButton expand="block" color="primary" onClick={handleSubmit} style={{ height: '50px', fontWeight: 'bold' }}>

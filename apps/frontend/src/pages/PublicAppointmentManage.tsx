@@ -185,6 +185,12 @@ const PublicAppointmentManage: React.FC = () => {
                   </IonGrid>
                 )}
 
+                {isPastOrClosed && (
+                  <IonButton expand="block" color="primary" fill="outline" style={{ marginTop: '20px' }} onClick={() => window.location.href = `/book/${appointment.tenantId}`}>
+                    Reservar de nuevo
+                  </IonButton>
+                )}
+
               </IonCardContent>
             </IonCard>
           ) : (
