@@ -115,6 +115,12 @@ const PublicBooking: React.FC = () => {
         const res = await axios.get(`${apiBase}/public/reservations/tenant/${tenantId}`);
         setTenantInfo(res.data);
         
+        // If business is pure retail/buy-sell without customer schedules, redirect to online store
+        if (res.data.featureBuySell && !res.data.featureCustomerSchedules) {
+          window.location.replace(`/store/${tenantId}`);
+          return;
+        }
+
         // If require service is NOT enabled and no services are defined, skip step 1
         if (!res.data.bookingRequireService && (!res.data.services || res.data.services.length === 0)) {
           setStep(2);

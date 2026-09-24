@@ -57,6 +57,12 @@ export class Settings {
   @Column('int', { default: 30 })
   slotInterval: number; // e.g. 15, 30, 60 minutes
 
+  @Column({ nullable: true })
+  themePrimaryColor: string;
+
+  @Column({ nullable: true })
+  themeHeaderColor: string;
+
   @ManyToOne(() => Tenant)
   @JoinColumn({ name: 'tenantId' })
   tenant: Tenant;

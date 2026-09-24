@@ -18,6 +18,7 @@ import SelectWorkspace from './pages/SelectWorkspace';
 import Reservations from './pages/Reservations';
 import Customers from './pages/Customers';
 import PublicBooking from './pages/PublicBooking';
+import PublicStore from './pages/PublicStore';
 import PublicAppointmentManage from './pages/PublicAppointmentManage';
 import FeedbackPage from './pages/Feedback';
 import { AuthProvider, AuthContext } from './context/AuthContext';
@@ -109,6 +110,8 @@ const MainLayout: React.FC = () => {
       <Menu />
       <IonRouterOutlet id="main">
         <Route path="/book/:tenantId" element={<PublicBooking />} />
+        <Route path="/store/:tenantId" element={<PublicStore />} />
+        <Route path="/tienda/:tenantId" element={<PublicStore />} />
         <Route path="/appointment/:id" element={<PublicAppointmentManage />} />
         <Route path="/" element={<HomeRedirector />} />
         <Route path="/login" element={<LoginRoute />} />

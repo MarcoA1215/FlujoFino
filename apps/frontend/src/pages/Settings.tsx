@@ -220,31 +220,87 @@ const SettingsPage: React.FC = () => {
             <BookingSettings settings={settings} setSettings={setSettings} />
           )}
 
+          {settings.featureBuySell && (
+            <IonRow>
+              <IonCol size="12">
+                <IonCard>
+                  <IonCardContent>
+                    <div style={{ padding: '15px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                      <h3 style={{ margin: '0 0 10px 0', color: '#166534', fontWeight: 'bold' }}>🛍️ Enlace Público de Tienda Online / Catálogo</h3>
+                      <p style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#14532d' }}>
+                        Comparte este enlace con tus clientes por WhatsApp o Instagram para que vean tus productos, precios en $ y Bs., armen su carrito de compras con control de stock y te envíen sus pedidos directo a Caja y WhatsApp.
+                      </p>
+                      <IonInput 
+                        readonly 
+                        value={`${window.location.origin}/store/${settings.publicToken || user?.tenantId}`} 
+                        style={{ backgroundColor: 'white', padding: '10px', borderRadius: '4px', marginBottom: '10px', border: '1px solid #86efac' }} 
+                      />
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <IonButton 
+                          size="small" 
+                          color="success" 
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/store/${settings.publicToken || user?.tenantId}`);
+                            presentToast({ message: '¡Enlace de tienda copiado!', duration: 2000, color: 'success' });
+                          }}
+                        >
+                          Copiar Enlace Tienda
+                        </IonButton>
+                        <IonButton 
+                          size="small" 
+                          fill="outline" 
+                          color="success" 
+                          onClick={() => {
+                            window.open(`${window.location.origin}/store/${settings.publicToken || user?.tenantId}`, '_blank');
+                          }}
+                        >
+                          Abrir Tienda
+                        </IonButton>
+                      </div>
+                    </div>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+            </IonRow>
+          )}
+
           {settings.featureCustomerSchedules && (
             <IonRow>
               <IonCol size="12">
                 <IonCard>
                   <IonCardContent>
                     <div style={{ padding: '15px', backgroundColor: 'var(--ion-color-light)', borderRadius: '8px' }}>
-                      <h3 style={{ margin: '0 0 10px 0' }}>Enlace Público de Reservaciones</h3>
+                      <h3 style={{ margin: '0 0 10px 0', fontWeight: 'bold' }}>📅 Enlace Público de Citas y Reservaciones</h3>
                       <p style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#666' }}>
-                        Comparte este enlace con tus clientes en WhatsApp o Instagram para que puedan reservar directamente sin iniciar sesión.
+                        Comparte este enlace con tus clientes para que puedan agendar sus turnos y servicios en el calendario sin iniciar sesión.
                       </p>
                       <IonInput 
                         readonly 
                         value={`${window.location.origin}/book/${settings.publicToken || user?.tenantId}`} 
                         style={{ backgroundColor: 'white', padding: '10px', borderRadius: '4px', marginBottom: '10px' }} 
                       />
-                      <IonButton 
-                        size="small" 
-                        color="secondary" 
-                        onClick={() => {
-                          navigator.clipboard.writeText(`${window.location.origin}/book/${settings.publicToken || user?.tenantId}`);
-                          presentToast({ message: '¡Enlace copiado!', duration: 2000, color: 'success' });
-                        }}
-                      >
-                        Copiar Enlace
-                      </IonButton>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <IonButton 
+                          size="small" 
+                          color="secondary" 
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/book/${settings.publicToken || user?.tenantId}`);
+                            presentToast({ message: '¡Enlace copiado!', duration: 2000, color: 'success' });
+                          }}
+                        >
+                          Copiar Enlace Citas
+                        </IonButton>
+                        <IonButton 
+                          size="small" 
+                          fill="outline" 
+                          color="secondary" 
+                          onClick={() => {
+                            window.open(`${window.location.origin}/book/${settings.publicToken || user?.tenantId}`, '_blank');
+                          }}
+                        >
+                          Abrir Reservaciones
+                        </IonButton>
+                      </div>
                     </div>
                   </IonCardContent>
                 </IonCard>

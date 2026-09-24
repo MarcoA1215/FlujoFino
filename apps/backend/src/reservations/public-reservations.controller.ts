@@ -76,6 +76,8 @@ export class PublicReservationsController {
       services: services,
       slotInterval: settings?.slotInterval || 30,
       featureShowCatalog: settings?.featureShowCatalog || false,
+      featureBuySell: settings?.featureBuySell ?? false,
+      featureCustomerSchedules: settings?.featureCustomerSchedules ?? true,
       bookingRequireService: settings?.bookingRequireService ?? true,
       bookingAllowStaffSelection: settings?.bookingAllowStaffSelection ?? false,
       staff: staff

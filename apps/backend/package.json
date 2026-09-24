@@ -28,6 +28,7 @@
     "@nestjs/jwt": "^10.0.0",
     "@nestjs/passport": "^10.0.0",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/throttler": "^6.7.1",
     "@nestjs/typeorm": "^12.0.1",
     "@nutrideli/shared-types": "workspace:*",
     "bcryptjs": "^2.4.3",
