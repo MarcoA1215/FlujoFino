@@ -263,9 +263,72 @@ const Reservations: React.FC = () => {
       title: r.serviceName ? `${r.customerName} - ${r.serviceName}` : `${r.customerName} (${r.numberOfPeople || 1} pax) ${r.tableNumber ? 'Mesa ' + r.tableNumber : ''}`,
       start: `${r.date}T${r.time}`,
       end: `${r.date}T${endH}:${endM}:00`,
-      color
+      color,
+      extendedProps: {
+        customerName: r.customerName,
+        customerPhone: r.customerPhone,
+        serviceName: r.serviceName,
+        tableNumber: r.tableNumber,
+        numberOfPeople: r.numberOfPeople,
+        status: r.status,
+        reservation: r
+      }
     };
   });
+
+  const renderEventContent = (eventInfo: any) => {
+    const { event, timeText } = eventInfo;
+    const props = event.extendedProps || {};
+    return (
+      <div style={{ 
+        padding: '5px 8px', 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        justifyContent: 'flex-start',
+        overflow: 'hidden',
+        lineHeight: '1.25'
+      }}>
+        <div style={{ 
+          fontSize: '11px', 
+          fontWeight: '800', 
+          opacity: 0.95, 
+          marginBottom: '2px',
+          letterSpacing: '0.2px'
+        }}>
+          {timeText}
+        </div>
+        <div style={{ 
+          fontSize: '13px', 
+          fontWeight: '700', 
+          whiteSpace: 'nowrap', 
+          overflow: 'hidden', 
+          textOverflow: 'ellipsis',
+          color: '#ffffff'
+        }}>
+          {props.customerName || event.title}
+        </div>
+        {props.serviceName && (
+          <div style={{ 
+            fontSize: '11.5px', 
+            fontWeight: '500', 
+            opacity: 0.95, 
+            whiteSpace: 'nowrap', 
+            overflow: 'hidden', 
+            textOverflow: 'ellipsis',
+            marginTop: '2px'
+          }}>
+            💅 {props.serviceName}
+          </div>
+        )}
+        {props.tableNumber && !props.serviceName && (
+          <div style={{ fontSize: '11px', opacity: 0.9, marginTop: '2px' }}>
+            Mesa {props.tableNumber} ({props.numberOfPeople || 1} pax)
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Calculate calendar visible hours based on business hours with 1h grace before and after
   const { slotMinTime, slotMaxTime, scrollTime } = React.useMemo(() => {
@@ -362,6 +425,44 @@ const Reservations: React.FC = () => {
       
       <IonContent className="ion-padding" style={{ 'backgroundColor': '#f4f5f8' }}>
         <div className="fc-wrapper">
+          <style>{`
+            /* Altura generosa para cada slot de 30 minutos */
+            .fc .fc-timegrid-slot {
+              height: 56px !important;
+            }
+            .fc .fc-timegrid-slot-lane {
+              height: 56px !important;
+            }
+            .fc .fc-timegrid-slot-label {
+              height: 56px !important;
+              vertical-align: top !important;
+            }
+            .fc .fc-timegrid-slots tr {
+              height: 56px !important;
+            }
+            .fc .fc-timegrid-slot-label-cushion {
+              font-size: 12px !important;
+              font-weight: 700 !important;
+              color: #334155 !important;
+              text-transform: uppercase !important;
+              padding: 2px 6px !important;
+            }
+            .fc-theme-standard td, .fc-theme-standard th {
+              border-color: #e2e8f0 !important;
+            }
+            .fc-v-event {
+              border-radius: 8px !important;
+              box-shadow: 0 3px 8px rgba(0,0,0,0.12) !important;
+              border: none !important;
+              padding: 0 !important;
+              cursor: pointer;
+            }
+            .fc-v-event .fc-event-main {
+              color: #ffffff !important;
+              padding: 0 !important;
+              height: 100%;
+            }
+          `}</style>
           <FullCalendar
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
@@ -378,7 +479,9 @@ const Reservations: React.FC = () => {
             locale="es"
             events={events}
             eventClick={handleEventClick}
-            height="80vh"
+            eventContent={renderEventContent}
+            height="auto"
+            expandRows={false}
             allDaySlot={false}
             slotMinTime={slotMinTime}
             slotMaxTime={slotMaxTime}
