@@ -21,6 +21,9 @@ export class Product {
   @Column({ nullable: true })
   category: string; // new field for categorization
 
+  @Column('simple-array', { nullable: true })
+  images: string[];
+
   @Column('float')
   salePrice: number;
 

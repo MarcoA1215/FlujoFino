@@ -49,6 +49,9 @@ export class Reservation {
   @Column('text', { nullable: true })
   notes: string;
 
+  @Column({ nullable: true })
+  referralSource: string;
+
   @ManyToOne(() => Tenant)
   @JoinColumn({ name: 'tenantId' })
   tenant: Tenant;

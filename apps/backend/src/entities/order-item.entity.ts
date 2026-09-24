@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
 import { Order } from './order.entity';
 import { Product } from './product.entity';
+import { OrderItemMedia } from './order-item-media.entity';
 
 @Entity()
 export class OrderItem {
@@ -36,5 +37,8 @@ export class OrderItem {
 
   @ManyToOne(() => Product, product => product.orderItems)
   product: Product;
+
+  @OneToMany(() => OrderItemMedia, media => media.orderItem)
+  media: OrderItemMedia[];
 }
 
