@@ -115,12 +115,18 @@ export class PublicReservationsController {
 
   @Get('tenant/:tenantId/availability')
   async getAvailability(
-    @Param('tenantId') tenantId: string, 
+    @Param('tenantId') tenantToken: string, 
     @Query('date') date: string, 
     @Query('serviceId') serviceId: string,
     @Query('exclude') excludeReservationId?: string
   ) {
-    return this.calculateAvailableSlots(tenantId, date, serviceId, excludeReservationId);
+    let id: string;
+    try {
+      id = decodeTenantId(tenantToken);
+    } catch {
+      throw new NotFoundException('Negocio no encontrado o enlace inválido');
+    }
+    return this.calculateAvailableSlots(id, date, serviceId, excludeReservationId);
   }
 
   @Get('tenant/:tenantId/catalog')

@@ -17,7 +17,13 @@ export function encodeTenantId(tenantId: string): string {
   }
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function decodeTenantId(token: string): string {
+  if (!token) return token;
+  if (UUID_REGEX.test(token)) {
+    return token;
+  }
   try {
     const decipher = crypto.createDecipheriv('aes-256-cbc', getSecret(), IV);
     let decrypted = decipher.update(token, 'base64url', 'utf8');
