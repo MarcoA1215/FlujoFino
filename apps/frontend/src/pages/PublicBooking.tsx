@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { IonPage, IonContent, IonCard, IonCardContent, IonInput, IonLabel, IonItem, IonButton, useIonToast, IonSpinner, IonIcon, IonSelect, IonSelectOption } from '@ionic/react';
+import { IonPage, IonContent, IonCard, IonCardContent, IonInput, IonLabel, IonItem, IonButton, useIonToast, IonSpinner, IonIcon, IonSelect, IonSelectOption, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { checkmarkCircleOutline, timeOutline, chevronBackOutline } from 'ionicons/icons';
+import { checkmarkCircleOutline, timeOutline, chevronBackOutline, imagesOutline } from 'ionicons/icons';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -24,6 +24,41 @@ const PublicBooking: React.FC = () => {
   const [referralSource, setReferralSource] = useState('');
   const [success, setSuccess] = useState(false);
   const [magicLink, setMagicLink] = useState('');
+
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [catalogItems, setCatalogItems] = useState<any[]>([]);
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [hasMoreCatalog, setHasMoreCatalog] = useState(true);
+
+  const fetchCatalog = async (page: number, append = false) => {
+    try {
+      const res = await axios.get(`${apiBase}/public/reservations/tenant/${tenantId}/catalog?page=${page}&limit=10`);
+      const data = res.data.data;
+      if (data.length < 10) setHasMoreCatalog(false);
+      else setHasMoreCatalog(true);
+      
+      if (append) {
+        setCatalogItems(prev => [...prev, ...data]);
+      } else {
+        setCatalogItems(data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const openCatalog = () => {
+    setCatalogPage(1);
+    setHasMoreCatalog(true);
+    fetchCatalog(1, false);
+    setShowCatalog(true);
+  };
+
+  const loadMoreCatalog = (e: any) => {
+    const nextPage = catalogPage + 1;
+    setCatalogPage(nextPage);
+    fetchCatalog(nextPage, true).finally(() => e.target.complete());
+  };
 
   useEffect(() => {
     const fetchTenant = async () => {
@@ -178,6 +213,15 @@ const PublicBooking: React.FC = () => {
             </h2>
           </div>
 
+          {tenantInfo?.featureShowCatalog && (
+            <div style={{ textAlign: 'center', marginBottom: '15px' }}>
+              <IonButton fill="outline" color="primary" onClick={openCatalog}>
+                <IonIcon slot="start" icon={imagesOutline} />
+                Ver Portafolio de Trabajos
+              </IonButton>
+            </div>
+          )}
+
           <IonCard style={{ margin: 0, borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
             <IonCardContent style={{ padding: '20px' }}>
               
@@ -331,6 +375,38 @@ const PublicBooking: React.FC = () => {
           </IonCard>
         </div>
       </IonContent>
+
+      <IonModal isOpen={showCatalog} onDidDismiss={() => setShowCatalog(false)}>
+        <IonHeader>
+          <IonToolbar color="primary">
+            <IonTitle>Portafolio / Catálogo</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowCatalog(false)}>Cerrar</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent style={{ backgroundColor: '#f4f5f8' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', padding: '10px' }}>
+            {catalogItems.map(item => (
+              <IonCard key={item.id} style={{ margin: 0, padding: 0 }}>
+                <img src={item.url} style={{ width: '100%', height: '150px', objectFit: 'cover' }} alt={item.title} />
+                <IonCardContent style={{ padding: '10px' }}>
+                  <h3 style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold', lineHeight: '1.2' }}>{item.title}</h3>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>{item.subtitle}</p>
+                </IonCardContent>
+              </IonCard>
+            ))}
+          </div>
+          {catalogItems.length === 0 && (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+              Aún no hay trabajos en el portafolio.
+            </div>
+          )}
+          <IonInfiniteScroll onIonInfinite={loadMoreCatalog} disabled={!hasMoreCatalog}>
+            <IonInfiniteScrollContent loadingSpinner="bubbles" loadingText="Cargando más..." />
+          </IonInfiniteScroll>
+        </IonContent>
+      </IonModal>
     </IonPage>
   );
 };

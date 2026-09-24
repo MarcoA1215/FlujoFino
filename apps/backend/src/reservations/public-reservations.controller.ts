@@ -9,6 +9,7 @@ import { Product } from '../entities/product.entity';
 import { ReservationStatus } from '@nutrideli/shared-types';
 import { decodeTenantId } from '../utils/tenant-crypto';
 import { Public } from '../auth/public.decorator';
+import { OrderItem } from '../entities/order-item.entity';
 
 @Public()
 @Controller('public/reservations')
@@ -51,7 +52,8 @@ export class PublicReservationsController {
       name: tenant.name,
       businessHours: settings?.businessHours || null,
       services: services,
-      slotInterval: settings?.slotInterval || 30
+      slotInterval: settings?.slotInterval || 30,
+      featureShowCatalog: settings?.featureShowCatalog || false
     };
   }
 
@@ -119,6 +121,77 @@ export class PublicReservationsController {
     @Query('exclude') excludeReservationId?: string
   ) {
     return this.calculateAvailableSlots(tenantId, date, serviceId, excludeReservationId);
+  }
+
+  @Get('tenant/:tenantId/catalog')
+  async getCatalog(@Param('tenantId') token: string, @Query('page') pageStr: string = '1', @Query('limit') limitStr: string = '10') {
+    let id: string;
+    try { id = decodeTenantId(token); } catch { throw new NotFoundException('Enlace inválido'); }
+    
+    const page = parseInt(pageStr, 10) || 1;
+    const limit = parseInt(limitStr, 10) || 10;
+    const offset = (page - 1) * limit;
+
+    const settingsRepo = this.tenantRepo.manager.getRepository(Settings);
+    const settings = await settingsRepo.findOne({ where: { tenantId: id } });
+    if (!settings?.featureShowCatalog) {
+      throw new BadRequestException('El catálogo no está habilitado');
+    }
+
+    const productRepo = this.tenantRepo.manager.getRepository(Product);
+    const orderItemRepo = this.tenantRepo.manager.getRepository(OrderItem);
+
+    // We want to combine Product images and OrderItem media.
+    // For simplicity, we can fetch all product images and order media, sort by date, and paginate.
+    // Since we don't have created_at on Product images natively (it's a JSON array), we will fetch:
+    // 1. OrderItemMedia (descending by createdAt)
+    // 2. Products with images (we'll just use the products and append them)
+    
+    // Instead of complex SQL, we'll fetch them, map into a unified format, sort, and slice.
+    // This is fine for small to medium scale. For huge scale, we'd need a unified view or unified table.
+    
+    const products = await productRepo.find({ where: { tenantId: id } });
+    const productImages = products
+      .filter(p => p.images && p.images.length > 0)
+      .flatMap(p => p.images.map((img, i) => ({
+        id: `prod-${p.id}-${i}`,
+        type: 'product',
+        url: img,
+        title: p.name,
+        subtitle: `Precio: $${p.salePrice.toFixed(2)}`,
+        date: p.updatedAt // Approximated
+      })));
+
+    const orderItems = await orderItemRepo.find({
+      where: { tenantId: id },
+      relations: { media: true, order: true }
+    });
+    
+    const orderImages = orderItems
+      .filter(oi => oi.media && oi.media.length > 0)
+      .flatMap(oi => oi.media.map(m => ({
+        id: `media-${m.id}`,
+        type: 'work',
+        url: m.imageUrl,
+        title: oi.productName || 'Trabajo Realizado',
+        subtitle: oi.order?.customerName ? `Para: ${oi.order.customerName}` : 'Trabajo completado',
+        date: m.createdAt
+      })));
+
+    const combined = [...productImages, ...orderImages];
+    // Sort descending by date
+    combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const total = combined.length;
+    const paginated = combined.slice(offset, offset + limit);
+
+    return {
+      data: paginated,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    };
   }
 
   @Put('appointment/:id/reschedule')

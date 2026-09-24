@@ -15,6 +15,7 @@ interface Settings {
   featureCustomerSchedules?: boolean;
   featureRecipes?: boolean;
   featureBuySell?: boolean;
+  featureShowCatalog?: boolean;
   publicToken?: string;
   businessHours?: any;
   services?: any[];
@@ -54,6 +55,7 @@ const SettingsPage: React.FC = () => {
           featureCustomerSchedules: settings.featureCustomerSchedules,
           featureRecipes: settings.featureRecipes,
           featureBuySell: settings.featureBuySell,
+          featureShowCatalog: settings.featureShowCatalog,
           businessHours: settings.businessHours,
           services: settings.services,
           slotInterval: settings.slotInterval,
@@ -167,6 +169,10 @@ const SettingsPage: React.FC = () => {
                   <IonItem>
                     <IonLabel className="ion-text-wrap">Compra-Venta Directa (Retail)</IonLabel>
                     <IonToggle checked={settings.featureBuySell || false} onIonChange={e => setSettings({...settings, featureBuySell: e.detail.checked})} />
+                  </IonItem>
+                  <IonItem>
+                    <IonLabel className="ion-text-wrap">Portafolio / Catálogo Público de Trabajos</IonLabel>
+                    <IonToggle checked={settings.featureShowCatalog || false} onIonChange={e => setSettings({...settings, featureShowCatalog: e.detail.checked})} />
                   </IonItem>
                 </IonCardContent>
               </IonCard>
