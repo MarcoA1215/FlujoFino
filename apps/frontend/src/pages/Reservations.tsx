@@ -383,6 +383,20 @@ const Reservations: React.FC = () => {
             slotMinTime={slotMinTime}
             slotMaxTime={slotMaxTime}
             scrollTime={scrollTime}
+            slotDuration="00:30:00"
+            slotLabelFormat={{
+              hour: 'numeric',
+              minute: '2-digit',
+              omitZeroMinute: false,
+              meridiem: 'short',
+              hour12: true
+            }}
+            eventTimeFormat={{
+              hour: 'numeric',
+              minute: '2-digit',
+              meridiem: 'short',
+              hour12: true
+            }}
           />
         </div>
 
