@@ -96,6 +96,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     return null;
   };
   const imageUrl = getProductImage();
+  const isService = featureProduction === false || p.category === 'Servicios' || Boolean(p.durationMinutes);
 
   return (
     <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3" style={{ display: 'flex' }}>
@@ -132,16 +133,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             )}
 
             {isClientMode && (
-              <p style={{ margin: '0 0 12px 0', color: (featureProduction === false || p.category === 'Servicios' || p.stockQuantity > 0) ? 'var(--ion-color-success)' : 'var(--ion-color-danger)', fontWeight: '500', fontSize: '0.9rem' }}>
-                {(featureProduction === false || p.category === 'Servicios') ? 'Disponible' : (p.stockQuantity > 0 ? `Disponible: ${p.stockQuantity}` : 'Agotado')}
+              <p style={{ margin: '0 0 12px 0', color: (isService || p.stockQuantity > 0) ? 'var(--ion-color-success)' : 'var(--ion-color-danger)', fontWeight: '500', fontSize: '0.9rem' }}>
+                {isService ? 'Disponible' : (p.stockQuantity > 0 ? `Disponible: ${p.stockQuantity}` : 'Agotado')}
               </p>
             )}
 
             {!isClientMode && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
-                {(!p.isCombo || p.isPreAssembled) && (
+                {!isService && (!p.isCombo || p.isPreAssembled) && (
                   <>
-                    {featureProduction !== false && (
+                    {Boolean(featureProduction) && (
                       <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
                         Físico: {p.physicalStock}
                       </IonBadge>
@@ -151,14 +152,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                     </IonBadge>
                   </>
                 )}
-                {(p.isCombo && !p.isPreAssembled) && (
+                {!isService && (p.isCombo && !p.isPreAssembled) && (
                   <IonBadge color="tertiary" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
                     Combo (Virtual)
                   </IonBadge>
                 )}
-                {featureProduction !== false && (p.recipe && p.recipe.length > 0 && !p.isCombo) && (
+                {!isService && Boolean(featureProduction) && (p.recipe && p.recipe.length > 0 && !p.isCombo) && (
                   <IonBadge color={p.isPreAssembled ? 'dark' : 'warning'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
                     {p.isPreAssembled ? 'Pre-Fabricado' : 'Hecho al Instante'}
+                  </IonBadge>
+                )}
+                {isService && (
+                  <IonBadge color="success" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                    Disponible
                   </IonBadge>
                 )}
                 {p.durationMinutes ? (
@@ -176,8 +182,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
           
           {!isClientMode && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'auto', paddingTop: '10px' }}>
-              <IonButton size="small" fill="solid" color="primary" onClick={openOptions} style={{ margin: 0 }}>
+            <div style={{ marginTop: 'auto', paddingTop: '10px' }}>
+              <IonButton expand="block" size="small" fill="outline" color="primary" onClick={openOptions} style={{ margin: 0, fontWeight: '600' }}>
                 Opciones
               </IonButton>
             </div>
