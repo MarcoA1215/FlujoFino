@@ -16,6 +16,8 @@ interface Settings {
   featureRecipes?: boolean;
   featureBuySell?: boolean;
   featureShowCatalog?: boolean;
+  bookingRequireService?: boolean;
+  bookingAllowStaffSelection?: boolean;
   publicToken?: string;
   businessHours?: any;
   services?: any[];
@@ -56,6 +58,8 @@ const SettingsPage: React.FC = () => {
           featureRecipes: settings.featureRecipes,
           featureBuySell: settings.featureBuySell,
           featureShowCatalog: settings.featureShowCatalog,
+          bookingRequireService: settings.bookingRequireService,
+          bookingAllowStaffSelection: settings.bookingAllowStaffSelection,
           businessHours: settings.businessHours,
           services: settings.services,
           slotInterval: settings.slotInterval,

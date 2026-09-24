@@ -2,6 +2,7 @@ import { ColumnNumericTransformer } from '../common/transformers/column-numeric.
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { ReservationStatus, PaymentStatus } from '@nutrideli/shared-types';
 import { Tenant } from './tenant.entity';
+import { User } from './user.entity';
 
 @Entity()
 export class Reservation {
@@ -31,6 +32,16 @@ export class Reservation {
 
   @Column({ nullable: true })
   tableNumber: string;
+
+  @Column({ nullable: true })
+  employeeId: string;
+
+  @Column({ nullable: true })
+  employeeName: string;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'employeeId' })
+  employee: User;
 
   @Column({ type: 'enum', enum: ReservationStatus, default: ReservationStatus.PENDING })
   status: ReservationStatus;

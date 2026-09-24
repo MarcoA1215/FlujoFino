@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton, IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonTextarea, IonButton, useIonToast, IonIcon } from '@ionic/react';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton, IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonTextarea, IonButton, useIonToast, IonIcon } from '@ionic/react';
 import { sendOutline, chatbubbleOutline, headsetOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 

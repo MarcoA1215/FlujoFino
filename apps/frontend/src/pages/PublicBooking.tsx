@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { IonPage, IonContent, IonCard, IonCardContent, IonInput, IonLabel, IonItem, IonButton, useIonToast, IonSpinner, IonIcon, IonSelect, IonSelectOption, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { checkmarkCircleOutline, timeOutline, chevronBackOutline, imagesOutline } from 'ionicons/icons';
+import { checkmarkCircleOutline, timeOutline, chevronBackOutline, imagesOutline, personOutline, sparklesOutline } from 'ionicons/icons';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -14,6 +14,7 @@ const PublicBooking: React.FC = () => {
 
   const [step, setStep] = useState(1);
   const [selectedService, setSelectedService] = useState<any>(null);
+  const [selectedStaff, setSelectedStaff] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string>('');
 
@@ -66,9 +67,11 @@ const PublicBooking: React.FC = () => {
         const res = await axios.get(`${apiBase}/public/reservations/tenant/${tenantId}`);
         setTenantInfo(res.data);
         
-        // If no services are defined, skip step 1
-        if (!res.data.services || res.data.services.length === 0) {
+        // If require service is NOT enabled and no services are defined, skip step 1
+        if (!res.data.bookingRequireService && (!res.data.services || res.data.services.length === 0)) {
           setStep(2);
+        } else {
+          setStep(1);
         }
       } catch (e) {
         presentToast({ message: 'Error cargando información', duration: 3000, color: 'danger' });
@@ -91,11 +94,14 @@ const PublicBooking: React.FC = () => {
         customerPhone, 
         date: (selectedDate ? new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : undefined), 
         time: selectedTime, 
-        numberOfPeople, 
+        numberOfPeople: (tenantInfo?.bookingRequireService || selectedService) ? 1 : numberOfPeople, 
         notes,
         referralSource,
         serviceId: selectedService?.id,
-        serviceName: selectedService?.name
+        serviceName: selectedService?.name,
+        employeeId: selectedStaff?.id || undefined,
+        employeeName: selectedStaff?.name || undefined,
+        totalAmount: selectedService?.price || 0
       });
       const appointmentId = res.data.id;
       setMagicLink(`${window.location.origin}/appointment/${appointmentId}`);
@@ -138,7 +144,8 @@ const PublicBooking: React.FC = () => {
       try {
         const dStr = new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
         const sId = selectedService ? `&serviceId=${selectedService.id}` : '';
-        const res = await axios.get(`${apiBase}/public/reservations/tenant/${tenantId}/availability?date=${dStr}${sId}`);
+        const empId = selectedStaff?.id ? `&employeeId=${selectedStaff.id}` : '';
+        const res = await axios.get(`${apiBase}/public/reservations/tenant/${tenantId}/availability?date=${dStr}${sId}${empId}`);
         setAvailableSlots(res.data);
       } catch (e) {
         presentToast({ message: 'Error cargando horarios', duration: 2000, color: 'danger' });
@@ -147,7 +154,7 @@ const PublicBooking: React.FC = () => {
       }
     };
     fetchSlots();
-  }, [selectedDate, selectedService, tenantId]);
+  }, [selectedDate, selectedService, selectedStaff, tenantId]);
 
   if (loading) return <IonPage><IonContent className="ion-padding ion-text-center"><IonSpinner /></IonContent></IonPage>;
 
@@ -192,10 +199,17 @@ const PublicBooking: React.FC = () => {
   }
 
   const goBack = () => {
-    if (step === 2 && tenantInfo?.services?.length > 0) setStep(1);
-    else if (step === 3) setStep(2);
-    else if (step === 4) setStep(3);
+    if (step === 2 && (tenantInfo?.bookingRequireService || selectedService || (tenantInfo?.services && tenantInfo.services.length > 0))) {
+      setStep(1);
+    } else if (step === 3) {
+      setStep(2);
+    } else if (step === 4) {
+      setStep(3);
+    }
   };
+
+  const hasServices = tenantInfo?.services && tenantInfo.services.length > 0;
+  const isServiceRequired = tenantInfo?.bookingRequireService;
 
   return (
     <IonPage>
@@ -203,12 +217,12 @@ const PublicBooking: React.FC = () => {
         <div style={{ maxWidth: '500px', margin: '20px auto' }}>
           
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
-            {step > 1 && (step !== 2 || tenantInfo?.services?.length > 0) && (
+            {step > 1 && (step !== 2 || hasServices || isServiceRequired) && (
               <IonButton fill="clear" onClick={goBack} style={{ margin: 0 }}>
                 <IonIcon slot="icon-only" icon={chevronBackOutline} />
               </IonButton>
             )}
-            <h2 style={{ fontWeight: 'bold', color: '#333', margin: '0 auto', paddingRight: step > 1 ? '48px' : '0' }}>
+            <h2 style={{ fontWeight: 'bold', color: '#333', margin: '0 auto', paddingRight: (step > 1 && (step !== 2 || hasServices || isServiceRequired)) ? '48px' : '0' }}>
               {tenantInfo?.name}
             </h2>
           </div>
@@ -225,44 +239,166 @@ const PublicBooking: React.FC = () => {
           <IonCard style={{ margin: 0, borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
             <IonCardContent style={{ padding: '20px' }}>
               
-              {/* STEP 1: SERVICES */}
+              {/* STEP 1: SERVICES & SPECIALIST */}
               {step === 1 && (
                 <div>
-                  <h3 style={{fontWeight: 'bold', marginBottom: '15px', textAlign: 'center'}}>Selecciona un Servicio</h3>
-                  {tenantInfo?.services?.map((svc: any) => (
-                    <div 
-                      key={svc.id} 
-                      onClick={() => { setSelectedService(svc); setStep(2); }}
-                      style={{ 
-                        padding: '15px', 
-                        border: '1px solid #ddd', 
-                        borderRadius: '8px', 
-                        marginBottom: '10px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}
-                    >
-                      <div>
-                        <div style={{fontWeight: 'bold', fontSize: '16px', color: '#333'}}>{svc.name}</div>
-                        <div style={{fontSize: '13px', color: '#666', marginTop: '4px'}}><IonIcon icon={timeOutline} style={{verticalAlign:'middle', marginRight:'4px'}}/> {svc.durationMinutes} min</div>
+                  <h3 style={{ fontWeight: 'bold', marginBottom: '4px', textAlign: 'center', fontSize: '18px' }}>
+                    {isServiceRequired ? 'Elige tu Servicio' : 'Selecciona un Servicio (Opcional)'}
+                  </h3>
+                  <p style={{ textAlign: 'center', color: '#64748b', fontSize: '13px', margin: '0 0 16px 0' }}>
+                    {isServiceRequired 
+                      ? 'Escoge el tratamiento o atención que deseas agendar' 
+                      : 'Elige un servicio o avanza directamente para reservar'}
+                  </p>
+
+                  {/* Specialist Selection if enabled */}
+                  {tenantInfo?.bookingAllowStaffSelection && tenantInfo?.staff && tenantInfo.staff.length > 0 && (
+                    <div style={{ marginBottom: '20px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <IonIcon icon={personOutline} color="primary" />
+                        ¿Con quién deseas atenderte?
                       </div>
-                      {svc.price > 0 && <div style={{fontWeight: 'bold', color: 'var(--ion-color-primary)'}}>${svc.price}</div>}
+                      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                        <div 
+                          onClick={() => setSelectedStaff(null)}
+                          style={{
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            whiteSpace: 'nowrap',
+                            border: !selectedStaff ? '2px solid var(--ion-color-primary)' : '1px solid #cbd5e1',
+                            backgroundColor: !selectedStaff ? '#eff6ff' : '#ffffff',
+                            color: !selectedStaff ? 'var(--ion-color-primary)' : '#475569',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <IonIcon icon={sparklesOutline} />
+                          Cualquiera disponible
+                        </div>
+                        {tenantInfo.staff.map((st: any) => (
+                          <div 
+                            key={st.id}
+                            onClick={() => setSelectedStaff(st)}
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              whiteSpace: 'nowrap',
+                              border: selectedStaff?.id === st.id ? '2px solid var(--ion-color-primary)' : '1px solid #cbd5e1',
+                              backgroundColor: selectedStaff?.id === st.id ? '#eff6ff' : '#ffffff',
+                              color: selectedStaff?.id === st.id ? 'var(--ion-color-primary)' : '#475569',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <IonIcon icon={personOutline} />
+                            {st.name} {st.jobTitle ? `(${st.jobTitle})` : ''}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
+                  )}
+
+                  {/* Services List */}
+                  {hasServices ? (
+                    <div>
+                      {tenantInfo.services.map((svc: any) => {
+                        const isSelected = selectedService?.id === svc.id;
+                        return (
+                          <div 
+                            key={svc.id} 
+                            onClick={() => setSelectedService(svc)}
+                            style={{ 
+                              padding: '12px', 
+                              border: isSelected ? '2px solid var(--ion-color-primary)' : '1px solid #e2e8f0', 
+                              backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
+                              borderRadius: '10px', 
+                              marginBottom: '10px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              {svc.image && (
+                                <img 
+                                  src={svc.image} 
+                                  alt={svc.name} 
+                                  style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover' }} 
+                                />
+                              )}
+                              <div>
+                                <div style={{ fontWeight: 'bold', fontSize: '15px', color: '#1e293b' }}>{svc.name}</div>
+                                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <IonIcon icon={timeOutline} style={{ fontSize: '13px' }} /> 
+                                  {svc.durationMinutes} min
+                                  {svc.category && svc.category !== 'Servicios' && ` • ${svc.category}`}
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontWeight: '800', fontSize: '16px', color: 'var(--ion-color-primary)' }}>
+                                ${Number(svc.price).toFixed(2)}
+                              </div>
+                              {isSelected && (
+                                <div style={{ fontSize: '11px', color: 'var(--ion-color-success)', fontWeight: 'bold', marginTop: '2px' }}>
+                                  Seleccionado
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      <IonButton 
+                        expand="block" 
+                        color="primary" 
+                        disabled={isServiceRequired && !selectedService}
+                        onClick={() => setStep(2)}
+                        style={{ marginTop: '16px', height: '48px', fontWeight: 'bold' }}
+                      >
+                        Continuar a Fecha y Hora
+                      </IonButton>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '20px 10px', color: '#64748b' }}>
+                      <p style={{ margin: '0 0 16px 0', fontSize: '14px' }}>
+                        No hay servicios cargados en este momento. Puedes continuar para reservar una mesa o consultar con el local.
+                      </p>
+                      <IonButton expand="block" color="primary" onClick={() => setStep(2)}>
+                        Continuar con Reserva General
+                      </IonButton>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* STEP 2: DATE */}
               {step === 2 && (
                 <div>
-                  <h3 style={{fontWeight: 'bold', marginBottom: '15px', textAlign: 'center'}}>Elige una Fecha</h3>
+                  <h3 style={{fontWeight: 'bold', marginBottom: '8px', textAlign: 'center'}}>Elige una Fecha</h3>
+                  
                   {selectedService && (
-                    <div style={{textAlign: 'center', marginBottom: '15px', color: '#666', fontSize: '14px'}}>
-                      Servicio: <b>{selectedService.name}</b>
+                    <div style={{ backgroundColor: '#f1f5f9', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <b>{selectedService.name}</b> • ⏱️ {selectedService.durationMinutes} min
+                        {selectedStaff && <div><span style={{ color: '#64748b' }}>Especialista:</span> <b>{selectedStaff.name}</b></div>}
+                      </div>
+                      <div style={{ fontWeight: 'bold', color: 'var(--ion-color-primary)', fontSize: '15px' }}>
+                        ${Number(selectedService.price).toFixed(2)}
+                      </div>
                     </div>
                   )}
+
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                     {getAvailableDates().map((d, i) => (
                       <div 
@@ -288,9 +424,10 @@ const PublicBooking: React.FC = () => {
               {/* STEP 3: TIME */}
               {step === 3 && (
                 <div>
-                  <h3 style={{fontWeight: 'bold', marginBottom: '15px', textAlign: 'center'}}>Horas Disponibles</h3>
-                  <div style={{textAlign: 'center', marginBottom: '15px', color: '#666', fontSize: '14px'}}>
+                  <h3 style={{fontWeight: 'bold', marginBottom: '6px', textAlign: 'center'}}>Horas Disponibles</h3>
+                  <div style={{textAlign: 'center', marginBottom: '14px', color: '#64748b', fontSize: '13px'}}>
                     Para el <b>{selectedDate?.toLocaleDateString()}</b>
+                    {selectedStaff && ` con ${selectedStaff.name}`}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
                     {loadingSlots ? (
@@ -325,10 +462,20 @@ const PublicBooking: React.FC = () => {
                 <div>
                   <h3 style={{fontWeight: 'bold', marginBottom: '15px', textAlign: 'center'}}>Tus Datos</h3>
                   
-                  <div style={{ backgroundColor: '#f0f8ff', padding: '15px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px' }}>
-                    <b>Resumen:</b><br/>
-                    {selectedDate?.toLocaleDateString()} a las {selectedTime}<br/>
-                    {selectedService ? `Servicio: ${selectedService.name}` : ''}
+                  <div style={{ backgroundColor: '#f0f8ff', padding: '15px', borderRadius: '10px', marginBottom: '20px', fontSize: '14px', border: '1px solid #bae6fd' }}>
+                    <div style={{ fontWeight: 'bold', color: '#0369a1', marginBottom: '6px' }}>Resumen de Cita:</div>
+                    <div style={{ color: '#1e293b', lineHeight: '1.5' }}>
+                      📅 <b>Fecha:</b> {selectedDate?.toLocaleDateString()} a las {selectedTime}<br/>
+                      {selectedService && (
+                        <>
+                          💅 <b>Servicio:</b> {selectedService.name} (⏱️ {selectedService.durationMinutes} min)<br/>
+                          💰 <b>Inversión:</b> ${Number(selectedService.price).toFixed(2)}<br/>
+                        </>
+                      )}
+                      {selectedStaff && (
+                        <>👤 <b>Atendido por:</b> {selectedStaff.name} {selectedStaff.jobTitle ? `(${selectedStaff.jobTitle})` : ''}<br/></>
+                      )}
+                    </div>
                   </div>
 
                   <IonItem lines="none" style={{ marginBottom: '10px', border: '1px solid #ddd', borderRadius: '8px' }}>
@@ -341,16 +488,17 @@ const PublicBooking: React.FC = () => {
                     <IonInput value={customerPhone} onIonInput={e => setCustomerPhone(e.detail.value!)} placeholder="Ej. +58 414..." />
                   </IonItem>
 
-                  {!tenantInfo?.services?.length && (
+                  {/* Only show "Cantidad de Personas" if it's NOT a required service mode and no service was picked */}
+                  {!isServiceRequired && !selectedService && (
                     <IonItem lines="none" style={{ marginBottom: '10px', border: '1px solid #ddd', borderRadius: '8px' }}>
-                      <IonLabel position="stacked">Cantidad de Personas</IonLabel>
+                      <IonLabel position="stacked">Cantidad de Personas / Puestos</IonLabel>
                       <IonInput type="number" value={numberOfPeople} onIonInput={e => setNumberOfPeople(parseInt(e.detail.value!, 10))} min={1} />
                     </IonItem>
                   )}
                   
                   <IonItem lines="none" style={{ marginBottom: '10px', border: '1px solid #ddd', borderRadius: '8px' }}>
                     <IonLabel position="stacked">Notas Especiales</IonLabel>
-                    <IonInput value={notes} onIonInput={e => setNotes(e.detail.value!)} placeholder="Ej. Retiro de acrílico..." />
+                    <IonInput value={notes} onIonInput={e => setNotes(e.detail.value!)} placeholder="Ej. Retiro de acrílico, diseño específico..." />
                   </IonItem>
 
                   <IonItem lines="none" style={{ marginBottom: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>

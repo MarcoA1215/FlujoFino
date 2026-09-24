@@ -11,6 +11,7 @@ export type Product = {
   recipe?: any[];
   physicalStock?: number;
   reservedQuantity?: number;
+  images?: string[];
 };
 
 export type RawMaterial = {

@@ -38,6 +38,12 @@ export class Settings {
   @Column('boolean', { default: true })
   featureShowCatalog: boolean;
 
+  @Column('boolean', { default: false })
+  bookingRequireService: boolean;
+
+  @Column('boolean', { default: false })
+  bookingAllowStaffSelection: boolean;
+
   // --- Booking Configuration ---
   @Column('jsonb', { nullable: true })
   businessHours: any;

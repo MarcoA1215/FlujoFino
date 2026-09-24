@@ -65,9 +65,35 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                   <IonSelectOption value={120}>Cada 2 horas</IonSelectOption>
                 </IonSelect>
               </IonItem>
-              <p style={{fontSize: '13px', color: '#64748b', marginLeft: '16px', marginTop: '8px'}}>
+              <p style={{fontSize: '13px', color: '#64748b', marginLeft: '16px', marginTop: '8px', marginBottom: '16px'}}>
                 Esto define los bloques de turno en tu calendario (ej. si eliges 30 mins, las citas solo se agendarán a las 8:00, 8:30, 9:00, etc.).
               </p>
+
+              <IonItem>
+                <IonLabel className="ion-text-wrap">
+                  <h2>Requerir selección de servicio de antemano</h2>
+                  <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
+                    Ideal para Salones de Belleza, Spas, Barberías y Consultorios. El cliente elegirá primero qué servicio desea y su duración. (Desactívalo si es un restaurante que solo reserva mesas).
+                  </p>
+                </IonLabel>
+                <IonToggle 
+                  checked={settings.bookingRequireService || false} 
+                  onIonChange={e => setSettings({...settings, bookingRequireService: e.detail.checked})} 
+                />
+              </IonItem>
+
+              <IonItem>
+                <IonLabel className="ion-text-wrap">
+                  <h2>Permitir elegir Profesional / Especialista</h2>
+                  <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
+                    El cliente podrá elegir qué manicurista, estilista o barbero lo atenderá según la agenda individual de cada empleado.
+                  </p>
+                </IonLabel>
+                <IonToggle 
+                  checked={settings.bookingAllowStaffSelection || false} 
+                  onIonChange={e => setSettings({...settings, bookingAllowStaffSelection: e.detail.checked})} 
+                />
+              </IonItem>
             </IonCardContent>
           </IonCard>
         </IonCol>
