@@ -68,6 +68,36 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
               <p style={{fontSize: '13px', color: '#64748b', marginLeft: '16px', marginTop: '8px'}}>
                 Esto define los bloques de turno en tu calendario (ej. si eliges 30 mins, las citas solo se agendarán a las 8:00, 8:30, 9:00, etc.).
               </p>
+
+              <IonItem lines="none" style={{ marginTop: '16px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                <IonLabel className="ion-text-wrap">
+                  <h2><strong>¿Desea que el cliente reserve un servicio/producto de antemano?</strong></h2>
+                  <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+                    Ideal para spas, salones o clínicas donde el cliente escoge primero el servicio que desea, con quién y conoce el costo de una vez. (Desactívalo si es un restaurante que solo reserva mesas).
+                  </p>
+                </IonLabel>
+                <IonToggle 
+                  slot="end" 
+                  checked={settings.bookingRequireService ?? true} 
+                  onIonChange={e => setSettings({ ...settings, bookingRequireService: e.detail.checked })} 
+                  color="primary" 
+                />
+              </IonItem>
+
+              <IonItem lines="none" style={{ marginTop: '12px' }}>
+                <IonLabel className="ion-text-wrap">
+                  <h2><strong>Permitir al cliente elegir el especialista que lo atenderá</strong></h2>
+                  <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+                    Permite que el cliente seleccione con qué especialista desea agendarse, mostrando solo la disponibilidad y ocupación real de esa persona.
+                  </p>
+                </IonLabel>
+                <IonToggle 
+                  slot="end" 
+                  checked={settings.bookingAllowStaffSelection ?? true} 
+                  onIonChange={e => setSettings({ ...settings, bookingAllowStaffSelection: e.detail.checked })} 
+                  color="primary" 
+                />
+              </IonItem>
             </IonCardContent>
           </IonCard>
         </IonCol>

@@ -185,11 +185,15 @@ export class ReservationsService {
           throw new BadRequestException(`No se puede desplazar la cita de ${res.customerName} a las ${this.minutesToTime(newStartMins).substring(0,5)} porque sobrepasa la hora de cierre.`);
         }
 
+        const oldTimeStr = this.minutesToTime(startMins).substring(0, 5);
+        if (!res.originalTime) res.originalTime = oldTimeStr;
+        if (!res.originalDate) res.originalDate = res.date;
         res.time = this.minutesToTime(newStartMins);
+        res.rescheduleStatus = 'PENDING_ACCEPTANCE';
         await manager.save(res);
 
         const baseUrl = process.env.VITE_FRONTEND_URL || 'http://localhost:5173';
-        const msg = `Hola ${res.customerName}, debido a un imprevisto en el servicio, tu cita ha sido reprogramada para las ${res.time.substring(0,5)}. Disculpa los inconvenientes. Puedes revisar, gestionar o cancelar tu cita en el siguiente enlace: ${baseUrl}/appointment/${res.id}`;
+        const msg = `Hola ${res.customerName}, debido a un imprevisto en el servicio, tu cita de las ${oldTimeStr} ha sido reprogramada para las ${res.time.substring(0,5)}. Por favor confírmanos si estás de acuerdo en tu enlace: ${baseUrl}/appointment/${res.id}`;
         let phone = res.customerPhone || '';
         phone = phone.replace(/\D/g, '');
         if (phone && !phone.startsWith('58') && phone.length === 10) phone = '58' + phone;

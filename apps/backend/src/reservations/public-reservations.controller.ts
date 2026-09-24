@@ -96,11 +96,27 @@ export class PublicReservationsController {
       }
     }
 
+    // Auto-acceptance logic:
+    // Si llega la hora de su anterior cita antes de la reprogramación y no ha aceptado, se marca como aceptada automáticamente
+    if (reservation.rescheduleStatus === 'PENDING_ACCEPTANCE' && reservation.originalTime) {
+      const origDateStr = reservation.originalDate || reservation.date;
+      const [h, m] = reservation.originalTime.split(':').map(Number);
+      const originalDateTime = new Date(`${origDateStr}T${(h || 0).toString().padStart(2, '0')}:${(m || 0).toString().padStart(2, '0')}:00`);
+      
+      if (new Date() >= originalDateTime) {
+        reservation.rescheduleStatus = 'ACCEPTED';
+        await reservationRepo.save(reservation);
+      }
+    }
+
     return {
       id: reservation.id,
       customerName: reservation.customerName,
       date: reservation.date,
       time: reservation.time.substring(0, 5),
+      originalTime: reservation.originalTime ? reservation.originalTime.substring(0, 5) : null,
+      originalDate: reservation.originalDate || reservation.date,
+      rescheduleStatus: reservation.rescheduleStatus,
       serviceId: reservation.serviceId,
       serviceName: reservation.serviceName,
       status: reservation.status,
@@ -111,6 +127,17 @@ export class PublicReservationsController {
       companyCedula: settings?.companyCedula,
       companyPhone: settings?.companyPhone,
     };
+  }
+
+  @Put('appointment/:id/accept-reschedule')
+  async acceptReschedule(@Param('id') id: string) {
+    const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
+    const reservation = await reservationRepo.findOne({ where: { id } });
+    if (!reservation) throw new NotFoundException('Cita no encontrada');
+    
+    reservation.rescheduleStatus = 'ACCEPTED';
+    await reservationRepo.save(reservation);
+    return { success: true, message: 'Reprogramación aceptada' };
   }
 
   @Get('tenant/:tenantId/availability')
@@ -224,6 +251,7 @@ export class PublicReservationsController {
     reservation.date = dto.date;
     reservation.time = dto.time.length <= 5 ? dto.time + ':00' : dto.time;
     reservation.status = ReservationStatus.PENDING; // Rescheduling resets to pending usually
+    reservation.rescheduleStatus = 'ACCEPTED';
     await reservationRepo.save(reservation);
 
     return { success: true };

@@ -64,6 +64,15 @@ export class Reservation {
   @Column({ nullable: true })
   referralSource: string;
 
+  @Column({ nullable: true })
+  rescheduleStatus: string; // 'PENDING_ACCEPTANCE' | 'ACCEPTED' | 'REJECTED'
+
+  @Column({ nullable: true })
+  originalTime: string;
+
+  @Column({ nullable: true })
+  originalDate: string;
+
   @ManyToOne(() => Tenant)
   @JoinColumn({ name: 'tenantId' })
   tenant: Tenant;

@@ -84,6 +84,16 @@ const PublicAppointmentManage: React.FC = () => {
     }
   };
 
+  const handleAcceptReschedule = async () => {
+    try {
+      await axios.put(`${apiBase}/public/reservations/appointment/${id}/accept-reschedule`);
+      presentToast({ message: '¡Has confirmado y aceptado el nuevo horario!', duration: 3000, color: 'success' });
+      fetchAppointment();
+    } catch (e: any) {
+      presentToast({ message: e.response?.data?.message || 'Error al aceptar', duration: 3000, color: 'danger' });
+    }
+  };
+
   const handleSubmitFeedback = async () => {
     if (!feedbackText.trim()) return;
     try {
@@ -163,6 +173,33 @@ const PublicAppointmentManage: React.FC = () => {
                     {appointment.status}
                   </span>
                 </div>
+
+                {appointment.rescheduleStatus === 'PENDING_ACCEPTANCE' && (
+                  <div style={{ backgroundColor: '#fff7ed', border: '1px solid #fdba74', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#c2410c', fontWeight: 'bold', fontSize: '15px' }}>
+                      <IonIcon icon={timeOutline} style={{ fontSize: '20px' }} />
+                      Tu cita ha sido reprogramada
+                    </div>
+                    <p style={{ fontSize: '13px', color: '#7c2d12', margin: '8px 0 14px 0', lineHeight: '1.4' }}>
+                      Debido a un imprevisto en el servicio, tu cita que originalmente era a las <strong>{appointment.originalTime || 'hora anterior'}</strong> ha sido reprogramada para las <strong>{appointment.time}</strong>. ¿Estás de acuerdo con este nuevo horario?
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <IonButton expand="block" color="success" style={{ flex: 1, minWidth: '140px' }} onClick={handleAcceptReschedule}>
+                        Aceptar Nuevo Horario
+                      </IonButton>
+                      <IonButton expand="block" color="warning" fill="outline" style={{ flex: 1, minWidth: '140px' }} onClick={() => setShowReschedule(true)}>
+                        Elegir Otro Horario
+                      </IonButton>
+                    </div>
+                  </div>
+                )}
+
+                {appointment.rescheduleStatus === 'ACCEPTED' && appointment.originalTime && (
+                  <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <IonIcon icon={checkmarkCircleOutline} style={{ fontSize: '18px', color: '#16a34a' }} />
+                    Horario reprogramado ({appointment.time}) aceptado y confirmado.
+                  </div>
+                )}
 
                 <div style={{ backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
                   <p style={{ margin: '0 0 10px 0' }}><b>Cliente:</b> {appointment.customerName}</p>
