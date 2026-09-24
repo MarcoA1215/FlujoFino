@@ -20,6 +20,7 @@ import { ProductsModule } from './products/products.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { SettingsModule } from './settings/settings.module';
 import { ReservationsModule } from './reservations/reservations.module';
+import { StorageModule } from './storage/storage.module';
 
 import { RawMaterial } from './entities/raw-material.entity';
 import { StockMovement } from './entities/stock-movement.entity';
@@ -60,6 +61,7 @@ import { AccessRequest } from './entities/access-request.entity';
     DashboardModule,
     SettingsModule,
     ReservationsModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: APP_GUARD, useClass: RolesGuard }],
