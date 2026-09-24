@@ -281,17 +281,28 @@ export class UsersService implements OnModuleInit {
       payload.tenantName = tenant.name;
     }
 
+    const user = await this.usersRepo.findOne({
+      where: { id: req.userId },
+      relations: { tenantAccess: { tenant: true } },
+    });
+    const allWorkspaces = user?.tenantAccess?.map(a => ({
+      tenantId: a.tenantId,
+      name: a.tenant?.name || 'Sucursal',
+      role: a.role,
+      status: a.status,
+    })) || [{
+      tenantId: req.tenantId,
+      name: payload.tenantName,
+      role: req.role,
+      status: 'ACCEPTED',
+    }];
+
     const token = this.jwtService.sign(payload);
     req.status = AccessRequestStatus.APPROVED;
     req.approvedToken = token;
     req.approvedPayload = JSON.stringify({
       user: payload,
-      workspaces: [{
-        tenantId: req.tenantId,
-        name: payload.tenantName,
-        role: req.role,
-        status: 'ACCEPTED',
-      }],
+      workspaces: allWorkspaces,
     });
 
     return accessReqRepo.save(req);

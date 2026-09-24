@@ -79,7 +79,9 @@ const Menu: React.FC = () => {
     }
   }, [isAuthenticated, user?.tenantId]);
 
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated || !user?.tenantId || location.pathname === '/select-workspace' || location.pathname.startsWith('/book') || location.pathname.startsWith('/appointment')) {
+    return null;
+  }
   
   const confirmLogout = () => {
     presentAlert({

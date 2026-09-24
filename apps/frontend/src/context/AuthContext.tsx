@@ -74,7 +74,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
     await login(res.data.access_token, res.data.user, res.data.workspaces);
-    window.location.href = '/dashboard';
+    window.location.href = '/';
   };
 
   const logout = async () => {

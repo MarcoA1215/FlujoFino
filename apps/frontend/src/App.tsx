@@ -89,32 +89,40 @@ const App: React.FC = () => {
     <AuthProvider>
       <IonApp>
         <IonReactRouter>
-          <IonSplitPane contentId="main">
-            <Menu />
-            <IonRouterOutlet id="main">
-              <Route path="/book/:tenantId" element={<PublicBooking />} />
-              <Route path="/appointment/:id" element={<PublicAppointmentManage />} />
-              <Route path="/" element={<HomeRedirector />} />
-              <Route path="/login" element={<LoginRoute />} />
-              <Route path="/register" element={<RegisterRoute />} />
-              <Route path="/select-workspace" element={<PrivateRoute><SelectWorkspace /></PrivateRoute>} />
-              
-              <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-              <Route path="/raw-materials" element={<PrivateRoute><RawMaterials /></PrivateRoute>} />
-              <Route path="/products" element={<PrivateRoute><Products /></PrivateRoute>} />
-              <Route path="/production" element={<PrivateRoute><Production /></PrivateRoute>} />
-              <Route path="/calculator" element={<PrivateRoute><Calculator /></PrivateRoute>} />
-              <Route path="/pos" element={<PrivateRoute><Pos /></PrivateRoute>} />
-              <Route path="/orders" element={<PrivateRoute><Orders /></PrivateRoute>} />
-              <Route path="/delivery-zones" element={<PrivateRoute><DeliveryZones /></PrivateRoute>} />
-              <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
-              <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
-              <Route path="/reservations" element={<PrivateRoute><Reservations /></PrivateRoute>} />
-            </IonRouterOutlet>
-          </IonSplitPane>
+          <MainLayout />
         </IonReactRouter>
       </IonApp>
     </AuthProvider>
+  );
+};
+
+const MainLayout: React.FC = () => {
+  const { user } = useContext(AuthContext);
+
+  return (
+    <IonSplitPane contentId="main" when={user?.tenantId ? 'md' : false}>
+      <Menu />
+      <IonRouterOutlet id="main">
+        <Route path="/book/:tenantId" element={<PublicBooking />} />
+        <Route path="/appointment/:id" element={<PublicAppointmentManage />} />
+        <Route path="/" element={<HomeRedirector />} />
+        <Route path="/login" element={<LoginRoute />} />
+        <Route path="/register" element={<RegisterRoute />} />
+        <Route path="/select-workspace" element={<PrivateRoute><SelectWorkspace /></PrivateRoute>} />
+        
+        <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+        <Route path="/raw-materials" element={<PrivateRoute><RawMaterials /></PrivateRoute>} />
+        <Route path="/products" element={<PrivateRoute><Products /></PrivateRoute>} />
+        <Route path="/production" element={<PrivateRoute><Production /></PrivateRoute>} />
+        <Route path="/calculator" element={<PrivateRoute><Calculator /></PrivateRoute>} />
+        <Route path="/pos" element={<PrivateRoute><Pos /></PrivateRoute>} />
+        <Route path="/orders" element={<PrivateRoute><Orders /></PrivateRoute>} />
+        <Route path="/delivery-zones" element={<PrivateRoute><DeliveryZones /></PrivateRoute>} />
+        <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
+        <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
+        <Route path="/reservations" element={<PrivateRoute><Reservations /></PrivateRoute>} />
+      </IonRouterOutlet>
+    </IonSplitPane>
   );
 };
 
