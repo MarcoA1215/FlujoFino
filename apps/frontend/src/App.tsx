@@ -1,6 +1,6 @@
 import { IonApp, IonRouterOutlet, IonSplitPane, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
-import { Navigate, Route } from 'react-router-dom';
+import { Navigate, Route, useLocation } from 'react-router-dom';
 import Menu from './components/Menu';
 import Dashboard from './pages/Dashboard';
 import RawMaterials from './pages/RawMaterials';
@@ -104,10 +104,15 @@ const App: React.FC = () => {
 
 const MainLayout: React.FC = () => {
   const { user } = useContext(AuthContext);
+  const location = useLocation();
+  const isPublicRoute = location.pathname.startsWith('/book') || 
+                        location.pathname.startsWith('/store') || 
+                        location.pathname.startsWith('/tienda') || 
+                        location.pathname.startsWith('/appointment');
 
   return (
-    <IonSplitPane contentId="main" when={user?.tenantId ? 'md' : false}>
-      <Menu />
+    <IonSplitPane contentId="main" when={!isPublicRoute && user?.tenantId ? 'md' : false}>
+      {!isPublicRoute && <Menu />}
       <IonRouterOutlet id="main">
         <Route path="/book/:tenantId" element={<PublicBooking />} />
         <Route path="/store/:tenantId" element={<PublicStore />} />
