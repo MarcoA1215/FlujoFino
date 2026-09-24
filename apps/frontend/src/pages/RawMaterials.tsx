@@ -187,7 +187,7 @@ const RawMaterials: React.FC = () => {
                 <IonCardContent>
                   <IonItem>
                     <IonLabel position="stacked">Nombre</IonLabel>
-                    <IonInput value={name} onIonInput={e => setName(e.detail.value!)} placeholder="Ej. Orégano" />
+                    <IonInput value={name} onIonInput={e => setName(e.detail.value!)} placeholder="Ej. Nombre del insumo o material" />
                   </IonItem>
                   <IonItem>
                     <IonLabel position="stacked">Unidad Base (Inventario)</IonLabel>
