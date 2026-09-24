@@ -21,6 +21,7 @@ import PublicBooking from './pages/PublicBooking';
 import PublicAppointmentManage from './pages/PublicAppointmentManage';
 import FeedbackPage from './pages/Feedback';
 import { AuthProvider, AuthContext } from './context/AuthContext';
+import { ImageViewerProvider } from './context/ImageViewerContext';
 import { UserRole } from '@nutrideli/shared-types';
 import { useContext, useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -89,11 +90,13 @@ const App: React.FC = () => {
 
   return (
     <AuthProvider>
-      <IonApp>
-        <IonReactRouter>
-          <MainLayout />
-        </IonReactRouter>
-      </IonApp>
+      <ImageViewerProvider>
+        <IonApp>
+          <IonReactRouter>
+            <MainLayout />
+          </IonReactRouter>
+        </IonApp>
+      </ImageViewerProvider>
     </AuthProvider>
   );
 };

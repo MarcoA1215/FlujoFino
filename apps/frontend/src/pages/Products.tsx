@@ -7,8 +7,10 @@ import type { Product } from '../types';
 import { ProductCard } from '../components/products/ProductCard';
 import { RecipeModal } from '../components/products/RecipeModal';
 import { ProductFormModal } from '../components/products/ProductFormModal';
+import { useImageViewer } from '../context/ImageViewerContext';
 
 const Products: React.FC = () => {
+  const { openImage } = useImageViewer();
   const [products, setProducts] = useState<Product[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [presentAlert] = useIonAlert();
@@ -210,7 +212,9 @@ const Products: React.FC = () => {
                             src={img} 
                             alt={p.name} 
                             slot="start" 
-                            style={{ width: '60px', height: '60px', borderRadius: '10px', objectFit: 'cover', marginRight: '14px' }} 
+                            onClick={(e) => { e.stopPropagation(); openImage(img, p.name); }}
+                            title="Toca para ver en grande"
+                            style={{ width: '60px', height: '60px', borderRadius: '10px', objectFit: 'cover', marginRight: '14px', cursor: 'zoom-in' }} 
                           />
                         )}
                         <IonLabel>

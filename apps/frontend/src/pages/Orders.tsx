@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';
 import type { DeliveryZone } from '../types';
+import { useImageViewer } from '../context/ImageViewerContext';
 
 type OrderItem = {
   id: string;
@@ -41,6 +42,7 @@ type Order = {
 
 const Orders: React.FC = () => {
   const router = useIonRouter();
+  const { openImage } = useImageViewer();
   const [orders, setOrders] = useState<Order[]>([]);
   const [tab, setTab] = useState<"activos" | "por_cobrar" | "historial">("activos");
   const [searchText, setSearchText] = useState("");
@@ -308,28 +310,20 @@ const Orders: React.FC = () => {
     });
   };
 
-  const isOrderService = (order: Order) => {
-    if (settings?.featureProduction === false) return true;
-    if (order.items && order.items.length > 0) {
-      return order.items.every((i: any) => {
-        const prod = i.product;
-        return prod?.category === 'Servicios' || Boolean(prod?.durationMinutes);
-      });
-    }
-    return false;
-  };
-
-  const translateStatus = (status: OrderStatus, isService?: boolean) => {
+  
+  // @ts-ignore
+const translateStatus = (status: OrderStatus) => {
     switch(status) {
       case OrderStatus.PENDING: return "Pendiente";
-      case OrderStatus.PREPARING: return isService ? "En Atención" : "Preparando";
-      case OrderStatus.DELIVERED: return isService ? "Completado" : "Entregado";
+      case OrderStatus.PREPARING: return "Preparando";
+      case OrderStatus.DELIVERED: return "Entregado";
       case OrderStatus.CANCELED: return "Cancelado";
       default: return status;
     }
   };
 
-  const getStatusColor = (status: OrderStatus) => {
+  // @ts-ignore
+const getStatusColor = (status: OrderStatus) => {
     switch(status) {
       case OrderStatus.PENDING: return "warning";
       case OrderStatus.PREPARING: return "tertiary";
@@ -436,14 +430,6 @@ const Orders: React.FC = () => {
           Atendido por: {order.employee.username || order.employee.name}{order.employee.jobTitle ? ` (${order.employee.jobTitle})` : ''}
         </IonBadge>
       )}
-      {isOrderService(order) && (
-        <IonBadge color="secondary" style={{ fontSize: '0.8rem' }}>
-          💅 Servicio
-        </IonBadge>
-      )}
-      <IonBadge color={getStatusColor(order.status)}>
-        {translateStatus(order.status, isOrderService(order))}
-      </IonBadge>
     </div>
   </div>
   <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '5px' }}>
@@ -506,23 +492,15 @@ const Orders: React.FC = () => {
 
                     {order.status !== OrderStatus.CANCELED && order.status !== OrderStatus.DELIVERED && (
                       <div className="ion-margin-top" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                        {isOrderService(order) ? (
-                          <IonButton style={{ flex: 1 }} color="success" onClick={() => updateStatus(order.id, OrderStatus.DELIVERED)}>
-                            Completar Servicio
-                          </IonButton>
-                        ) : (
-                          <>
-                            <IonButton style={{ flex: 1 }} color="success" onClick={() => updateStatus(order.id, OrderStatus.DELIVERED)}>
-                              Entregar Todo
-                            </IonButton>
-                            <IonButton style={{ flex: 1 }} color="tertiary" onClick={() => openPartialModal(order)}>
-                              Entrega Parcial
-                            </IonButton>
-                          </>
-                        )}
+                        <IonButton style={{ flex: 1 }} color="success" onClick={() => updateStatus(order.id, OrderStatus.DELIVERED)}>
+                          Entregar Todo
+                        </IonButton>
+                        <IonButton style={{ flex: 1 }} color="tertiary" onClick={() => openPartialModal(order)}>
+                          Entrega Parcial
+                        </IonButton>
                         <div style={{ width: '100%', textAlign: 'center', marginTop: '5px' }}>
                           <IonButton fill="clear" color="danger" size="small" onClick={() => updateStatus(order.id, OrderStatus.CANCELED)}>
-                            {isOrderService(order) ? 'Cancelar Servicio' : 'Cancelar Pedido'}
+                            Cancelar Pedido
                           </IonButton>
                         </div>
                       </div>
@@ -530,7 +508,7 @@ const Orders: React.FC = () => {
 
                     {(order.status === OrderStatus.CANCELED || order.status === OrderStatus.DELIVERED) && (
                       <IonButton expand="block" color="primary" fill="outline" className="ion-margin-top" onClick={() => cloneOrder(order.id)}>
-                        {isOrderService(order) ? 'Repetir Servicio' : 'Clonar / Repetir Pedido'}
+                        Clonar / Repetir Pedido
                       </IonButton>
                     )}
                   
@@ -585,9 +563,16 @@ const Orders: React.FC = () => {
                       </IonButton>
                     </div>
                     {item.media && item.media.length > 0 && (
-                      <div style={{ marginTop: '10px', display: 'flex', gap: '5px', overflowX: 'auto' }}>
+                      <div style={{ marginTop: '10px', display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
                         {item.media.map((m: any) => (
-                          <img key={m.id} src={m.imageUrl} style={{ height: '80px', borderRadius: '4px' }} alt="Media" />
+                          <img 
+                            key={m.id} 
+                            src={m.imageUrl} 
+                            onClick={() => openImage(m.imageUrl, `${item.productName || 'Trabajo'} - Foto`)}
+                            title="Toca para ver en grande"
+                            style={{ height: '80px', borderRadius: '6px', cursor: 'zoom-in', objectFit: 'cover', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.06)' }} 
+                            alt="Media" 
+                          />
                         ))}
                       </div>
                     )}

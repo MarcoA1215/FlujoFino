@@ -8,6 +8,7 @@ import type { DeliveryZone } from '../types';
 import { DeliveryMethod, PaymentStatus, UserRole } from '@nutrideli/shared-types';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
+import { useImageViewer } from '../context/ImageViewerContext';
 
 type Product = {
   id: string;
@@ -25,6 +26,7 @@ type CartItem = {
 type PaymentMethod = 'PENDING' | 'PAGO_MOVIL' | 'USD';
 
 const Pos: React.FC = () => {
+  const { openImage } = useImageViewer();
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -374,7 +376,9 @@ const Pos: React.FC = () => {
                                 <img 
                                   src={img} 
                                   alt={p.name} 
-                                  style={{ width: '100%', height: '85px', objectFit: 'cover' }} 
+                                  onClick={(e) => { e.stopPropagation(); openImage(img, p.name); }}
+                                  title="Toca para ver en grande"
+                                  style={{ width: '100%', height: '85px', objectFit: 'cover', cursor: 'zoom-in' }} 
                                 />
                               )}
                               <IonCardHeader style={{ padding: '10px 12px 4px 12px' }}>

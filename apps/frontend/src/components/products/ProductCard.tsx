@@ -2,6 +2,7 @@ import { pencilOutline, trashOutline, buildOutline, cubeOutline, swapHorizontalO
 import React from 'react';
 import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
 import type { Product } from '../../types';
+import { useImageViewer } from '../../context/ImageViewerContext';
 
 interface ProductCardProps {
   product: Product;
@@ -30,6 +31,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   featureRecipes,
   featureProduction
 }) => {
+  const { openImage } = useImageViewer();
   const [present] = useIonActionSheet();
 
   const openOptions = () => {
@@ -103,7 +105,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           
           <div style={{ flex: 1 }}>
             {imageUrl && (
-              <img src={imageUrl} alt={p.name} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '10px' }} />
+              <img 
+                src={imageUrl} 
+                alt={p.name} 
+                onClick={(e) => { e.stopPropagation(); openImage(imageUrl, p.name); }}
+                title="Toca para ver en grande"
+                style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '10px', cursor: 'zoom-in' }} 
+              />
             )}
             <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 5px 0', lineHeight: '1.3' }}>{p.name}</h2>
             

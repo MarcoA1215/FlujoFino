@@ -3,10 +3,12 @@ import { IonPage, IonContent, IonCard, IonCardContent, IonInput, IonLabel, IonIt
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { checkmarkCircleOutline, timeOutline, chevronBackOutline, imagesOutline, personOutline, sparklesOutline } from 'ionicons/icons';
+import { useImageViewer } from '../context/ImageViewerContext';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const PublicBooking: React.FC = () => {
+  const { openImage } = useImageViewer();
   const { tenantId } = useParams<{ tenantId: string }>();
   const [tenantInfo, setTenantInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -367,7 +369,9 @@ const PublicBooking: React.FC = () => {
                                 <img 
                                   src={svc.image} 
                                   alt={svc.name} 
-                                  style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover' }} 
+                                  onClick={(e) => { e.stopPropagation(); openImage(svc.image, svc.name); }}
+                                  title="Toca para ver en grande"
+                                  style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover', cursor: 'zoom-in' }} 
                                 />
                               )}
                               <div>
@@ -724,7 +728,13 @@ const PublicBooking: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', padding: '10px' }}>
             {catalogItems.map(item => (
               <IonCard key={item.id} style={{ margin: 0, padding: 0 }}>
-                <img src={item.url} style={{ width: '100%', height: '150px', objectFit: 'cover' }} alt={item.title} />
+                <img 
+                  src={item.url} 
+                  style={{ width: '100%', height: '150px', objectFit: 'cover', cursor: 'zoom-in' }} 
+                  alt={item.title} 
+                  onClick={() => openImage(item.url, `${item.title}${item.subtitle ? ' - ' + item.subtitle : ''}`)}
+                  title="Toca para ver en grande"
+                />
                 <IonCardContent style={{ padding: '10px' }}>
                   <h3 style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold', lineHeight: '1.2' }}>{item.title}</h3>
                   <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>{item.subtitle}</p>
