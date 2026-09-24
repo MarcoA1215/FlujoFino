@@ -369,11 +369,14 @@ export class OrdersService {
                 }
               }
             } else if (!product.isCombo || product.isPreAssembled) {
-                if (product.physicalStock < item.quantity) {
-                  throw new BadRequestException('Falta stock físico para entregar');
+                const isService = product.category === 'Servicios' || Boolean(product.durationMinutes);
+                if (!isService) {
+                  if (product.physicalStock < item.quantity) {
+                    throw new BadRequestException('Falta stock físico para entregar');
+                  }
+                  product.physicalStock -= item.quantity;
+                  await manager.save(Product, product);
                 }
-                product.physicalStock -= item.quantity;
-                await manager.save(Product, product);
               }
           }
         }
@@ -416,11 +419,14 @@ export class OrdersService {
                 }
               }
             } else if (!product.isCombo || product.isPreAssembled) {
-                product.stockQuantity += item.quantity;
-              if (order.status === OrderStatus.DELIVERED) {
-                 product.physicalStock += item.quantity;
-              }
-              await manager.save(Product, product);
+                const isService = product.category === 'Servicios' || Boolean(product.durationMinutes);
+                if (!isService) {
+                  product.stockQuantity += item.quantity;
+                  if (order.status === OrderStatus.DELIVERED) {
+                    product.physicalStock += item.quantity;
+                  }
+                  await manager.save(Product, product);
+                }
             }
           }
         }

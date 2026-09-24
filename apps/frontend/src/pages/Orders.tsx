@@ -308,20 +308,28 @@ const Orders: React.FC = () => {
     });
   };
 
-  
-  // @ts-ignore
-const translateStatus = (status: OrderStatus) => {
+  const isOrderService = (order: Order) => {
+    if (settings?.featureProduction === false) return true;
+    if (order.items && order.items.length > 0) {
+      return order.items.every((i: any) => {
+        const prod = i.product;
+        return prod?.category === 'Servicios' || Boolean(prod?.durationMinutes);
+      });
+    }
+    return false;
+  };
+
+  const translateStatus = (status: OrderStatus, isService?: boolean) => {
     switch(status) {
       case OrderStatus.PENDING: return "Pendiente";
-      case OrderStatus.PREPARING: return "Preparando";
-      case OrderStatus.DELIVERED: return "Entregado";
+      case OrderStatus.PREPARING: return isService ? "En Atención" : "Preparando";
+      case OrderStatus.DELIVERED: return isService ? "Completado" : "Entregado";
       case OrderStatus.CANCELED: return "Cancelado";
       default: return status;
     }
   };
 
-  // @ts-ignore
-const getStatusColor = (status: OrderStatus) => {
+  const getStatusColor = (status: OrderStatus) => {
     switch(status) {
       case OrderStatus.PENDING: return "warning";
       case OrderStatus.PREPARING: return "tertiary";
@@ -428,6 +436,14 @@ const getStatusColor = (status: OrderStatus) => {
           Atendido por: {order.employee.username || order.employee.name}{order.employee.jobTitle ? ` (${order.employee.jobTitle})` : ''}
         </IonBadge>
       )}
+      {isOrderService(order) && (
+        <IonBadge color="secondary" style={{ fontSize: '0.8rem' }}>
+          💅 Servicio
+        </IonBadge>
+      )}
+      <IonBadge color={getStatusColor(order.status)}>
+        {translateStatus(order.status, isOrderService(order))}
+      </IonBadge>
     </div>
   </div>
   <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '5px' }}>
@@ -490,15 +506,23 @@ const getStatusColor = (status: OrderStatus) => {
 
                     {order.status !== OrderStatus.CANCELED && order.status !== OrderStatus.DELIVERED && (
                       <div className="ion-margin-top" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                        <IonButton style={{ flex: 1 }} color="success" onClick={() => updateStatus(order.id, OrderStatus.DELIVERED)}>
-                          Entregar Todo
-                        </IonButton>
-                        <IonButton style={{ flex: 1 }} color="tertiary" onClick={() => openPartialModal(order)}>
-                          Entrega Parcial
-                        </IonButton>
+                        {isOrderService(order) ? (
+                          <IonButton style={{ flex: 1 }} color="success" onClick={() => updateStatus(order.id, OrderStatus.DELIVERED)}>
+                            Completar Servicio
+                          </IonButton>
+                        ) : (
+                          <>
+                            <IonButton style={{ flex: 1 }} color="success" onClick={() => updateStatus(order.id, OrderStatus.DELIVERED)}>
+                              Entregar Todo
+                            </IonButton>
+                            <IonButton style={{ flex: 1 }} color="tertiary" onClick={() => openPartialModal(order)}>
+                              Entrega Parcial
+                            </IonButton>
+                          </>
+                        )}
                         <div style={{ width: '100%', textAlign: 'center', marginTop: '5px' }}>
                           <IonButton fill="clear" color="danger" size="small" onClick={() => updateStatus(order.id, OrderStatus.CANCELED)}>
-                            Cancelar Pedido
+                            {isOrderService(order) ? 'Cancelar Servicio' : 'Cancelar Pedido'}
                           </IonButton>
                         </div>
                       </div>
@@ -506,7 +530,7 @@ const getStatusColor = (status: OrderStatus) => {
 
                     {(order.status === OrderStatus.CANCELED || order.status === OrderStatus.DELIVERED) && (
                       <IonButton expand="block" color="primary" fill="outline" className="ion-margin-top" onClick={() => cloneOrder(order.id)}>
-                        Clonar / Repetir Pedido
+                        {isOrderService(order) ? 'Repetir Servicio' : 'Clonar / Repetir Pedido'}
                       </IonButton>
                     )}
                   
