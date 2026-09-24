@@ -48,9 +48,77 @@ export class ReservationsService {
     }
   }
 
+  async validateSlotOverlap(tenantId: string, date: string, time: string, serviceId?: string, serviceName?: string, excludeId?: string, employeeId?: string) {
+    const qb = this.repo.createQueryBuilder('res')
+      .where('res.tenantId = :tenantId', { tenantId })
+      .andWhere('res.date = :date', { date })
+      .andWhere('res.status IN (:...statuses)', { statuses: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] });
+
+    if (excludeId) {
+      qb.andWhere('res.id != :exclude', { exclude: excludeId });
+    }
+    if (employeeId) {
+      qb.andWhere('(res.employeeId = :employeeId OR res.employeeId IS NULL)', { employeeId });
+    }
+    const existing = await qb.getMany();
+    if (existing.length === 0) return;
+
+    const settingsRepo = this.repo.manager.getRepository('Settings');
+    const settings: any = await settingsRepo.findOne({ where: { tenantId } });
+    const interval = Number(settings?.slotInterval) || 30;
+
+    const productRepo = this.repo.manager.getRepository('Product');
+    const products: any[] = await productRepo.find({ where: { tenantId } });
+    const productMap = new Map(products.map(p => [p.id, p]));
+    const productNameMap = new Map(products.map(p => [p.name.trim().toLowerCase(), p]));
+
+    // Determine requested reservation duration
+    let reqDuration = interval;
+    let currentProd = serviceId ? productMap.get(serviceId) : null;
+    if (!currentProd && serviceName) {
+      currentProd = productNameMap.get(serviceName.trim().toLowerCase());
+    }
+    if (currentProd && currentProd.durationMinutes) {
+      reqDuration = Number(currentProd.durationMinutes);
+    }
+
+    const [th, tm] = time.split(':').map(Number);
+    const reqStart = th * 60 + tm;
+    const reqEnd = reqStart + reqDuration;
+
+    for (const res of existing) {
+      const [rh, rm] = res.time.split(':').map(Number);
+      const exStart = rh * 60 + rm;
+      let exDuration = interval;
+      let sp = res.serviceId ? productMap.get(res.serviceId) : null;
+      if (!sp && res.serviceName) {
+        sp = productNameMap.get(res.serviceName.trim().toLowerCase());
+      }
+      if (sp && sp.durationMinutes) {
+        exDuration = Number(sp.durationMinutes);
+      }
+      const exEnd = exStart + exDuration;
+
+      // Overlap: reqStart < exEnd && reqEnd > exStart
+      if (reqStart < exEnd && reqEnd > exStart) {
+        const formatTime = (m: number) => {
+          const h = Math.floor(m / 60);
+          const min = m % 60;
+          const ampm = h >= 12 ? 'PM' : 'AM';
+          const h12 = h % 12 || 12;
+          return `${h12}:${min.toString().padStart(2, '0')} ${ampm}`;
+        };
+        throw new BadRequestException(
+          `El horario choca con la cita de "${res.customerName}" (${formatTime(exStart)} a ${formatTime(exEnd)}). Si deseas agendarla de todas formas, confirma para forzar.`
+        );
+      }
+    }
+  }
+
   async create(tenantId: string, dto: any) {
     if (dto.date && dto.time && !dto.force) {
       await this.validateBusinessHours(tenantId, dto.date, dto.time);
+      await this.validateSlotOverlap(tenantId, dto.date, dto.time, dto.serviceId, dto.serviceName, undefined, dto.employeeId);
     }
     if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
     if (dto.totalAmount !== undefined && dto.totalAmount < 0) throw new BadRequestException('El monto total no puede ser negativo');
@@ -67,6 +135,7 @@ export class ReservationsService {
   async update(tenantId: string, id: string, dto: any) {
     if (dto.date && dto.time && !dto.force) {
       await this.validateBusinessHours(tenantId, dto.date, dto.time);
+      await this.validateSlotOverlap(tenantId, dto.date, dto.time, dto.serviceId, dto.serviceName, id, dto.employeeId);
     }
     if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
     if (dto.totalAmount !== undefined && dto.totalAmount < 0) throw new BadRequestException('El monto total no puede ser negativo');

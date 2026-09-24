@@ -24,6 +24,8 @@ const Reservations: React.FC = () => {
   const [tableNumber, setTableNumber] = useState('');
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [notes, setNotes] = useState('');
+  const [serviceId, setServiceId] = useState('');
+  const [products, setProducts] = useState<any[]>([]);
 
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
@@ -42,8 +44,18 @@ const Reservations: React.FC = () => {
     }
   };
 
+  const fetchProducts = async () => {
+    try {
+      const res = await apiClient.get('/products');
+      setProducts(res.data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchReservations();
+    fetchProducts();
     setTimeout(() => {
       window.dispatchEvent(new Event('resize'));
     }, 500);
@@ -80,11 +92,22 @@ const Reservations: React.FC = () => {
     setCustomerPhone('');
     setDate('');
     setTime('');
+    setServiceId('');
     setNumberOfPeople(1);
     setTableNumber('');
     setTotalAmount(0);
     setNotes('');
     setShowModal(true);
+  };
+
+  const handleServiceChange = (sId: string) => {
+    setServiceId(sId);
+    const found = products.find(p => p.id === sId);
+    if (found) {
+      if (!totalAmount || totalAmount === 0) {
+        setTotalAmount(found.salePrice || 0);
+      }
+    }
   };
 
   const handleSave = async (force: boolean = false) => {
@@ -93,7 +116,20 @@ const Reservations: React.FC = () => {
       return;
     }
 
-    const payload = { customerName, customerPhone, date, time, numberOfPeople, tableNumber, totalAmount, notes, force };
+    const selectedProd = products.find(p => p.id === serviceId);
+    const payload = {
+      customerName,
+      customerPhone,
+      date,
+      time,
+      serviceId: serviceId || undefined,
+      serviceName: selectedProd?.name || undefined,
+      numberOfPeople,
+      tableNumber,
+      totalAmount,
+      notes,
+      force
+    };
     
     try {
       if (editingId) {
@@ -107,12 +143,12 @@ const Reservations: React.FC = () => {
       fetchReservations();
     } catch (e: any) {
       const errMsg = e.response?.data?.message || '';
-      if (errMsg.includes('horario laboral')) {
-        if (window.confirm(errMsg + '\n\n¿Estás absolutamente seguro de que deseas forzar y agendar esta reservación fuera de horario?')) {
+      if (errMsg.includes('choca con la cita') || errMsg.includes('horario laboral')) {
+        if (window.confirm(errMsg + '\n\n¿Estás seguro de que deseas forzar y agendar esta reservación de todas formas?')) {
           handleSave(true);
         }
       } else {
-        presentToast({ message: errMsg || 'Error guardando reservación', duration: 3000, color: 'danger' });
+        presentToast({ message: errMsg || 'Error guardando reservación', duration: 3500, color: 'danger' });
       }
     }
   };
@@ -185,6 +221,7 @@ const Reservations: React.FC = () => {
     setCustomerPhone(res.customerPhone || '');
     setDate(res.date);
     setTime(res.time);
+    setServiceId(res.serviceId || '');
     setNumberOfPeople(res.numberOfPeople);
     setTableNumber(res.tableNumber || '');
     setTotalAmount(res.totalAmount || 0);
@@ -199,10 +236,22 @@ const Reservations: React.FC = () => {
     if (r.status === ReservationStatus.CANCELED) color = '#eb445a'; // danger
     if (r.status === ReservationStatus.COMPLETED) color = '#92949c'; // medium
 
+    let dur = 30;
+    const prod = products.find(p => p.id === r.serviceId || (r.serviceName && p.name.trim().toLowerCase() === r.serviceName.trim().toLowerCase()));
+    if (prod && prod.durationMinutes) {
+      dur = Number(prod.durationMinutes);
+    }
+
+    const [rh, rm] = (r.time || '00:00').split(':').map(Number);
+    const endMins = rh * 60 + rm + dur;
+    const endH = String(Math.floor(endMins / 60)).padStart(2, '0');
+    const endM = String(endMins % 60).padStart(2, '0');
+
     return {
       id: r.id,
       title: r.serviceName ? `${r.customerName} - ${r.serviceName}` : `${r.customerName} (${r.numberOfPeople || 1} pax) ${r.tableNumber ? 'Mesa ' + r.tableNumber : ''}`,
       start: `${r.date}T${r.time}`,
+      end: `${r.date}T${endH}:${endM}:00`,
       color
     };
   });
@@ -356,12 +405,17 @@ const Reservations: React.FC = () => {
               <IonLabel position="stacked">Hora *</IonLabel>
               <IonInput type="time" value={time} onIonInput={e => setTime(e.detail.value!)} />
             </IonItem>
-            {editingId && reservations.find(r => r.id === editingId)?.serviceName && (
-              <IonItem>
-                <IonLabel position="stacked">Servicio</IonLabel>
-                <IonInput readonly value={reservations.find(r => r.id === editingId)?.serviceName} />
-              </IonItem>
-            )}
+            <IonItem>
+              <IonLabel position="stacked">Servicio (Opcional)</IonLabel>
+              <IonSelect value={serviceId} onIonChange={e => handleServiceChange(e.detail.value)} interface="popover" placeholder="Selecciona un servicio">
+                <IonSelectOption value="">Sin servicio específico</IonSelectOption>
+                {products.map(p => (
+                  <IonSelectOption key={p.id} value={p.id}>
+                    {p.name} ({p.durationMinutes || 30} min) - ${Number(p.salePrice).toFixed(2)}
+                  </IonSelectOption>
+                ))}
+              </IonSelect>
+            </IonItem>
             <IonItem>
               <IonLabel position="stacked">Cantidad de Personas</IonLabel>
               <IonInput type="number" min="0" value={numberOfPeople} onIonInput={e => setNumberOfPeople(parseInt(e.detail.value!, 10) || 1)} />

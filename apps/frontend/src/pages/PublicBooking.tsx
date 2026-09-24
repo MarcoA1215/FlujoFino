@@ -314,7 +314,10 @@ const PublicBooking: React.FC = () => {
                         return (
                           <div 
                             key={svc.id} 
-                            onClick={() => setSelectedService(svc)}
+                            onClick={() => {
+                              setSelectedService(svc);
+                              setSelectedTime('');
+                            }}
                             style={{ 
                               padding: '12px', 
                               border: isSelected ? '2px solid var(--ion-color-primary)' : '1px solid #e2e8f0', 

@@ -10,6 +10,7 @@ import { ReservationStatus } from '@nutrideli/shared-types';
 import { decodeTenantId } from '../utils/tenant-crypto';
 import { Public } from '../auth/public.decorator';
 import { OrderItem } from '../entities/order-item.entity';
+import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 
 @Public()
 @Controller('public/reservations')
@@ -47,13 +48,34 @@ export class PublicReservationsController {
       category: p.category
     }));
 
+    // Fetch active staff if staff selection is allowed
+    let staff: any[] = [];
+    if (settings?.bookingAllowStaffSelection) {
+      const accessRepo = this.tenantRepo.manager.getRepository(UserTenantAccess);
+      const accesses = await accessRepo.find({
+        where: { tenantId: id, isActive: true, status: 'ACCEPTED' },
+        relations: { user: true },
+        order: { user: { username: 'ASC' } }
+      });
+      staff = accesses
+        .filter(a => !!a.user)
+        .map(a => ({
+          id: a.user.id,
+          name: a.user.username,
+          jobTitle: a.jobTitle || undefined
+        }));
+    }
+
     return { 
       id: token, 
       name: tenant.name,
       businessHours: settings?.businessHours || null,
       services: services,
       slotInterval: settings?.slotInterval || 30,
-      featureShowCatalog: settings?.featureShowCatalog || false
+      featureShowCatalog: settings?.featureShowCatalog || false,
+      bookingRequireService: settings?.bookingRequireService ?? true,
+      bookingAllowStaffSelection: settings?.bookingAllowStaffSelection ?? false,
+      staff: staff
     };
   }
 
@@ -69,7 +91,7 @@ export class PublicReservationsController {
     if (!tenant) throw new NotFoundException('Negocio no encontrado');
     
     // Check overlap using new logic
-    const isAvailable = await this.checkSlotAvailability(id, dto.date, dto.time, dto.serviceId);
+    const isAvailable = await this.checkSlotAvailability(id, dto.date, dto.time, dto.serviceId, undefined, dto.employeeId);
     if (!isAvailable) {
       throw new BadRequestException('El horario seleccionado ya no está disponible.');
     }
@@ -145,7 +167,8 @@ export class PublicReservationsController {
     @Param('tenantId') tenantToken: string, 
     @Query('date') date: string, 
     @Query('serviceId') serviceId: string,
-    @Query('exclude') excludeReservationId?: string
+    @Query('exclude') excludeReservationId?: string,
+    @Query('employeeId') employeeId?: string
   ) {
     let id: string;
     try {
@@ -153,7 +176,7 @@ export class PublicReservationsController {
     } catch {
       throw new NotFoundException('Negocio no encontrado o enlace inválido');
     }
-    return this.calculateAvailableSlots(id, date, serviceId, excludeReservationId);
+    return this.calculateAvailableSlots(id, date, serviceId, excludeReservationId, employeeId);
   }
 
   @Get('tenant/:tenantId/catalog')
@@ -243,7 +266,7 @@ export class PublicReservationsController {
     }
 
     // validate availability
-    const isAvailable = await this.checkSlotAvailability(reservation.tenantId, dto.date, dto.time, reservation.serviceId, reservation.id);
+    const isAvailable = await this.checkSlotAvailability(reservation.tenantId, dto.date, dto.time, reservation.serviceId, reservation.id, reservation.employeeId);
     if (!isAvailable) {
       throw new BadRequestException('El nuevo horario no está disponible o choca con otra cita.');
     }
@@ -294,7 +317,7 @@ export class PublicReservationsController {
 
   // --- Helper Methods ---
 
-  private async calculateAvailableSlots(tenantId: string, date: string, serviceId?: string, excludeReservationId?: string) {
+  private async calculateAvailableSlots(tenantId: string, date: string, serviceId?: string, excludeReservationId?: string, employeeId?: string) {
     const settingsRepo = this.tenantRepo.manager.getRepository(Settings);
     const settings = await settingsRepo.findOne({ where: { tenantId } });
 
@@ -305,7 +328,7 @@ export class PublicReservationsController {
 
     if (!dayConfig || !dayConfig.isOpen) return [];
 
-    const interval = settings?.slotInterval || 30;
+    const interval = Number(settings?.slotInterval) || 30;
 
     const [sh, sm] = dayConfig.startTime.split(':').map(Number);
     const [eh, em] = dayConfig.endTime.split(':').map(Number);
@@ -321,20 +344,21 @@ export class PublicReservationsController {
     if (excludeReservationId) {
       qb.andWhere('res.id != :exclude', { exclude: excludeReservationId });
     }
+    if (employeeId) {
+      qb.andWhere('(res.employeeId = :employeeId OR res.employeeId IS NULL)', { employeeId });
+    }
     const existing = await qb.getMany();
 
-    // Query products for service durations
+    // Query products for service durations (match by ID and name)
     const productRepo = this.tenantRepo.manager.getRepository(Product);
-    const serviceIds = [serviceId, ...existing.map(r => r.serviceId)].filter((sid): sid is string => !!sid);
-    const products = serviceIds.length > 0 
-      ? await productRepo.find({ where: { id: In(serviceIds) } }) 
-      : [];
-    const productMap = new Map<string, Product>(products.map(p => [p.id, p]));
+    const allProducts = await productRepo.find({ where: { tenantId } });
+    const productMap = new Map<string, Product>(allProducts.map(p => [p.id, p]));
+    const productNameMap = new Map<string, Product>(allProducts.map(p => [p.name.trim().toLowerCase(), p]));
 
     let duration = interval;
     if (serviceId && productMap.has(serviceId)) {
       const sp = productMap.get(serviceId);
-      if (sp && sp.durationMinutes) duration = sp.durationMinutes;
+      if (sp && sp.durationMinutes) duration = Number(sp.durationMinutes);
     }
 
     // Map existing into busy intervals [startMins, endMins]
@@ -342,10 +366,15 @@ export class PublicReservationsController {
       const [rh, rm] = r.time.split(':').map(Number);
       const startMins = rh * 60 + rm;
       let rDuration = interval;
-      if (r.serviceId && productMap.has(r.serviceId)) {
-        const s = productMap.get(r.serviceId);
-        if (s && s.durationMinutes) rDuration = s.durationMinutes;
+      
+      let sp = r.serviceId ? productMap.get(r.serviceId) : null;
+      if (!sp && r.serviceName) {
+        sp = productNameMap.get(r.serviceName.trim().toLowerCase());
       }
+      if (sp && sp.durationMinutes) {
+        rDuration = Number(sp.durationMinutes);
+      }
+
       return { start: startMins, end: startMins + rDuration };
     });
 
@@ -362,10 +391,9 @@ export class PublicReservationsController {
         continue;
       }
 
-      // Check overlap
+      // Check overlap: new slot [currentMins, currentMins + duration) overlaps with [busy.start, busy.end)
       const slotEnd = currentMins + duration;
       const overlaps = busyIntervals.some(busy => {
-        // Overlap condition: start < busy.end AND end > busy.start
         return currentMins < busy.end && slotEnd > busy.start;
       });
 
@@ -379,8 +407,8 @@ export class PublicReservationsController {
     return slots;
   }
 
-  private async checkSlotAvailability(tenantId: string, date: string, time: string, serviceId?: string, excludeReservationId?: string) {
-    const slots = await this.calculateAvailableSlots(tenantId, date, serviceId, excludeReservationId);
+  private async checkSlotAvailability(tenantId: string, date: string, time: string, serviceId?: string, excludeReservationId?: string, employeeId?: string) {
+    const slots = await this.calculateAvailableSlots(tenantId, date, serviceId, excludeReservationId, employeeId);
     return slots.includes(time.substring(0, 5));
   }
 
