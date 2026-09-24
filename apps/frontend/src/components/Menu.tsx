@@ -186,7 +186,7 @@ const Menu: React.FC = () => {
           </button>
 
           <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#64748b' }}>
-            @{user?.username} {user?.tenantId && user?.role ? <span style={{ opacity: 0.8 }}>({user.role})</span> : ''}
+            @{user?.username} {user?.tenantId && user?.role ? <span style={{ opacity: 0.8 }}>({user.role === 'KITCHEN' ? 'Servicio' : user.role})</span> : ''}
           </p>
         </div>
 

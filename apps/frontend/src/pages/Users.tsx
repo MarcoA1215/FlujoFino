@@ -19,6 +19,17 @@ interface UserData {
   createdAt: string;
 }
 
+const getRoleLabel = (r: string) => {
+  switch (r) {
+    case UserRole.ADMIN: return 'Administrador';
+    case UserRole.POS: return 'Caja / POS';
+    case UserRole.KITCHEN: return 'Servicio / Preparación';
+    case UserRole.DELIVERY: return 'Reparto / Envíos';
+    case UserRole.INVENTORY: return 'Inventario / Stock';
+    default: return r;
+  }
+};
+
 const Users: React.FC = () => {
   const [users, setUsers] = useState<UserData[]>([]);
   const [email, setEmail] = useState('');
@@ -284,14 +295,14 @@ const Users: React.FC = () => {
                         <IonLabel position="stacked">Rol / Permiso</IonLabel>
                         <IonSelect value={role} onIonChange={e => setRole(e.detail.value)}>
                           <IonSelectOption value={UserRole.ADMIN}>Administrador</IonSelectOption>
-                          <IonSelectOption value={UserRole.POS}>Cajero (POS)</IonSelectOption>
+                          <IonSelectOption value={UserRole.POS}>Cajero / Atención (POS)</IonSelectOption>
                           {settings?.featureRecipes !== false && (
-                            <IonSelectOption value={UserRole.KITCHEN}>Cocina (KITCHEN)</IonSelectOption>
+                            <IonSelectOption value={UserRole.KITCHEN}>Especialista en Servicio / Preparación</IonSelectOption>
                           )}
                           {settings?.featureBuySell !== false && (
-                            <IonSelectOption value={UserRole.DELIVERY}>Repartidor (DELIVERY)</IonSelectOption>
+                            <IonSelectOption value={UserRole.DELIVERY}>Repartidor / Entregas</IonSelectOption>
                           )}
-                          <IonSelectOption value={UserRole.INVENTORY}>Reabastecedor (INVENTORY)</IonSelectOption>
+                          <IonSelectOption value={UserRole.INVENTORY}>Control de Inventario / Insumos</IonSelectOption>
                         </IonSelect>
                       </IonItem>
                       <IonItem>
@@ -299,7 +310,7 @@ const Users: React.FC = () => {
                         <IonInput 
                           value={jobTitle} 
                           onIonInput={e => setJobTitle(e.detail.value!)} 
-                          placeholder="Ej. Manicurista, Estilista, Mesero, Vendedora" 
+                          placeholder="Ej. Especialista, Terapeuta, Encargado, Vendedor, etc." 
                         />
                       </IonItem>
                       <IonRow style={{ padding: 0 }}>
@@ -379,7 +390,7 @@ const Users: React.FC = () => {
                               </td>
                               <td>{u.email}</td>
                               <td>
-                                <IonBadge color={u.role === UserRole.ADMIN ? 'danger' : 'primary'}>{u.role}</IonBadge>
+                                <IonBadge color={u.role === UserRole.ADMIN ? 'danger' : 'primary'}>{getRoleLabel(u.role)}</IonBadge>
                               </td>
                               <td>
                                 {u.entryTime && u.exitTime ? (
@@ -542,14 +553,14 @@ const Users: React.FC = () => {
               <IonLabel position="stacked">Rol / Permiso</IonLabel>
               <IonSelect value={editRole} onIonChange={e => setEditRole(e.detail.value)}>
                 <IonSelectOption value={UserRole.ADMIN}>Administrador</IonSelectOption>
-                <IonSelectOption value={UserRole.POS}>Cajero (POS)</IonSelectOption>
+                <IonSelectOption value={UserRole.POS}>Cajero / Atención (POS)</IonSelectOption>
                 {settings?.featureRecipes !== false && (
-                  <IonSelectOption value={UserRole.KITCHEN}>Cocina (KITCHEN)</IonSelectOption>
+                  <IonSelectOption value={UserRole.KITCHEN}>Especialista en Servicio / Preparación</IonSelectOption>
                 )}
                 {settings?.featureBuySell !== false && (
-                  <IonSelectOption value={UserRole.DELIVERY}>Repartidor (DELIVERY)</IonSelectOption>
+                  <IonSelectOption value={UserRole.DELIVERY}>Repartidor / Entregas</IonSelectOption>
                 )}
-                <IonSelectOption value={UserRole.INVENTORY}>Reabastecedor (INVENTORY)</IonSelectOption>
+                <IonSelectOption value={UserRole.INVENTORY}>Control de Inventario / Insumos</IonSelectOption>
               </IonSelect>
             </IonItem>
 
@@ -558,7 +569,7 @@ const Users: React.FC = () => {
               <IonInput 
                 value={editJobTitle} 
                 onIonInput={e => setEditJobTitle(e.detail.value!)} 
-                placeholder="Ej. Manicurista, Estilista, Mesero, Vendedora" 
+                placeholder="Ej. Especialista, Terapeuta, Encargado, Vendedor, etc." 
               />
             </IonItem>
 
