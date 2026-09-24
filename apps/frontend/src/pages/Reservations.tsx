@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonMenuButton, IonContent, IonFab, IonFabButton, IonIcon, useIonToast, IonModal, IonItem, IonLabel, IonInput, IonButton, IonSelect, IonSelectOption, IonText, IonGrid, IonRow, IonCol, IonCard, IonCardContent } from '@ionic/react';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonMenuButton, IonContent, IonFab, IonFabButton, IonIcon, useIonToast, IonModal, IonItem, IonLabel, IonInput, IonButton, IonSelect, IonSelectOption, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonBadge } from '@ionic/react';
 import { addOutline, trashOutline, cashOutline, saveOutline, refreshOutline, timeOutline, logoWhatsapp } from 'ionicons/icons';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -7,7 +7,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
 import { apiClient } from '../api/client';
-import { ReservationStatus, PaymentStatus } from '@nutrideli/shared-types';
+import { ReservationStatus } from '@nutrideli/shared-types';
 
 const Reservations: React.FC = () => {
   const [reservations, setReservations] = useState<any[]>([]);
@@ -198,6 +198,24 @@ const Reservations: React.FC = () => {
       setReservations(res.data);
     } catch (e) {
       presentToast({ message: 'Error registrando abono', duration: 2000, color: 'danger' });
+    }
+  };
+
+  const handlePayFull = async () => {
+    if (!selectedEvent) return;
+    const remaining = Number(selectedEvent.totalAmount || 0) - Number(selectedEvent.abonosTotal || 0);
+    if (remaining <= 0) return;
+    try {
+      await apiClient.post(`/reservations/${selectedEvent.id}/abono`, { amount: remaining });
+      presentToast({ message: 'Pago completo registrado exitosamente', duration: 2000, color: 'success' });
+      fetchReservations();
+      
+      const res = await apiClient.get('/reservations');
+      const updated = res.data.find((r: any) => r.id === selectedEvent.id);
+      setSelectedEvent(updated);
+      setReservations(res.data);
+    } catch (e) {
+      presentToast({ message: 'Error registrando pago', duration: 2000, color: 'danger' });
     }
   };
 
@@ -655,23 +673,47 @@ const Reservations: React.FC = () => {
                 </IonCard>
 
                 {/* Pagos / Abonos */}
-                {selectedEvent.totalAmount > 0 && (
-                  <IonCard>
-                    <IonCardContent>
-                      <h3>Abonos y Pagos</h3>
-                      <IonText color={selectedEvent.paymentStatus === PaymentStatus.PAID ? 'success' : 'warning'}>
-                        <b>Estado de Pago:</b> {selectedEvent.paymentStatus}
-                      </IonText>
-                      <p>Total Abonado: ${selectedEvent.abonosTotal.toFixed(2)}</p>
-                      <p>Restante: ${(selectedEvent.totalAmount - selectedEvent.abonosTotal).toFixed(2)}</p>
+                {selectedEvent.totalAmount > 0 && (() => {
+                  const total = Number(selectedEvent.totalAmount || 0);
+                  const abonos = Number(selectedEvent.abonosTotal || 0);
+                  const remaining = Math.max(0, total - abonos);
+                  const isFullyPaid = remaining <= 0 && total > 0;
 
-                      <IonItem className="ion-margin-top">
-                        <IonLabel position="stacked">Monto a abonar ($)</IonLabel>
-                        <IonInput type="number" min="0" value={abonoAmount} onIonInput={e => setAbonoAmount(e.detail.value!)} />
-                      </IonItem>
-                      <IonButton expand="block" size="small" color="primary" onClick={handleAddAbono}>
-                        <IonIcon icon={cashOutline} slot="start" /> Registrar Abono
-                      </IonButton>
+                  return (
+                    <IonCard>
+                      <IonCardContent>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <h3 style={{ margin: 0, fontWeight: 'bold' }}>Abonos y Pagos</h3>
+                          <IonBadge color={isFullyPaid ? 'success' : (abonos > 0 ? 'warning' : 'medium')}>
+                            {isFullyPaid ? 'Totalmente Pagado' : (abonos > 0 ? 'Abono Parcial' : 'Pendiente de Pago')}
+                          </IonBadge>
+                        </div>
+
+                        <div style={{ marginTop: '10px', background: '#f8fafc', padding: '10px', borderRadius: '8px' }}>
+                          <p style={{ margin: '3px 0' }}><b>Total Servicio:</b> ${total.toFixed(2)}</p>
+                          <p style={{ margin: '3px 0', color: '#16a34a' }}><b>Total Abonado:</b> ${abonos.toFixed(2)}</p>
+                          <p style={{ margin: '3px 0', fontWeight: 'bold', color: isFullyPaid ? '#16a34a' : '#dc2626' }}>
+                            <b>Restante por Cobrar:</b> ${remaining.toFixed(2)}
+                          </p>
+                        </div>
+
+                        {!isFullyPaid && (
+                          <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <IonButton expand="block" color="success" onClick={handlePayFull}>
+                              <IonIcon icon={cashOutline} slot="start" /> Cobrar Restante (${remaining.toFixed(2)})
+                            </IonButton>
+
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                              <IonItem style={{ flex: 1, '--background': '#f1f5f9', borderRadius: '6px' }}>
+                                <IonLabel position="stacked">Abono Parcial ($)</IonLabel>
+                                <IonInput type="number" min="0" placeholder="0.00" value={abonoAmount} onIonInput={e => setAbonoAmount(e.detail.value!)} />
+                              </IonItem>
+                              <IonButton fill="outline" color="primary" onClick={handleAddAbono} style={{ height: '42px', marginBottom: '2px' }}>
+                                Abonar
+                              </IonButton>
+                            </div>
+                          </div>
+                        )}
 
                       {selectedEvent.abonosHistory && selectedEvent.abonosHistory.length > 0 && (
                         <div style={{ marginTop: '15px' }}>
@@ -690,7 +732,8 @@ const Reservations: React.FC = () => {
                       )}
                     </IonCardContent>
                   </IonCard>
-                )}
+                );
+              })()}
 
                   {/* Acciones Generales */}
                   <IonGrid>

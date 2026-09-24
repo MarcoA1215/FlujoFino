@@ -56,6 +56,7 @@ const Pos: React.FC = () => {
   const [deliveryZoneId, setDeliveryZoneId] = useState<string>('');
   const [customerAddress, setCustomerAddress] = useState<string>('');
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [linkedReservationId, setLinkedReservationId] = useState<string | null>(null);
   
   const { user } = useContext(AuthContext);
   const [employees, setEmployees] = useState<{ id: string; username: string; name?: string; role?: string; jobTitle?: string }[]>([]);
@@ -168,6 +169,7 @@ const Pos: React.FC = () => {
       setEditingOrderId(null);
     }
     if (resId) {
+      setLinkedReservationId(resId);
       apiClient.get(`/reservations`).then(res => {
         const found = res.data.find((r: any) => r.id === resId);
         if (found) {
@@ -300,6 +302,14 @@ const Pos: React.FC = () => {
         router.push('/orders');
       } else {
         await apiClient.post('/orders', payload);
+        if (linkedReservationId && paymentMethod !== 'PENDING') {
+          try {
+            await apiClient.post(`/reservations/${linkedReservationId}/abono`, { amount: totalCart });
+            await apiClient.put(`/reservations/${linkedReservationId}/status`, { status: 'CONFIRMED' });
+          } catch (err) {
+            console.error('Error sincronizando pago a reservacion:', err);
+          }
+        }
         presentToast({ message: 'Pedido creado exitosamente', duration: 2000, color: 'success' });
       }
 
@@ -319,6 +329,7 @@ const Pos: React.FC = () => {
       setUsdReceived('');
       setSearchTerm('');
       setPaymentMethod('PAGO_MOVIL');
+      setLinkedReservationId(null);
       fetchProducts();
     } catch (e: any) {
       presentToast({ message: 'Error al crear pedido', duration: 3000, color: 'danger' });

@@ -216,9 +216,12 @@ export class ReservationsService {
   }
 
   private recalculatePaymentStatus(res: Reservation) {
-    const remaining = (res.totalAmount || 0) - (res.abonosTotal || 0);
-    if (res.totalAmount > 0) {
-      if (res.abonosTotal === 0) res.paymentStatus = PaymentStatus.PENDING;
+    const total = Number(res.totalAmount || 0);
+    const abonos = Number(res.abonosTotal || 0);
+    const remaining = total - abonos;
+
+    if (total > 0) {
+      if (abonos <= 0) res.paymentStatus = PaymentStatus.PENDING;
       else if (remaining <= 0) res.paymentStatus = PaymentStatus.PAID;
       else res.paymentStatus = PaymentStatus.PARTIAL;
     } else {
