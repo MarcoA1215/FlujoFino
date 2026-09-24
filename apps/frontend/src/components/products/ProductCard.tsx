@@ -82,6 +82,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     }
   };
   
+  const getProductImage = () => {
+    if (!p.images) return null;
+    if (Array.isArray(p.images) && p.images.length > 0) {
+      return p.images[p.images.length - 1];
+    }
+    if (typeof p.images === 'string' && (p.images as string).trim().length > 0) {
+      const parts = (p.images as string).split(',');
+      return parts[parts.length - 1].trim();
+    }
+    return null;
+  };
+  const imageUrl = getProductImage();
+
   return (
     <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3" style={{ display: 'flex' }}>
       <input type="file" id={`upload-${p.id}`} style={{ display: 'none' }} accept="image/*" onChange={handleFileChange} />
@@ -89,8 +102,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <IonCardContent style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '15px' }}>
           
           <div style={{ flex: 1 }}>
-            {p.images && p.images.length > 0 && (
-              <img src={p.images[p.images.length - 1]} alt={p.name} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '10px' }} />
+            {imageUrl && (
+              <img src={imageUrl} alt={p.name} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '10px' }} />
             )}
             <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 5px 0', lineHeight: '1.3' }}>{p.name}</h2>
             

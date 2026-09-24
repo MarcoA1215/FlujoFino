@@ -47,7 +47,7 @@ export class PublicReservationsController {
       price: p.salePrice,
       durationMinutes: p.durationMinutes || settings?.slotInterval || 30,
       category: p.category,
-      image: (p.images && p.images.length > 0) ? p.images[0] : null
+      image: (p.images && p.images.length > 0) ? (Array.isArray(p.images) ? p.images[0] : (typeof p.images === 'string' ? (p.images as string).split(',')[0].trim() : null)) : null
     }));
 
     if (services.length === 0 && settings?.services && Array.isArray(settings.services) && settings.services.length > 0) {
