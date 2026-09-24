@@ -73,7 +73,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                 <IonLabel className="ion-text-wrap">
                   <h2>Requerir selección de servicio de antemano</h2>
                   <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
-                    Ideal para Salones de Belleza, Spas, Barberías y Consultorios. El cliente elegirá primero qué servicio desea y su duración. (Desactívalo si es un restaurante que solo reserva mesas).
+                    Ideal para negocios de servicios, citas y consultas (Salones, Spas, Consultorios Médicos, etc.). El cliente elegirá primero qué servicio desea y su duración. (Desactívalo si es un restaurante que solo reserva mesas).
                   </p>
                 </IonLabel>
                 <IonToggle 
@@ -86,7 +86,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                 <IonLabel className="ion-text-wrap">
                   <h2>Permitir elegir Profesional / Especialista</h2>
                   <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
-                    El cliente podrá elegir qué manicurista, estilista o barbero lo atenderá según la agenda individual de cada empleado.
+                    El cliente podrá elegir qué profesional o especialista lo atenderá según la agenda y horarios asignados a cada colaborador.
                   </p>
                 </IonLabel>
                 <IonToggle 
