@@ -14,6 +14,7 @@ interface ProductCardProps {
   onUnpackKit?: (p: Product) => void;
   isClientMode?: boolean;
   featureRecipes?: boolean;
+  featureProduction?: boolean;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -26,7 +27,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onToggleKitting,
   onUnpackKit,
   isClientMode,
-  featureRecipes
+  featureRecipes,
+  featureProduction
 }) => {
   const [present] = useIonActionSheet();
 
@@ -38,16 +40,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     if (p.isCombo) {
       buttons.push({ text: 'Configurar Combo', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
     } else if (featureRecipes) {
-      buttons.push({ text: 'Configurar Fórmula', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
+      buttons.push({ text: 'Configurar Fórmula / Receta', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
     }
 
     buttons.push({ text: 'Stock Inicial / Ajuste', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) });
 
-    if ((p.isCombo || (p.recipe && p.recipe.length > 0)) && onToggleKitting && (p.isCombo || featureRecipes)) {
+    if (featureProduction !== false && (p.isCombo || (p.recipe && p.recipe.length > 0)) && onToggleKitting && (p.isCombo || featureRecipes)) {
       buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Hecho al Instante' : 'Pre-Fabricado'}`, icon: swapHorizontalOutline, cssClass: 'action-sheet-cambiar', handler: () => onToggleKitting(p) });
     }
 
-    if (p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) {
+    if (featureProduction !== false && p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) {
       buttons.push({ text: 'Desarmar 1 Und', icon: cutOutline, cssClass: 'action-sheet-desarmar', handler: () => onUnpackKit(p) });
     }
 
@@ -102,6 +104,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               Precio: ${p.salePrice.toFixed(2)}
             </p>
 
+            {p.estimatedCost && Number(p.estimatedCost) > 0 && !isClientMode && (
+              <p style={{ margin: '-8px 0 10px 0', fontSize: '0.82rem', color: '#10b981', fontWeight: 600 }}>
+                Costo Est.: ${Number(p.estimatedCost).toFixed(2)} &bull; Margen: ${(p.salePrice - Number(p.estimatedCost)).toFixed(2)}
+              </p>
+            )}
+
             {isClientMode && (
               <p style={{ margin: '0 0 12px 0', color: p.stockQuantity > 0 ? 'var(--ion-color-success)' : 'var(--ion-color-danger)', fontWeight: '500', fontSize: '0.9rem' }}>
                 Disponible: {p.stockQuantity}
@@ -112,9 +120,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
                 {(!p.isCombo || p.isPreAssembled) && (
                   <>
-                    <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
-                      Físico: {p.physicalStock}
-                    </IonBadge>
+                    {featureProduction !== false && (
+                      <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                        Físico: {p.physicalStock}
+                      </IonBadge>
+                    )}
                     <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
                       Disp: {p.stockQuantity}
                     </IonBadge>
@@ -125,7 +135,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                     Combo (Virtual)
                   </IonBadge>
                 )}
-                {(p.recipe && p.recipe.length > 0 && !p.isCombo) && (
+                {featureProduction !== false && (p.recipe && p.recipe.length > 0 && !p.isCombo) && (
                   <IonBadge color={p.isPreAssembled ? 'dark' : 'warning'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
                     {p.isPreAssembled ? 'Pre-Fabricado' : 'Hecho al Instante'}
                   </IonBadge>

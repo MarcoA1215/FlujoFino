@@ -229,6 +229,8 @@ export class OrdersService {
             for (const ri of product.recipe) {
                 if (ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit;
             }
+        } else if (product.estimatedCost) {
+            unitCost = Number(product.estimatedCost);
         }
         
         totalCost += unitCost * itemDto.quantity;
@@ -640,6 +642,8 @@ export class OrdersService {
                   for (const ri of product.recipe) {
                       if (ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit;
                   }
+              } else if (product.estimatedCost) {
+                  unitCost = Number(product.estimatedCost);
               }
           }
           

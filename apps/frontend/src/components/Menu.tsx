@@ -118,7 +118,7 @@ const Menu: React.FC = () => {
     { title: 'Tablero Principal', url: '/dashboard', iosIcon: pieChartOutline, mdIcon: pieChartOutline },
     { title: 'Inventario (Insumos)', url: '/raw-materials', iosIcon: cubeOutline, mdIcon: cubeOutline, conditional: 'featureRecipes' },
     { title: 'Servicios / Productos', url: '/products', iosIcon: listOutline, mdIcon: listOutline },
-    { title: 'Fórmulas / Ensamblaje', url: '/production', iosIcon: constructOutline, mdIcon: constructOutline, conditional: 'featureRecipes' },
+    { title: 'Fórmulas / Ensamblaje', url: '/production', iosIcon: constructOutline, mdIcon: constructOutline, conditional: 'featureProduction' },
     { title: 'Calculadora de Costos', url: '/calculator', iosIcon: calculatorOutline, mdIcon: calculatorOutline, conditional: 'featureRecipes' },
     { title: 'Caja', url: '/pos', iosIcon: cashOutline, mdIcon: cashOutline },
     { title: 'Pedidos / Tickets', url: '/orders', iosIcon: cartOutline, mdIcon: cartOutline },
@@ -129,14 +129,14 @@ const Menu: React.FC = () => {
     { title: 'Configuración', url: '/settings', iosIcon: settingsOutline, mdIcon: settingsOutline }
   ];
 
-  let appPages = rawPages.filter(p => !p.conditional || settings[p.conditional]);
+  let appPages = rawPages.filter(p => !p.conditional || (p.conditional === 'featureProduction' ? settings.featureProduction !== false : settings[p.conditional]));
 
   if (!user?.tenantId) {
     appPages = [];
   } else if (user?.role === UserRole.POS) {
     appPages = appPages.filter(p => ['/pos', '/orders', '/calculator', '/reservations'].includes(p.url));
   } else if (user?.role === UserRole.KITCHEN) {
-    appPages = appPages.filter(p => ['/orders', '/production'].includes(p.url));
+    appPages = appPages.filter(p => settings?.featureProduction === false ? ['/orders'].includes(p.url) : ['/orders', '/production'].includes(p.url));
   } else if (user?.role === UserRole.DELIVERY) {
     appPages = appPages.filter(p => ['/orders'].includes(p.url));
   } else if (user?.role === UserRole.INVENTORY) {

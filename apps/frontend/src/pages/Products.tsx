@@ -40,6 +40,7 @@ const Products: React.FC = () => {
         { name: 'name', type: 'text', placeholder: 'Nombre' },
         { name: 'category', type: 'text', placeholder: 'Categoría' },
         { name: 'salePrice', type: 'number', placeholder: 'Precio Venta ($)' },
+        { name: 'estimatedCost', type: 'number', placeholder: 'Costo Estimado Insumos ($) (Opcional)' },
         { name: 'durationMinutes', type: 'number', placeholder: 'Duración estimada en minutos (Ej. 45)' }
       ],
       buttons: [
@@ -53,6 +54,7 @@ const Products: React.FC = () => {
                 name: data.name,
                 category: data.category,
                 salePrice: parseFloat(data.salePrice),
+                estimatedCost: data.estimatedCost ? parseFloat(data.estimatedCost) : 0,
                 durationMinutes: data.durationMinutes ? parseInt(data.durationMinutes, 10) : 30,
                 isCombo,
                 isPreAssembled: false
@@ -145,6 +147,7 @@ const Products: React.FC = () => {
         { name: 'name', type: 'text', value: p.name, placeholder: 'Nombre' },
         { name: 'category', type: 'text', value: p.category, placeholder: 'Categoría' },
         { name: 'salePrice', type: 'number', value: p.salePrice, placeholder: 'Precio Venta ($)' },
+        { name: 'estimatedCost', type: 'number', value: p.estimatedCost ?? 0, placeholder: 'Costo Estimado Insumos ($)' },
         { name: 'durationMinutes', type: 'number', value: p.durationMinutes ?? 30, placeholder: 'Duración estimada en minutos (Ej. 45)' }
       ],
       buttons: [
@@ -158,6 +161,7 @@ const Products: React.FC = () => {
                 name: data.name,
                 category: data.category,
                 salePrice: parseFloat(data.salePrice),
+                estimatedCost: data.estimatedCost ? parseFloat(data.estimatedCost) : 0,
                 durationMinutes: data.durationMinutes ? parseInt(data.durationMinutes, 10) : null
               });
               fetchData();
@@ -252,6 +256,7 @@ const Products: React.FC = () => {
                     {filteredData.map(p => (
                       <ProductCard isClientMode={isClientMode}
                         featureRecipes={settings?.featureRecipes}
+                        featureProduction={settings?.featureProduction !== false}
                         key={p.id}
                         product={p}
                         onEdit={openEditProductAlert}

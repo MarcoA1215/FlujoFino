@@ -66,6 +66,7 @@ export class SettingsService implements OnModuleInit {
     if (payload.featureCustomerSchedules !== undefined) settings.featureCustomerSchedules = payload.featureCustomerSchedules;
     if (payload.featureRecipes !== undefined) settings.featureRecipes = payload.featureRecipes;
     if (payload.featureBuySell !== undefined) settings.featureBuySell = payload.featureBuySell;
+    if (payload.featureProduction !== undefined) settings.featureProduction = payload.featureProduction;
     if (payload.featureShowCatalog !== undefined) settings.featureShowCatalog = payload.featureShowCatalog;
     if (payload.bookingRequireService !== undefined) settings.bookingRequireService = payload.bookingRequireService;
     if (payload.bookingAllowStaffSelection !== undefined) settings.bookingAllowStaffSelection = payload.bookingAllowStaffSelection;

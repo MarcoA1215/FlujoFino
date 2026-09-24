@@ -12,6 +12,8 @@ export type Product = {
   physicalStock?: number;
   reservedQuantity?: number;
   images?: string[];
+  estimatedCost?: number;
+  baseCost?: number;
 };
 
 export type RawMaterial = {

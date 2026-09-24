@@ -22,6 +22,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
   const [recipeItems, setRecipeItems] = useState<RecipeItem[]>([]);
   const [comboItems, setComboItems] = useState<any[]>([]);
   const [totalRecipeCost, setTotalRecipeCost] = useState(0);
+  const [estimatedCost, setEstimatedCost] = useState<number>(0);
   const [newRmId, setNewRmId] = useState('');
   const [newRmQty, setNewRmQty] = useState<number>();
   const [inputUnit, setInputUnit] = useState<string>('');
@@ -37,7 +38,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
   useEffect(() => {
     if (product) loadData(product);
     else {
-      setRecipeItems([]); setComboItems([]); setTotalRecipeCost(0);
+      setRecipeItems([]); setComboItems([]); setTotalRecipeCost(0); setEstimatedCost(0);
       setNewRmId(''); setNewRmQty(undefined);
       setNewComboProdId(''); setNewComboQty(undefined);
     }
@@ -45,6 +46,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
 
   const loadData = async (p: Product) => {
     try {
+      setEstimatedCost(p.estimatedCost ? Number(p.estimatedCost) : 0);
       const [matRes, prodRes, recRes] = await Promise.all([
         apiClient.get<RawMaterial[]>('/raw-materials'),
         apiClient.get<Product[]>('/products'),
@@ -114,6 +116,9 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
       await apiClient.put('/products/' + product.id + '/combo', {
         comboItems: comboItems.map(i => ({ componentId: i.componentId, quantity: i.quantity }))
       });
+      await apiClient.put('/products/' + product.id, {
+        estimatedCost: Number(estimatedCost || 0)
+      });
       presentToast({ message: 'Composición guardada exitosamente', duration: 2000, color: 'success' });
       onSaved();
     } catch (e) {
@@ -121,6 +126,8 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
       presentToast({ message: 'Error al guardar la composición', duration: 3000, color: 'danger' });
     }
   };
+
+  const effectiveCost = totalRecipeCost > 0 ? totalRecipeCost : (estimatedCost || 0);
 
   return (
     <IonModal isOpen={!!product} onDidDismiss={onClose}>
@@ -216,15 +223,40 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
             </IonCol>
             <IonCol size="12" sizeLg="4">
               <IonCard color="light" style={{ margin: '0 0 20px 0' }}>
-                <IonCardHeader><IonCardTitle>Rentabilidad</IonCardTitle></IonCardHeader>
+                <IonCardHeader><IonCardTitle>Rentabilidad y Margen</IonCardTitle></IonCardHeader>
                 <IonCardContent>
-                  <p><strong>Costo Receta:</strong> $ {totalRecipeCost.toFixed(2)}</p>
-                  <p><strong>Precio de Venta:</strong> $ {product?.salePrice.toFixed(2)}</p>
+                  <div style={{ marginBottom: '14px', background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <IonLabel style={{ fontWeight: 600, fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>
+                      Costo Estimado Directo ($)
+                    </IonLabel>
+                    <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 8px 0' }}>
+                      Costo aproximado en insumos por servicio o producto (si no usas lista de insumos).
+                    </p>
+                    <IonInput 
+                      type="number" 
+                      step="any" 
+                      min="0"
+                      value={estimatedCost} 
+                      onIonInput={e => setEstimatedCost(parseFloat(e.detail.value!) || 0)} 
+                      placeholder="0.00" 
+                      style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px' }}
+                    />
+                  </div>
+
+                  {totalRecipeCost > 0 && (
+                    <p style={{ margin: '4px 0' }}><strong>Costo por Receta:</strong> ${totalRecipeCost.toFixed(2)}</p>
+                  )}
+                  <p style={{ margin: '4px 0' }}><strong>Costo Base Considerado:</strong> ${effectiveCost.toFixed(2)}</p>
+                  <p style={{ margin: '4px 0' }}><strong>Precio de Venta:</strong> ${(product?.salePrice || 0).toFixed(2)}</p>
                   <hr className="ion-margin-vertical" />
                   {product && (
                     <>
-                      <p><strong>Ganancia Neta:</strong> $ {(product.salePrice - totalRecipeCost).toFixed(2)}</p>
-                      <p><strong>Margen:</strong> {product.salePrice > 0 ? ` ${(((product.salePrice - totalRecipeCost) / product.salePrice) * 100).toFixed(1)}%` : ' N/A'}</p>
+                      <p style={{ margin: '4px 0', color: (product.salePrice - effectiveCost) >= 0 ? '#16a34a' : '#dc2626' }}>
+                        <strong>Ganancia Neta:</strong> ${(product.salePrice - effectiveCost).toFixed(2)}
+                      </p>
+                      <p style={{ margin: '4px 0', fontWeight: 'bold' }}>
+                        <strong>Margen:</strong> {product.salePrice > 0 ? ` ${(((product.salePrice - effectiveCost) / product.salePrice) * 100).toFixed(1)}%` : ' N/A'}
+                      </p>
                     </>
                   )}
                 </IonCardContent>
@@ -234,7 +266,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
         </IonGrid>
       </IonContent>
       <IonFooter>
-        <IonToolbar><IonButton expand="block" color="success" style={{ margin: '10px' }} onClick={saveRecipe}>Guardar</IonButton></IonToolbar>
+        <IonToolbar><IonButton expand="block" color="success" style={{ margin: '10px' }} onClick={saveRecipe}>Guardar Composición y Costos</IonButton></IonToolbar>
       </IonFooter>
     </IonModal>
   );

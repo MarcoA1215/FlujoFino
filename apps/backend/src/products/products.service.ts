@@ -67,6 +67,8 @@ export class ProductsService {
         for (const ri of p.recipe) {
            if (ri.rawMaterial) baseCost += ri.quantity * ri.rawMaterial.costPerUnit;
         }
+      } else if (p.estimatedCost) {
+        baseCost = Number(p.estimatedCost);
       }
 
       return {

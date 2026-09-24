@@ -32,6 +32,9 @@ export class Settings {
   @Column('boolean', { default: false })
   featureBuySell: boolean;
 
+  @Column('boolean', { default: true })
+  featureProduction: boolean;
+
   @Column('boolean', { default: false })
   requireApprovalAlways: boolean;
 

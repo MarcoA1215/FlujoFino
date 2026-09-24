@@ -28,6 +28,9 @@ export class Product {
   @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
   salePrice: number;
 
+  @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  estimatedCost: number;
+
   @Column('int', { name: 'duration_minutes', nullable: true, default: 30 })
   durationMinutes: number | null;
 

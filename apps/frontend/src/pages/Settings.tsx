@@ -15,6 +15,7 @@ interface Settings {
   featureCustomerSchedules?: boolean;
   featureRecipes?: boolean;
   featureBuySell?: boolean;
+  featureProduction?: boolean;
   featureShowCatalog?: boolean;
   bookingRequireService?: boolean;
   bookingAllowStaffSelection?: boolean;
@@ -57,6 +58,7 @@ const SettingsPage: React.FC = () => {
           featureCustomerSchedules: settings.featureCustomerSchedules,
           featureRecipes: settings.featureRecipes,
           featureBuySell: settings.featureBuySell,
+          featureProduction: settings.featureProduction !== false,
           featureShowCatalog: settings.featureShowCatalog,
           bookingRequireService: settings.bookingRequireService,
           bookingAllowStaffSelection: settings.bookingAllowStaffSelection,
@@ -173,6 +175,15 @@ const SettingsPage: React.FC = () => {
                   <IonItem>
                     <IonLabel className="ion-text-wrap">Compra-Venta Directa (Retail)</IonLabel>
                     <IonToggle checked={settings.featureBuySell || false} onIonChange={e => setSettings({...settings, featureBuySell: e.detail.checked})} />
+                  </IonItem>
+                  <IonItem>
+                    <IonLabel className="ion-text-wrap">
+                      <h2>Módulo de Producción y Ensamblaje por Lotes</h2>
+                      <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
+                        Permite fabricar productos y preparar lotes antes de la venta. Desactívalo si tu negocio es 100% de servicios (Spas, Salones, Consultorios) para simplificar la interfaz.
+                      </p>
+                    </IonLabel>
+                    <IonToggle checked={settings.featureProduction !== false} onIonChange={e => setSettings({...settings, featureProduction: e.detail.checked})} />
                   </IonItem>
                   <IonItem>
                     <IonLabel className="ion-text-wrap">Portafolio / Catálogo Público de Trabajos</IonLabel>
