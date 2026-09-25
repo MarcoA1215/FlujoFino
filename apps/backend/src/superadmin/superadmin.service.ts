@@ -12,6 +12,7 @@ import {
   UpdateTenantPlanDTO,
   SaaSPaymentReportDTO,
   UserRole,
+  MySubscriptionDTO,
 } from '@nutrideli/shared-types';
 
 @Injectable()
@@ -80,6 +81,63 @@ export class SuperAdminService {
   }
 
   /**
+   * Returns current tenant's subscription details, referral metrics, and unique referral code
+   */
+  async getMySubscription(tenantId: string): Promise<MySubscriptionDTO> {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) {
+      throw new NotFoundException(`Tenant con id ${tenantId} no encontrado`);
+    }
+
+    // Ensure tenant has a referral code
+    if (!tenant.referral_code) {
+      const cleanPrefix = (tenant.name || 'FF')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .substring(0, 4)
+        .toUpperCase() || 'FF';
+      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+      tenant.referral_code = `${cleanPrefix}-${randomSuffix}`;
+      await this.tenantRepo.save(tenant);
+    }
+
+    const feeCalc = await this.calculateMonthlyFee(tenantId);
+
+    const totalReferrals = await this.tenantRepo.count({
+      where: { referred_by_tenant_id: tenantId },
+    });
+
+    const now = Date.now();
+    let trialDaysLeft = 0;
+    if (tenant.status === TenantStatus.TRIAL) {
+      const trialEnd = tenant.trial_ends_at
+        ? new Date(tenant.trial_ends_at).getTime()
+        : new Date(tenant.createdAt).getTime() + 15 * 86400000;
+      const diff = Math.ceil((trialEnd - now) / 86400000);
+      trialDaysLeft = Math.max(0, diff);
+    }
+
+    return {
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      status: tenant.status || TenantStatus.TRIAL,
+      planType: tenant.plan_type || TenantPlanType.REGULAR,
+      referralCode: tenant.referral_code,
+      basePrice: feeCalc.basePrice,
+      activeReferrals: feeCalc.activeReferrals,
+      totalReferrals,
+      discountPercentage: feeCalc.discountPercentage,
+      finalFee: feeCalc.finalFee,
+      trialDaysLeft,
+      trialEndsAt: tenant.trial_ends_at ? new Date(tenant.trial_ends_at).toISOString() : undefined,
+      currentPeriodEndsAt: tenant.current_period_ends_at
+        ? new Date(tenant.current_period_ends_at).toISOString()
+        : undefined,
+    };
+  }
+
+  /**
    * List all registered tenants with their owner, trial days left, plan, active referrals, and fee
    */
   async getTenants(): Promise<SuperAdminTenantDTO[]> {
@@ -142,6 +200,7 @@ export class SuperAdminService {
           : undefined,
         referredByTenantId: t.referred_by_tenant_id || undefined,
         referrerName: t.referred_by_tenant_id ? tenantNameMap.get(t.referred_by_tenant_id) : undefined,
+        referralCode: t.referral_code || undefined,
         createdAt: new Date(t.createdAt).toISOString(),
         owner: ownerMap.get(t.id),
         trialDaysLeft,

@@ -299,6 +299,7 @@ export interface SuperAdminTenantDTO {
   currentPeriodEndsAt?: string;
   referredByTenantId?: string;
   referrerName?: string;
+  referralCode?: string;
   createdAt: string;
   owner?: {
     id: string;
@@ -317,4 +318,21 @@ export interface UpdateTenantPlanDTO {
   extendDays?: number;
   basePrice?: number;
 }
+
+export interface MySubscriptionDTO {
+  tenantId: string;
+  tenantName: string;
+  status: TenantStatus;
+  planType: TenantPlanType;
+  referralCode: string;
+  basePrice: number;
+  activeReferrals: number;
+  totalReferrals: number;
+  discountPercentage: number;
+  finalFee: number;
+  trialDaysLeft: number;
+  trialEndsAt?: string;
+  currentPeriodEndsAt?: string;
+}
+
 

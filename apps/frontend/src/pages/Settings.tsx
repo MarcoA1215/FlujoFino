@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonButton, IonButtons, IonMenuButton, useIonToast, IonIcon, IonToggle } from '@ionic/react';
-import { saveOutline, refreshOutline } from 'ionicons/icons';
+import { saveOutline, refreshOutline, giftOutline, copyOutline, logoWhatsapp } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole, TenantPlanType, type MySubscriptionDTO } from '@nutrideli/shared-types';
 import { BookingSettings } from '../components/BookingSettings';
 
 interface Settings {
@@ -41,6 +41,7 @@ interface Settings {
 
 const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<Settings>({});
+  const [subscription, setSubscription] = useState<MySubscriptionDTO | null>(null);
   const [presentToast] = useIonToast();
   const { user } = useContext(AuthContext);
 
@@ -53,9 +54,19 @@ const SettingsPage: React.FC = () => {
     }
   };
 
+  const fetchSubscription = async () => {
+    try {
+      const res = await apiClient.get<MySubscriptionDTO>('/superadmin/my-subscription');
+      setSubscription(res.data);
+    } catch (e) {
+      console.log('Error cargando suscripción:', e);
+    }
+  };
+
   useEffect(() => {
     if (user?.role === UserRole.ADMIN) {
       fetchSettings();
+      fetchSubscription();
     }
   }, [user]);
 
@@ -143,6 +154,150 @@ const SettingsPage: React.FC = () => {
       <IonContent className="ion-padding">
         <IonGrid>
           <IonRow>
+            {/* Tarjeta Programa de Referidos • Invita y Ahorra */}
+            {subscription && (
+              <IonCol size="12">
+                <IonCard style={{
+                  margin: '0 0 16px 0',
+                  borderRadius: '16px',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.06)',
+                  border: subscription.planType === TenantPlanType.PIONEER ? '2px solid #f59e0b' : '2px solid #3b82f6',
+                  background: '#ffffff'
+                }}>
+                  <IonCardHeader style={{
+                    paddingBottom: '10px',
+                    background: subscription.planType === TenantPlanType.PIONEER 
+                      ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(217, 119, 6, 0.03) 100%)'
+                      : 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(29, 78, 216, 0.03) 100%)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <IonCardTitle style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <IonIcon icon={giftOutline} style={{ color: subscription.planType === TenantPlanType.PIONEER ? '#f59e0b' : '#3b82f6', fontSize: '22px' }} />
+                        Programa de Referidos • Invita y Ahorra
+                      </IonCardTitle>
+                      {subscription.planType === TenantPlanType.PIONEER ? (
+                        <span style={{
+                          background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                          color: '#fff',
+                          padding: '4px 12px',
+                          borderRadius: '20px',
+                          fontWeight: 800,
+                          fontSize: '11px',
+                          boxShadow: '0 2px 4px rgba(245, 158, 11, 0.3)'
+                        }}>
+                          ⭐ CUENTA PIONERA
+                        </span>
+                      ) : (
+                        <span style={{
+                          background: '#e0f2fe',
+                          color: '#0369a1',
+                          padding: '4px 12px',
+                          borderRadius: '20px',
+                          fontWeight: 800,
+                          fontSize: '11px'
+                        }}>
+                          PLAN REGULAR
+                        </span>
+                      )}
+                    </div>
+                  </IonCardHeader>
+
+                  <IonCardContent style={{ paddingTop: '14px' }}>
+                    <p style={{ color: '#475569', fontSize: '14px', lineHeight: '1.5', margin: '0 0 16px 0' }}>
+                      {subscription.planType === TenantPlanType.PIONEER ? (
+                        <>
+                          ¡Tu negocio forma parte de las cuentas <strong>Pioneras</strong> de Flujo Fino! Invita a <strong>2 negocios</strong> que activen su suscripción y tendrás el sistema <strong>100% GRATIS de por vida ($0/mes)</strong>.
+                        </>
+                      ) : (
+                        <>
+                          Comparte Flujo Fino con otros negocios amigos. Obtén un <strong>10% de descuento mensual</strong> por cada referido activo que mantengas (¡hasta un <strong>50% de descuento</strong> recurrente!).
+                        </>
+                      )}
+                    </p>
+
+                    {/* Métricas y Progreso */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                      <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                        <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Referidos Activos</div>
+                        <div style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
+                          {subscription.activeReferrals}
+                          {subscription.planType === TenantPlanType.PIONEER && (
+                            <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 500 }}> / 2</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                        <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Descuento Obtenido</div>
+                        <div style={{ fontSize: '24px', fontWeight: 800, color: subscription.discountPercentage > 0 ? '#10b981' : '#64748b', marginTop: '2px' }}>
+                          {subscription.discountPercentage}% OFF
+                        </div>
+                      </div>
+
+                      <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                        <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Tu Cuota Mensual</div>
+                        <div style={{ fontSize: '24px', fontWeight: 800, color: subscription.finalFee === 0 ? '#10b981' : '#0f172a', marginTop: '2px' }}>
+                          ${subscription.finalFee.toFixed(2)}
+                          <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 400 }}> / mes</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Código y Enlace de Invitación */}
+                    <div style={{ background: '#f1f5f9', padding: '14px', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+                        <div>
+                          <div style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>Tu Código de Referido:</div>
+                          <div style={{ fontSize: '22px', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a', letterSpacing: '1px', marginTop: '2px' }}>
+                            {subscription.referralCode}
+                          </div>
+                        </div>
+                        <IonButton
+                          size="small"
+                          fill="outline"
+                          color="dark"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(subscription.referralCode);
+                            presentToast({ message: 'Código de referido copiado', duration: 1500, color: 'dark' });
+                          }}
+                        >
+                          <IonIcon icon={copyOutline} slot="start" /> Copiar Código
+                        </IonButton>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <IonButton
+                          color="primary"
+                          style={{ flex: 1, minWidth: '160px', fontWeight: 700 }}
+                          onClick={() => {
+                            const link = `${window.location.origin}/register?ref=${subscription.referralCode}`;
+                            navigator.clipboard?.writeText(link);
+                            presentToast({ message: 'Enlace de registro copiado al portapapeles', duration: 2000, color: 'success' });
+                          }}
+                        >
+                          <IonIcon icon={copyOutline} slot="start" />
+                          Copiar Enlace de Invitación
+                        </IonButton>
+
+                        <IonButton
+                          color="success"
+                          style={{ flex: 1, minWidth: '160px', fontWeight: 700 }}
+                          onClick={() => {
+                            const link = `${window.location.origin}/register?ref=${subscription.referralCode}`;
+                            const msg = `¡Hola! Te recomiendo Flujo Fino para administrar tu negocio (punto de venta, pedidos, inventario y delivery). Regístrate gratis con mi enlace de invitación: ${link}`;
+                            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                          }}
+                        >
+                          <IonIcon icon={logoWhatsapp} slot="start" />
+                          Compartir por WhatsApp
+                        </IonButton>
+                      </div>
+                    </div>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+            )}
+
             <IonCol size="12" sizeMd="6">
               <IonCard>
                 <IonCardHeader>

@@ -1,6 +1,6 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonButton, useIonToast, IonToggle, IonText, IonIcon } from '@ionic/react';
-import { informationCircleOutline, arrowBackOutline, arrowForwardOutline, checkmarkDoneOutline } from 'ionicons/icons';
+import { informationCircleOutline, arrowBackOutline, arrowForwardOutline, checkmarkDoneOutline, giftOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import { useIonRouter } from '@ionic/react';
@@ -11,6 +11,15 @@ const Register: React.FC = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref') || params.get('referral');
+    if (ref) {
+      setReferralCode(ref.trim().toUpperCase());
+    }
+  }, []);
   
   const [featureCustomerSchedules, setFeatureCustomerSchedules] = useState(false);
   const [featureRecipes, setFeatureRecipes] = useState(false);
@@ -32,6 +41,7 @@ const Register: React.FC = () => {
         username,
         email,
         password,
+        referralCode: referralCode.trim() || undefined,
         featureCustomerSchedules,
         featureRecipes,
         featureBuySell
@@ -80,6 +90,24 @@ const Register: React.FC = () => {
                     <IonLabel position="stacked">Contraseña</IonLabel>
                     <IonInput type="password" value={password} placeholder="Mínimo 6 caracteres" onIonInput={e => setPassword(e.detail.value!)} />
                   </IonItem>
+
+                  <IonItem lines="full" className="ion-margin-bottom">
+                    <IonLabel position="stacked" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <IonIcon icon={giftOutline} style={{ color: '#f59e0b' }} />
+                      ¿Tienes un código de referido? (Opcional)
+                    </IonLabel>
+                    <IonInput
+                      value={referralCode}
+                      placeholder="Ej. BURG-9X2A"
+                      onIonInput={e => setReferralCode(e.detail.value || '')}
+                      style={{ textTransform: 'uppercase', letterSpacing: '1px' }}
+                    />
+                  </IonItem>
+                  {referralCode.trim() && (
+                    <div style={{ margin: '-8px 0 14px 4px', fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <IonIcon icon={checkmarkDoneOutline} /> Código de invitación vinculado: <strong>{referralCode.trim().toUpperCase()}</strong>
+                    </div>
+                  )}
                   
                   <IonButton expand="block" className="ion-margin-top" onClick={() => setStep(2)}>
                     Siguiente <IonIcon slot="end" icon={arrowForwardOutline} />

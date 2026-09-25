@@ -34,8 +34,12 @@ export class Tenant {
   @Column({ type: 'uuid', nullable: true })
   referred_by_tenant_id: string;
 
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  referral_code: string;
+
   @Column('decimal', { precision: 10, scale: 2, default: 20.00, transformer: new ColumnNumericTransformer() })
   base_price: number;
+
 
   @CreateDateColumn()
   createdAt: Date;

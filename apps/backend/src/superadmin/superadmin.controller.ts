@@ -23,7 +23,7 @@ export class SuperAdminController {
   @Get('my-subscription')
   async getMySubscription(@Req() req: any) {
     const tenantId = req.user.tenantId;
-    return await this.superadminService.calculateMonthlyFee(tenantId);
+    return await this.superadminService.getMySubscription(tenantId);
   }
 
   /**

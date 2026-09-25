@@ -262,13 +262,37 @@ export class AuthService {
       const trialEndsAt = new Date();
       trialEndsAt.setDate(trialEndsAt.getDate() + 15);
 
+      // Generate unique referral code for this new business (e.g., BURG-9X2A)
+      const cleanPrefix = (body.tenantName || 'FF')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .substring(0, 4)
+        .toUpperCase() || 'FF';
+      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const myReferralCode = `${cleanPrefix}-${randomSuffix}`;
+
+      // Resolve referrer if a referral code or ID was provided
+      let referredByTenantId: string | null = null;
+      if (body.referralCode && typeof body.referralCode === 'string' && body.referralCode.trim()) {
+        const inputCode = body.referralCode.trim().toUpperCase();
+        const referrerTenant: any = await queryRunner.manager.createQueryBuilder('Tenant', 't')
+          .where('UPPER(t.referral_code) = :code', { code: inputCode })
+          .orWhere('CAST(t.id AS VARCHAR) = :codeId', { codeId: body.referralCode.trim() })
+          .getOne();
+        if (referrerTenant) {
+          referredByTenantId = referrerTenant.id;
+        }
+      }
+
       const tenant = queryRunner.manager.create('Tenant', {
         name: body.tenantName,
         isActive: true,
         status: 'TRIAL',
         plan_type: 'REGULAR',
         trial_ends_at: trialEndsAt,
-        referred_by_tenant_id: body.referredByTenantId || null,
+        referred_by_tenant_id: referredByTenantId || body.referredByTenantId || null,
+        referral_code: myReferralCode,
         base_price: 20.00,
       });
       const savedTenant: any = await queryRunner.manager.save(tenant);
