@@ -23,6 +23,10 @@ const Products: React.FC = () => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
   const [isCreatingCombo, setIsCreatingCombo] = useState(false);
+  const [isResaleModal, setIsResaleModal] = useState(false);
+
+  const isRetailOnly = Boolean(settings?.featureBuySell && !settings?.featureCustomerSchedules && !settings?.featureRecipes);
+  const isHybrid = Boolean(settings?.featureBuySell && (settings?.featureCustomerSchedules || settings?.featureRecipes));
 
   const fetchData = async () => {
     try {
@@ -50,16 +54,56 @@ const Products: React.FC = () => {
     fetchUsers();
   }, []);
 
-  const openCreateModal = (isCombo: boolean) => {
+  const openCreateModal = (isCombo: boolean, isResale: boolean = false) => {
     setProductToEdit(null);
     setIsCreatingCombo(isCombo);
+    setIsResaleModal(isRetailOnly || isResale);
     setShowProductModal(true);
   };
 
   const openEditModal = (p: Product) => {
     setProductToEdit(p);
     setIsCreatingCombo(!!p.isCombo);
+    const isService = p.is_service === true || p.category === 'Servicios' || Boolean(p.durationMinutes);
+    const isResale = isRetailOnly || (!isService && !p.isCombo && (!p.recipe || p.recipe.length === 0));
+    setIsResaleModal(isResale);
     setShowProductModal(true);
+  };
+
+  const openAddStockAlert = (p: Product) => {
+    const curStock = p.stock !== undefined && p.stock !== null ? p.stock : p.stockQuantity;
+    presentAlert({
+      header: 'Cargar Stock: ' + p.name,
+      subHeader: `Stock actual: ${curStock} unidades`,
+      inputs: [
+        { name: 'additionalStock', type: 'number', placeholder: 'Cantidad a sumar (ej. 10)', min: 1 },
+        { name: 'newCost', type: 'number', placeholder: 'Nuevo costo unitario $ (opcional)' }
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { 
+          text: 'Cargar Stock', 
+          handler: async (data) => {
+            const qty = parseFloat(data.additionalStock);
+            if (!qty || isNaN(qty) || qty <= 0) {
+              presentToast({ message: 'Ingresa una cantidad válida', duration: 2500, color: 'warning' });
+              return false;
+            }
+            const cost = data.newCost ? parseFloat(data.newCost) : undefined;
+            try {
+              await apiClient.patch('/products/' + p.id + '/add-stock', { 
+                additionalStock: qty,
+                newCost: cost
+              });
+              fetchData();
+              presentToast({ message: `Se añadieron ${qty} unidades a ${p.name}`, duration: 2500, color: 'success' });
+            } catch(e: any) {
+              presentToast({ message: 'Error: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
+            }
+          } 
+        }
+      ]
+    });
   };
 
   const openAdjustStockAlert = (p: Product) => {
@@ -189,11 +233,42 @@ const Products: React.FC = () => {
       <IonContent fullscreen className="ion-padding">
         <IonGrid>
           {!isClientMode && (
-  <IonRow className="ion-margin-bottom">
-    <IonCol size="12" sizeSm="6" sizeMd="4"><IonButton expand="block" color="primary" onClick={() => openCreateModal(false)}>+ Crear Producto / Servicio</IonButton></IonCol>
-    <IonCol size="12" sizeSm="6" sizeMd="4"><IonButton expand="block" color="tertiary" onClick={() => openCreateModal(true)}>+ Crear Combo</IonButton></IonCol>
-  </IonRow>
-)}
+            <IonRow className="ion-margin-bottom">
+              {isRetailOnly ? (
+                <IonCol size="12" sizeSm="6" sizeMd="4">
+                  <IonButton expand="block" color="primary" onClick={() => openCreateModal(false, true)}>
+                    + Nuevo Producto
+                  </IonButton>
+                </IonCol>
+              ) : isHybrid ? (
+                <>
+                  <IonCol size="12" sizeSm="6" sizeMd="4">
+                    <IonButton expand="block" color="success" onClick={() => openCreateModal(false, true)}>
+                      + Producto para Reventa
+                    </IonButton>
+                  </IonCol>
+                  <IonCol size="12" sizeSm="6" sizeMd="4">
+                    <IonButton expand="block" color="primary" onClick={() => openCreateModal(false, false)}>
+                      + Servicio / Con Fórmula
+                    </IonButton>
+                  </IonCol>
+                </>
+              ) : (
+                <>
+                  <IonCol size="12" sizeSm="6" sizeMd="4">
+                    <IonButton expand="block" color="primary" onClick={() => openCreateModal(false, false)}>
+                      + Crear Producto / Servicio
+                    </IonButton>
+                  </IonCol>
+                  <IonCol size="12" sizeSm="6" sizeMd="4">
+                    <IonButton expand="block" color="tertiary" onClick={() => openCreateModal(true, false)}>
+                      + Crear Combo
+                    </IonButton>
+                  </IonCol>
+                </>
+              )}
+            </IonRow>
+          )}
 
           <IonRow>
             <IonCol size="12">
@@ -205,6 +280,7 @@ const Products: React.FC = () => {
                       ? p.images[p.images.length - 1] 
                       : (typeof p.images === 'string' && p.images ? (p.images as string).split(',').pop()?.trim() : null);
                     const isService = isServiceOrNoProduction(p);
+                    const currentStock = p.stock !== undefined && p.stock !== null ? p.stock : p.stockQuantity;
                     return (
                       <IonItem key={p.id} style={{ '--padding-top': '10px', '--padding-bottom': '10px' }}>
                         {img && (
@@ -232,8 +308,8 @@ const Products: React.FC = () => {
                             Disponible
                           </IonBadge>
                         ) : (
-                          <IonBadge slot="end" color={p.stockQuantity > 0 ? 'success' : 'danger'} style={{ padding: '6px 10px', fontSize: '0.85rem' }}>
-                            {p.stockQuantity > 0 ? `Stock: ${p.stockQuantity}` : 'Agotado'}
+                          <IonBadge slot="end" color={currentStock > 0 ? 'success' : 'danger'} style={{ padding: '6px 10px', fontSize: '0.85rem' }}>
+                            {currentStock > 0 ? `Stock: ${currentStock}` : 'Agotado'}
                           </IonBadge>
                         )}
                       </IonItem>
@@ -253,6 +329,7 @@ const Products: React.FC = () => {
                         onDelete={handleDeleteProduct}
                         onConfigure={() => setSelectedProductForRecipe(p)}
                         onAdjustStock={openAdjustStockAlert}
+                        onAddStock={openAddStockAlert}
                         onRegisterLoss={openLossAlert}
                         onToggleKitting={handleToggleKitting}
                         onUnpackKit={handleUnpackKit}
@@ -277,6 +354,7 @@ const Products: React.FC = () => {
           }}
           product={productToEdit}
           isCombo={isCreatingCombo}
+          isResaleOnly={isResaleModal}
           users={users}
         />
       </IonContent>

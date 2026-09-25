@@ -145,8 +145,9 @@ export class OrdersService {
               }
             }
           } else if (!product.isCombo || product.isPreAssembled) {
-            const isService = product.category === 'Servicios' || Boolean(product.durationMinutes);
-            if (!isService && product.stockQuantity < itemDto.quantity) {
+            const isService = product.is_service || product.category === 'Servicios' || Boolean(product.durationMinutes);
+            const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
+            if (!isService && currentStock < itemDto.quantity) {
               requiresPreparation = true;
             }
           }
@@ -238,9 +239,11 @@ export class OrdersService {
             }
           }
         } else if (!product.isCombo || product.isPreAssembled) {
-          const isService = product.category === 'Servicios' || Boolean(product.durationMinutes);
+          const isService = product.is_service || product.category === 'Servicios' || Boolean(product.durationMinutes);
           if (!isService) {
-            product.stockQuantity -= itemDto.quantity;
+            const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
+            product.stock = currentStock - itemDto.quantity;
+            product.stockQuantity = product.stock;
             await manager.save(Product, product);
           }
         }
@@ -262,6 +265,8 @@ export class OrdersService {
             for (const ri of product.recipe) {
                 if (ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit;
             }
+        } else if (product.cost !== undefined && product.cost !== null && Number(product.cost) > 0) {
+            unitCost = Number(product.cost);
         } else if (product.estimatedCost) {
             unitCost = Number(product.estimatedCost);
         }
@@ -378,7 +383,7 @@ export class OrdersService {
                 }
               }
             } else if (!product.isCombo || product.isPreAssembled) {
-                const isService = product.category === 'Servicios' || Boolean(product.durationMinutes);
+                const isService = product.is_service || product.category === 'Servicios' || Boolean(product.durationMinutes);
                 if (!isService) {
                   if (product.physicalStock < item.quantity) {
                     throw new BadRequestException('Falta stock físico para entregar');
@@ -428,11 +433,13 @@ export class OrdersService {
                 }
               }
             } else if (!product.isCombo || product.isPreAssembled) {
-                const isService = product.category === 'Servicios' || Boolean(product.durationMinutes);
+                const isService = product.is_service || product.category === 'Servicios' || Boolean(product.durationMinutes);
                 if (!isService) {
-                  product.stockQuantity += item.quantity;
+                  const restored = (Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0) + item.quantity;
+                  product.stock = restored;
+                  product.stockQuantity = restored;
                   if (order.status === OrderStatus.DELIVERED) {
-                    product.physicalStock += item.quantity;
+                    product.physicalStock = (Number(product.physicalStock) || 0) + item.quantity;
                   }
                   await manager.save(Product, product);
                 }

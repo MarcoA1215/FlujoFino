@@ -73,6 +73,9 @@ export class ProductsService {
 
       return {
         ...p,
+        cost: p.cost !== undefined && p.cost !== null ? Number(p.cost) : (p.estimatedCost ? Number(p.estimatedCost) : 0),
+        stock: finalStock,
+        is_service: p.is_service !== undefined ? p.is_service : (p.category === 'Servicios' || Boolean(p.durationMinutes)),
         baseCost,
         stockQuantity: finalStock,
         physicalStock: finalPhysical,
@@ -88,7 +91,19 @@ export class ProductsService {
   }
 
   async create(tenantId: string, dto: CreateProductDto) {
-    const product = this.productRepo.create({ ...dto, tenantId });
+    const stockVal = dto.stock !== undefined ? dto.stock : (dto.stockQuantity || 0);
+    const costVal = dto.cost !== undefined ? dto.cost : (dto.estimatedCost || 0);
+    const isServiceVal = dto.is_service !== undefined ? dto.is_service : false;
+    const product = this.productRepo.create({
+      ...dto,
+      stock: stockVal,
+      stockQuantity: stockVal,
+      physicalStock: stockVal,
+      cost: costVal,
+      estimatedCost: costVal,
+      is_service: isServiceVal,
+      tenantId
+    });
     return this.productRepo.save(product);
   }
 
@@ -118,6 +133,19 @@ export class ProductsService {
           product.physicalStock = 0;
           product.stockQuantity = 0;
         }
+      }
+
+      if (dto.stock !== undefined) {
+        product.stock = dto.stock;
+        product.stockQuantity = dto.stock;
+        product.physicalStock = dto.stock;
+      }
+      if (dto.cost !== undefined) {
+        product.cost = dto.cost;
+        product.estimatedCost = dto.cost;
+      }
+      if (dto.is_service !== undefined) {
+        product.is_service = dto.is_service;
       }
 
       Object.assign(product, dto);
@@ -299,7 +327,27 @@ export class ProductsService {
 
   async adjustStock(tenantId: string, id: string, quantity: number) {
     const product = await this.findOne(tenantId, id);
-    product.stockQuantity += quantity;
+    const qty = Number(quantity) || 0;
+    product.stockQuantity = (Number(product.stockQuantity) || 0) + qty;
+    product.stock = (Number(product.stock) || 0) + qty;
+    product.physicalStock = (Number(product.physicalStock) || 0) + qty;
+    return this.productRepo.save(product);
+  }
+
+  async addStock(tenantId: string, id: string, dto: { additionalStock: number; newCost?: number }) {
+    const product = await this.findOne(tenantId, id);
+    const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
+    const added = Number(dto.additionalStock) || 0;
+    const newStock = currentStock + added;
+
+    product.stock = newStock;
+    product.stockQuantity = newStock;
+    product.physicalStock = (Number(product.physicalStock) || 0) + added;
+
+    if (dto.newCost !== undefined && dto.newCost !== null && !isNaN(Number(dto.newCost))) {
+      product.cost = Number(dto.newCost);
+      product.estimatedCost = Number(dto.newCost);
+    }
     return this.productRepo.save(product);
   }
 

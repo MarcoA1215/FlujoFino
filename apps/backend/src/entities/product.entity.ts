@@ -40,6 +40,15 @@ export class Product {
   @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   stockQuantity: number;
 
+  @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  cost: number;
+
+  @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  stock: number;
+
+  @Column({ name: 'is_service', default: false })
+  is_service: boolean;
+
   @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   physicalStock: number;
 

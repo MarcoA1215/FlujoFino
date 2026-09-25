@@ -10,4 +10,8 @@ export class CreateProductDto {
   @IsOptional() @IsBoolean() isCombo?: boolean;
   @IsOptional() @IsBoolean() isPreAssembled?: boolean;
   @IsOptional() @IsArray() assignedStaffIds?: string[];
+  @IsOptional() @IsNumber() cost?: number;
+  @IsOptional() @IsNumber() stock?: number;
+  @IsOptional() @IsNumber() stockQuantity?: number;
+  @IsOptional() @IsBoolean() is_service?: boolean;
 }

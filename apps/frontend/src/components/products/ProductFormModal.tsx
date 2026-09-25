@@ -24,6 +24,7 @@ interface ProductFormModalProps {
   onSaved: () => void;
   product: Product | null;
   isCombo?: boolean;
+  isResaleOnly?: boolean;
   users: any[];
 }
 
@@ -33,6 +34,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   onSaved,
   product,
   isCombo = false,
+  isResaleOnly = false,
   users
 }) => {
   const [presentToast] = useIonToast();
@@ -40,6 +42,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [category, setCategory] = useState('');
   const [salePrice, setSalePrice] = useState('');
   const [estimatedCost, setEstimatedCost] = useState('');
+  const [stock, setStock] = useState('0');
   const [durationMinutes, setDurationMinutes] = useState('30');
   const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -49,7 +52,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setName(product.name || '');
       setCategory(product.category || '');
       setSalePrice(product.salePrice !== undefined ? String(product.salePrice) : '');
-      setEstimatedCost(product.estimatedCost !== undefined && product.estimatedCost !== null ? String(product.estimatedCost) : '');
+      const existingCost = product.cost !== undefined && product.cost !== null ? product.cost : product.estimatedCost;
+      setEstimatedCost(existingCost !== undefined && existingCost !== null ? String(existingCost) : '');
+      setStock(product.stock !== undefined && product.stock !== null ? String(product.stock) : String(product.stockQuantity || '0'));
       setDurationMinutes(product.durationMinutes ? String(product.durationMinutes) : '30');
       
       let staffIds: string[] = [];
@@ -61,13 +66,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setSelectedStaffIds(staffIds);
     } else {
       setName('');
-      setCategory(isCombo ? 'Combos' : 'Servicios');
+      setCategory(isCombo ? 'Combos' : isResaleOnly ? 'General' : 'Servicios');
       setSalePrice('');
       setEstimatedCost('');
+      setStock('0');
       setDurationMinutes('30');
       setSelectedStaffIds([]);
     }
-  }, [product, isCombo, isOpen]);
+  }, [product, isCombo, isResaleOnly, isOpen]);
 
   const toggleStaff = (userId: string) => {
     setSelectedStaffIds(prev => 
@@ -98,13 +104,20 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
     setSaving(true);
     try {
+      const costNum = estimatedCost ? parseFloat(estimatedCost) : 0;
+      const stockNum = stock ? parseFloat(stock) : 0;
       const payload: any = {
         name: name.trim(),
         category: category.trim() || undefined,
         salePrice: priceNum,
-        estimatedCost: estimatedCost ? parseFloat(estimatedCost) : 0,
-        durationMinutes: durationMinutes ? parseInt(durationMinutes, 10) : 30,
-        assignedStaffIds: selectedStaffIds
+        cost: costNum,
+        estimatedCost: costNum,
+        stock: stockNum,
+        stockQuantity: stockNum,
+        physicalStock: stockNum,
+        durationMinutes: isResaleOnly ? null : (durationMinutes ? parseInt(durationMinutes, 10) : 30),
+        assignedStaffIds: isResaleOnly ? [] : selectedStaffIds,
+        is_service: isResaleOnly ? false : (product?.is_service !== undefined ? product.is_service : false)
       };
 
       if (product) {
@@ -114,7 +127,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         payload.isCombo = isCombo;
         payload.isPreAssembled = false;
         await apiClient.post('/products', payload);
-        presentToast({ message: isCombo ? 'Combo creado con éxito' : 'Servicio/Producto creado con éxito', duration: 2500, color: 'success' });
+        presentToast({ message: isCombo ? 'Combo creado con éxito' : isResaleOnly ? 'Producto creado con éxito' : 'Servicio/Producto creado con éxito', duration: 2500, color: 'success' });
       }
 
       onSaved();
@@ -136,7 +149,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       <IonHeader>
         <IonToolbar color="primary">
           <IonTitle>
-            {product ? `Editar: ${product.name}` : isCombo ? 'Nuevo Combo' : 'Nuevo Producto / Servicio'}
+            {product ? `Editar: ${product.name}` : isCombo ? 'Nuevo Combo' : isResaleOnly ? 'Nuevo Producto' : 'Nuevo Servicio / Fórmula'}
           </IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={onClose}>
@@ -152,15 +165,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           {/* Main Info Card */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
             <h4 style={{ margin: '0 0 14px 0', fontSize: '15px', fontWeight: '700', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <IonIcon icon={pricetagOutline} color="primary" /> Información Principal
+              <IonIcon icon={pricetagOutline} color="primary" /> {isResaleOnly ? 'Datos del Producto' : 'Información Principal'}
             </h4>
 
             <IonItem lines="none" style={{ marginBottom: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', '--background': '#ffffff' } as any}>
-              <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600' }}>Nombre del Servicio / Producto *</IonLabel>
+              <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600' }}>
+                {isResaleOnly ? 'Nombre del Producto *' : 'Nombre del Servicio / Producto *'}
+              </IonLabel>
               <IonInput 
                 value={name} 
                 onIonInput={e => setName(e.detail.value!)} 
-                placeholder="Ej. Uñas Acrílicas, Masaje Relajante, etc." 
+                placeholder={isResaleOnly ? 'Ej. Vestido Casual, Pantalón Jean, Nutella 350g...' : 'Ej. Uñas Acrílicas, Masaje Relajante, etc.'} 
               />
             </IonItem>
 
@@ -169,7 +184,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               <IonInput 
                 value={category} 
                 onIonInput={e => setCategory(e.detail.value!)} 
-                placeholder="Ej. Servicios, Manicura, Masajes, Estética..." 
+                placeholder={isResaleOnly ? 'Ej. Ropa, Snacks, Bodegón, Bebidas...' : 'Ej. Servicios, Manicura, Masajes, Estética...'} 
               />
             </IonItem>
 
@@ -186,38 +201,56 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </IonItem>
 
               <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', '--background': '#ffffff' } as any}>
-                <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600' }}>Costo Insumos ($)</IonLabel>
+                <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600' }}>
+                  {isResaleOnly ? 'Costo de Compra ($)' : 'Costo Insumos ($)'}
+                </IonLabel>
                 <IonInput 
                   type="number" 
                   value={estimatedCost} 
                   onIonInput={e => setEstimatedCost(e.detail.value!)} 
-                  placeholder="Opcional (Ej. 5.00)" 
+                  placeholder={isResaleOnly ? 'Ej. 10.00' : 'Opcional (Ej. 5.00)'} 
                   step="0.01"
                 />
               </IonItem>
             </div>
 
-            <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', '--background': '#ffffff' } as any}>
-              <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <IonIcon icon={timeOutline} /> Duración Estimada (Minutos)
-              </IonLabel>
-              <IonInput 
-                type="number" 
-                value={durationMinutes} 
-                onIonInput={e => setDurationMinutes(e.detail.value!)} 
-                placeholder="Ej. 30, 45, 60..." 
-                min="5"
-                step="5"
-              />
-            </IonItem>
+            {isResaleOnly ? (
+              <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', '--background': '#ffffff' } as any}>
+                <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {product ? 'Stock Actual' : 'Stock Inicial'}
+                </IonLabel>
+                <IonInput 
+                  type="number" 
+                  value={stock} 
+                  onIonInput={e => setStock(e.detail.value!)} 
+                  placeholder="Ej. 15" 
+                  min="0"
+                />
+              </IonItem>
+            ) : (
+              <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', '--background': '#ffffff' } as any}>
+                <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <IonIcon icon={timeOutline} /> Duración Estimada (Minutos)
+                </IonLabel>
+                <IonInput 
+                  type="number" 
+                  value={durationMinutes} 
+                  onIonInput={e => setDurationMinutes(e.detail.value!)} 
+                  placeholder="Ej. 30, 45, 60..." 
+                  min="5"
+                  step="5"
+                />
+              </IonItem>
+            )}
           </div>
 
-          {/* Assigned Staff Card */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <IonIcon icon={personOutline} color="primary" /> Especialistas / Personal que realiza este trabajo
-              </h4>
+          {/* Assigned Staff Card - only if not resale-only */}
+          {!isResaleOnly && (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <IonIcon icon={personOutline} color="primary" /> Especialistas / Personal que realiza este trabajo
+                </h4>
               {users.length > 0 && (
                 <button 
                   type="button"
@@ -308,6 +341,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </div>
             )}
           </div>
+          )}
 
         </div>
       </IonContent>

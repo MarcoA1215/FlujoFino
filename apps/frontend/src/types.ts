@@ -15,6 +15,9 @@ export type Product = {
   estimatedCost?: number;
   baseCost?: number;
   assignedStaffIds?: string[];
+  cost?: number;
+  stock?: number;
+  is_service?: boolean;
 };
 
 export type RawMaterial = {

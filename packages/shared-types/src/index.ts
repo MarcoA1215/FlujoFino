@@ -74,6 +74,9 @@ export interface ProductDTO {
   recipe?: RecipeItemDTO[];
   comboItems?: ComboItemDTO[];
   assignedStaffIds?: string[];
+  cost?: number;
+  stock?: number;
+  is_service?: boolean;
 }
 
 export interface OrderItemDTO {

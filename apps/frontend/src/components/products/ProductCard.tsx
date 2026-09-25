@@ -10,6 +10,7 @@ interface ProductCardProps {
   onDelete: (p: Product) => void;
   onConfigure: (p: Product) => void;
   onAdjustStock: (p: Product) => void;
+  onAddStock?: (p: Product) => void;
   onRegisterLoss: (p: Product) => void;
   onToggleKitting?: (p: Product) => void;
   onUnpackKit?: (p: Product) => void;
@@ -24,6 +25,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onDelete,
   onConfigure,
   onAdjustStock,
+  onAddStock,
   onRegisterLoss,
   onToggleKitting,
   onUnpackKit,
@@ -35,9 +37,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const [present] = useIonActionSheet();
 
   const openOptions = () => {
+    const isService = p.is_service === true || (featureProduction === false && p.category === 'Servicios') || Boolean(p.durationMinutes);
+    const isResale = !isService && !p.isCombo && (!p.recipe || p.recipe.length === 0);
+
     const buttons: any[] = [
       { text: 'Editar Info / Precio', icon: pencilOutline, cssClass: 'action-sheet-editar', handler: () => onEdit(p) }
     ];
+
+    if (isResale && onAddStock) {
+      buttons.push({ text: 'Cargar Stock', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAddStock(p) });
+    }
 
     if (p.isCombo) {
       buttons.push({ text: 'Configurar Combo', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
@@ -96,7 +105,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     return null;
   };
   const imageUrl = getProductImage();
-  const isService = featureProduction === false || p.category === 'Servicios' || Boolean(p.durationMinutes);
+  const isService = p.is_service === true || (featureProduction === false && p.category === 'Servicios') || Boolean(p.durationMinutes);
+  const isResale = !isService && !p.isCombo && (!p.recipe || p.recipe.length === 0);
+  const costValue = p.cost !== undefined && p.cost !== null && Number(p.cost) > 0 ? Number(p.cost) : (p.estimatedCost ? Number(p.estimatedCost) : 0);
+  const currentStock = p.stock !== undefined && p.stock !== null ? p.stock : p.stockQuantity;
 
   return (
     <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3" style={{ display: 'flex' }}>
@@ -118,7 +130,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             
             {!isClientMode && (
               <p style={{ margin: '0 0 8px 0', color: 'gray', fontSize: '0.85rem' }}>
-                {p.category || 'Sin categoría'} - {p.isCombo ? 'Combo' : 'Base'}
+                {p.category || 'Sin categoría'} - {p.isCombo ? 'Combo' : isResale ? 'Reventa' : 'Base'}
               </p>
             )}
             
@@ -126,21 +138,25 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               Precio: ${p.salePrice.toFixed(2)}
             </p>
 
-            {p.estimatedCost && Number(p.estimatedCost) > 0 && !isClientMode && (
+            {costValue > 0 && !isClientMode && (
               <p style={{ margin: '-8px 0 10px 0', fontSize: '0.82rem', color: '#10b981', fontWeight: 600 }}>
-                Costo Est.: ${Number(p.estimatedCost).toFixed(2)} &bull; Margen: ${(p.salePrice - Number(p.estimatedCost)).toFixed(2)}
+                {isResale ? 'Costo:' : 'Costo Est.:'} ${costValue.toFixed(2)} &bull; Margen: ${(p.salePrice - costValue).toFixed(2)}
               </p>
             )}
 
             {isClientMode && (
-              <p style={{ margin: '0 0 12px 0', color: (isService || p.stockQuantity > 0) ? 'var(--ion-color-success)' : 'var(--ion-color-danger)', fontWeight: '500', fontSize: '0.9rem' }}>
-                {isService ? 'Disponible' : (p.stockQuantity > 0 ? `Disponible: ${p.stockQuantity}` : 'Agotado')}
+              <p style={{ margin: '0 0 12px 0', color: (isService || currentStock > 0) ? 'var(--ion-color-success)' : 'var(--ion-color-danger)', fontWeight: '500', fontSize: '0.9rem' }}>
+                {isService ? 'Disponible' : (currentStock > 0 ? `Disponible: ${currentStock}` : 'Agotado')}
               </p>
             )}
 
             {!isClientMode && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
-                {!isService && (!p.isCombo || p.isPreAssembled) && (
+                {isResale ? (
+                  <IonBadge color={currentStock <= 0 ? 'danger' : 'success'} style={{ padding: '6px 8px', fontSize: '0.82rem', fontWeight: 'bold' }}>
+                    Stock: {currentStock}
+                  </IonBadge>
+                ) : !isService && (!p.isCombo || p.isPreAssembled) ? (
                   <>
                     {Boolean(featureProduction) && (
                       <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
@@ -151,7 +167,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                       Disp: {p.stockQuantity}
                     </IonBadge>
                   </>
-                )}
+                ) : null}
                 {!isService && (p.isCombo && !p.isPreAssembled) && (
                   <IonBadge color="tertiary" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
                     Combo (Virtual)
@@ -182,8 +198,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
           
           {!isClientMode && (
-            <div style={{ marginTop: 'auto', paddingTop: '10px' }}>
-              <IonButton expand="block" size="small" fill="outline" color="primary" onClick={openOptions} style={{ margin: 0, fontWeight: '600' }}>
+            <div style={{ marginTop: 'auto', paddingTop: '10px', display: 'flex', gap: '8px' }}>
+              {isResale && onAddStock && (
+                <IonButton expand="block" size="small" color="success" onClick={() => onAddStock(p)} style={{ flex: 1, margin: 0, fontWeight: '700' }}>
+                  + Cargar Stock
+                </IonButton>
+              )}
+              <IonButton expand={isResale && onAddStock ? undefined : "block"} size="small" fill="outline" color="primary" onClick={openOptions} style={{ margin: 0, fontWeight: '600' }}>
                 Opciones
               </IonButton>
             </div>

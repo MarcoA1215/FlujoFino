@@ -1,9 +1,10 @@
-import { Controller, Request, Get, Post, Put, Delete, Body, Param, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Request, Get, Post, Put, Patch, Delete, Body, Param, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
 import { RegisterLossDto } from '../raw-materials/dto/register-loss.dto';
+import { AddStockDto } from './dto/add-stock.dto';
 
 import { StorageService } from '../storage/storage.service';
 
@@ -74,6 +75,11 @@ export class ProductsController {
   @Post(':id/adjust-stock')
   adjustStock(@Request() req: any, @Param('id') id: string, @Body('quantity') quantity: number) {
     return this.productsService.adjustStock(req.user.tenantId, id, quantity);}
+
+  @Patch(':id/add-stock')
+  addStock(@Request() req: any, @Param('id') id: string, @Body() dto: AddStockDto) {
+    return this.productsService.addStock(req.user.tenantId, id, dto);
+  }
 
   @Get('migrate-stock')
   migratePhysicalStock(@Request() req: any) {
