@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, Between } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Product } from '../entities/product.entity';
@@ -9,6 +9,7 @@ import { RawMaterial } from '../entities/raw-material.entity';
 import { DeliveryZone } from '../entities/delivery-zone.entity';
 import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
+import { Settings } from '../entities/settings.entity';
 
 export class CreateOrderDto {
   customerName: string;
@@ -142,7 +143,8 @@ export class OrdersService {
               }
             }
           } else if (!product.isCombo || product.isPreAssembled) {
-            if (product.stockQuantity < itemDto.quantity) {
+            const isService = product.category === 'Servicios' || Boolean(product.durationMinutes);
+            if (!isService && product.stockQuantity < itemDto.quantity) {
               requiresPreparation = true;
             }
           }
@@ -233,8 +235,11 @@ export class OrdersService {
             }
           }
         } else if (!product.isCombo || product.isPreAssembled) {
+          const isService = product.category === 'Servicios' || Boolean(product.durationMinutes);
+          if (!isService) {
             product.stockQuantity -= itemDto.quantity;
             await manager.save(Product, product);
+          }
         }
 
         let unitCost = 0;
@@ -615,8 +620,11 @@ export class OrdersService {
             }
           }
         } else if (!product.isCombo || product.isPreAssembled) {
-          product.stockQuantity += (quantity * multiplier);
-          await manager.save(Product, product);
+          const isService = product.category === 'Servicios' || Boolean(product.durationMinutes);
+          if (!isService) {
+            product.stockQuantity += (quantity * multiplier);
+            await manager.save(Product, product);
+          }
         }
       };
 
@@ -812,5 +820,111 @@ export class OrdersService {
       await manager.save(OrderItemMedia, media);
       return media;
     });
+  }
+
+  async getDailyCashSummary(tenantId: string, dateStr?: string) {
+    const targetDate = dateStr ? new Date(dateStr) : new Date();
+    const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0, 0);
+    const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+
+    const orders = await this.dataSource.getRepository(Order).find({
+      where: {
+        tenantId,
+        createdAt: Between(startOfDay, endOfDay),
+      },
+      relations: { items: { product: true }, deliveryZone: true, employee: true },
+      order: { createdAt: 'DESC' },
+    });
+
+    const settings = await this.dataSource.getRepository(Settings).findOne({ where: { tenantId } });
+    const exchangeRate = Number(settings?.exchangeRateBs || 40.0);
+
+    let totalSalesUSD = 0;
+    let totalPaidUSD = 0;
+    let totalPendingUSD = 0;
+    let totalPagoMovilBs = 0;
+    let totalPagoMovilUSD = 0;
+    let totalCashUSD = 0;
+
+    let deliveryOrdersCount = 0;
+    let inStoreOrdersCount = 0;
+    let webOrdersCount = 0;
+
+    const pagoMovilList: any[] = [];
+    const recentOrders: any[] = [];
+
+    for (const o of orders) {
+      if (o.status === OrderStatus.CANCELED) continue;
+
+      const orderTotal = Number(o.totalAmount || 0);
+      const abonos = Number(o.abonosTotal || 0);
+      totalSalesUSD += orderTotal;
+
+      if (o.paymentStatus === PaymentStatus.PAID) {
+        totalPaidUSD += orderTotal;
+      } else if (o.paymentStatus === PaymentStatus.PARTIAL) {
+        totalPaidUSD += abonos;
+        totalPendingUSD += Math.max(0, orderTotal - abonos);
+      } else {
+        totalPendingUSD += orderTotal;
+      }
+
+      // Check delivery method
+      if (o.deliveryMethod === DeliveryMethod.DELIVERY) deliveryOrdersCount++;
+      else inStoreOrdersCount++;
+
+      if (!o.employeeId) webOrdersCount++;
+
+      // Pago Movil vs Cash Divisas
+      if (o.pagoMovilRef && o.pagoMovilRef.trim().length > 0) {
+        const bs = Number(o.amountBs || (orderTotal * exchangeRate));
+        totalPagoMovilBs += bs;
+        totalPagoMovilUSD += bs / exchangeRate;
+        pagoMovilList.push({
+          orderId: o.id,
+          orderNumber: o.id.slice(0, 8).toUpperCase(),
+          customerName: o.customerName,
+          ref: o.pagoMovilRef,
+          bank: o.pagoMovilBank || 'Pago Móvil',
+          phone: o.pagoMovilPhone || o.customerPhone,
+          amountBs: bs,
+          createdAt: o.createdAt,
+        });
+      } else if (o.paymentStatus === PaymentStatus.PAID) {
+        totalCashUSD += orderTotal;
+      }
+
+      recentOrders.push({
+        id: o.id,
+        orderNumber: o.id.slice(0, 8).toUpperCase(),
+        customerName: o.customerName,
+        totalAmount: orderTotal,
+        paymentStatus: o.paymentStatus,
+        status: o.status,
+        deliveryMethod: o.deliveryMethod,
+        pagoMovilRef: o.pagoMovilRef,
+        createdAt: o.createdAt,
+      });
+    }
+
+    return {
+      date: startOfDay.toISOString().split('T')[0],
+      exchangeRate,
+      totalSalesUSD: Number(totalSalesUSD.toFixed(2)),
+      totalPaidUSD: Number(totalPaidUSD.toFixed(2)),
+      totalPendingUSD: Number(totalPendingUSD.toFixed(2)),
+      totalPagoMovilBs: Number(totalPagoMovilBs.toFixed(2)),
+      totalPagoMovilUSD: Number(totalPagoMovilUSD.toFixed(2)),
+      totalCashUSD: Number(totalCashUSD.toFixed(2)),
+      ordersCount: orders.filter(o => o.status !== OrderStatus.CANCELED).length,
+      paidOrdersCount: orders.filter(o => o.paymentStatus === PaymentStatus.PAID && o.status !== OrderStatus.CANCELED).length,
+      pendingOrdersCount: orders.filter(o => o.paymentStatus !== PaymentStatus.PAID && o.status !== OrderStatus.CANCELED).length,
+      cancelledOrdersCount: orders.filter(o => o.status === OrderStatus.CANCELED).length,
+      deliveryOrdersCount,
+      inStoreOrdersCount,
+      webOrdersCount,
+      pagoMovilList,
+      recentOrders: recentOrders.slice(0, 15),
+    };
   }
 }

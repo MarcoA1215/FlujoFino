@@ -1,7 +1,6 @@
 // @ts-nocheck
-﻿import { refreshOutline } from 'ionicons/icons';
-import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonInput, IonSelect, IonSelectOption, IonText, IonIcon, IonSearchbar, useIonRouter } from '@ionic/react';
-import { cartOutline, cashOutline, trashOutline, personOutline } from 'ionicons/icons';
+import { refreshOutline, cartOutline, cashOutline, trashOutline, personOutline, walletOutline, copyOutline, closeOutline, storefrontOutline, bicycleOutline, globeOutline, logoWhatsapp } from 'ionicons/icons';
+import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonInput, IonSelect, IonSelectOption, IonText, IonIcon, IonSearchbar, useIonRouter, IonModal, IonSpinner } from '@ionic/react';
 import { useEffect, useState, useContext } from 'react';
 import { useLocation } from 'react-router-dom';
 import type { DeliveryZone } from '../types';
@@ -66,6 +65,57 @@ const Pos: React.FC = () => {
   const [presentAlert] = useIonAlert();
   const location = useLocation();
   const router = useIonRouter();
+
+  const [showCashCloseModal, setShowCashCloseModal] = useState(false);
+  const [cashSummary, setCashSummary] = useState<any>(null);
+  const [loadingCashSummary, setLoadingCashSummary] = useState(false);
+
+  const fetchDailySummary = async () => {
+    setLoadingCashSummary(true);
+    try {
+      const res = await apiClient.get('/orders/daily-cash-summary');
+      setCashSummary(res.data);
+    } catch (e) {
+      console.error(e);
+      presentToast({ message: 'Error cargando arqueo de caja', duration: 3000, color: 'danger' });
+    } finally {
+      setLoadingCashSummary(false);
+    }
+  };
+
+  const openCashClose = () => {
+    setShowCashCloseModal(true);
+    fetchDailySummary();
+  };
+
+  const copyCashReportToWhatsApp = () => {
+    if (!cashSummary) return;
+    const text = `📊 *CIERRE DE CAJA / ARQUEO DIARIO*
+📅 Fecha: ${cashSummary.date}
+💱 Tasa BCV: Bs. ${Number(cashSummary.exchangeRate || 0).toFixed(2)}
+
+💵 *TOTAL EFECTIVO USD:* $${Number(cashSummary.totalCashUSD || 0).toFixed(2)}
+📱 *PAGO MÓVIL (Bs.):* Bs. ${Number(cashSummary.totalPagoMovilBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (equiv. $${Number(cashSummary.totalPagoMovilUSD || 0).toFixed(2)})
+💰 *TOTAL INGRESOS COBRADOS:* $${Number(cashSummary.totalPaidUSD || 0).toFixed(2)}
+⏳ *PENDIENTE POR COBRAR:* $${Number(cashSummary.totalPendingUSD || 0).toFixed(2)}
+📈 *VENTAS TOTALES DEL DÍA:* $${Number(cashSummary.totalSalesUSD || 0).toFixed(2)}
+
+📦 *DESGLOSE DE PEDIDOS:*
+- Total pedidos: ${cashSummary.ordersCount} (Pagados: ${cashSummary.paidOrdersCount}, Pendientes: ${cashSummary.pendingOrdersCount})
+- 🏪 En Tienda: ${cashSummary.inStoreOrdersCount}
+- 🛵 Delivery: ${cashSummary.deliveryOrdersCount}
+- 🛒 Tienda Web: ${cashSummary.webOrdersCount}
+${cashSummary.cancelledOrdersCount > 0 ? `- ❌ Cancelados: ${cashSummary.cancelledOrdersCount}\n` : ''}
+${cashSummary.pagoMovilList?.length > 0 ? `\n📝 *PAGOS MÓVILES REGISTRADOS (${cashSummary.pagoMovilList.length}):*\n` + cashSummary.pagoMovilList.map((p: any) => `• Ref: ${p.ref || 'S/R'} | Bs. ${Number(p.amountBs).toFixed(2)} | ${p.customerName || 'Cliente'}`).join('\n') : ''}
+`;
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      presentToast({ message: '¡Reporte copiado al portapapeles! Listo para pegar en WhatsApp.', duration: 3000, color: 'success' });
+    } else {
+      presentToast({ message: 'No se pudo acceder al portapapeles', duration: 3000, color: 'warning' });
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -344,8 +394,12 @@ const Pos: React.FC = () => {
             <IonMenuButton />
           </IonButtons>
           <IonTitle>POS / Caja</IonTitle>
-          <IonButtons slot="end"><IonButton onClick={fetchProducts}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
           <IonButtons slot="end">
+            <IonButton fill="solid" color="dark" onClick={openCashClose} style={{ fontWeight: 'bold', marginRight: '6px' }}>
+              <IonIcon icon={walletOutline} slot="start" />
+              Cierre de Caja
+            </IonButton>
+            <IonButton onClick={fetchProducts}><IonIcon icon={refreshOutline} /></IonButton>
             <IonButton onClick={() => user?.role === UserRole.ADMIN ? openRateAlert() : presentToast({message: 'Solo el administrador puede configurar la tasa', duration: 2000, color: 'warning'})}>
               <IonBadge color="light" style={{ padding: '8px', fontSize: '1rem', color: '#000' }}>
                 Tasa: Bs. {exchangeRate.toFixed(2)}
@@ -657,6 +711,176 @@ const Pos: React.FC = () => {
           </IonRow>
         </IonGrid>
       </IonContent>
+
+      <IonModal isOpen={showCashCloseModal} onDidDismiss={() => setShowCashCloseModal(false)}>
+        <IonHeader>
+          <IonToolbar color="dark">
+            <IonTitle>💼 Cierre de Caja / Arqueo Diario</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowCashCloseModal(false)}>
+                <IonIcon icon={closeOutline} />
+              </IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          {loadingCashSummary ? (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <IonSpinner name="crescent" />
+              <p>Calculando arqueo de caja...</p>
+            </div>
+          ) : !cashSummary ? (
+            <p>No se encontraron datos para la jornada.</p>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontWeight: 'bold' }}>Jornada: {cashSummary.date}</h3>
+                  <small style={{ color: '#666' }}>Tasa del día: Bs. {Number(cashSummary.exchangeRate || 0).toFixed(2)}</small>
+                </div>
+                <IonButton size="small" fill="outline" onClick={fetchDailySummary}>
+                  <IonIcon icon={refreshOutline} slot="start" />
+                  Actualizar
+                </IonButton>
+              </div>
+
+              {/* Summary Cards */}
+              <IonGrid style={{ padding: 0 }}>
+                <IonRow>
+                  {/* Cash USD */}
+                  <IonCol size="12" sizeMd="6">
+                    <IonCard style={{ margin: '4px', background: '#e8f5e9', border: '1px solid #c8e6c9' }}>
+                      <IonCardContent>
+                        <div style={{ fontSize: '0.85rem', color: '#2e7d32', fontWeight: 'bold' }}>💵 EFECTIVO EN CAJA (USD)</div>
+                        <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1b5e20', margin: '6px 0' }}>
+                          ${Number(cashSummary.totalCashUSD || 0).toFixed(2)}
+                        </h1>
+                        <small style={{ color: '#4caf50' }}>Total billetes físicos a cuadrar en gaveta</small>
+                      </IonCardContent>
+                    </IonCard>
+                  </IonCol>
+
+                  {/* Pago Movil Bs */}
+                  <IonCol size="12" sizeMd="6">
+                    <IonCard style={{ margin: '4px', background: '#e3f2fd', border: '1px solid #bbdefb' }}>
+                      <IonCardContent>
+                        <div style={{ fontSize: '0.85rem', color: '#1565c0', fontWeight: 'bold' }}>📱 PAGO MÓVIL (BS.)</div>
+                        <h1 style={{ fontSize: '1.7rem', fontWeight: 'bold', color: '#0d47a1', margin: '6px 0' }}>
+                          Bs. {Number(cashSummary.totalPagoMovilBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </h1>
+                        <small style={{ color: '#1976d2' }}>Equivalente: ~${Number(cashSummary.totalPagoMovilUSD || 0).toFixed(2)} USD ({cashSummary.pagoMovilList?.length || 0} transferencias)</small>
+                      </IonCardContent>
+                    </IonCard>
+                  </IonCol>
+                </IonRow>
+
+                <IonRow>
+                  {/* Totals Breakdown */}
+                  <IonCol size="6" sizeMd="4">
+                    <IonCard style={{ margin: '4px', background: '#fafafa', border: '1px solid #eee' }}>
+                      <IonCardContent style={{ padding: '12px' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#666' }}>💰 Total Cobrado</div>
+                        <h3 style={{ margin: '4px 0', fontWeight: 'bold', color: '#2dd36f' }}>${Number(cashSummary.totalPaidUSD || 0).toFixed(2)}</h3>
+                      </IonCardContent>
+                    </IonCard>
+                  </IonCol>
+
+                  <IonCol size="6" sizeMd="4">
+                    <IonCard style={{ margin: '4px', background: '#fafafa', border: '1px solid #eee' }}>
+                      <IonCardContent style={{ padding: '12px' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#666' }}>⏳ Por Cobrar (Pendiente)</div>
+                        <h3 style={{ margin: '4px 0', fontWeight: 'bold', color: '#e0ac08' }}>${Number(cashSummary.totalPendingUSD || 0).toFixed(2)}</h3>
+                      </IonCardContent>
+                    </IonCard>
+                  </IonCol>
+
+                  <IonCol size="12" sizeMd="4">
+                    <IonCard style={{ margin: '4px', background: '#fafafa', border: '1px solid #eee' }}>
+                      <IonCardContent style={{ padding: '12px' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#666' }}>📈 Total Facturado (Ventas)</div>
+                        <h3 style={{ margin: '4px 0', fontWeight: 'bold' }}>${Number(cashSummary.totalSalesUSD || 0).toFixed(2)}</h3>
+                      </IonCardContent>
+                    </IonCard>
+                  </IonCol>
+                </IonRow>
+              </IonGrid>
+
+              {/* Order Channels Breakdown */}
+              <IonCard style={{ margin: '8px 4px 16px 4px' }}>
+                <IonCardHeader style={{ padding: '12px' }}>
+                  <IonCardTitle style={{ fontSize: '0.95rem' }}>📦 Flujo de Canales de Venta</IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent style={{ padding: '0 12px 12px 12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{cashSummary.inStoreOrdersCount}</div>
+                      <small style={{ color: '#666' }}>🏪 En Tienda</small>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#3880ff' }}>{cashSummary.deliveryOrdersCount}</div>
+                      <small style={{ color: '#666' }}>🛵 Delivery</small>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#7044ff' }}>{cashSummary.webOrdersCount}</div>
+                      <small style={{ color: '#666' }}>🛒 Tienda Web</small>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#2dd36f' }}>{cashSummary.ordersCount}</div>
+                      <small style={{ color: '#666' }}>Total Activos</small>
+                    </div>
+                  </div>
+                </IonCardContent>
+              </IonCard>
+
+              {/* Pago Movil Reference List */}
+              {cashSummary.pagoMovilList?.length > 0 && (
+                <IonCard style={{ margin: '8px 4px 16px 4px' }}>
+                  <IonCardHeader style={{ padding: '12px' }}>
+                    <IonCardTitle style={{ fontSize: '0.95rem' }}>📱 Detalle de Pagos Móviles del Día ({cashSummary.pagoMovilList.length})</IonCardTitle>
+                  </IonCardHeader>
+                  <IonCardContent style={{ padding: '0 12px 12px 12px' }}>
+                    <IonList lines="full">
+                      {cashSummary.pagoMovilList.map((p: any, idx: number) => (
+                        <IonItem key={idx} style={{ '--padding-start': '0px' }}>
+                          <IonLabel>
+                            <h3><strong>Ref: {p.ref || 'Sin ref'}</strong> &bull; {p.customerName || 'Cliente'}</h3>
+                            <p style={{ fontSize: '0.8rem' }}>{p.bank} {p.phone ? `(${p.phone})` : ''}</p>
+                          </IonLabel>
+                          <IonBadge slot="end" color="primary" style={{ fontSize: '0.9rem' }}>
+                            Bs. {Number(p.amountBs).toFixed(2)}
+                          </IonBadge>
+                        </IonItem>
+                      ))}
+                    </IonList>
+                  </IonCardContent>
+                </IonCard>
+              )}
+
+              {/* Action Buttons */}
+              <div style={{ marginTop: '20px' }}>
+                <IonButton 
+                  expand="block" 
+                  color="success" 
+                  size="large" 
+                  onClick={copyCashReportToWhatsApp}
+                  style={{ fontWeight: 'bold' }}
+                >
+                  <IonIcon icon={logoWhatsapp} slot="start" />
+                  Copiar Reporte para WhatsApp
+                </IonButton>
+                <IonButton 
+                  expand="block" 
+                  fill="clear" 
+                  color="medium" 
+                  onClick={() => setShowCashCloseModal(false)}
+                >
+                  Cerrar Ventana
+                </IonButton>
+              </div>
+            </div>
+          )}
+        </IonContent>
+      </IonModal>
     </IonPage>
   );
 };

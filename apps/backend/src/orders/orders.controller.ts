@@ -1,4 +1,4 @@
-import { Controller, Request, Get, Post, Body, Param, Patch, Delete, Put, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Request, Get, Post, Body, Param, Patch, Delete, Put, UseInterceptors, UploadedFile, BadRequestException, Query } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { OrdersService, CreateOrderDto, UpdatePaymentDto } from './orders.service';
 import { StorageService } from '../storage/storage.service';
@@ -38,6 +38,11 @@ export class OrdersController {
   @Get()
   getAllOrders(@Request() req: any) {
     return this.ordersService.getAllOrders(req.user.tenantId);}
+
+  @Get('daily-cash-summary')
+  getDailyCashSummary(@Request() req: any, @Query('date') date?: string) {
+    return this.ordersService.getDailyCashSummary(req.user.tenantId, date);
+  }
 
   @Get(':id')
   getOrderById(@Request() req: any, @Param('id') id: string) {

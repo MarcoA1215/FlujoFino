@@ -1,4 +1,4 @@
-import { refreshOutline, copyOutline, informationCircleOutline, trashOutline, createOutline, personOutline, imageOutline } from 'ionicons/icons';
+import { refreshOutline, copyOutline, informationCircleOutline, trashOutline, createOutline, personOutline, imageOutline, logoWhatsapp } from 'ionicons/icons';
 import { IonModal, IonInput, IonSelect, IonSelectOption } from '@ionic/react';
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, useIonRouter, IonText, IonSegment, IonSegmentButton, IonSearchbar, IonIcon } from '@ionic/react';
 import { useEffect, useState } from 'react';
@@ -311,12 +311,17 @@ const Orders: React.FC = () => {
   };
 
   
-  // @ts-ignore
-const translateStatus = (status: OrderStatus) => {
+  const isOrderService = (order: any) => {
+    return order?.items?.some((item: any) => 
+      item.product?.category === 'Servicios' || Boolean(item.product?.durationMinutes)
+    );
+  };
+
+  const translateStatus = (status: OrderStatus, isService = false) => {
     switch(status) {
-      case OrderStatus.PENDING: return "Pendiente";
-      case OrderStatus.PREPARING: return "Preparando";
-      case OrderStatus.DELIVERED: return "Entregado";
+      case OrderStatus.PENDING: return isService ? "Por Atender" : "Pendiente";
+      case OrderStatus.PREPARING: return isService ? "En Atención" : "Preparando";
+      case OrderStatus.DELIVERED: return isService ? "Completado" : "Entregado";
       case OrderStatus.CANCELED: return "Cancelado";
       default: return status;
     }
@@ -420,16 +425,52 @@ const getStatusColor = (status: OrderStatus) => {
                 <IonCard color={order.status === OrderStatus.DELIVERED ? "light" : (order.status === OrderStatus.CANCELED ? "medium" : "white")}>
                   <IonCardHeader style={{ position: 'relative', paddingRight: '70px' }}>
   <div>
-    <IonCardTitle>{order.customerName}</IonCardTitle>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <IonCardTitle style={{ margin: 0 }}>{order.customerName}</IonCardTitle>
+      {order.customerPhone && (
+        <a 
+          href={`https://wa.me/${order.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola ${order.customerName}, te escribimos respecto a tu pedido #${order.id.slice(0, 8).toUpperCase()}.`)}`} 
+          target="_blank" 
+          rel="noreferrer"
+          title="Contactar al cliente por WhatsApp"
+          style={{ display: 'inline-flex', alignItems: 'center', color: '#25D366' }}
+        >
+          <IonIcon icon={logoWhatsapp} style={{ fontSize: '1.25rem' }} />
+        </a>
+      )}
+    </div>
     <IonCardSubtitle>{new Date(order.createdAt).toLocaleString()}</IonCardSubtitle>
     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px', alignItems: 'center' }}>
       {order.tableNumber && (<IonBadge color="primary">{order.tableNumber}</IonBadge>)}
-      {order.employee && (
+      {order.employee ? (
         <IonBadge color="light" style={{ border: '1px solid #ddd', color: '#444', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}>
           <IonIcon icon={personOutline} style={{ fontSize: '0.85rem' }} />
           Atendido por: {order.employee.username || order.employee.name}{order.employee.jobTitle ? ` (${order.employee.jobTitle})` : ''}
         </IonBadge>
+      ) : (
+        <IonBadge color="tertiary" style={{ fontSize: '0.8rem' }}>
+          🛒 Tienda Web
+        </IonBadge>
       )}
+
+      {order.deliveryMethod === DeliveryMethod.DELIVERY ? (
+        <IonBadge color="secondary" style={{ fontSize: '0.8rem' }}>
+          🛵 Delivery{order.deliveryZone?.name ? `: ${order.deliveryZone.name}` : ''}
+        </IonBadge>
+      ) : order.deliveryMethod === DeliveryMethod.IN_STORE && !isOrderService(order) ? (
+        <IonBadge color="light" style={{ border: '1px solid #cbd5e1', color: '#334155', fontSize: '0.8rem' }}>
+          🏪 Retiro en Tienda
+        </IonBadge>
+      ) : null}
+
+      {isOrderService(order) && (
+        <IonBadge color="secondary" style={{ fontSize: '0.8rem' }}>
+          💅 Servicio
+        </IonBadge>
+      )}
+      <IonBadge color={getStatusColor(order.status)}>
+        {translateStatus(order.status, isOrderService(order))}
+      </IonBadge>
     </div>
   </div>
   <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '5px' }}>
@@ -448,6 +489,12 @@ const getStatusColor = (status: OrderStatus) => {
 </IonCardHeader>
 
                   <IonCardContent>
+                    {order.customerAddress && (
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '6px 10px', fontSize: '0.82rem', color: '#1e293b', marginBottom: '8px' }}>
+                        📍 <b>Dirección de Entrega:</b> {order.customerAddress}
+                      </div>
+                    )}
+
                     <IonList lines="none" style={{ background: "transparent" }}>
                       {order.items.map((item: any) => (
                         <IonItem key={item.id} style={{ "--background": "transparent" }}>
