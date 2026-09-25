@@ -140,20 +140,12 @@ const SettingsPage: React.FC = () => {
                     <IonInput value={settings.companyBank || ''} onIonInput={e => setSettings({...settings, companyBank: e.detail.value!})} placeholder="Ej. Banesco" />
                   </IonItem>
                   <IonItem>
-                    <IonLabel position="stacked">Titular / Razón Social de la Cuenta</IonLabel>
-                    <IonInput value={settings.companyAccountHolder || ''} onIonInput={e => setSettings({...settings, companyAccountHolder: e.detail.value!})} placeholder="Ej. Inversiones Mi Negocio C.A." />
-                  </IonItem>
-                  <IonItem>
                     <IonLabel position="stacked">Cédula / RIF</IonLabel>
                     <IonInput value={settings.companyCedula || ''} onIonInput={e => setSettings({...settings, companyCedula: e.detail.value!})} placeholder="Ej. J-12345678-0" />
                   </IonItem>
                   <IonItem>
                     <IonLabel position="stacked">Teléfono (Pago Móvil / WhatsApp)</IonLabel>
                     <IonInput value={settings.companyPhone || ''} onIonInput={e => setSettings({...settings, companyPhone: e.detail.value!})} placeholder="Ej. 0414-1234567" />
-                  </IonItem>
-                  <IonItem>
-                    <IonLabel position="stacked">Número de Cuenta Bancaria (20 dígitos)</IonLabel>
-                    <IonInput value={settings.companyAccountNumber || ''} onIonInput={e => setSettings({...settings, companyAccountNumber: e.detail.value!})} placeholder="Ej. 0134-0000-00-0000000000" />
                   </IonItem>
                 </IonCardContent>
               </IonCard>
