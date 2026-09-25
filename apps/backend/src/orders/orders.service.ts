@@ -239,10 +239,13 @@ export class OrdersService {
             }
           }
         } else if (!product.isCombo || product.isPreAssembled) {
-          const isService = product.is_service || product.category === 'Servicios' || Boolean(product.durationMinutes);
+          const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
           if (!isService) {
             const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
-            product.stock = currentStock - itemDto.quantity;
+            if (currentStock < itemDto.quantity) {
+              throw new BadRequestException(`Stock insuficiente para "${product.name}". Disponible: ${currentStock}, solicitado: ${itemDto.quantity}`);
+            }
+            product.stock = Math.max(0, currentStock - itemDto.quantity);
             product.stockQuantity = product.stock;
             await manager.save(Product, product);
           }
@@ -383,7 +386,7 @@ export class OrdersService {
                 }
               }
             } else if (!product.isCombo || product.isPreAssembled) {
-                const isService = product.is_service || product.category === 'Servicios' || Boolean(product.durationMinutes);
+                const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
                 if (!isService) {
                   if (product.physicalStock < item.quantity) {
                     throw new BadRequestException('Falta stock físico para entregar');
@@ -433,7 +436,7 @@ export class OrdersService {
                 }
               }
             } else if (!product.isCombo || product.isPreAssembled) {
-                const isService = product.is_service || product.category === 'Servicios' || Boolean(product.durationMinutes);
+                const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
                 if (!isService) {
                   const restored = (Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0) + item.quantity;
                   product.stock = restored;

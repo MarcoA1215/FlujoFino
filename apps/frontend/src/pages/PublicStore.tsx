@@ -52,9 +52,13 @@ interface StoreProduct {
   salePrice: number;
   images: string[];
   stockQuantity: number;
+  stock?: number;
   isService: boolean;
   isOutOfStock: boolean;
 }
+
+const getAvailableStock = (p: StoreProduct) =>
+  Math.max(0, Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.stockQuantity || 0)));
 
 interface DeliveryZone {
   id: string;
@@ -182,11 +186,12 @@ const PublicStore: React.FC = () => {
 
     const existingIndex = cart.findIndex((i) => i.product.id === product.id);
     const currentQtyInCart = existingIndex > -1 ? cart[existingIndex].quantity : 0;
+    const availableStock = getAvailableStock(product);
 
     // Check inventory availability
-    if (!product.isService && currentQtyInCart + 1 > product.stockQuantity) {
+    if (!product.isService && currentQtyInCart + 1 > availableStock) {
       presentToast({
-        message: `Solo quedan ${product.stockQuantity} unidades disponibles de "${product.name}".`,
+        message: `Solo quedan ${availableStock} unidades disponibles de "${product.name}".`,
         duration: 3000,
         color: 'warning',
       });
@@ -221,10 +226,12 @@ const PublicStore: React.FC = () => {
       return;
     }
 
+    const availableStock = getAvailableStock(item.product);
+
     // Check inventory cap on increase
-    if (delta > 0 && !item.product.isService && newQty > item.product.stockQuantity) {
+    if (delta > 0 && !item.product.isService && newQty > availableStock) {
       presentToast({
-        message: `Límite alcanzado: solo hay ${item.product.stockQuantity} disponibles.`,
+        message: `Límite alcanzado: solo hay ${availableStock} unidades disponibles de "${item.product.name}".`,
         duration: 2500,
         color: 'warning',
       });
@@ -257,6 +264,18 @@ const PublicStore: React.FC = () => {
     if (cart.length === 0) {
       presentToast({ message: 'El carrito está vacío', duration: 2000, color: 'warning' });
       return;
+    }
+
+    for (const item of cart) {
+      const avail = getAvailableStock(item.product);
+      if (!item.product.isService && item.quantity > avail) {
+        presentToast({
+          message: `El producto "${item.product.name}" solo tiene ${avail} unidades disponibles. Por favor ajusta la cantidad.`,
+          duration: 3500,
+          color: 'warning',
+        });
+        return;
+      }
     }
 
     if (paymentOption === 'TRANSFER' && !transferRef.trim()) {
@@ -652,7 +671,7 @@ const PublicStore: React.FC = () => {
                                 fontWeight: '500',
                               }}
                             >
-                              Disp: {product.stockQuantity}
+                              Disp: {getAvailableStock(product)}
                             </div>
                           )}
                         </div>
@@ -752,7 +771,7 @@ const PublicStore: React.FC = () => {
                                 size="small"
                                 color="primary"
                                 onClick={() => handleUpdateQuantity(product.id, 1)}
-                                disabled={!product.isService && inCart.quantity >= product.stockQuantity}
+                                disabled={!product.isService && inCart.quantity >= getAvailableStock(product)}
                                 style={{ margin: 0, height: '32px', width: '32px' }}
                               >
                                 <IonIcon slot="icon-only" icon={addOutline} />
@@ -884,6 +903,21 @@ const PublicStore: React.FC = () => {
                           <span style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 'bold' }}>
                             ${item.product.salePrice.toFixed(2)} c/u (${lineTotal.toFixed(2)})
                           </span>
+                          {!item.product.isService && (
+                            <span
+                              style={{
+                                fontSize: '0.75rem',
+                                color: item.quantity > getAvailableStock(item.product) ? '#ef4444' : '#64748b',
+                                display: 'block',
+                                marginTop: '2px',
+                                fontWeight: item.quantity > getAvailableStock(item.product) ? 'bold' : 'normal',
+                              }}
+                            >
+                              {item.quantity > getAvailableStock(item.product)
+                                ? `⚠️ Excede stock disponible (${getAvailableStock(item.product)})`
+                                : `Disponible: ${getAvailableStock(item.product)}`}
+                            </span>
+                          )}
                         </div>
 
                         {/* Quantity Stepper */}
@@ -904,7 +938,7 @@ const PublicStore: React.FC = () => {
                             size="small"
                             fill="outline"
                             color="primary"
-                            disabled={!item.product.isService && item.quantity >= item.product.stockQuantity}
+                            disabled={!item.product.isService && item.quantity >= getAvailableStock(item.product)}
                             onClick={() => handleUpdateQuantity(item.product.id, 1)}
                             style={{ height: '30px', width: '30px', margin: 0 }}
                           >

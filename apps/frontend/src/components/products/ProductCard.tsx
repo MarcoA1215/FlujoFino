@@ -37,7 +37,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const [present] = useIonActionSheet();
 
   const openOptions = () => {
-    const isService = p.is_service === true || (featureProduction === false && p.category === 'Servicios') || Boolean(p.durationMinutes);
+    const isService = p.is_service === true || (p.is_service !== false && p.category === 'Servicios');
     const isResale = !isService && !p.isCombo && (!p.recipe || p.recipe.length === 0);
 
     const buttons: any[] = [
@@ -105,7 +105,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     return null;
   };
   const imageUrl = getProductImage();
-  const isService = p.is_service === true || (featureProduction === false && p.category === 'Servicios') || Boolean(p.durationMinutes);
+  const isService = p.is_service === true || (p.is_service !== false && p.category === 'Servicios');
   const isResale = !isService && !p.isCombo && (!p.recipe || p.recipe.length === 0);
   const costValue = p.cost !== undefined && p.cost !== null && Number(p.cost) > 0 ? Number(p.cost) : (p.estimatedCost ? Number(p.estimatedCost) : 0);
   const currentStock = p.stock !== undefined && p.stock !== null ? p.stock : p.stockQuantity;

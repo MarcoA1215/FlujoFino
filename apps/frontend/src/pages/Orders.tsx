@@ -362,7 +362,7 @@ const Orders: React.FC = () => {
   
   const isOrderService = (order: any) => {
     return order?.items?.some((item: any) => 
-      item.product?.category === 'Servicios' || Boolean(item.product?.durationMinutes)
+      item.product?.is_service === true || (item.product?.is_service !== false && item.product?.category === 'Servicios')
     );
   };
 

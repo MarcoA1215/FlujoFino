@@ -75,7 +75,7 @@ export class ProductsService {
         ...p,
         cost: p.cost !== undefined && p.cost !== null ? Number(p.cost) : (p.estimatedCost ? Number(p.estimatedCost) : 0),
         stock: finalStock,
-        is_service: p.is_service !== undefined ? p.is_service : (p.category === 'Servicios' || Boolean(p.durationMinutes)),
+        is_service: p.is_service === true || (p.is_service !== false && p.category === 'Servicios'),
         baseCost,
         stockQuantity: finalStock,
         physicalStock: finalPhysical,

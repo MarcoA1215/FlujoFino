@@ -115,9 +115,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         stock: stockNum,
         stockQuantity: stockNum,
         physicalStock: stockNum,
-        durationMinutes: isResaleOnly ? null : (durationMinutes ? parseInt(durationMinutes, 10) : 30),
+        durationMinutes: isResaleOnly ? null : (category.trim() === 'Servicios' ? (durationMinutes ? parseInt(durationMinutes, 10) : 30) : null),
         assignedStaffIds: isResaleOnly ? [] : selectedStaffIds,
-        is_service: isResaleOnly ? false : (product?.is_service !== undefined ? product.is_service : false)
+        is_service: isResaleOnly ? false : (product?.is_service !== undefined ? product.is_service : (category.trim() === 'Servicios'))
       };
 
       if (product) {

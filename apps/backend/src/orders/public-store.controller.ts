@@ -49,8 +49,8 @@ export class PublicStoreController {
 
     // Filter products: keep retail/physical products or items intended for sale
     const storeProducts = products.map((p) => {
-      const isService = Boolean(p.durationMinutes) || p.category === 'Servicios';
-      const availableStock = Number(p.stockQuantity || 0);
+      const isService = p.is_service === true || (p.is_service !== false && p.category === 'Servicios');
+      const availableStock = Math.max(0, Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.stockQuantity || 0)));
 
       return {
         id: p.id,
@@ -64,6 +64,7 @@ export class PublicStoreController {
           ? (p.images as string).split(',').map((s) => s.trim())
           : [],
         stockQuantity: availableStock,
+        stock: availableStock,
         isService,
         isOutOfStock: !isService && availableStock <= 0,
       };
@@ -135,9 +136,9 @@ export class PublicStoreController {
         throw new BadRequestException(`Producto con ID ${item.productId} no encontrado`);
       }
 
-      const isService = Boolean(product.durationMinutes) || product.category === 'Servicios';
+      const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
       if (!isService) {
-        const availableStock = Number(product.stockQuantity || 0);
+        const availableStock = Math.max(0, Number(product.stock !== undefined && product.stock !== null ? product.stock : (product.stockQuantity || 0)));
         if (availableStock <= 0) {
           throw new BadRequestException(
             `El producto "${product.name}" se encuentra agotado.`
