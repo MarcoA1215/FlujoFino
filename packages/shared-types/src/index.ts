@@ -222,6 +222,9 @@ export interface SettingsDTO {
   companyBank?: string;
   companyCedula?: string;
   companyPhone?: string;
+  binancePayId?: string;
+  binanceEmail?: string;
+  binancePhone?: string;
   allowPartialPayments?: boolean;
   minDepositPercentage?: number;
   allowCashierBypassDeposit?: boolean;

@@ -1106,12 +1106,40 @@ const PublicStore: React.FC = () => {
                   )}
 
                   {paymentOption === 'BINANCE' && (
-                    <div style={{ background: '#fefce8', padding: '12px', borderRadius: '8px', marginTop: '10px', border: '1px solid #fde047' }}>
-                      <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 'bold', color: '#854d0e' }}>
-                        🟡 Binance Pay (USDT) (Total: ${grandTotalUSD.toFixed(2)} USDT)
+                    <div style={{ background: '#fefce8', padding: '14px', borderRadius: '10px', marginTop: '10px', border: '1px solid #fde047' }}>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 'bold', color: '#854d0e' }}>
+                        🟡 Enviar pago por Binance Pay (Total: ${grandTotalUSD.toFixed(2)} USDT)
                       </p>
-                      <IonItem lines="none" style={{ '--background': '#fff', borderRadius: '6px', marginTop: '8px' }}>
-                        <IonLabel position="stacked">ID de Transacción / Order ID / Pay ID *</IonLabel>
+
+                      {storeData?.settings?.binancePayId && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0', background: '#fff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #fef08a' }}>
+                          <span style={{ fontSize: '13px' }}><b>Binance Pay ID:</b> {storeData.settings.binancePayId}</span>
+                          <IonButton fill="clear" size="small" onClick={() => copyToClipboard(storeData.settings.binancePayId, 'Binance Pay ID')}>
+                            <IonIcon icon={copyOutline} slot="icon-only" />
+                          </IonButton>
+                        </div>
+                      )}
+
+                      {storeData?.settings?.binanceEmail && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0', background: '#fff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #fef08a' }}>
+                          <span style={{ fontSize: '13px' }}><b>Correo Binance:</b> {storeData.settings.binanceEmail}</span>
+                          <IonButton fill="clear" size="small" onClick={() => copyToClipboard(storeData.settings.binanceEmail, 'Correo Binance')}>
+                            <IonIcon icon={copyOutline} slot="icon-only" />
+                          </IonButton>
+                        </div>
+                      )}
+
+                      {storeData?.settings?.binancePhone && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0', background: '#fff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #fef08a' }}>
+                          <span style={{ fontSize: '13px' }}><b>Teléfono Binance:</b> {storeData.settings.binancePhone}</span>
+                          <IonButton fill="clear" size="small" onClick={() => copyToClipboard(storeData.settings.binancePhone, 'Teléfono Binance')}>
+                            <IonIcon icon={copyOutline} slot="icon-only" />
+                          </IonButton>
+                        </div>
+                      )}
+
+                      <IonItem lines="none" style={{ '--background': '#fff', borderRadius: '6px', marginTop: '10px' }}>
+                        <IonLabel position="stacked">Tu ID de Transacción / Order ID / Pay ID *</IonLabel>
                         <IonInput
                           value={binanceRef}
                           onIonInput={(e) => setBinanceRef(e.detail.value!)}

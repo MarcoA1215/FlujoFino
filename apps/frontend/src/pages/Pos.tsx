@@ -734,11 +734,16 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
 
                   {paymentMethod === 'BINANCE' && (
                     <div style={{ background: '#fefce8', padding: '12px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #fde047' }}>
-                      <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: '#854d0e', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: '1rem', color: '#854d0e', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         🟡 Binance Pay (USDT) (Total: ${totalCart.toFixed(2)} USDT)
                       </h4>
+                      {(settings?.binancePayId || settings?.binanceEmail) && (
+                        <p style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: '#713f12' }}>
+                          💡 <b>Datos del negocio para el cliente:</b> Pay ID: <b>{settings.binancePayId || 'N/A'}</b> {settings.binanceEmail ? `| Correo: ${settings.binanceEmail}` : ''}
+                        </p>
+                      )}
                       <IonItem color="light">
-                        <IonLabel position="stacked">ID de Orden / Pay ID / TxID *</IonLabel>
+                        <IonLabel position="stacked">ID de Orden / Pay ID / TxID del Cliente *</IonLabel>
                         <IonInput value={binanceRef} onIonInput={e => setBinanceRef(e.detail.value!)} placeholder="Ej. 2938471928" />
                       </IonItem>
                     </div>

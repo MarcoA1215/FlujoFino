@@ -10,6 +10,9 @@ interface Settings {
   companyBank?: string;
   companyCedula?: string;
   companyPhone?: string;
+  binancePayId?: string;
+  binanceEmail?: string;
+  binancePhone?: string;
   allowPartialPayments?: boolean;
   minDepositPercentage?: number;
   allowCashierBypassDeposit?: boolean;
@@ -60,6 +63,9 @@ const SettingsPage: React.FC = () => {
           companyBank: settings.companyBank, 
           companyCedula: settings.companyCedula, 
           companyPhone: settings.companyPhone,
+          binancePayId: settings.binancePayId,
+          binanceEmail: settings.binanceEmail,
+          binancePhone: settings.binancePhone,
           allowPartialPayments: settings.allowPartialPayments,
           minDepositPercentage: Number(settings.minDepositPercentage) || 0,
           allowCashierBypassDeposit: settings.allowCashierBypassDeposit !== false,
@@ -274,6 +280,53 @@ const SettingsPage: React.FC = () => {
                           />
                         </IonItem>
                       </IonCol>
+
+                      {settings.acceptBinance === true && (
+                        <IonCol size="12">
+                          <div style={{ background: '#fefce8', padding: '14px', borderRadius: '10px', border: '1px solid #fde047', marginTop: '4px', marginBottom: '8px' }}>
+                            <h4 style={{ margin: '0 0 6px 0', fontSize: '0.95rem', fontWeight: 'bold', color: '#854d0e', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              🟡 Datos de tu Cuenta Binance Pay (Para recibir fondos)
+                            </h4>
+                            <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#713f12' }}>
+                              Estos datos se mostrarán a tus clientes en la tienda online y en el POS para que puedan enviarte los USDT.
+                            </p>
+                            <IonGrid style={{ padding: 0 }}>
+                              <IonRow>
+                                <IonCol size="12" sizeMd="4">
+                                  <IonItem color="light" style={{ borderRadius: '8px' }}>
+                                    <IonLabel position="stacked">Binance Pay ID / UID *</IonLabel>
+                                    <IonInput 
+                                      value={settings.binancePayId || ''} 
+                                      onIonInput={e => setSettings({...settings, binancePayId: e.detail.value!})} 
+                                      placeholder="Ej. 284719283" 
+                                    />
+                                  </IonItem>
+                                </IonCol>
+                                <IonCol size="12" sizeMd="4">
+                                  <IonItem color="light" style={{ borderRadius: '8px' }}>
+                                    <IonLabel position="stacked">Correo en Binance (Opcional)</IonLabel>
+                                    <IonInput 
+                                      value={settings.binanceEmail || ''} 
+                                      onIonInput={e => setSettings({...settings, binanceEmail: e.detail.value!})} 
+                                      placeholder="Ej. pagos@minegocio.com" 
+                                    />
+                                  </IonItem>
+                                </IonCol>
+                                <IonCol size="12" sizeMd="4">
+                                  <IonItem color="light" style={{ borderRadius: '8px' }}>
+                                    <IonLabel position="stacked">Teléfono en Binance (Opcional)</IonLabel>
+                                    <IonInput 
+                                      value={settings.binancePhone || ''} 
+                                      onIonInput={e => setSettings({...settings, binancePhone: e.detail.value!})} 
+                                      placeholder="Ej. +58414..." 
+                                    />
+                                  </IonItem>
+                                </IonCol>
+                              </IonRow>
+                            </IonGrid>
+                          </div>
+                        </IonCol>
+                      )}
 
                       <IonCol size="12" sizeMd="6">
                         <IonItem>

@@ -19,6 +19,16 @@ export class Settings {
   @Column({ nullable: true })
   companyPhone: string;
 
+  // --- Binance Pay Config ---
+  @Column({ nullable: true })
+  binancePayId: string;
+
+  @Column({ nullable: true })
+  binanceEmail: string;
+
+  @Column({ nullable: true })
+  binancePhone: string;
+
   // --- Métodos de pago aceptados ---
   @Column('boolean', { default: true })
   acceptCashUsd: boolean;
