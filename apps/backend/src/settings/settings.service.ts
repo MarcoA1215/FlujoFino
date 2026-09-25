@@ -62,6 +62,12 @@ export class SettingsService implements OnModuleInit {
     if (payload.companyCedula !== undefined) settings.companyCedula = payload.companyCedula;
     if (payload.companyPhone !== undefined) settings.companyPhone = payload.companyPhone;
     if (payload.allowPartialPayments !== undefined) settings.allowPartialPayments = payload.allowPartialPayments;
+    if (payload.minDepositPercentage !== undefined) settings.minDepositPercentage = payload.minDepositPercentage;
+    if (payload.acceptCashUsd !== undefined) settings.acceptCashUsd = payload.acceptCashUsd;
+    if (payload.acceptPagoMovil !== undefined) settings.acceptPagoMovil = payload.acceptPagoMovil;
+    if (payload.acceptCardPos !== undefined) settings.acceptCardPos = payload.acceptCardPos;
+    if (payload.acceptBinance !== undefined) settings.acceptBinance = payload.acceptBinance;
+    if (payload.acceptTransfer !== undefined) settings.acceptTransfer = payload.acceptTransfer;
     
     if (payload.featureCustomerSchedules !== undefined) settings.featureCustomerSchedules = payload.featureCustomerSchedules;
     if (payload.featureRecipes !== undefined) settings.featureRecipes = payload.featureRecipes;

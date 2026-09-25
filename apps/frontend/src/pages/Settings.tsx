@@ -11,6 +11,12 @@ interface Settings {
   companyCedula?: string;
   companyPhone?: string;
   allowPartialPayments?: boolean;
+  minDepositPercentage?: number;
+  acceptCashUsd?: boolean;
+  acceptPagoMovil?: boolean;
+  acceptCardPos?: boolean;
+  acceptBinance?: boolean;
+  acceptTransfer?: boolean;
   requireApprovalAlways?: boolean;
   featureCustomerSchedules?: boolean;
   featureRecipes?: boolean;
@@ -54,6 +60,12 @@ const SettingsPage: React.FC = () => {
           companyCedula: settings.companyCedula, 
           companyPhone: settings.companyPhone,
           allowPartialPayments: settings.allowPartialPayments,
+          minDepositPercentage: Number(settings.minDepositPercentage) || 0,
+          acceptCashUsd: settings.acceptCashUsd !== false,
+          acceptPagoMovil: settings.acceptPagoMovil !== false,
+          acceptCardPos: settings.acceptCardPos === true,
+          acceptBinance: settings.acceptBinance === true,
+          acceptTransfer: settings.acceptTransfer === true,
           requireApprovalAlways: settings.requireApprovalAlways,
           featureCustomerSchedules: settings.featureCustomerSchedules,
           featureRecipes: settings.featureRecipes,
@@ -135,9 +147,34 @@ const SettingsPage: React.FC = () => {
                 <IonCardContent>
                   <p style={{marginBottom: '15px'}}>Opciones generales del punto de venta y operaciones.</p>
                   <IonItem>
-                    <IonLabel>Permitir Pagos Parciales (Abonos)</IonLabel>
-                    <IonToggle checked={settings.allowPartialPayments || false} onIonChange={e => setSettings({...settings, allowPartialPayments: e.detail.checked})} />
+                    <IonLabel className="ion-text-wrap">
+                      <h2>Permitir Pagos Parciales (Abonos / Cuentas Abiertas)</h2>
+                      <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
+                        Permite a los cajeros registrar pedidos con inicial o cuenta por cobrar.
+                      </p>
+                    </IonLabel>
+                    <IonToggle checked={settings.allowPartialPayments !== false} onIonChange={e => setSettings({...settings, allowPartialPayments: e.detail.checked})} />
                   </IonItem>
+
+                  {settings.allowPartialPayments !== false && (
+                    <IonItem style={{ marginTop: '8px', background: '#f8fafc', borderRadius: '8px' }}>
+                      <IonLabel position="stacked">
+                        Porcentaje Mínimo de Abono Inicial (%)
+                        <small style={{ display: 'block', color: '#64748b' }}>
+                          0% = No exige mínimo. (Ej. 30% o 50% para apartados o créditos).
+                        </small>
+                      </IonLabel>
+                      <IonInput 
+                        type="number" 
+                        min="0" 
+                        max="100" 
+                        value={settings.minDepositPercentage !== undefined ? settings.minDepositPercentage : 0} 
+                        onIonInput={e => setSettings({...settings, minDepositPercentage: parseFloat(e.detail.value!) || 0})} 
+                        placeholder="0" 
+                      />
+                    </IonItem>
+                  )}
+
                   <IonItem>
                     <IonLabel className="ion-text-wrap">
                       <h2>Siempre solicitar aprobación de entrada a empleados</h2>
@@ -150,6 +187,91 @@ const SettingsPage: React.FC = () => {
                       onIonChange={e => setSettings({...settings, requireApprovalAlways: e.detail.checked})} 
                     />
                   </IonItem>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
+          </IonRow>
+
+          {/* Métodos de Pago Aceptados */}
+          <IonRow>
+            <IonCol size="12">
+              <IonCard>
+                <IonCardHeader>
+                  <IonCardTitle>💳 Métodos de Pago Aceptados</IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  <p style={{ marginBottom: '15px', color: '#64748b' }}>
+                    Selecciona qué formas de pago acepta tu sucursal. Los métodos inactivos no aparecerán en la caja POS ni en la tienda online.
+                  </p>
+
+                  <IonGrid style={{ padding: 0 }}>
+                    <IonRow>
+                      <IonCol size="12" sizeMd="6">
+                        <IonItem>
+                          <IonLabel className="ion-text-wrap">
+                            <h2>💵 Efectivo Divisas (USD)</h2>
+                            <p style={{ color: '#64748b', fontSize: '13px' }}>Billetes físicos en dólares en caja y contra entrega.</p>
+                          </IonLabel>
+                          <IonToggle 
+                            checked={settings.acceptCashUsd !== false} 
+                            onIonChange={e => setSettings({...settings, acceptCashUsd: e.detail.checked})} 
+                          />
+                        </IonItem>
+                      </IonCol>
+
+                      <IonCol size="12" sizeMd="6">
+                        <IonItem>
+                          <IonLabel className="ion-text-wrap">
+                            <h2>📱 Pago Móvil (Bs.)</h2>
+                            <p style={{ color: '#64748b', fontSize: '13px' }}>Transferencias instantáneas interbancarias P2P/C2P.</p>
+                          </IonLabel>
+                          <IonToggle 
+                            checked={settings.acceptPagoMovil !== false} 
+                            onIonChange={e => setSettings({...settings, acceptPagoMovil: e.detail.checked})} 
+                          />
+                        </IonItem>
+                      </IonCol>
+
+                      <IonCol size="12" sizeMd="6">
+                        <IonItem>
+                          <IonLabel className="ion-text-wrap">
+                            <h2>💳 Punto de Venta Bancario (Tarjeta de Débito)</h2>
+                            <p style={{ color: '#64748b', fontSize: '13px' }}>Cobro físico por datáfono / terminal con reporte de lote.</p>
+                          </IonLabel>
+                          <IonToggle 
+                            checked={settings.acceptCardPos === true} 
+                            onIonChange={e => setSettings({...settings, acceptCardPos: e.detail.checked})} 
+                          />
+                        </IonItem>
+                      </IonCol>
+
+                      <IonCol size="12" sizeMd="6">
+                        <IonItem>
+                          <IonLabel className="ion-text-wrap">
+                            <h2>🟡 Binance Pay / USDT</h2>
+                            <p style={{ color: '#64748b', fontSize: '13px' }}>Pagos digitales en criptoactivos estables.</p>
+                          </IonLabel>
+                          <IonToggle 
+                            checked={settings.acceptBinance === true} 
+                            onIonChange={e => setSettings({...settings, acceptBinance: e.detail.checked})} 
+                          />
+                        </IonItem>
+                      </IonCol>
+
+                      <IonCol size="12" sizeMd="6">
+                        <IonItem>
+                          <IonLabel className="ion-text-wrap">
+                            <h2>🏦 Transferencia Bancaria en Bs.</h2>
+                            <p style={{ color: '#64748b', fontSize: '13px' }}>Transferencias bancarias tradicionales diferidas o del mismo banco.</p>
+                          </IonLabel>
+                          <IonToggle 
+                            checked={settings.acceptTransfer === true} 
+                            onIonChange={e => setSettings({...settings, acceptTransfer: e.detail.checked})} 
+                          />
+                        </IonItem>
+                      </IonCol>
+                    </IonRow>
+                  </IonGrid>
                 </IonCardContent>
               </IonCard>
             </IonCol>

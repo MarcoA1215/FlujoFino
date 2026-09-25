@@ -92,8 +92,10 @@ const PublicStore: React.FC = () => {
   const [selectedZoneId, setSelectedZoneId] = useState<string>('');
   const [customerAddress, setCustomerAddress] = useState('');
   const [notes, setNotes] = useState('');
-  const [paymentOption, setPaymentOption] = useState<'PAGO_MOVIL' | 'USD' | 'WHATSAPP'>('PAGO_MOVIL');
+  const [paymentOption, setPaymentOption] = useState<'PAGO_MOVIL' | 'USD' | 'TRANSFER' | 'BINANCE' | 'WHATSAPP'>('PAGO_MOVIL');
   const [pagoMovilRef, setPagoMovilRef] = useState('');
+  const [transferRef, setTransferRef] = useState('');
+  const [binanceRef, setBinanceRef] = useState('');
 
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,6 +112,15 @@ const PublicStore: React.FC = () => {
       setCategories(res.data.categories || []);
       if (res.data.deliveryZones?.length > 0) {
         setSelectedZoneId(res.data.deliveryZones[0].id);
+      }
+
+      if (res.data?.settings) {
+        const s = res.data.settings;
+        if (s.acceptPagoMovil !== false) setPaymentOption('PAGO_MOVIL');
+        else if (s.acceptCashUsd !== false) setPaymentOption('USD');
+        else if (s.acceptTransfer === true) setPaymentOption('TRANSFER');
+        else if (s.acceptBinance === true) setPaymentOption('BINANCE');
+        else setPaymentOption('WHATSAPP');
       }
     } catch (err: any) {
       console.error(err);
@@ -248,16 +259,34 @@ const PublicStore: React.FC = () => {
       return;
     }
 
+    if (paymentOption === 'TRANSFER' && !transferRef.trim()) {
+      presentToast({ message: 'Por favor ingresa la referencia de transferencia bancaria', duration: 2500, color: 'warning' });
+      return;
+    }
+    if (paymentOption === 'BINANCE' && !binanceRef.trim()) {
+      presentToast({ message: 'Por favor ingresa el ID de transacción / Binance Pay', duration: 2500, color: 'warning' });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
+      const paymentNote = paymentOption === 'TRANSFER' ? `MÉTODO: Transferencia Bancaria | Ref: ${transferRef.trim()}` :
+                          paymentOption === 'BINANCE' ? `MÉTODO: Binance Pay | ID: ${binanceRef.trim()}` :
+                          paymentOption === 'USD' ? 'MÉTODO: Divisas Efectivo (USD)' :
+                          paymentOption === 'WHATSAPP' ? 'MÉTODO: A convenir por WhatsApp' : '';
+
+      const finalNotes = [notes.trim(), paymentNote].filter(Boolean).join(' | ');
+
       const payload = {
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
         deliveryMethod,
         deliveryZoneId: deliveryMethod === 'DELIVERY' ? selectedZoneId : undefined,
         customerAddress: deliveryMethod === 'DELIVERY' ? customerAddress.trim() : undefined,
-        notes: notes.trim(),
-        pagoMovilRef: paymentOption === 'PAGO_MOVIL' ? pagoMovilRef.trim() : undefined,
+        notes: finalNotes,
+        pagoMovilRef: paymentOption === 'PAGO_MOVIL' ? pagoMovilRef.trim() : 
+                      paymentOption === 'TRANSFER' ? transferRef.trim() : 
+                      paymentOption === 'BINANCE' ? binanceRef.trim() : undefined,
         exchangeRate,
         amountBs: grandTotalBs,
         items: cart.map((i) => ({
@@ -275,7 +304,7 @@ const PublicStore: React.FC = () => {
         deliveryFeeUSD,
         grandTotalUSD,
         grandTotalBs,
-        notes,
+        notes: finalNotes,
       });
 
       // Clear cart
@@ -320,7 +349,15 @@ const PublicStore: React.FC = () => {
     );
 
     if (paymentOption === 'PAGO_MOVIL' && pagoMovilRef) {
-      lines.push(`💳 *Ref. Pago Móvil:* ${pagoMovilRef}`);
+      lines.push(`📱 *Ref. Pago Móvil:* ${pagoMovilRef}`);
+    } else if (paymentOption === 'TRANSFER' && transferRef) {
+      lines.push(`🏦 *Ref. Transferencia:* ${transferRef}`);
+    } else if (paymentOption === 'BINANCE' && binanceRef) {
+      lines.push(`🟡 *ID Binance Pay:* ${binanceRef}`);
+    } else if (paymentOption === 'USD') {
+      lines.push(`💵 *Método:* Efectivo Divisas (USD)`);
+    } else if (paymentOption === 'WHATSAPP') {
+      lines.push(`💬 *Método:* A convenir por WhatsApp`);
     }
 
     if (orderResult.notes) {
@@ -988,15 +1025,25 @@ const PublicStore: React.FC = () => {
                   <IonItem lines="none">
                     <IonLabel>Método</IonLabel>
                     <IonSelect value={paymentOption} onIonChange={(e) => setPaymentOption(e.detail.value)}>
-                      <IonSelectOption value="PAGO_MOVIL">Pago Móvil (Bolívares)</IonSelectOption>
-                      <IonSelectOption value="USD">Efectivo / Divisas USD</IonSelectOption>
-                      <IonSelectOption value="WHATSAPP">Acordar por WhatsApp</IonSelectOption>
+                      {storeData?.settings?.acceptPagoMovil !== false && (
+                        <IonSelectOption value="PAGO_MOVIL">📱 Pago Móvil (Bolívares)</IonSelectOption>
+                      )}
+                      {storeData?.settings?.acceptCashUsd !== false && (
+                        <IonSelectOption value="USD">💵 Divisas / Efectivo (USD)</IonSelectOption>
+                      )}
+                      {storeData?.settings?.acceptTransfer === true && (
+                        <IonSelectOption value="TRANSFER">🏦 Transferencia Bancaria (Bs.)</IonSelectOption>
+                      )}
+                      {storeData?.settings?.acceptBinance === true && (
+                        <IonSelectOption value="BINANCE">🟡 Binance Pay (USDT)</IonSelectOption>
+                      )}
+                      <IonSelectOption value="WHATSAPP">💬 Acordar por WhatsApp</IonSelectOption>
                     </IonSelect>
                   </IonItem>
 
                   {paymentOption === 'PAGO_MOVIL' && storeData?.settings && (
                     <div style={{ background: '#f1f5f9', padding: '12px', borderRadius: '8px', marginTop: '10px' }}>
-                      <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 'bold' }}>Datos para Pago Móvil:</p>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 'bold' }}>Datos para Pago Móvil (Total: Bs. {grandTotalBs.toFixed(2)}):</p>
                       {storeData.settings.companyBank && (
                         <p style={{ margin: '2px 0', fontSize: '13px' }}>
                           <b>Banco:</b> {storeData.settings.companyBank}
@@ -1024,6 +1071,51 @@ const PublicStore: React.FC = () => {
                           value={pagoMovilRef}
                           onIonInput={(e) => setPagoMovilRef(e.detail.value!)}
                           placeholder="Ej. 9482"
+                        />
+                      </IonItem>
+                    </div>
+                  )}
+
+                  {paymentOption === 'TRANSFER' && storeData?.settings && (
+                    <div style={{ background: '#eff6ff', padding: '12px', borderRadius: '8px', marginTop: '10px', border: '1px solid #bfdbfe' }}>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 'bold', color: '#1e40af' }}>
+                        Datos para Transferencia Bancaria (Total: Bs. {grandTotalBs.toFixed(2)}):
+                      </p>
+                      {storeData.settings.companyBank && (
+                        <p style={{ margin: '2px 0', fontSize: '13px' }}>
+                          <b>Banco:</b> {storeData.settings.companyBank}
+                        </p>
+                      )}
+                      {storeData.settings.companyCedula && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '2px 0' }}>
+                          <span style={{ fontSize: '13px' }}><b>Cédula/RIF:</b> {storeData.settings.companyCedula}</span>
+                          <IonButton fill="clear" size="small" onClick={() => copyToClipboard(storeData.settings.companyCedula, 'Cédula')}>
+                            <IonIcon icon={copyOutline} slot="icon-only" />
+                          </IonButton>
+                        </div>
+                      )}
+                      <IonItem lines="none" style={{ '--background': '#fff', borderRadius: '6px', marginTop: '8px' }}>
+                        <IonLabel position="stacked">N° de Referencia de Transferencia *</IonLabel>
+                        <IonInput
+                          value={transferRef}
+                          onIonInput={(e) => setTransferRef(e.detail.value!)}
+                          placeholder="Ej. 829104"
+                        />
+                      </IonItem>
+                    </div>
+                  )}
+
+                  {paymentOption === 'BINANCE' && (
+                    <div style={{ background: '#fefce8', padding: '12px', borderRadius: '8px', marginTop: '10px', border: '1px solid #fde047' }}>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 'bold', color: '#854d0e' }}>
+                        🟡 Binance Pay (USDT) (Total: ${grandTotalUSD.toFixed(2)} USDT)
+                      </p>
+                      <IonItem lines="none" style={{ '--background': '#fff', borderRadius: '6px', marginTop: '8px' }}>
+                        <IonLabel position="stacked">ID de Transacción / Order ID / Pay ID *</IonLabel>
+                        <IonInput
+                          value={binanceRef}
+                          onIonInput={(e) => setBinanceRef(e.detail.value!)}
+                          placeholder="Ej. 2938471928"
                         />
                       </IonItem>
                     </div>

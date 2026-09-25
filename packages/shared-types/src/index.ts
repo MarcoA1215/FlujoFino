@@ -215,3 +215,33 @@ export interface CustomerLookupResponse {
   identification?: string;
 }
 
+export interface SettingsDTO {
+  id?: string;
+  tenantId?: string;
+  exchangeRateBs?: number;
+  companyBank?: string;
+  companyCedula?: string;
+  companyPhone?: string;
+  allowPartialPayments?: boolean;
+  minDepositPercentage?: number;
+  acceptCashUsd?: boolean;
+  acceptPagoMovil?: boolean;
+  acceptCardPos?: boolean;
+  acceptBinance?: boolean;
+  acceptTransfer?: boolean;
+  featureCustomerSchedules?: boolean;
+  featureRecipes?: boolean;
+  featureBuySell?: boolean;
+  featureProduction?: boolean;
+  featureShowCatalog?: boolean;
+  bookingRequireService?: boolean;
+  bookingAllowStaffSelection?: boolean;
+  requireApprovalAlways?: boolean;
+  businessHours?: any;
+  services?: any[];
+  slotInterval?: number;
+  themePrimaryColor?: string;
+  themeHeaderColor?: string;
+  publicToken?: string;
+}
+

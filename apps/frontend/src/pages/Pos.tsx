@@ -22,7 +22,7 @@ type CartItem = {
   quantity: number;
 };
 
-type PaymentMethod = 'PENDING' | 'PAGO_MOVIL' | 'USD' | 'PUNTO';
+type PaymentMethod = 'PENDING' | 'PAGO_MOVIL' | 'USD' | 'PUNTO' | 'BINANCE' | 'TRANSFER';
 
 const Pos: React.FC = () => {
   const { openImage } = useImageViewer();
@@ -51,6 +51,13 @@ const Pos: React.FC = () => {
   // Punto de Venta Fields
   const [puntoRef, setPuntoRef] = useState('');
   const [puntoBank, setPuntoBank] = useState('');
+
+  // Binance Pay Fields
+  const [binanceRef, setBinanceRef] = useState('');
+
+  // Transferencia Bancaria Fields
+  const [transferRef, setTransferRef] = useState('');
+  const [transferBank, setTransferBank] = useState('');
 
   // USD Fields
   const [usdReceived, setUsdReceived] = useState<number | ''>('');
@@ -136,9 +143,18 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
   const fetchRate = async () => {
     try {
       const res = await apiClient.get<any>('/settings');
-      setSettings(res.data);
-      setExchangeRate(res.data.exchangeRateBs || 40.0);
-      setAllowPartialPayments(res.data.allowPartialPayments || false);
+      const s = res.data;
+      setSettings(s);
+      setExchangeRate(s.exchangeRateBs || 40.0);
+      setAllowPartialPayments(s.allowPartialPayments !== false);
+
+      // Elegir método de pago por defecto entre los activos
+      if (s.acceptPagoMovil !== false) setPaymentMethod('PAGO_MOVIL');
+      else if (s.acceptCashUsd !== false) setPaymentMethod('USD');
+      else if (s.acceptCardPos === true) setPaymentMethod('PUNTO');
+      else if (s.acceptBinance === true) setPaymentMethod('BINANCE');
+      else if (s.acceptTransfer === true) setPaymentMethod('TRANSFER');
+      else if (s.allowPartialPayments !== false) setPaymentMethod('PENDING');
     } catch (e) {}
   };
 
@@ -312,6 +328,21 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
     if (cart.length === 0 && paymentMethod !== 'PENDING') return presentToast({ message: 'Carrito vacío', duration: 2000, color: 'warning' });
     if (!customerName.trim()) return presentToast({ message: 'Ingresa el nombre', duration: 2000, color: 'warning' });
 
+    if (paymentMethod === 'PENDING') {
+      const minDepositPct = Number(settings?.minDepositPercentage || 0);
+      if (minDepositPct > 0) {
+        const minRequired = totalCart * (minDepositPct / 100);
+        const abonoVal = initialAbono ? Number(initialAbono) : 0;
+        if (abonoVal < minRequired) {
+          return presentToast({
+            message: `El abono inicial debe ser al menos el ${minDepositPct}% ($${minRequired.toFixed(2)})`,
+            duration: 4000,
+            color: 'warning'
+          });
+        }
+      }
+    }
+
     if (paymentMethod === 'PAGO_MOVIL') {
       if (!pagoMovilRef || !pagoMovilBank) {
         return presentToast({ message: 'Referencia y Banco son obligatorios', duration: 3000, color: 'warning' });
@@ -324,6 +355,18 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
       }
     }
 
+    if (paymentMethod === 'BINANCE') {
+      if (!binanceRef.trim()) {
+        return presentToast({ message: 'El ID de orden / comprobante de Binance Pay es obligatorio', duration: 3000, color: 'warning' });
+      }
+    }
+
+    if (paymentMethod === 'TRANSFER') {
+      if (!transferRef.trim()) {
+        return presentToast({ message: 'La referencia de la transferencia es obligatoria', duration: 3000, color: 'warning' });
+      }
+    }
+
     let notes = '';
     if (paymentMethod === 'USD') {
       const received = typeof usdReceived === 'number' ? usdReceived : totalCart;
@@ -332,6 +375,10 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
       notes = `MÉTODO: Divisas (USD) | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`;
     } else if (paymentMethod === 'PUNTO') {
       notes = `MÉTODO: Punto de Venta | Ref: ${puntoRef} | Banco/Terminal: ${puntoBank || 'Punto de Venta'}`;
+    } else if (paymentMethod === 'BINANCE') {
+      notes = `MÉTODO: Binance Pay | ID/Hash: ${binanceRef}`;
+    } else if (paymentMethod === 'TRANSFER') {
+      notes = `MÉTODO: Transferencia Bancaria | Ref: ${transferRef} | Banco: ${transferBank || 'Bancario'}`;
     }
 
     try {
@@ -343,10 +390,16 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
         paymentStatus: paymentMethod === 'PENDING' ? PaymentStatus.PENDING : PaymentStatus.PAID,
         paymentMethod,
         notes,
-        pagoMovilRef: paymentMethod === 'PAGO_MOVIL' ? pagoMovilRef : (paymentMethod === 'PUNTO' ? puntoRef : undefined),
+        pagoMovilRef: paymentMethod === 'PAGO_MOVIL' ? pagoMovilRef : 
+                      paymentMethod === 'PUNTO' ? puntoRef : 
+                      paymentMethod === 'BINANCE' ? binanceRef : 
+                      paymentMethod === 'TRANSFER' ? transferRef : undefined,
         pagoMovilPhone: paymentMethod === 'PAGO_MOVIL' ? pagoMovilPhone : undefined,
         pagoMovilCedula: paymentMethod === 'PAGO_MOVIL' ? pagoMovilCedula : undefined,
-        pagoMovilBank: paymentMethod === 'PAGO_MOVIL' ? pagoMovilBank : (paymentMethod === 'PUNTO' ? (puntoBank || 'Punto de Venta') : undefined),
+        pagoMovilBank: paymentMethod === 'PAGO_MOVIL' ? pagoMovilBank : 
+                       paymentMethod === 'PUNTO' ? (puntoBank || 'Punto de Venta') : 
+                       paymentMethod === 'BINANCE' ? 'Binance Pay' : 
+                       paymentMethod === 'TRANSFER' ? (transferBank || 'Transferencia') : undefined,
         amountBs: totalCart * exchangeRate,
         exchangeRate,
         deliveryMethod,
@@ -391,6 +444,9 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
       setPagoMovilBank('');
       setPuntoRef('');
       setPuntoBank('');
+      setBinanceRef('');
+      setTransferRef('');
+      setTransferBank('');
       setDeliveryMethod(DeliveryMethod.IN_STORE);
       setDeliveryZoneId('');
       setUsdReceived('');
@@ -573,19 +629,46 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
                   <IonItem className="ion-margin-bottom">
                     <IonLabel position="stacked">Método de Pago</IonLabel>
                     <IonSelect value={paymentMethod} onIonChange={e => setPaymentMethod(e.detail.value)}>
-                      <IonSelectOption value="PAGO_MOVIL">📱 Pago Móvil (Bs.)</IonSelectOption>
-                      <IonSelectOption value="PUNTO">💳 Punto de Venta / Tarjeta (Bs.)</IonSelectOption>
-                      <IonSelectOption value="USD">💵 Divisas (USD Efectivo)</IonSelectOption>
-                      <IonSelectOption value="PENDING">⏳ Por Pagar / Cuenta Abierta</IonSelectOption>
+                      {settings?.acceptPagoMovil !== false && (
+                        <IonSelectOption value="PAGO_MOVIL">📱 Pago Móvil (Bs.)</IonSelectOption>
+                      )}
+                      {settings?.acceptCardPos === true && (
+                        <IonSelectOption value="PUNTO">💳 Punto de Venta / Tarjeta (Bs.)</IonSelectOption>
+                      )}
+                      {settings?.acceptCashUsd !== false && (
+                        <IonSelectOption value="USD">💵 Divisas (USD Efectivo)</IonSelectOption>
+                      )}
+                      {settings?.acceptBinance === true && (
+                        <IonSelectOption value="BINANCE">🟡 Binance Pay (USDT)</IonSelectOption>
+                      )}
+                      {settings?.acceptTransfer === true && (
+                        <IonSelectOption value="TRANSFER">🏦 Transferencia Bancaria (Bs.)</IonSelectOption>
+                      )}
+                      {settings?.allowPartialPayments !== false && (
+                        <IonSelectOption value="PENDING">⏳ Por Pagar / Cuenta Abierta</IonSelectOption>
+                      )}
                     </IonSelect>
                   </IonItem>
 
                   {paymentMethod === 'PENDING' && (
-                    <div style={{ background: '#e9ecef', padding: '10px', borderRadius: '8px', marginBottom: '15px' }}>
-                      <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: '#495057' }}>Abono Inicial (Opcional)</h4>
+                    <div style={{ background: '#e9ecef', padding: '12px', borderRadius: '8px', marginBottom: '15px' }}>
+                      <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', color: '#495057' }}>
+                        Abono Inicial {Number(settings?.minDepositPercentage || 0) > 0 ? `(Mínimo Requerido: ${settings.minDepositPercentage}%)` : '(Opcional)'}
+                      </h4>
+                      {Number(settings?.minDepositPercentage || 0) > 0 && (
+                        <p style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: '#0d6efd', fontWeight: 600 }}>
+                          💡 Abono mínimo requerido ({settings.minDepositPercentage}%): ${(totalCart * (Number(settings.minDepositPercentage) / 100)).toFixed(2)} USD
+                        </p>
+                      )}
                       <IonItem color="light">
                         <IonLabel position="stacked">Monto (USD)</IonLabel>
-                        <IonInput type="number" min="0" value={initialAbono} onIonInput={e => setInitialAbono(e.detail.value!)} placeholder="Ej. 10.00" />
+                        <IonInput 
+                          type="number" 
+                          min="0" 
+                          value={initialAbono} 
+                          onIonInput={e => setInitialAbono(e.detail.value!)} 
+                          placeholder={Number(settings?.minDepositPercentage || 0) > 0 ? `Mínimo: $${(totalCart * (Number(settings.minDepositPercentage) / 100)).toFixed(2)}` : 'Ej. 10.00'} 
+                        />
                       </IonItem>
                     </div>
                   )}
@@ -603,6 +686,34 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
                       <IonItem color="light">
                         <IonLabel position="stacked">Banco / Terminal del Punto (Opcional)</IonLabel>
                         <IonInput value={puntoBank} onIonInput={e => setPuntoBank(e.detail.value!)} placeholder="Ej. Punto Banesco, BDV, Bancamiga..." />
+                      </IonItem>
+                    </div>
+                  )}
+
+                  {paymentMethod === 'BINANCE' && (
+                    <div style={{ background: '#fefce8', padding: '12px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #fde047' }}>
+                      <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: '#854d0e', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        🟡 Binance Pay (USDT) (Total: ${totalCart.toFixed(2)} USDT)
+                      </h4>
+                      <IonItem color="light">
+                        <IonLabel position="stacked">ID de Orden / Pay ID / TxID *</IonLabel>
+                        <IonInput value={binanceRef} onIonInput={e => setBinanceRef(e.detail.value!)} placeholder="Ej. 2938471928" />
+                      </IonItem>
+                    </div>
+                  )}
+
+                  {paymentMethod === 'TRANSFER' && (
+                    <div style={{ background: '#eff6ff', padding: '12px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #bfdbfe' }}>
+                      <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        🏦 Transferencia Bancaria en Bs. (Total: Bs. {(totalCart * exchangeRate).toFixed(2)})
+                      </h4>
+                      <IonItem color="light" className="ion-margin-bottom">
+                        <IonLabel position="stacked">N° de Transferencia / Referencia *</IonLabel>
+                        <IonInput value={transferRef} onIonInput={e => setTransferRef(e.detail.value!)} placeholder="Ej. 182746" />
+                      </IonItem>
+                      <IonItem color="light">
+                        <IonLabel position="stacked">Banco de Origen / Destino (Opcional)</IonLabel>
+                        <IonInput value={transferBank} onIonInput={e => setTransferBank(e.detail.value!)} placeholder="Ej. Banesco a Banesco" />
                       </IonItem>
                     </div>
                   )}

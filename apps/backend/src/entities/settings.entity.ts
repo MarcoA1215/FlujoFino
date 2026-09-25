@@ -19,8 +19,28 @@ export class Settings {
   @Column({ nullable: true })
   companyPhone: string;
 
+  // --- Métodos de pago aceptados ---
+  @Column('boolean', { default: true })
+  acceptCashUsd: boolean;
+
+  @Column('boolean', { default: true })
+  acceptPagoMovil: boolean;
+
   @Column('boolean', { default: false })
+  acceptCardPos: boolean;
+
+  @Column('boolean', { default: false })
+  acceptBinance: boolean;
+
+  @Column('boolean', { default: false })
+  acceptTransfer: boolean;
+
+  // --- Políticas de abonos y crédito ---
+  @Column('boolean', { default: true })
   allowPartialPayments: boolean;
+
+  @Column('decimal', { precision: 5, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  minDepositPercentage: number;
 
   // Feature Flags / Onboarding
   @Column('boolean', { default: false })
