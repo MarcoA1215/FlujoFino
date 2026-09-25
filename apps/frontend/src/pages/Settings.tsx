@@ -60,6 +60,20 @@ const SettingsPage: React.FC = () => {
   }, [user]);
 
   const handleSaveSettings = async () => {
+    const isCashUsd = settings.acceptCashUsd !== false;
+    const isPagoMovil = settings.acceptPagoMovil !== false;
+    const isCardPos = settings.acceptCardPos === true;
+    const isBinance = settings.acceptBinance === true;
+    const isTransfer = settings.acceptTransfer === true;
+
+    if (!isCashUsd && !isPagoMovil && !isCardPos && !isBinance && !isTransfer) {
+      return presentToast({
+        message: '⚠️ Debes mantener al menos un método de pago activo (Efectivo USD, Pago Móvil, Punto, Binance o Transferencia).',
+        duration: 4500,
+        color: 'warning'
+      });
+    }
+
     try {
       await apiClient.put('/settings', { 
           companyBank: settings.companyBank, 
@@ -96,7 +110,8 @@ const SettingsPage: React.FC = () => {
           message: 'Configuración guardada', duration: 2000, color: 'success' });
       fetchSettings();
     } catch(e: any) {
-      presentToast({ message: 'Error guardando ajustes', duration: 3000, color: 'danger' });
+      const msg = e.response?.data?.message || 'Error guardando ajustes';
+      presentToast({ message: msg, duration: 4000, color: 'danger' });
     }
   };
 
@@ -230,6 +245,16 @@ const SettingsPage: React.FC = () => {
                   <p style={{ marginBottom: '15px', color: '#64748b' }}>
                     Selecciona qué formas de pago acepta tu sucursal. Los métodos inactivos no aparecerán en la caja POS ni en la tienda online.
                   </p>
+
+                  {settings.acceptCashUsd === false &&
+                   settings.acceptPagoMovil === false &&
+                   !settings.acceptCardPos &&
+                   !settings.acceptBinance &&
+                   !settings.acceptTransfer && (
+                    <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#fef2f2', border: '1px solid #f87171', borderRadius: '8px', color: '#991b1b', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      ⚠️ No puedes desactivar todos los métodos de pago. Activa al menos uno para poder guardar tu configuración.
+                    </div>
+                  )}
 
                   <IonGrid style={{ padding: 0 }}>
                     <IonRow>

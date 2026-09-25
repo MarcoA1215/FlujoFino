@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Settings } from '../entities/settings.entity';
@@ -69,6 +69,24 @@ export class SettingsService implements OnModuleInit {
     if (payload.allowPartialPayments !== undefined) settings.allowPartialPayments = payload.allowPartialPayments;
     if (payload.minDepositPercentage !== undefined) settings.minDepositPercentage = payload.minDepositPercentage;
     if (payload.allowCashierBypassDeposit !== undefined) settings.allowCashierBypassDeposit = payload.allowCashierBypassDeposit;
+    const nextCashUsd = payload.acceptCashUsd !== undefined ? payload.acceptCashUsd : settings.acceptCashUsd;
+    const nextPagoMovil = payload.acceptPagoMovil !== undefined ? payload.acceptPagoMovil : settings.acceptPagoMovil;
+    const nextCardPos = payload.acceptCardPos !== undefined ? payload.acceptCardPos : settings.acceptCardPos;
+    const nextBinance = payload.acceptBinance !== undefined ? payload.acceptBinance : settings.acceptBinance;
+    const nextTransfer = payload.acceptTransfer !== undefined ? payload.acceptTransfer : settings.acceptTransfer;
+
+    if (
+      payload.acceptCashUsd !== undefined ||
+      payload.acceptPagoMovil !== undefined ||
+      payload.acceptCardPos !== undefined ||
+      payload.acceptBinance !== undefined ||
+      payload.acceptTransfer !== undefined
+    ) {
+      if (!nextCashUsd && !nextPagoMovil && !nextCardPos && !nextBinance && !nextTransfer) {
+        throw new BadRequestException('Debes mantener al menos un método de pago activo');
+      }
+    }
+
     if (payload.acceptCashUsd !== undefined) settings.acceptCashUsd = payload.acceptCashUsd;
     if (payload.acceptPagoMovil !== undefined) settings.acceptPagoMovil = payload.acceptPagoMovil;
     if (payload.acceptCardPos !== undefined) settings.acceptCardPos = payload.acceptCardPos;
