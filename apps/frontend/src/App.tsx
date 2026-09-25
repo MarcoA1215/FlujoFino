@@ -48,6 +48,9 @@ const HomeRedirector: React.FC = () => {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!user?.tenantId) return <Navigate to="/select-workspace" replace />;
   
+  if (user?.role === UserRole.SUPERADMIN || user?.email === 'superadmin@flujofino.com') {
+    return <Navigate to="/platform-admin" replace />;
+  }
   if (user?.role === UserRole.POS) return <Navigate to="/pos" replace />;
   if (user?.role === UserRole.KITCHEN) return <Navigate to="/orders" replace />;
   if (user?.role === UserRole.DELIVERY) return <Navigate to="/orders" replace />;

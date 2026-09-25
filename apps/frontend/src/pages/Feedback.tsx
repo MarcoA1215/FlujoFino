@@ -1,28 +1,85 @@
-import React, { useState, useEffect } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton, IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonTextarea, IonButton, useIonToast, IonIcon } from '@ionic/react';
-import { sendOutline, chatbubbleOutline, headsetOutline } from 'ionicons/icons';
+import React, { useState, useEffect, useContext } from 'react';
+import {
+  IonPage,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonContent,
+  IonButtons,
+  IonMenuButton,
+  IonSegment,
+  IonSegmentButton,
+  IonLabel,
+  IonCard,
+  IonCardHeader,
+  IonCardTitle,
+  IonCardContent,
+  IonTextarea,
+  IonButton,
+  useIonToast,
+  IonIcon,
+  IonBadge,
+  IonSpinner,
+} from '@ionic/react';
+import {
+  sendOutline,
+  chatbubbleOutline,
+  headsetOutline,
+  refreshOutline,
+  businessOutline,
+  timeOutline,
+  mailOutline,
+} from 'ionicons/icons';
 import { apiClient } from '../api/client';
+import { AuthContext } from '../context/AuthContext';
+import { UserRole } from '@nutrideli/shared-types';
 
 const FeedbackPage: React.FC = () => {
+  const { user } = useContext(AuthContext);
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || user?.email === 'superadmin@flujofino.com';
+
   const [tab, setTab] = useState<'clientes' | 'soporte'>('clientes');
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [platformFeedbacks, setPlatformFeedbacks] = useState<any[]>([]);
   const [supportMessage, setSupportMessage] = useState('');
+  const [loading, setLoading] = useState(false);
   const [presentToast] = useIonToast();
 
   const fetchFeedbacks = async () => {
     try {
+      setLoading(true);
       const res = await apiClient.get('/feedback/business');
-      setFeedbacks(res.data);
+      setFeedbacks(res.data || []);
     } catch (e) {
       console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchPlatformFeedbacks = async () => {
+    try {
+      setLoading(true);
+      const res = await apiClient.get('/feedback/platform');
+      setPlatformFeedbacks(res.data || []);
+    } catch (e: any) {
+      presentToast({
+        message: 'Error al cargar mensajes: ' + (e.response?.data?.message || e.message),
+        duration: 3000,
+        color: 'danger',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (tab === 'clientes') {
+    if (isSuperAdmin) {
+      fetchPlatformFeedbacks();
+    } else if (tab === 'clientes') {
       fetchFeedbacks();
     }
-  }, [tab]);
+  }, [tab, isSuperAdmin]);
 
   const handleSendSupport = async () => {
     if (!supportMessage.trim()) return;
@@ -35,6 +92,92 @@ const FeedbackPage: React.FC = () => {
     }
   };
 
+  // --- VISTA SUPERADMIN: BANDEJA DE MENSAJES DE NEGOCIOS ---
+  if (isSuperAdmin) {
+    return (
+      <IonPage>
+        <IonHeader>
+          <IonToolbar color="primary">
+            <IonButtons slot="start">
+              <IonMenuButton />
+            </IonButtons>
+            <IonTitle style={{ fontWeight: 700 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <IonIcon icon={mailOutline} />
+                Mensajes y Soporte de Negocios
+              </span>
+            </IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={fetchPlatformFeedbacks} disabled={loading} title="Actualizar mensajes">
+                <IonIcon icon={refreshOutline} slot="icon-only" />
+              </IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+
+        <IonContent className="ion-padding" style={{ backgroundColor: '#f1f5f9' }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  Bandeja de Entrada • Flujo Fino
+                </h2>
+                <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
+                  Comentarios, reportes y sugerencias que los negocios registrados te han enviado.
+                </p>
+              </div>
+              <IonBadge color="primary" style={{ fontSize: '13px', padding: '6px 12px', borderRadius: '12px' }}>
+                {platformFeedbacks.length} Mensajes
+              </IonBadge>
+            </div>
+
+            {loading && (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <IonSpinner name="crescent" color="primary" />
+                <p style={{ color: '#64748b', marginTop: '8px' }}>Cargando mensajes...</p>
+              </div>
+            )}
+
+            {!loading && platformFeedbacks.length === 0 && (
+              <div style={{ background: '#fff', padding: '50px 20px', textAlign: 'center', borderRadius: '12px', color: '#64748b', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                <IonIcon icon={mailOutline} style={{ fontSize: '56px', color: '#cbd5e1', marginBottom: '12px' }} />
+                <h3 style={{ fontWeight: 800, fontSize: '18px', color: '#0f172a', margin: 0 }}>
+                  Aún no has recibido mensajes
+                </h3>
+                <p style={{ fontSize: '14px', marginTop: '6px', maxWidth: '400px', margin: '6px auto 0 auto' }}>
+                  Cuando algún negocio escriba una sugerencia o reporte desde su sección de Soporte en Flujo Fino, aparecerá en esta bandeja.
+                </p>
+              </div>
+            )}
+
+            {!loading && platformFeedbacks.map((f) => (
+              <IonCard key={f.id} style={{ margin: '0 0 16px 0', borderRadius: '12px', boxShadow: '0 2px 6px rgba(0,0,0,0.06)', borderLeft: '4px solid #3b82f6' }}>
+                <IonCardHeader style={{ paddingBottom: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <IonCardTitle style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <IonIcon icon={businessOutline} style={{ color: '#3b82f6' }} />
+                      {f.tenant?.name || 'Negocio Registrado'}
+                    </IonCardTitle>
+                    <span style={{ fontSize: '12px', color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <IonIcon icon={timeOutline} />
+                      {new Date(f.createdAt).toLocaleString('es-VE')}
+                    </span>
+                  </div>
+                </IonCardHeader>
+                <IonCardContent>
+                  <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#1e293b', fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                    {f.content}
+                  </div>
+                </IonCardContent>
+              </IonCard>
+            ))}
+          </div>
+        </IonContent>
+      </IonPage>
+    );
+  }
+
+  // --- VISTA PARA DUEÑOS DE TIENDA REGULARES ---
   return (
     <IonPage>
       <IonHeader>
@@ -123,4 +266,3 @@ const FeedbackPage: React.FC = () => {
 };
 
 export default FeedbackPage;
-

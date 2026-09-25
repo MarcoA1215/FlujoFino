@@ -41,6 +41,7 @@ import {
   peopleOutline,
   createOutline,
   copyOutline,
+  mailOutline,
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import {
@@ -56,10 +57,11 @@ const SuperAdminDashboard: React.FC = () => {
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
 
-  const [activeTab, setActiveTab] = useState<'tenants' | 'payments'>('tenants');
+  const [activeTab, setActiveTab] = useState<'tenants' | 'payments' | 'support'>('tenants');
   const [loading, setLoading] = useState(false);
   const [tenants, setTenants] = useState<SuperAdminTenantDTO[]>([]);
   const [pendingPayments, setPendingPayments] = useState<SaaSPaymentReportDTO[]>([]);
+  const [supportMessages, setSupportMessages] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Modal for modifying plan / extending days
@@ -77,12 +79,14 @@ const SuperAdminDashboard: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [tenantsRes, paymentsRes] = await Promise.all([
+      const [tenantsRes, paymentsRes, supportRes] = await Promise.all([
         apiClient.get<SuperAdminTenantDTO[]>('/superadmin/tenants'),
         apiClient.get<SaaSPaymentReportDTO[]>('/superadmin/payments'),
+        apiClient.get<any[]>('/feedback/platform'),
       ]);
       setTenants(tenantsRes.data || []);
       setPendingPayments(paymentsRes.data || []);
+      setSupportMessages(supportRes.data || []);
     } catch (err: any) {
       presentToast({
         message: 'Error al cargar datos del SuperAdmin: ' + (err.response?.data?.message || err.message),
@@ -328,6 +332,17 @@ const SuperAdminDashboard: React.FC = () => {
                 {pendingCount > 0 && (
                   <IonBadge color="danger" style={{ fontSize: '11px', marginLeft: '4px' }}>
                     {pendingCount}
+                  </IonBadge>
+                )}
+              </IonLabel>
+            </IonSegmentButton>
+            <IonSegmentButton value="support">
+              <IonLabel style={{ fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <IonIcon icon={mailOutline} />
+                Mensajes de Soporte
+                {supportMessages.length > 0 && (
+                  <IonBadge color="primary" style={{ fontSize: '11px', marginLeft: '4px' }}>
+                    {supportMessages.length}
                   </IonBadge>
                 )}
               </IonLabel>
@@ -619,6 +634,56 @@ const SuperAdminDashboard: React.FC = () => {
                   ))}
                 </IonRow>
               </IonGrid>
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: MENSAJES Y SOPORTE */}
+        {activeTab === 'support' && (
+          <div>
+            {loading && (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <IonSpinner name="crescent" color="primary" />
+                <p style={{ color: '#64748b', marginTop: '8px' }}>Cargando mensajes de soporte...</p>
+              </div>
+            )}
+
+            {!loading && supportMessages.length === 0 && (
+              <div style={{ background: '#fff', padding: '50px 20px', textAlign: 'center', borderRadius: '12px', color: '#64748b', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                <IonIcon icon={mailOutline} style={{ fontSize: '56px', color: '#cbd5e1', marginBottom: '12px' }} />
+                <h3 style={{ fontWeight: 800, fontSize: '18px', color: '#0f172a', margin: 0 }}>
+                  Aún no has recibido mensajes de soporte
+                </h3>
+                <p style={{ fontSize: '14px', marginTop: '6px', maxWidth: '420px', margin: '6px auto 0 auto' }}>
+                  Cuando algún negocio escriba un reporte, duda o sugerencia desde la sección de Ayuda en su sistema, aparecerá aquí.
+                </p>
+              </div>
+            )}
+
+            {!loading && supportMessages.length > 0 && (
+              <div style={{ maxWidth: '850px', margin: '0 auto' }}>
+                {supportMessages.map((msg) => (
+                  <IonCard key={msg.id} style={{ margin: '0 0 16px 0', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderLeft: '4px solid #3b82f6' }}>
+                    <IonCardHeader style={{ paddingBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <IonCardTitle style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <IonIcon icon={businessOutline} style={{ color: '#3b82f6' }} />
+                          {msg.tenant?.name || 'Negocio Registrado'}
+                        </IonCardTitle>
+                        <span style={{ fontSize: '12px', color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <IonIcon icon={timeOutline} />
+                          {new Date(msg.createdAt).toLocaleString('es-VE')}
+                        </span>
+                      </div>
+                    </IonCardHeader>
+                    <IonCardContent>
+                      <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#1e293b', fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                        {msg.content}
+                      </div>
+                    </IonCardContent>
+                  </IonCard>
+                ))}
+              </div>
             )}
           </div>
         )}

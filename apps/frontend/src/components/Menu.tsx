@@ -148,13 +148,12 @@ const Menu: React.FC = () => {
 
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || user?.email === 'superadmin@flujofino.com';
   if (isSuperAdmin) {
-    appPages.unshift({
-      title: 'Plataforma SaaS',
-      url: '/platform-admin',
-      iosIcon: shieldCheckmarkOutline,
-      mdIcon: shieldCheckmarkOutline,
-    });
+    appPages = [
+      { title: 'Plataforma SaaS', url: '/platform-admin', iosIcon: shieldCheckmarkOutline, mdIcon: shieldCheckmarkOutline },
+      { title: 'Mensajes de Soporte', url: '/feedback', iosIcon: chatbubbleOutline, mdIcon: chatbubbleOutline },
+    ];
   }
+
 
   const acceptedWorkspaces = workspaces.filter(w => !w.status || w.status === 'ACCEPTED');
   const displayWorkspaces = acceptedWorkspaces.length > 0 ? acceptedWorkspaces : [
@@ -172,6 +171,7 @@ const Menu: React.FC = () => {
           <button 
             type="button"
             onClick={() => {
+              if (isSuperAdmin) return;
               loadWorkspaces();
               setShowBranchModal(true);
             }}
@@ -191,11 +191,11 @@ const Menu: React.FC = () => {
             }}
             title="Cambiar de sucursal / espacio"
           >
-            <IonIcon icon={businessOutline} style={{ fontSize: '15px', color: 'var(--ion-color-primary)' }} />
+            <IonIcon icon={isSuperAdmin ? shieldCheckmarkOutline : businessOutline} style={{ fontSize: '15px', color: isSuperAdmin ? '#3b82f6' : 'var(--ion-color-primary)' }} />
             <span style={{ fontSize: '14px', fontWeight: '700', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.tenantName || 'Flujo Fino'}
+              {isSuperAdmin ? 'Plataforma Flujo Fino' : (user?.tenantName || 'Flujo Fino')}
             </span>
-            <IonIcon icon={chevronDownOutline} style={{ fontSize: '13px', color: '#64748b' }} />
+            {!isSuperAdmin && <IonIcon icon={chevronDownOutline} style={{ fontSize: '13px', color: '#64748b' }} />}
           </button>
 
           <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#64748b' }}>

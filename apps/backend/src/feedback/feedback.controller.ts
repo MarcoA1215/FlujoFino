@@ -20,10 +20,10 @@ export class FeedbackController {
     return this.feedbackService.createPlatformFeedback(req.user.tenantId, content);
   }
 
-  // Only global admin can view platform feedbacks
+  // Global/SuperAdmin view of platform feedbacks
   @Get('platform')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN) // Assuming ADMIN role handles global, or we might need superadmin. But ADMIN is fine for now
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   getPlatformFeedbacks() {
     return this.feedbackService.getPlatformFeedbacks();
   }
