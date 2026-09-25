@@ -335,4 +335,16 @@ export interface MySubscriptionDTO {
   currentPeriodEndsAt?: string;
 }
 
+export interface PlatformConfigDTO {
+  companyBank?: string;
+  companyCedula?: string;
+  companyPhone?: string;
+  companyAccountNumber?: string;
+  companyAccountHolder?: string;
+  binancePayId?: string;
+  binanceEmail?: string;
+  defaultMonthlyPrice?: number;
+  defaultTrialDays?: number;
+}
+
 

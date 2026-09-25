@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Put,
   Param,
   Body,
   UseGuards,
@@ -12,6 +13,7 @@ import { SuperAdminService } from './superadmin.service';
 import { SuperAdminGuard } from './superadmin.guard';
 import { UpdateTenantPlanDto } from './dto/update-tenant-plan.dto';
 import { ReportPaymentDto } from './dto/report-payment.dto';
+import { UpdatePlatformConfigDto } from './dto/update-platform-config.dto';
 
 @Controller('superadmin')
 export class SuperAdminController {
@@ -36,6 +38,23 @@ export class SuperAdminController {
   ) {
     const tenantId = req.user.tenantId;
     return await this.superadminService.reportPayment(tenantId, body);
+  }
+
+  /**
+   * Endpoint for tenants or SuperAdmin to view official SaaS payment reception accounts
+   */
+  @Get('platform-config')
+  async getPlatformConfig() {
+    return await this.superadminService.getPlatformConfig();
+  }
+
+  /**
+   * Endpoint for SuperAdmin to update official SaaS payment accounts & subscription defaults
+   */
+  @Put('platform-config')
+  @UseGuards(SuperAdminGuard)
+  async updatePlatformConfig(@Body() body: UpdatePlatformConfigDto) {
+    return await this.superadminService.updatePlatformConfig(body);
   }
 
   // --- STRICT SUPERADMIN PROTECTED ROUTES ---

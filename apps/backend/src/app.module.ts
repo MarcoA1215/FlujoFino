@@ -41,6 +41,7 @@ import { OrderItemMedia } from './entities/order-item-media.entity';
 import { Customer } from './entities/customer.entity';
 import { CustomersModule } from './customers/customers.module';
 import { SaaSPaymentReport } from './entities/saas-payment-report.entity';
+import { PlatformConfig } from './entities/platform-config.entity';
 import { SuperAdminModule } from './superadmin/superadmin.module';
 
 @Module({
@@ -56,7 +57,7 @@ import { SuperAdminModule } from './superadmin/superadmin.module';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
-        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport],
+        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig],
         synchronize: true,
       }),
       inject: [ConfigService],

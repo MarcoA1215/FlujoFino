@@ -4,6 +4,8 @@ import { Repository, In } from 'typeorm';
 import { Tenant } from '../entities/tenant.entity';
 import { SaaSPaymentReport } from '../entities/saas-payment-report.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
+import { PlatformConfig } from '../entities/platform-config.entity';
+import { UpdatePlatformConfigDto } from './dto/update-platform-config.dto';
 import {
   TenantPlanType,
   TenantStatus,
@@ -24,6 +26,8 @@ export class SuperAdminService {
     private readonly paymentReportRepo: Repository<SaaSPaymentReport>,
     @InjectRepository(UserTenantAccess)
     private readonly userAccessRepo: Repository<UserTenantAccess>,
+    @InjectRepository(PlatformConfig)
+    private readonly platformConfigRepo: Repository<PlatformConfig>,
   ) {}
 
   /**
@@ -368,4 +372,37 @@ export class SuperAdminService {
 
     return await this.paymentReportRepo.save(report);
   }
+
+  /**
+   * Get global platform payment & subscription configuration
+   */
+  async getPlatformConfig(): Promise<PlatformConfig> {
+    let config = await this.platformConfigRepo.findOne({ where: { id: 'default' } });
+    if (!config) {
+      config = this.platformConfigRepo.create({
+        id: 'default',
+        companyBank: 'Banesco',
+        companyCedula: 'J-12345678-0',
+        companyPhone: '0414-1234567',
+        companyAccountNumber: '01340000000000000000',
+        companyAccountHolder: 'Flujo Fino SaaS',
+        binancePayId: '123456789',
+        binanceEmail: 'pagos@flujofino.com',
+        defaultMonthlyPrice: 20.0,
+        defaultTrialDays: 15,
+      });
+      await this.platformConfigRepo.save(config);
+    }
+    return config;
+  }
+
+  /**
+   * Update global platform payment & subscription configuration (SuperAdmin only)
+   */
+  async updatePlatformConfig(dto: UpdatePlatformConfigDto): Promise<PlatformConfig> {
+    const config = await this.getPlatformConfig();
+    Object.assign(config, dto);
+    return await this.platformConfigRepo.save(config);
+  }
 }
+

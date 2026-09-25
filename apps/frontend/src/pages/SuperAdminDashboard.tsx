@@ -42,6 +42,9 @@ import {
   createOutline,
   copyOutline,
   mailOutline,
+  walletOutline,
+  saveOutline,
+  cardOutline,
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import {
@@ -51,18 +54,33 @@ import {
   type SaaSPaymentReportDTO,
   type SuperAdminTenantDTO,
   type UpdateTenantPlanDTO,
+  type PlatformConfigDTO,
 } from '@nutrideli/shared-types';
 
 const SuperAdminDashboard: React.FC = () => {
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
 
-  const [activeTab, setActiveTab] = useState<'tenants' | 'payments' | 'support'>('tenants');
+  const [activeTab, setActiveTab] = useState<'tenants' | 'payments' | 'config' | 'support'>('tenants');
   const [loading, setLoading] = useState(false);
   const [tenants, setTenants] = useState<SuperAdminTenantDTO[]>([]);
   const [pendingPayments, setPendingPayments] = useState<SaaSPaymentReportDTO[]>([]);
   const [supportMessages, setSupportMessages] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Platform accounts configuration
+  const [platformConfig, setPlatformConfig] = useState<PlatformConfigDTO>({
+    companyBank: '',
+    companyCedula: '',
+    companyPhone: '',
+    companyAccountNumber: '',
+    companyAccountHolder: '',
+    binancePayId: '',
+    binanceEmail: '',
+    defaultMonthlyPrice: 20,
+    defaultTrialDays: 15,
+  });
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
 
   // Modal for modifying plan / extending days
   const [selectedTenant, setSelectedTenant] = useState<SuperAdminTenantDTO | null>(null);
@@ -79,14 +97,18 @@ const SuperAdminDashboard: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [tenantsRes, paymentsRes, supportRes] = await Promise.all([
+      const [tenantsRes, paymentsRes, supportRes, configRes] = await Promise.all([
         apiClient.get<SuperAdminTenantDTO[]>('/superadmin/tenants'),
         apiClient.get<SaaSPaymentReportDTO[]>('/superadmin/payments'),
         apiClient.get<any[]>('/feedback/platform'),
+        apiClient.get<PlatformConfigDTO>('/superadmin/platform-config'),
       ]);
       setTenants(tenantsRes.data || []);
       setPendingPayments(paymentsRes.data || []);
       setSupportMessages(supportRes.data || []);
+      if (configRes.data) {
+        setPlatformConfig(configRes.data);
+      }
     } catch (err: any) {
       presentToast({
         message: 'Error al cargar datos del SuperAdmin: ' + (err.response?.data?.message || err.message),
@@ -95,6 +117,26 @@ const SuperAdminDashboard: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSavePlatformConfig = async () => {
+    try {
+      setIsSavingConfig(true);
+      await apiClient.put('/superadmin/platform-config', platformConfig);
+      presentToast({
+        message: 'Cuentas de cobro SaaS actualizadas con éxito.',
+        duration: 2500,
+        color: 'success',
+      });
+    } catch (err: any) {
+      presentToast({
+        message: 'Error al guardar cuentas: ' + (err.response?.data?.message || err.message),
+        duration: 3500,
+        color: 'danger',
+      });
+    } finally {
+      setIsSavingConfig(false);
     }
   };
 
@@ -334,6 +376,12 @@ const SuperAdminDashboard: React.FC = () => {
                     {pendingCount}
                   </IonBadge>
                 )}
+              </IonLabel>
+            </IonSegmentButton>
+            <IonSegmentButton value="config">
+              <IonLabel style={{ fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <IonIcon icon={walletOutline} />
+                Cuentas de Cobro SaaS
               </IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="support">
@@ -638,7 +686,191 @@ const SuperAdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 3: MENSAJES Y SOPORTE */}
+        {/* TAB 3: CUENTAS DE COBRO SAAS */}
+        {activeTab === 'config' && (
+          <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+            <div style={{ background: '#fff', borderRadius: '12px', padding: '16px 20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <IonIcon icon={walletOutline} color="primary" />
+                Configuración de Cuentas Oficiales de Flujo Fino
+              </h2>
+              <p style={{ color: '#64748b', fontSize: '13px', margin: 0, lineHeight: '1.5' }}>
+                Estas son las cuentas bancarias, Pago Móvil y Binance a las que los negocios suscritos transferirán su cuota mensual de SaaS. 
+                Aparecerán automáticamente en la ventana de reporte de pago de cada cliente.
+              </p>
+            </div>
+
+            <IonGrid style={{ padding: 0 }}>
+              <IonRow>
+                {/* Pago Móvil Flujo Fino */}
+                <IonCol size="12" sizeMd="6">
+                  <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px', borderLeft: '4px solid #10b981' }}>
+                    <IonCardHeader style={{ paddingBottom: '8px' }}>
+                      <IonCardTitle style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <IonIcon icon={cashOutline} style={{ color: '#10b981' }} />
+                        Pago Móvil (Receptor)
+                      </IonCardTitle>
+                    </IonCardHeader>
+                    <IonCardContent>
+                      <IonItem lines="none" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '10px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Banco Receptor</IonLabel>
+                        <IonInput
+                          placeholder="Ej: Banesco (0134)"
+                          value={platformConfig.companyBank || ''}
+                          onIonInput={(e) => setPlatformConfig({ ...platformConfig, companyBank: e.detail.value || '' })}
+                        />
+                      </IonItem>
+
+                      <IonItem lines="none" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '10px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Cédula / RIF</IonLabel>
+                        <IonInput
+                          placeholder="Ej: J-12345678-0 ó V-12345678"
+                          value={platformConfig.companyCedula || ''}
+                          onIonInput={(e) => setPlatformConfig({ ...platformConfig, companyCedula: e.detail.value || '' })}
+                        />
+                      </IonItem>
+
+                      <IonItem lines="none" style={{ border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Teléfono Pago Móvil</IonLabel>
+                        <IonInput
+                          placeholder="Ej: 0414-1234567"
+                          value={platformConfig.companyPhone || ''}
+                          onIonInput={(e) => setPlatformConfig({ ...platformConfig, companyPhone: e.detail.value || '' })}
+                        />
+                      </IonItem>
+                    </IonCardContent>
+                  </IonCard>
+                </IonCol>
+
+                {/* Binance Pay */}
+                <IonCol size="12" sizeMd="6">
+                  <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px', borderLeft: '4px solid #f59e0b' }}>
+                    <IonCardHeader style={{ paddingBottom: '8px' }}>
+                      <IonCardTitle style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ color: '#f59e0b', fontWeight: 900, fontSize: '18px' }}>₿</span>
+                        Binance Pay (Cripto)
+                      </IonCardTitle>
+                    </IonCardHeader>
+                    <IonCardContent>
+                      <IonItem lines="none" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '10px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Binance Pay ID</IonLabel>
+                        <IonInput
+                          placeholder="Ej: 123456789"
+                          value={platformConfig.binancePayId || ''}
+                          onIonInput={(e) => setPlatformConfig({ ...platformConfig, binancePayId: e.detail.value || '' })}
+                        />
+                      </IonItem>
+
+                      <IonItem lines="none" style={{ border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Correo Registrado en Binance</IonLabel>
+                        <IonInput
+                          type="email"
+                          placeholder="Ej: pagos@flujofino.com"
+                          value={platformConfig.binanceEmail || ''}
+                          onIonInput={(e) => setPlatformConfig({ ...platformConfig, binanceEmail: e.detail.value || '' })}
+                        />
+                      </IonItem>
+                    </IonCardContent>
+                  </IonCard>
+                </IonCol>
+
+                {/* Transferencia Bancaria Nacional */}
+                <IonCol size="12">
+                  <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
+                    <IonCardHeader style={{ paddingBottom: '8px' }}>
+                      <IonCardTitle style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <IonIcon icon={cardOutline} style={{ color: '#3b82f6' }} />
+                        Transferencia Bancaria Nacional (Cuenta Corriente)
+                      </IonCardTitle>
+                    </IonCardHeader>
+                    <IonCardContent>
+                      <IonRow>
+                        <IonCol size="12" sizeMd="6">
+                          <IonItem lines="none" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '10px' }}>
+                            <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Número de Cuenta (20 Dígitos)</IonLabel>
+                            <IonInput
+                              placeholder="0134-XXXX-XX-XXXXXXXXXX"
+                              value={platformConfig.companyAccountNumber || ''}
+                              onIonInput={(e) => setPlatformConfig({ ...platformConfig, companyAccountNumber: e.detail.value || '' })}
+                            />
+                          </IonItem>
+                        </IonCol>
+                        <IonCol size="12" sizeMd="6">
+                          <IonItem lines="none" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '10px' }}>
+                            <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Titular de la Cuenta</IonLabel>
+                            <IonInput
+                              placeholder="Ej: Flujo Fino SaaS C.A."
+                              value={platformConfig.companyAccountHolder || ''}
+                              onIonInput={(e) => setPlatformConfig({ ...platformConfig, companyAccountHolder: e.detail.value || '' })}
+                            />
+                          </IonItem>
+                        </IonCol>
+                      </IonRow>
+                    </IonCardContent>
+                  </IonCard>
+                </IonCol>
+
+                {/* Valores SaaS por Defecto */}
+                <IonCol size="12">
+                  <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px', borderLeft: '4px solid #8b5cf6' }}>
+                    <IonCardHeader style={{ paddingBottom: '8px' }}>
+                      <IonCardTitle style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
+                        ⚙️ Parámetros Globales de Suscripción
+                      </IonCardTitle>
+                    </IonCardHeader>
+                    <IonCardContent>
+                      <IonRow>
+                        <IonCol size="12" sizeMd="6">
+                          <IonItem lines="none" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '10px' }}>
+                            <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Precio Base Mensual ($ USD)</IonLabel>
+                            <IonInput
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={platformConfig.defaultMonthlyPrice ?? 20}
+                              onIonInput={(e) => setPlatformConfig({ ...platformConfig, defaultMonthlyPrice: parseFloat(e.detail.value || '20') })}
+                            />
+                          </IonItem>
+                        </IonCol>
+                        <IonCol size="12" sizeMd="6">
+                          <IonItem lines="none" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '10px' }}>
+                            <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Días de Prueba para Nuevos Negocios</IonLabel>
+                            <IonInput
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={platformConfig.defaultTrialDays ?? 15}
+                              onIonInput={(e) => setPlatformConfig({ ...platformConfig, defaultTrialDays: parseInt(e.detail.value || '15', 10) })}
+                            />
+                          </IonItem>
+                        </IonCol>
+                      </IonRow>
+                    </IonCardContent>
+                  </IonCard>
+                </IonCol>
+              </IonRow>
+            </IonGrid>
+
+            <div style={{ textAlign: 'center', marginTop: '10px', marginBottom: '30px' }}>
+              <IonButton
+                size="large"
+                color="primary"
+                onClick={handleSavePlatformConfig}
+                disabled={isSavingConfig}
+                style={{ fontWeight: 800, minWidth: '280px' }}
+              >
+                {isSavingConfig ? <IonSpinner name="crescent" /> : (
+                  <>
+                    <IonIcon icon={saveOutline} slot="start" />
+                    Guardar Cuentas de Cobro SaaS
+                  </>
+                )}
+              </IonButton>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: MENSAJES Y SOPORTE */}
         {activeTab === 'support' && (
           <div>
             {loading && (

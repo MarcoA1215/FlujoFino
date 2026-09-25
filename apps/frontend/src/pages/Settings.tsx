@@ -1,9 +1,52 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonButton, IonButtons, IonMenuButton, useIonToast, IonIcon, IonToggle } from '@ionic/react';
-import { saveOutline, refreshOutline, giftOutline, copyOutline, logoWhatsapp } from 'ionicons/icons';
+import {
+  IonPage,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonContent,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonCard,
+  IonCardHeader,
+  IonCardTitle,
+  IonCardContent,
+  IonItem,
+  IonLabel,
+  IonInput,
+  IonButton,
+  IonButtons,
+  IonMenuButton,
+  useIonToast,
+  IonIcon,
+  IonToggle,
+  IonModal,
+  IonSelect,
+  IonSelectOption,
+  IonSpinner,
+  IonBadge,
+} from '@ionic/react';
+import {
+  saveOutline,
+  refreshOutline,
+  giftOutline,
+  copyOutline,
+  logoWhatsapp,
+  cashOutline,
+  cardOutline,
+  checkmarkCircleOutline,
+} from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
-import { UserRole, TenantPlanType, type MySubscriptionDTO } from '@nutrideli/shared-types';
+import {
+  UserRole,
+  TenantPlanType,
+  TenantStatus,
+  SaaSPaymentMethod,
+  type MySubscriptionDTO,
+  type PlatformConfigDTO,
+} from '@nutrideli/shared-types';
 import { BookingSettings } from '../components/BookingSettings';
 
 interface Settings {
@@ -45,6 +88,14 @@ const SettingsPage: React.FC = () => {
   const [presentToast] = useIonToast();
   const { user } = useContext(AuthContext);
 
+  // Subscription Payment Reporting Modal state
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [platformConfig, setPlatformConfig] = useState<PlatformConfigDTO | null>(null);
+  const [reportAmount, setReportAmount] = useState<number>(20);
+  const [reportMethod, setReportMethod] = useState<SaaSPaymentMethod>(SaaSPaymentMethod.PAGO_MOVIL);
+  const [reportReference, setReportReference] = useState<string>('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState<boolean>(false);
+
   const fetchSettings = async () => {
     try {
       const setRes = await apiClient.get<Settings>('/settings');
@@ -58,15 +109,73 @@ const SettingsPage: React.FC = () => {
     try {
       const res = await apiClient.get<MySubscriptionDTO>('/superadmin/my-subscription');
       setSubscription(res.data);
+      if (res.data) {
+        setReportAmount(res.data.finalFee);
+      }
     } catch (e) {
       console.log('Error cargando suscripción:', e);
     }
+  };
+
+  const fetchPlatformConfig = async () => {
+    try {
+      const res = await apiClient.get<PlatformConfigDTO>('/superadmin/platform-config');
+      setPlatformConfig(res.data);
+    } catch (e) {
+      console.log('Error cargando cuentas oficiales de la plataforma:', e);
+    }
+  };
+
+  const handleOpenReportModal = () => {
+    if (subscription) {
+      setReportAmount(subscription.finalFee);
+    }
+    setReportReference('');
+    fetchPlatformConfig();
+    setIsReportModalOpen(true);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportAmount || reportAmount <= 0) {
+      return presentToast({ message: 'El monto debe ser mayor a 0', duration: 3000, color: 'warning' });
+    }
+    if (!reportReference || !reportReference.trim()) {
+      return presentToast({ message: 'Ingresa el número de referencia del comprobante', duration: 3000, color: 'warning' });
+    }
+
+    try {
+      setIsSubmittingReport(true);
+      await apiClient.post('/superadmin/payments/report', {
+        amount: Number(reportAmount),
+        payment_method: reportMethod,
+        reference: reportReference.trim(),
+      });
+      presentToast({
+        message: '¡Reporte de pago enviado con éxito! El administrador verificará tu pago.',
+        duration: 3500,
+        color: 'success',
+      });
+      setIsReportModalOpen(false);
+      fetchSubscription();
+    } catch (e: any) {
+      const msg = e.response?.data?.message || 'Error al enviar reporte de pago';
+      presentToast({ message: msg, duration: 4000, color: 'danger' });
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
+  const copyField = (text?: string, label?: string) => {
+    if (!text) return;
+    navigator.clipboard?.writeText(text);
+    presentToast({ message: `${label || 'Dato'} copiado al portapapeles`, duration: 1500, color: 'dark' });
   };
 
   useEffect(() => {
     if (user?.role === UserRole.ADMIN) {
       fetchSettings();
       fetchSubscription();
+      fetchPlatformConfig();
     }
   }, [user]);
 
@@ -292,6 +401,55 @@ const SettingsPage: React.FC = () => {
                           Compartir por WhatsApp
                         </IonButton>
                       </div>
+                    </div>
+
+                    {/* Estado de Suscripción & Botón Reportar Pago */}
+                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Estado actual:</span>
+                        {subscription.status === TenantStatus.ACTIVE && (
+                          <IonBadge color="success" style={{ padding: '6px 10px', fontSize: '12px', fontWeight: 700 }}>
+                            ✅ ACTIVO
+                          </IonBadge>
+                        )}
+                        {subscription.status === TenantStatus.TRIAL && (
+                          <IonBadge color="warning" style={{ padding: '6px 10px', fontSize: '12px', fontWeight: 700 }}>
+                            ⏳ EN PRUEBA ({subscription.trialDaysLeft} días restantes)
+                          </IonBadge>
+                        )}
+                        {subscription.status === TenantStatus.PAST_DUE && (
+                          <IonBadge color="danger" style={{ padding: '6px 10px', fontSize: '12px', fontWeight: 700 }}>
+                            ⚠️ PAGO VENCIDO
+                          </IonBadge>
+                        )}
+                        {subscription.status === TenantStatus.SUSPENDED && (
+                          <IonBadge color="dark" style={{ padding: '6px 10px', fontSize: '12px', fontWeight: 700 }}>
+                            ⛔ SUSPENDIDO
+                          </IonBadge>
+                        )}
+
+                        {subscription.currentPeriodEndsAt && subscription.status === TenantStatus.ACTIVE && (
+                          <span style={{ fontSize: '12px', color: '#64748b' }}>
+                            • Vence: {new Date(subscription.currentPeriodEndsAt).toLocaleDateString('es-VE')}
+                          </span>
+                        )}
+                      </div>
+
+                      {subscription.finalFee === 0 ? (
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          🎉 ¡Cuota 100% Bonificada! No necesitas pagar mensualidad.
+                        </div>
+                      ) : (
+                        <IonButton
+                          color="primary"
+                          fill="solid"
+                          onClick={handleOpenReportModal}
+                          style={{ fontWeight: 800 }}
+                        >
+                          <IonIcon icon={cashOutline} slot="start" />
+                          Reportar Pago Mensual (${subscription.finalFee.toFixed(2)} USD)
+                        </IonButton>
+                      )}
                     </div>
                   </IonCardContent>
                 </IonCard>
@@ -747,6 +905,184 @@ const SettingsPage: React.FC = () => {
             Guardar Todos los Ajustes
           </IonButton>
         </div>
+
+        {/* MODAL: REPORTAR PAGO DE SUSCRIPCIÓN SAAS */}
+        <IonModal isOpen={isReportModalOpen} onDidDismiss={() => setIsReportModalOpen(false)}>
+          <IonHeader>
+            <IonToolbar color="primary">
+              <IonTitle style={{ fontWeight: 700 }}>
+                Reportar Pago de Suscripción
+              </IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setIsReportModalOpen(false)}>Cerrar</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+
+          <IonContent className="ion-padding" style={{ backgroundColor: '#f8fafc' }}>
+            <div style={{ maxWidth: '650px', margin: '0 auto' }}>
+              {/* Header Info */}
+              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '16px', marginBottom: '20px', textAlign: 'center' }}>
+                <div style={{ fontSize: '13px', color: '#1e40af', fontWeight: 600 }}>Cuota a Cancelar:</div>
+                <div style={{ fontSize: '32px', fontWeight: 900, color: '#1e3a8a', margin: '4px 0' }}>
+                  ${subscription ? subscription.finalFee.toFixed(2) : '20.00'} <span style={{ fontSize: '16px', fontWeight: 500 }}>USD</span>
+                </div>
+                {subscription && subscription.discountPercentage > 0 && (
+                  <div style={{ fontSize: '12px', color: '#10b981', fontWeight: 700 }}>
+                    ✨ Incluye {subscription.discountPercentage}% de descuento por tus {subscription.activeReferrals} referidos activos.
+                  </div>
+                )}
+              </div>
+
+              {/* Cuentas Receptoras Oficiales Flujo Fino */}
+              <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '10px' }}>
+                1. Transfiere a cualquiera de las cuentas oficiales de Flujo Fino:
+              </h3>
+
+              {platformConfig ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+                  {/* Pago Móvil */}
+                  <div style={{ background: '#ffffff', borderRadius: '12px', padding: '14px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <IonIcon icon={cashOutline} style={{ color: '#10b981' }} /> Pago Móvil
+                      </span>
+                      <IonBadge color="success">Bs al cambio</IonBadge>
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#334155', display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px', alignItems: 'center' }}>
+                      <div><strong>Banco:</strong> {platformConfig.companyBank || 'No especificado'}</div>
+                      <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.companyBank, 'Banco')}>
+                        <IonIcon icon={copyOutline} slot="icon-only" />
+                      </IonButton>
+
+                      <div><strong>Cédula / RIF:</strong> {platformConfig.companyCedula || 'No especificado'}</div>
+                      <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.companyCedula, 'Cédula/RIF')}>
+                        <IonIcon icon={copyOutline} slot="icon-only" />
+                      </IonButton>
+
+                      <div><strong>Teléfono:</strong> {platformConfig.companyPhone || 'No especificado'}</div>
+                      <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.companyPhone, 'Teléfono')}>
+                        <IonIcon icon={copyOutline} slot="icon-only" />
+                      </IonButton>
+                    </div>
+                  </div>
+
+                  {/* Binance Pay */}
+                  <div style={{ background: '#ffffff', borderRadius: '12px', padding: '14px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ color: '#f59e0b', fontWeight: 900 }}>₿</span> Binance Pay (USDT)
+                      </span>
+                      <IonBadge color="warning">Cero comisión</IonBadge>
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#334155', display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px', alignItems: 'center' }}>
+                      <div><strong>Binance Pay ID:</strong> {platformConfig.binancePayId || 'No especificado'}</div>
+                      <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.binancePayId, 'Pay ID')}>
+                        <IonIcon icon={copyOutline} slot="icon-only" />
+                      </IonButton>
+
+                      <div><strong>Correo Binance:</strong> {platformConfig.binanceEmail || 'No especificado'}</div>
+                      <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.binanceEmail, 'Correo')}>
+                        <IonIcon icon={copyOutline} slot="icon-only" />
+                      </IonButton>
+                    </div>
+                  </div>
+
+                  {/* Transferencia Bancaria */}
+                  {platformConfig.companyAccountNumber && (
+                    <div style={{ background: '#ffffff', borderRadius: '12px', padding: '14px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <IonIcon icon={cardOutline} style={{ color: '#3b82f6' }} /> Transferencia Bancaria
+                        </span>
+                        <IonBadge color="primary">Nacional</IonBadge>
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#334155', display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px', alignItems: 'center' }}>
+                        <div><strong>Cuenta:</strong> <code style={{ fontSize: '12px' }}>{platformConfig.companyAccountNumber}</code></div>
+                        <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.companyAccountNumber, 'Número de cuenta')}>
+                          <IonIcon icon={copyOutline} slot="icon-only" />
+                        </IonButton>
+
+                        <div><strong>Titular:</strong> {platformConfig.companyAccountHolder || 'Flujo Fino SaaS'}</div>
+                        <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.companyAccountHolder, 'Titular')}>
+                          <IonIcon icon={copyOutline} slot="icon-only" />
+                        </IonButton>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px' }}>
+                  <IonSpinner name="dots" />
+                </div>
+              )}
+
+              {/* Formulario de Reporte */}
+              <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '10px' }}>
+                2. Ingresa los datos de tu comprobante:
+              </h3>
+
+              <div style={{ background: '#ffffff', borderRadius: '12px', padding: '16px', border: '1px solid #cbd5e1', marginBottom: '24px' }}>
+                <div style={{ marginBottom: '14px' }}>
+                  <IonLabel style={{ fontWeight: 700, fontSize: '13px', color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    Método Utilizado:
+                  </IonLabel>
+                  <IonSelect
+                    value={reportMethod}
+                    onIonChange={(e) => setReportMethod(e.detail.value)}
+                    interface="action-sheet"
+                    style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 14px' }}
+                  >
+                    <IonSelectOption value={SaaSPaymentMethod.PAGO_MOVIL}>Pago Móvil</IonSelectOption>
+                    <IonSelectOption value={SaaSPaymentMethod.BINANCE}>Binance Pay</IonSelectOption>
+                    <IonSelectOption value={SaaSPaymentMethod.CASH}>Transferencia / Efectivo</IonSelectOption>
+                  </IonSelect>
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <IonLabel style={{ fontWeight: 700, fontSize: '13px', color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    Monto Transferido ($ USD):
+                  </IonLabel>
+                  <IonInput
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    value={reportAmount}
+                    onIonInput={(e) => setReportAmount(parseFloat(e.detail.value || '0'))}
+                    style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px 12px' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '18px' }}>
+                  <IonLabel style={{ fontWeight: 700, fontSize: '13px', color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    Número de Referencia / Comprobante: <span style={{ color: '#ef4444' }}>*</span>
+                  </IonLabel>
+                  <IonInput
+                    placeholder="Ej: Últimos 6 dígitos o ID de transacción Binance..."
+                    value={reportReference}
+                    onIonInput={(e) => setReportReference(e.detail.value || '')}
+                    style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px 12px' }}
+                  />
+                </div>
+
+                <IonButton
+                  expand="block"
+                  color="success"
+                  onClick={handleSubmitReport}
+                  disabled={isSubmittingReport}
+                  style={{ fontWeight: 800, height: '48px' }}
+                >
+                  {isSubmittingReport ? <IonSpinner name="dots" /> : (
+                    <>
+                      <IonIcon icon={checkmarkCircleOutline} slot="start" />
+                      Enviar Reporte de Pago
+                    </>
+                  )}
+                </IonButton>
+              </div>
+            </div>
+          </IonContent>
+        </IonModal>
       </IonContent>
     </IonPage>
   );
