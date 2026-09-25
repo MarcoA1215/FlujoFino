@@ -751,9 +751,14 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
 
                   {paymentMethod === 'TRANSFER' && (
                     <div style={{ background: '#eff6ff', padding: '12px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #bfdbfe' }}>
-                      <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: '1rem', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         🏦 Transferencia Bancaria en Bs. (Total: Bs. {(totalCart * exchangeRate).toFixed(2)})
                       </h4>
+                      {(settings?.companyBank || settings?.companyAccountNumber) && (
+                        <p style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: '#1e3a8a' }}>
+                          💡 <b>Datos del negocio:</b> {settings.companyBank || 'Banco'} | N° Cuenta: <b>{settings.companyAccountNumber || 'Sin cuenta'}</b> {settings.companyAccountHolder ? `| Titular: ${settings.companyAccountHolder}` : ''} {settings.companyCedula ? `| RIF: ${settings.companyCedula}` : ''}
+                        </p>
+                      )}
                       <IonItem color="light" className="ion-margin-bottom">
                         <IonLabel position="stacked">N° de Transferencia / Referencia *</IonLabel>
                         <IonInput value={transferRef} onIonInput={e => setTransferRef(e.detail.value!)} placeholder="Ej. 182746" />

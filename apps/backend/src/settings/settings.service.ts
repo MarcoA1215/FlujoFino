@@ -61,6 +61,8 @@ export class SettingsService implements OnModuleInit {
     if (payload.companyBank !== undefined) settings.companyBank = payload.companyBank;
     if (payload.companyCedula !== undefined) settings.companyCedula = payload.companyCedula;
     if (payload.companyPhone !== undefined) settings.companyPhone = payload.companyPhone;
+    if (payload.companyAccountNumber !== undefined) settings.companyAccountNumber = payload.companyAccountNumber;
+    if (payload.companyAccountHolder !== undefined) settings.companyAccountHolder = payload.companyAccountHolder;
     if (payload.binancePayId !== undefined) settings.binancePayId = payload.binancePayId;
     if (payload.binanceEmail !== undefined) settings.binanceEmail = payload.binanceEmail;
     if (payload.binancePhone !== undefined) settings.binancePhone = payload.binancePhone;

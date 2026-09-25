@@ -10,6 +10,8 @@ interface Settings {
   companyBank?: string;
   companyCedula?: string;
   companyPhone?: string;
+  companyAccountNumber?: string;
+  companyAccountHolder?: string;
   binancePayId?: string;
   binanceEmail?: string;
   binancePhone?: string;
@@ -63,6 +65,8 @@ const SettingsPage: React.FC = () => {
           companyBank: settings.companyBank, 
           companyCedula: settings.companyCedula, 
           companyPhone: settings.companyPhone,
+          companyAccountNumber: settings.companyAccountNumber,
+          companyAccountHolder: settings.companyAccountHolder,
           binancePayId: settings.binancePayId,
           binanceEmail: settings.binanceEmail,
           binancePhone: settings.binancePhone,
@@ -136,12 +140,20 @@ const SettingsPage: React.FC = () => {
                     <IonInput value={settings.companyBank || ''} onIonInput={e => setSettings({...settings, companyBank: e.detail.value!})} placeholder="Ej. Banesco" />
                   </IonItem>
                   <IonItem>
-                    <IonLabel position="stacked">Cédula / RIF</IonLabel>
-                    <IonInput value={settings.companyCedula || ''} onIonInput={e => setSettings({...settings, companyCedula: e.detail.value!})} placeholder="Ej. J-12345678" />
+                    <IonLabel position="stacked">Titular / Razón Social de la Cuenta</IonLabel>
+                    <IonInput value={settings.companyAccountHolder || ''} onIonInput={e => setSettings({...settings, companyAccountHolder: e.detail.value!})} placeholder="Ej. Inversiones Mi Negocio C.A." />
                   </IonItem>
                   <IonItem>
-                    <IonLabel position="stacked">Teléfono</IonLabel>
+                    <IonLabel position="stacked">Cédula / RIF</IonLabel>
+                    <IonInput value={settings.companyCedula || ''} onIonInput={e => setSettings({...settings, companyCedula: e.detail.value!})} placeholder="Ej. J-12345678-0" />
+                  </IonItem>
+                  <IonItem>
+                    <IonLabel position="stacked">Teléfono (Pago Móvil / WhatsApp)</IonLabel>
                     <IonInput value={settings.companyPhone || ''} onIonInput={e => setSettings({...settings, companyPhone: e.detail.value!})} placeholder="Ej. 0414-1234567" />
+                  </IonItem>
+                  <IonItem>
+                    <IonLabel position="stacked">Número de Cuenta Bancaria (20 dígitos)</IonLabel>
+                    <IonInput value={settings.companyAccountNumber || ''} onIonInput={e => setSettings({...settings, companyAccountNumber: e.detail.value!})} placeholder="Ej. 0134-0000-00-0000000000" />
                   </IonItem>
                 </IonCardContent>
               </IonCard>
@@ -340,6 +352,43 @@ const SettingsPage: React.FC = () => {
                           />
                         </IonItem>
                       </IonCol>
+
+                      {settings.acceptTransfer === true && (
+                        <IonCol size="12">
+                          <div style={{ background: '#eff6ff', padding: '14px', borderRadius: '10px', border: '1px solid #bfdbfe', marginTop: '4px', marginBottom: '8px' }}>
+                            <h4 style={{ margin: '0 0 6px 0', fontSize: '0.95rem', fontWeight: 'bold', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              🏦 Cuenta Bancaria para Transferencias
+                            </h4>
+                            <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#1e3a8a' }}>
+                              Asegúrate de ingresar el número de cuenta de 20 dígitos y el titular para que tus clientes puedan transferir con facilidad.
+                            </p>
+                            <IonGrid style={{ padding: 0 }}>
+                              <IonRow>
+                                <IonCol size="12" sizeMd="6">
+                                  <IonItem color="light" style={{ borderRadius: '8px' }}>
+                                    <IonLabel position="stacked">N° de Cuenta (20 Dígitos) *</IonLabel>
+                                    <IonInput 
+                                      value={settings.companyAccountNumber || ''} 
+                                      onIonInput={e => setSettings({...settings, companyAccountNumber: e.detail.value!})} 
+                                      placeholder="Ej. 0134-0000-00-0000000000" 
+                                    />
+                                  </IonItem>
+                                </IonCol>
+                                <IonCol size="12" sizeMd="6">
+                                  <IonItem color="light" style={{ borderRadius: '8px' }}>
+                                    <IonLabel position="stacked">Titular / Razón Social *</IonLabel>
+                                    <IonInput 
+                                      value={settings.companyAccountHolder || ''} 
+                                      onIonInput={e => setSettings({...settings, companyAccountHolder: e.detail.value!})} 
+                                      placeholder="Ej. Inversiones Mi Negocio C.A." 
+                                    />
+                                  </IonItem>
+                                </IonCol>
+                              </IonRow>
+                            </IonGrid>
+                          </div>
+                        </IonCol>
+                      )}
                     </IonRow>
                   </IonGrid>
                 </IonCardContent>

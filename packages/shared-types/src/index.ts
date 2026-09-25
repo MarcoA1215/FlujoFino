@@ -222,6 +222,8 @@ export interface SettingsDTO {
   companyBank?: string;
   companyCedula?: string;
   companyPhone?: string;
+  companyAccountNumber?: string;
+  companyAccountHolder?: string;
   binancePayId?: string;
   binanceEmail?: string;
   binancePhone?: string;

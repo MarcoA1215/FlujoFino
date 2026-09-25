@@ -1077,24 +1077,37 @@ const PublicStore: React.FC = () => {
                   )}
 
                   {paymentOption === 'TRANSFER' && storeData?.settings && (
-                    <div style={{ background: '#eff6ff', padding: '12px', borderRadius: '8px', marginTop: '10px', border: '1px solid #bfdbfe' }}>
-                      <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 'bold', color: '#1e40af' }}>
-                        Datos para Transferencia Bancaria (Total: Bs. {grandTotalBs.toFixed(2)}):
+                    <div style={{ background: '#eff6ff', padding: '14px', borderRadius: '10px', marginTop: '10px', border: '1px solid #bfdbfe' }}>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 'bold', color: '#1e40af' }}>
+                        🏦 Datos para Transferencia Bancaria (Total: Bs. {grandTotalBs.toFixed(2)}):
                       </p>
                       {storeData.settings.companyBank && (
-                        <p style={{ margin: '2px 0', fontSize: '13px' }}>
+                        <p style={{ margin: '3px 0', fontSize: '13px' }}>
                           <b>Banco:</b> {storeData.settings.companyBank}
                         </p>
                       )}
+                      {storeData.settings.companyAccountHolder && (
+                        <p style={{ margin: '3px 0', fontSize: '13px' }}>
+                          <b>Titular:</b> {storeData.settings.companyAccountHolder}
+                        </p>
+                      )}
                       {storeData.settings.companyCedula && (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '2px 0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '3px 0' }}>
                           <span style={{ fontSize: '13px' }}><b>Cédula/RIF:</b> {storeData.settings.companyCedula}</span>
-                          <IonButton fill="clear" size="small" onClick={() => copyToClipboard(storeData.settings.companyCedula, 'Cédula')}>
+                          <IonButton fill="clear" size="small" onClick={() => copyToClipboard(storeData.settings.companyCedula, 'Cédula/RIF')}>
                             <IonIcon icon={copyOutline} slot="icon-only" />
                           </IonButton>
                         </div>
                       )}
-                      <IonItem lines="none" style={{ '--background': '#fff', borderRadius: '6px', marginTop: '8px' }}>
+                      {storeData.settings.companyAccountNumber && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0', background: '#fff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
+                          <span style={{ fontSize: '13px' }}><b>N° Cuenta:</b> {storeData.settings.companyAccountNumber}</span>
+                          <IonButton fill="clear" size="small" onClick={() => copyToClipboard(storeData.settings.companyAccountNumber, 'Número de Cuenta')}>
+                            <IonIcon icon={copyOutline} slot="icon-only" />
+                          </IonButton>
+                        </div>
+                      )}
+                      <IonItem lines="none" style={{ '--background': '#fff', borderRadius: '6px', marginTop: '10px' }}>
                         <IonLabel position="stacked">N° de Referencia de Transferencia *</IonLabel>
                         <IonInput
                           value={transferRef}

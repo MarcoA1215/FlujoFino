@@ -19,6 +19,12 @@ export class Settings {
   @Column({ nullable: true })
   companyPhone: string;
 
+  @Column({ nullable: true })
+  companyAccountNumber: string;
+
+  @Column({ nullable: true })
+  companyAccountHolder: string;
+
   // --- Binance Pay Config ---
   @Column({ nullable: true })
   binancePayId: string;
