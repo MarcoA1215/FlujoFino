@@ -18,6 +18,12 @@ export class SaaSPaymentReport {
   @Column('decimal', { precision: 10, scale: 2, transformer: new ColumnNumericTransformer() })
   amount: number;
 
+  @Column('decimal', { precision: 12, scale: 2, nullable: true, transformer: new ColumnNumericTransformer() })
+  amount_bs: number | null;
+
+  @Column('decimal', { precision: 10, scale: 2, nullable: true, transformer: new ColumnNumericTransformer() })
+  exchange_rate: number | null;
+
   @Column({
     type: 'varchar',
     default: SaaSPaymentMethod.PAGO_MOVIL,

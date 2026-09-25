@@ -281,6 +281,8 @@ export interface SaaSPaymentReportDTO {
   tenantId: string;
   tenantName?: string;
   amount: number;
+  amountBs?: number;
+  exchangeRate?: number;
   paymentMethod: SaaSPaymentMethod;
   reference: string;
   status: SaaSPaymentStatus;

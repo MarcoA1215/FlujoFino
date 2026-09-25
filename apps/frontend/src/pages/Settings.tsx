@@ -91,7 +91,9 @@ const SettingsPage: React.FC = () => {
   // Subscription Payment Reporting Modal state
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [platformConfig, setPlatformConfig] = useState<PlatformConfigDTO | null>(null);
-  const [reportAmount, setReportAmount] = useState<number>(20);
+  const [exchangeRate, setExchangeRate] = useState<number>(40.0);
+  const [reportAmountUsd, setReportAmountUsd] = useState<number>(20);
+  const [reportAmountBs, setReportAmountBs] = useState<number>(800);
   const [reportMethod, setReportMethod] = useState<SaaSPaymentMethod>(SaaSPaymentMethod.PAGO_MOVIL);
   const [reportReference, setReportReference] = useState<string>('');
   const [isSubmittingReport, setIsSubmittingReport] = useState<boolean>(false);
@@ -110,7 +112,8 @@ const SettingsPage: React.FC = () => {
       const res = await apiClient.get<MySubscriptionDTO>('/superadmin/my-subscription');
       setSubscription(res.data);
       if (res.data) {
-        setReportAmount(res.data.finalFee);
+        setReportAmountUsd(res.data.finalFee);
+        setReportAmountBs(Math.round(res.data.finalFee * exchangeRate * 100) / 100);
       }
     } catch (e) {
       console.log('Error cargando suscripción:', e);
@@ -126,17 +129,44 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleOpenReportModal = () => {
-    if (subscription) {
-      setReportAmount(subscription.finalFee);
+  const fetchExchangeRate = async (): Promise<number> => {
+    try {
+      const res = await apiClient.get<{ exchangeRateBs: number }>('/settings/exchange-rate');
+      if (res.data?.exchangeRateBs) {
+        const rate = Number(res.data.exchangeRateBs);
+        setExchangeRate(rate);
+        return rate;
+      }
+    } catch (e) {
+      console.log('Error cargando tasa cambiaria:', e);
     }
+    return exchangeRate;
+  };
+
+  const handleOpenReportModal = async () => {
+    const rate = await fetchExchangeRate();
+    const fee = subscription ? subscription.finalFee : 20;
+    setReportAmountUsd(fee);
+    setReportAmountBs(Math.round(fee * rate * 100) / 100);
     setReportReference('');
     fetchPlatformConfig();
     setIsReportModalOpen(true);
   };
 
+  const handleAmountUsdChange = (val: number) => {
+    setReportAmountUsd(val);
+    setReportAmountBs(Math.round(val * exchangeRate * 100) / 100);
+  };
+
+  const handleAmountBsChange = (val: number) => {
+    setReportAmountBs(val);
+    if (exchangeRate > 0) {
+      setReportAmountUsd(Math.round((val / exchangeRate) * 100) / 100);
+    }
+  };
+
   const handleSubmitReport = async () => {
-    if (!reportAmount || reportAmount <= 0) {
+    if (!reportAmountUsd || reportAmountUsd <= 0) {
       return presentToast({ message: 'El monto debe ser mayor a 0', duration: 3000, color: 'warning' });
     }
     if (!reportReference || !reportReference.trim()) {
@@ -145,8 +175,11 @@ const SettingsPage: React.FC = () => {
 
     try {
       setIsSubmittingReport(true);
+      const isBs = reportMethod === SaaSPaymentMethod.PAGO_MOVIL || reportMethod === SaaSPaymentMethod.CASH;
       await apiClient.post('/superadmin/payments/report', {
-        amount: Number(reportAmount),
+        amount: Number(reportAmountUsd),
+        amount_bs: isBs ? Number(reportAmountBs) : undefined,
+        exchange_rate: isBs ? Number(exchangeRate) : undefined,
         payment_method: reportMethod,
         reference: reportReference.trim(),
       });
@@ -174,6 +207,7 @@ const SettingsPage: React.FC = () => {
   useEffect(() => {
     if (user?.role === UserRole.ADMIN) {
       fetchSettings();
+      fetchExchangeRate();
       fetchSubscription();
       fetchPlatformConfig();
     }
@@ -921,36 +955,85 @@ const SettingsPage: React.FC = () => {
 
           <IonContent className="ion-padding" style={{ backgroundColor: '#f8fafc' }}>
             <div style={{ maxWidth: '650px', margin: '0 auto' }}>
-              {/* Header Info */}
-              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '16px', marginBottom: '20px', textAlign: 'center' }}>
-                <div style={{ fontSize: '13px', color: '#1e40af', fontWeight: 600 }}>Cuota a Cancelar:</div>
-                <div style={{ fontSize: '32px', fontWeight: 900, color: '#1e3a8a', margin: '4px 0' }}>
-                  ${subscription ? subscription.finalFee.toFixed(2) : '20.00'} <span style={{ fontSize: '16px', fontWeight: 500 }}>USD</span>
+              {/* Header Info con Tasa Cambiaria Oficial */}
+              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '14px', padding: '16px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '13px', color: '#1e40af', fontWeight: 700 }}>
+                    Cuota Mensual Flujo Fino:
+                  </span>
+                  <span style={{ background: '#dbeafe', color: '#1e40af', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 800 }}>
+                    💱 Tasa Oficial: Bs. {exchangeRate.toFixed(2)} / $
+                  </span>
                 </div>
-                {subscription && subscription.discountPercentage > 0 && (
-                  <div style={{ fontSize: '12px', color: '#10b981', fontWeight: 700 }}>
-                    ✨ Incluye {subscription.discountPercentage}% de descuento por tus {subscription.activeReferrals} referidos activos.
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', background: '#fff', borderRadius: '10px', padding: '14px', border: '1px solid #e2e8f0' }}>
+                  {/* Monto en Bs para Pago Móvil / Transferencia */}
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                      Total en Bolívares (Pago Móvil / Transferencia):
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
+                      Bs. {reportAmountBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <IonButton
+                      size="small"
+                      fill="outline"
+                      color="primary"
+                      onClick={() => copyField(reportAmountBs.toFixed(2), 'Monto en Bolívares')}
+                      style={{ marginTop: '6px', height: '28px', fontSize: '11px', fontWeight: 700 }}
+                    >
+                      <IonIcon icon={copyOutline} slot="start" /> Copiar Monto Bs
+                    </IonButton>
                   </div>
-                )}
+
+                  {/* Equivalente en USD */}
+                  <div style={{ borderLeft: '1px solid #f1f5f9', paddingLeft: '12px' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                      Equivalente en Dólares / USDT:
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: 900, color: '#10b981', marginTop: '2px' }}>
+                      ${reportAmountUsd.toFixed(2)} <span style={{ fontSize: '13px', fontWeight: 600 }}>USD</span>
+                    </div>
+                    {subscription && subscription.discountPercentage > 0 && (
+                      <div style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, marginTop: '6px' }}>
+                        ✨ Incluye {subscription.discountPercentage}% de descuento
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Cuentas Receptoras Oficiales Flujo Fino */}
-              <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '10px' }}>
-                1. Transfiere a cualquiera de las cuentas oficiales de Flujo Fino:
+              <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '12px' }}>
+                1. Cuentas oficiales para transferir a Flujo Fino:
               </h3>
 
               {platformConfig ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-                  {/* Pago Móvil */}
-                  <div style={{ background: '#ffffff', borderRadius: '12px', padding: '14px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <IonIcon icon={cashOutline} style={{ color: '#10b981' }} /> Pago Móvil
+                  {/* Tarjeta Pago Móvil con Monto en Bs exacto */}
+                  <div style={{ background: '#ffffff', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.04)', borderLeft: '4px solid #10b981' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <IonIcon icon={cashOutline} style={{ color: '#10b981', fontSize: '18px' }} />
+                        Pago Móvil (en Bolívares)
                       </span>
-                      <IonBadge color="success">Bs al cambio</IonBadge>
+                      <IonBadge color="success">Bs. {reportAmountBs.toFixed(2)}</IonBadge>
                     </div>
+
+                    <div style={{ background: '#f0fdf4', padding: '10px 14px', borderRadius: '8px', border: '1px solid #bbf7d0', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: '11px', color: '#166534', fontWeight: 700 }}>MONTO EXACTO A ENVIAR:</div>
+                        <div style={{ fontSize: '18px', fontWeight: 900, color: '#14532d' }}>
+                          Bs. {reportAmountBs.toFixed(2)}
+                        </div>
+                      </div>
+                      <IonButton size="small" color="success" onClick={() => copyField(reportAmountBs.toFixed(2), 'Monto en Bolívares')}>
+                        <IonIcon icon={copyOutline} slot="start" /> Copiar Monto
+                      </IonButton>
+                    </div>
+
                     <div style={{ fontSize: '13px', color: '#334155', display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px', alignItems: 'center' }}>
-                      <div><strong>Banco:</strong> {platformConfig.companyBank || 'No especificado'}</div>
+                      <div><strong>Banco Receptor:</strong> {platformConfig.companyBank || 'No especificado'}</div>
                       <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.companyBank, 'Banco')}>
                         <IonIcon icon={copyOutline} slot="icon-only" />
                       </IonButton>
@@ -960,21 +1043,35 @@ const SettingsPage: React.FC = () => {
                         <IonIcon icon={copyOutline} slot="icon-only" />
                       </IonButton>
 
-                      <div><strong>Teléfono:</strong> {platformConfig.companyPhone || 'No especificado'}</div>
+                      <div><strong>Teléfono Pago Móvil:</strong> {platformConfig.companyPhone || 'No especificado'}</div>
                       <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.companyPhone, 'Teléfono')}>
                         <IonIcon icon={copyOutline} slot="icon-only" />
                       </IonButton>
                     </div>
                   </div>
 
-                  {/* Binance Pay */}
-                  <div style={{ background: '#ffffff', borderRadius: '12px', padding: '14px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ color: '#f59e0b', fontWeight: 900 }}>₿</span> Binance Pay (USDT)
+                  {/* Tarjeta Binance Pay */}
+                  <div style={{ background: '#ffffff', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.04)', borderLeft: '4px solid #f59e0b' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ color: '#f59e0b', fontWeight: 900, fontSize: '18px' }}>₿</span>
+                        Binance Pay (Cripto USDT)
                       </span>
-                      <IonBadge color="warning">Cero comisión</IonBadge>
+                      <IonBadge color="warning">${reportAmountUsd.toFixed(2)} USDT</IonBadge>
                     </div>
+
+                    <div style={{ background: '#fffbeb', padding: '10px 14px', borderRadius: '8px', border: '1px solid #fef3c7', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: '11px', color: '#92400e', fontWeight: 700 }}>MONTO EXACTO A ENVIAR:</div>
+                        <div style={{ fontSize: '18px', fontWeight: 900, color: '#78350f' }}>
+                          ${reportAmountUsd.toFixed(2)} USDT
+                        </div>
+                      </div>
+                      <IonButton size="small" color="warning" onClick={() => copyField(reportAmountUsd.toFixed(2), 'Monto USDT')}>
+                        <IonIcon icon={copyOutline} slot="start" /> Copiar Monto
+                      </IonButton>
+                    </div>
+
                     <div style={{ fontSize: '13px', color: '#334155', display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px', alignItems: 'center' }}>
                       <div><strong>Binance Pay ID:</strong> {platformConfig.binancePayId || 'No especificado'}</div>
                       <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.binancePayId, 'Pay ID')}>
@@ -982,29 +1079,48 @@ const SettingsPage: React.FC = () => {
                       </IonButton>
 
                       <div><strong>Correo Binance:</strong> {platformConfig.binanceEmail || 'No especificado'}</div>
-                      <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.binanceEmail, 'Correo')}>
+                      <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.binanceEmail, 'Correo Binance')}>
                         <IonIcon icon={copyOutline} slot="icon-only" />
                       </IonButton>
                     </div>
                   </div>
 
-                  {/* Transferencia Bancaria */}
+                  {/* Transferencia Bancaria Nacional */}
                   {platformConfig.companyAccountNumber && (
-                    <div style={{ background: '#ffffff', borderRadius: '12px', padding: '14px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <IonIcon icon={cardOutline} style={{ color: '#3b82f6' }} /> Transferencia Bancaria
+                    <div style={{ background: '#ffffff', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.04)', borderLeft: '4px solid #3b82f6' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <span style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <IonIcon icon={cardOutline} style={{ color: '#3b82f6', fontSize: '18px' }} />
+                          Transferencia Bancaria (en Bolívares)
                         </span>
-                        <IonBadge color="primary">Nacional</IonBadge>
+                        <IonBadge color="primary">Bs. {reportAmountBs.toFixed(2)}</IonBadge>
                       </div>
+
+                      <div style={{ background: '#eff6ff', padding: '10px 14px', borderRadius: '8px', border: '1px solid #dbeafe', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#1e40af', fontWeight: 700 }}>MONTO EXACTO A TRANSFERIR:</div>
+                          <div style={{ fontSize: '18px', fontWeight: 900, color: '#1e3a8a' }}>
+                            Bs. {reportAmountBs.toFixed(2)}
+                          </div>
+                        </div>
+                        <IonButton size="small" color="primary" onClick={() => copyField(reportAmountBs.toFixed(2), 'Monto en Bolívares')}>
+                          <IonIcon icon={copyOutline} slot="start" /> Copiar Monto
+                        </IonButton>
+                      </div>
+
                       <div style={{ fontSize: '13px', color: '#334155', display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px', alignItems: 'center' }}>
-                        <div><strong>Cuenta:</strong> <code style={{ fontSize: '12px' }}>{platformConfig.companyAccountNumber}</code></div>
+                        <div><strong>Cuenta Corriente:</strong> <code style={{ fontSize: '12px' }}>{platformConfig.companyAccountNumber}</code></div>
                         <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.companyAccountNumber, 'Número de cuenta')}>
                           <IonIcon icon={copyOutline} slot="icon-only" />
                         </IonButton>
 
                         <div><strong>Titular:</strong> {platformConfig.companyAccountHolder || 'Flujo Fino SaaS'}</div>
                         <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.companyAccountHolder, 'Titular')}>
+                          <IonIcon icon={copyOutline} slot="icon-only" />
+                        </IonButton>
+
+                        <div><strong>Cédula / RIF:</strong> {platformConfig.companyCedula || 'No especificado'}</div>
+                        <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.companyCedula, 'Cédula/RIF')}>
                           <IonIcon icon={copyOutline} slot="icon-only" />
                         </IonButton>
                       </div>
@@ -1018,8 +1134,8 @@ const SettingsPage: React.FC = () => {
               )}
 
               {/* Formulario de Reporte */}
-              <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '10px' }}>
-                2. Ingresa los datos de tu comprobante:
+              <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '12px' }}>
+                2. Ingresa los datos del pago realizado:
               </h3>
 
               <div style={{ background: '#ffffff', borderRadius: '12px', padding: '16px', border: '1px solid #cbd5e1', marginBottom: '24px' }}>
@@ -1033,32 +1149,55 @@ const SettingsPage: React.FC = () => {
                     interface="action-sheet"
                     style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 14px' }}
                   >
-                    <IonSelectOption value={SaaSPaymentMethod.PAGO_MOVIL}>Pago Móvil</IonSelectOption>
-                    <IonSelectOption value={SaaSPaymentMethod.BINANCE}>Binance Pay</IonSelectOption>
-                    <IonSelectOption value={SaaSPaymentMethod.CASH}>Transferencia / Efectivo</IonSelectOption>
+                    <IonSelectOption value={SaaSPaymentMethod.PAGO_MOVIL}>📱 Pago Móvil (en Bolívares)</IonSelectOption>
+                    <IonSelectOption value={SaaSPaymentMethod.BINANCE}>🟡 Binance Pay (USDT)</IonSelectOption>
+                    <IonSelectOption value={SaaSPaymentMethod.CASH}>🏦 Transferencia Bancaria (en Bolívares)</IonSelectOption>
                   </IonSelect>
                 </div>
 
-                <div style={{ marginBottom: '14px' }}>
-                  <IonLabel style={{ fontWeight: 700, fontSize: '13px', color: '#334155', display: 'block', marginBottom: '6px' }}>
-                    Monto Transferido ($ USD):
-                  </IonLabel>
-                  <IonInput
-                    type="number"
-                    min="1"
-                    step="0.01"
-                    value={reportAmount}
-                    onIonInput={(e) => setReportAmount(parseFloat(e.detail.value || '0'))}
-                    style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px 12px' }}
-                  />
-                </div>
+                {reportMethod !== SaaSPaymentMethod.BINANCE ? (
+                  <div style={{ marginBottom: '14px' }}>
+                    <IonLabel style={{ fontWeight: 700, fontSize: '13px', color: '#334155', display: 'block', marginBottom: '6px' }}>
+                      Monto Transferido en Bolívares (Bs):
+                    </IonLabel>
+                    <IonInput
+                      type="number"
+                      min="1"
+                      step="0.01"
+                      value={reportAmountBs}
+                      onIonInput={(e) => handleAmountBsChange(parseFloat(e.detail.value || '0'))}
+                      style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px 12px' }}
+                    />
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                      💡 Equivale a <strong>${reportAmountUsd.toFixed(2)} USD</strong> calculados a Tasa Oficial de <strong>Bs. {exchangeRate.toFixed(2)}</strong>.
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ marginBottom: '14px' }}>
+                    <IonLabel style={{ fontWeight: 700, fontSize: '13px', color: '#334155', display: 'block', marginBottom: '6px' }}>
+                      Monto Transferido en USDT ($):
+                    </IonLabel>
+                    <IonInput
+                      type="number"
+                      min="1"
+                      step="0.01"
+                      value={reportAmountUsd}
+                      onIonInput={(e) => handleAmountUsdChange(parseFloat(e.detail.value || '0'))}
+                      style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px 12px' }}
+                    />
+                  </div>
+                )}
 
                 <div style={{ marginBottom: '18px' }}>
                   <IonLabel style={{ fontWeight: 700, fontSize: '13px', color: '#334155', display: 'block', marginBottom: '6px' }}>
                     Número de Referencia / Comprobante: <span style={{ color: '#ef4444' }}>*</span>
                   </IonLabel>
                   <IonInput
-                    placeholder="Ej: Últimos 6 dígitos o ID de transacción Binance..."
+                    placeholder={
+                      reportMethod === SaaSPaymentMethod.BINANCE
+                        ? 'Ej: ID de orden o transacción Binance'
+                        : 'Ej: Últimos 6 u 8 dígitos del comprobante bancario / Pago Móvil...'
+                    }
                     value={reportReference}
                     onIonInput={(e) => setReportReference(e.detail.value || '')}
                     style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px 12px' }}

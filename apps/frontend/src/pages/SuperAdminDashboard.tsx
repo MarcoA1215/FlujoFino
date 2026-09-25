@@ -624,17 +624,24 @@ const SuperAdminDashboard: React.FC = () => {
                           <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', marginBottom: '14px', border: '1px solid #e2e8f0' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                               <span style={{ fontSize: '13px', color: '#64748b' }}>Monto Reportado:</span>
-                              <span style={{ fontSize: '20px', fontWeight: 800, color: '#10b981' }}>
-                                ${p.amount.toFixed(2)} USD
-                              </span>
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '20px', fontWeight: 800, color: '#10b981' }}>
+                                  {p.amountBs ? `Bs. ${p.amountBs.toFixed(2)}` : `$${p.amount.toFixed(2)} USD`}
+                                </div>
+                                {p.amountBs && (
+                                  <div style={{ fontSize: '12px', color: '#64748b' }}>
+                                    ${p.amount.toFixed(2)} USD {p.exchangeRate ? `(Tasa: Bs. ${p.exchangeRate.toFixed(2)})` : ''}
+                                  </div>
+                                )}
+                              </div>
                             </div>
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                               <span style={{ fontSize: '13px', color: '#64748b' }}>Método de Pago:</span>
                               <span style={{ fontWeight: 700, fontSize: '13px' }}>
-                                {p.paymentMethod === SaaSPaymentMethod.PAGO_MOVIL && '📱 Pago Móvil'}
-                                {p.paymentMethod === SaaSPaymentMethod.BINANCE && '🟡 Binance Pay'}
-                                {p.paymentMethod === SaaSPaymentMethod.CASH && '💵 Efectivo'}
+                                {p.paymentMethod === SaaSPaymentMethod.PAGO_MOVIL && '📱 Pago Móvil (en Bs)'}
+                                {p.paymentMethod === SaaSPaymentMethod.BINANCE && '🟡 Binance Pay (USDT)'}
+                                {p.paymentMethod === SaaSPaymentMethod.CASH && '🏦 Transferencia / Efectivo'}
                               </span>
                             </div>
 

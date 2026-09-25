@@ -271,6 +271,8 @@ export class SuperAdminService {
       tenantId: r.tenant_id,
       tenantName: r.tenant?.name || 'Negocio no identificado',
       amount: Number(r.amount),
+      amountBs: r.amount_bs ? Number(r.amount_bs) : undefined,
+      exchangeRate: r.exchange_rate ? Number(r.exchange_rate) : undefined,
       paymentMethod: r.payment_method,
       reference: r.reference,
       status: r.status,
@@ -352,6 +354,8 @@ export class SuperAdminService {
    */
   async reportPayment(tenantId: string, data: {
     amount: number;
+    amount_bs?: number;
+    exchange_rate?: number;
     payment_method: any;
     reference: string;
   }): Promise<SaaSPaymentReport> {
@@ -365,6 +369,8 @@ export class SuperAdminService {
     const report = this.paymentReportRepo.create({
       tenant_id: tenantId,
       amount: data.amount,
+      amount_bs: data.amount_bs || null,
+      exchange_rate: data.exchange_rate || null,
       payment_method: data.payment_method,
       reference: data.reference.trim(),
       status: SaaSPaymentStatus.PENDING,
