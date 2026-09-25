@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import Pos from './Pos';
 import { apiClient } from '../api/client';
 
@@ -21,7 +22,11 @@ describe('Caja Registradora (POS) - Lógica de Rentabilidad y Descuentos', () =>
     ];
     (apiClient.get as any).mockResolvedValue({ data: mockProducts });
 
-    render(<Pos />);
+    render(
+      <MemoryRouter>
+        <Pos />
+      </MemoryRouter>
+    );
     
     // Esperar a que los productos carguen
     await waitFor(() => {
