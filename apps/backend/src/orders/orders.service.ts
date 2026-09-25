@@ -22,6 +22,7 @@ export class CreateOrderDto {
   deliveryZoneId?: string;
   employeeId?: string;
   employee_id?: string;
+  paymentMethod?: string;
   pagoMovilRef?: string;
   pagoMovilPhone?: string;
   pagoMovilCedula?: string;
@@ -35,6 +36,7 @@ export class CreateOrderDto {
 
 export class UpdatePaymentDto {
   status: PaymentStatus;
+  paymentMethod?: string;
   notes?: string;
   pagoMovilRef?: string;
   pagoMovilPhone?: string;
@@ -189,6 +191,7 @@ export class OrdersService {
         netProfit: 0,
         totalAmount: 0,
         employeeId: employeeIdToSave,
+        paymentMethod: dto.paymentMethod,
         pagoMovilRef: dto.pagoMovilRef,
         pagoMovilPhone: dto.pagoMovilPhone,
         pagoMovilCedula: dto.pagoMovilCedula,
@@ -335,6 +338,7 @@ export class OrdersService {
     if (order.status === OrderStatus.CANCELED) throw new BadRequestException('El pedido está cancelado');
     
     order.paymentStatus = dto.status;
+    if (dto.paymentMethod) order.paymentMethod = dto.paymentMethod;
     if (dto.notes) order.notes = dto.notes;
     if (dto.pagoMovilRef) order.pagoMovilRef = dto.pagoMovilRef;
     if (dto.pagoMovilPhone) order.pagoMovilPhone = dto.pagoMovilPhone;
@@ -844,6 +848,8 @@ export class OrdersService {
     let totalPendingUSD = 0;
     let totalPagoMovilBs = 0;
     let totalPagoMovilUSD = 0;
+    let totalPuntoBs = 0;
+    let totalPuntoUSD = 0;
     let totalCashUSD = 0;
 
     let deliveryOrdersCount = 0;
@@ -851,6 +857,7 @@ export class OrdersService {
     let webOrdersCount = 0;
 
     const pagoMovilList: any[] = [];
+    const puntoList: any[] = [];
     const recentOrders: any[] = [];
 
     for (const o of orders) {
@@ -875,8 +882,25 @@ export class OrdersService {
 
       if (!o.employeeId) webOrdersCount++;
 
-      // Pago Movil vs Cash Divisas
-      if (o.pagoMovilRef && o.pagoMovilRef.trim().length > 0) {
+      // Punto de Venta vs Pago Movil vs Cash Divisas
+      const isPunto = o.paymentMethod === 'PUNTO' || 
+                      o.pagoMovilBank?.toLowerCase().includes('punto') || 
+                      o.notes?.toLowerCase().includes('punto');
+
+      if (isPunto) {
+        const bs = Number(o.amountBs || (orderTotal * exchangeRate));
+        totalPuntoBs += bs;
+        totalPuntoUSD += bs / exchangeRate;
+        puntoList.push({
+          orderId: o.id,
+          orderNumber: o.id.slice(0, 8).toUpperCase(),
+          customerName: o.customerName,
+          ref: o.pagoMovilRef,
+          bank: o.pagoMovilBank || 'Punto de Venta',
+          amountBs: bs,
+          createdAt: o.createdAt,
+        });
+      } else if (o.pagoMovilRef && o.pagoMovilRef.trim().length > 0) {
         const bs = Number(o.amountBs || (orderTotal * exchangeRate));
         totalPagoMovilBs += bs;
         totalPagoMovilUSD += bs / exchangeRate;
@@ -900,6 +924,7 @@ export class OrdersService {
         customerName: o.customerName,
         totalAmount: orderTotal,
         paymentStatus: o.paymentStatus,
+        paymentMethod: o.paymentMethod,
         status: o.status,
         deliveryMethod: o.deliveryMethod,
         pagoMovilRef: o.pagoMovilRef,
@@ -915,6 +940,8 @@ export class OrdersService {
       totalPendingUSD: Number(totalPendingUSD.toFixed(2)),
       totalPagoMovilBs: Number(totalPagoMovilBs.toFixed(2)),
       totalPagoMovilUSD: Number(totalPagoMovilUSD.toFixed(2)),
+      totalPuntoBs: Number(totalPuntoBs.toFixed(2)),
+      totalPuntoUSD: Number(totalPuntoUSD.toFixed(2)),
       totalCashUSD: Number(totalCashUSD.toFixed(2)),
       ordersCount: orders.filter(o => o.status !== OrderStatus.CANCELED).length,
       paidOrdersCount: orders.filter(o => o.paymentStatus === PaymentStatus.PAID && o.status !== OrderStatus.CANCELED).length,
@@ -924,6 +951,7 @@ export class OrdersService {
       inStoreOrdersCount,
       webOrdersCount,
       pagoMovilList,
+      puntoList,
       recentOrders: recentOrders.slice(0, 15),
     };
   }

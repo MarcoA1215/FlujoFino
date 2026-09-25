@@ -53,6 +53,9 @@ export class Order {
   })
   paymentStatus: PaymentStatus;
 
+  @Column({ nullable: true })
+  paymentMethod: string; // 'USD' | 'PAGO_MOVIL' | 'PUNTO' | 'PENDING'
+
   @Column({
     type: 'enum',
     enum: DeliveryMethod,

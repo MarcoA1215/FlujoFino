@@ -21,6 +21,12 @@ type Order = {
   totalAmount: number;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
+  paymentMethod?: string;
+  pagoMovilRef?: string;
+  pagoMovilPhone?: string;
+  pagoMovilCedula?: string;
+  pagoMovilBank?: string;
+  amountBs?: number;
   notes?: string;
   tableNumber?: string;
   items: OrderItem[];
@@ -255,6 +261,7 @@ const Orders: React.FC = () => {
             try {
               await apiClient.patch(`/orders/${order.id}/payment`, {
                 status: PaymentStatus.PAID,
+                paymentMethod: 'PAGO_MOVIL',
                 pagoMovilRef: data.pagoMovilRef,
                 pagoMovilPhone: data.pagoMovilPhone,
                 pagoMovilCedula: data.pagoMovilCedula,
@@ -264,6 +271,47 @@ const Orders: React.FC = () => {
               });
               fetchOrders();
               presentToast({ message: "Pago registrado exitosamente", duration: 2000, color: "success" });
+            } catch (e) {
+              presentToast({ message: "Error al actualizar pago", duration: 3000, color: "danger" });
+            }
+          }
+        }
+      ]
+    });
+  };
+
+  const openPuntoPaymentAlert = (order: Order) => {
+    if (order.status === OrderStatus.CANCELED) return;
+    const remaining = order.totalAmount - (order.abonosTotal || 0);
+    const totalBs = (remaining * exchangeRate).toFixed(2);
+    presentAlert({
+      header: "Cobro por Punto de Venta",
+      subHeader: `Monto a cobrar: Bs. ${totalBs} (~$${remaining.toFixed(2)})`,
+      inputs: [
+        { name: "puntoRef", type: "text", placeholder: "N° Aprobación / Voucher *" },
+        { name: "puntoBank", type: "text", placeholder: "Banco / Terminal (Ej. Banesco, BDV)" },
+      ],
+      buttons: [
+        { text: "Cancelar", role: "cancel" },
+        {
+          text: "Confirmar Cobro Punto",
+          handler: async (data: any) => {
+            if (!data.puntoRef) {
+              presentToast({ message: "El N° de Aprobación del voucher es obligatorio", duration: 3000, color: "warning" });
+              return false;
+            }
+            try {
+              await apiClient.patch(`/orders/${order.id}/payment`, {
+                status: PaymentStatus.PAID,
+                paymentMethod: 'PUNTO',
+                pagoMovilRef: data.puntoRef,
+                pagoMovilBank: data.puntoBank || 'Punto de Venta',
+                amountBs: parseFloat(totalBs),
+                exchangeRate: exchangeRate,
+                notes: (order.notes ? order.notes + '\n' : '') + `Pago Punto de Venta | Voucher: ${data.puntoRef} | Terminal: ${data.puntoBank || 'Punto'}`
+              });
+              fetchOrders();
+              presentToast({ message: "Pago con Punto de Venta registrado", duration: 2000, color: "success" });
             } catch (e) {
               presentToast({ message: "Error al actualizar pago", duration: 3000, color: "danger" });
             }
@@ -297,6 +345,7 @@ const Orders: React.FC = () => {
             try {
               await apiClient.patch(`/orders/${order.id}/payment`, {
                 status: PaymentStatus.PAID,
+                paymentMethod: 'USD',
                 notes: (order.notes ? order.notes + '\n' : '') + `Pago USD (Restante): $${remaining.toFixed(2)} | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
               });
               fetchOrders();
@@ -522,16 +571,28 @@ const getStatusColor = (status: OrderStatus) => {
                       {order.paymentStatus === PaymentStatus.PARTIAL ? (
                           <IonBadge color="warning">Abono Parcial</IonBadge>
                         ) : order.paymentStatus === PaymentStatus.PAID ? (
-                        <IonBadge color="success">Pagado</IonBadge>
+                        <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                          <IonBadge color="success">Pagado</IonBadge>
+                          {(order.paymentMethod === 'PUNTO' || order.pagoMovilBank?.toLowerCase().includes('punto')) ? (
+                            <IonBadge color="success" style={{ fontSize: "0.75rem" }}>💳 Punto</IonBadge>
+                          ) : order.pagoMovilRef ? (
+                            <IonBadge color="primary" style={{ fontSize: "0.75rem" }}>📱 PM</IonBadge>
+                          ) : (
+                            <IonBadge color="light" style={{ border: '1px solid #ccc', color: '#333', fontSize: "0.75rem" }}>💵 USD</IonBadge>
+                          )}
+                        </div>
                       ) : order.paymentStatus === PaymentStatus.REFUNDED ? (
                         <IonBadge color="dark">Reembolsado</IonBadge>
                       ) : order.status !== OrderStatus.CANCELED ? (
-                        <div style={{ display: "flex", gap: "5px" }}>
+                        <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
                           <IonButton size="small" color="tertiary" onClick={() => openUSDPaymentAlert(order)}>
-                            Cobrar (USD)
+                            USD ($)
                           </IonButton>
                           <IonButton size="small" color="danger" onClick={() => openPaymentAlert(order)}>
-                            Cobrar (PM)
+                            Pago Móvil
+                          </IonButton>
+                          <IonButton size="small" color="success" onClick={() => openPuntoPaymentAlert(order)}>
+                            Punto
                           </IonButton>
                         </div>
                       ) : null}

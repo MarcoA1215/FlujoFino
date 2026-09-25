@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { refreshOutline, cartOutline, cashOutline, trashOutline, personOutline, walletOutline, copyOutline, closeOutline, storefrontOutline, bicycleOutline, globeOutline, logoWhatsapp } from 'ionicons/icons';
+import { refreshOutline, cartOutline, cashOutline, trashOutline, personOutline, walletOutline, copyOutline, closeOutline, storefrontOutline, bicycleOutline, globeOutline, logoWhatsapp, cardOutline } from 'ionicons/icons';
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, useIonToast, useIonAlert, IonInput, IonSelect, IonSelectOption, IonText, IonIcon, IonSearchbar, useIonRouter, IonModal, IonSpinner } from '@ionic/react';
 import { useEffect, useState, useContext } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -22,7 +22,7 @@ type CartItem = {
   quantity: number;
 };
 
-type PaymentMethod = 'PENDING' | 'PAGO_MOVIL' | 'USD';
+type PaymentMethod = 'PENDING' | 'PAGO_MOVIL' | 'USD' | 'PUNTO';
 
 const Pos: React.FC = () => {
   const { openImage } = useImageViewer();
@@ -47,6 +47,10 @@ const Pos: React.FC = () => {
   const [pagoMovilPhone, setPagoMovilPhone] = useState('');
   const [pagoMovilCedula, setPagoMovilCedula] = useState('');
   const [pagoMovilBank, setPagoMovilBank] = useState('');
+
+  // Punto de Venta Fields
+  const [puntoRef, setPuntoRef] = useState('');
+  const [puntoBank, setPuntoBank] = useState('');
 
   // USD Fields
   const [usdReceived, setUsdReceived] = useState<number | ''>('');
@@ -95,6 +99,7 @@ const Pos: React.FC = () => {
 💱 Tasa BCV: Bs. ${Number(cashSummary.exchangeRate || 0).toFixed(2)}
 
 💵 *TOTAL EFECTIVO USD:* $${Number(cashSummary.totalCashUSD || 0).toFixed(2)}
+💳 *PUNTO DE VENTA (Bs.):* Bs. ${Number(cashSummary.totalPuntoBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (equiv. $${Number(cashSummary.totalPuntoUSD || 0).toFixed(2)})
 📱 *PAGO MÓVIL (Bs.):* Bs. ${Number(cashSummary.totalPagoMovilBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (equiv. $${Number(cashSummary.totalPagoMovilUSD || 0).toFixed(2)})
 💰 *TOTAL INGRESOS COBRADOS:* $${Number(cashSummary.totalPaidUSD || 0).toFixed(2)}
 ⏳ *PENDIENTE POR COBRAR:* $${Number(cashSummary.totalPendingUSD || 0).toFixed(2)}
@@ -106,7 +111,8 @@ const Pos: React.FC = () => {
 - 🛵 Delivery: ${cashSummary.deliveryOrdersCount}
 - 🛒 Tienda Web: ${cashSummary.webOrdersCount}
 ${cashSummary.cancelledOrdersCount > 0 ? `- ❌ Cancelados: ${cashSummary.cancelledOrdersCount}\n` : ''}
-${cashSummary.pagoMovilList?.length > 0 ? `\n📝 *PAGOS MÓVILES REGISTRADOS (${cashSummary.pagoMovilList.length}):*\n` + cashSummary.pagoMovilList.map((p: any) => `• Ref: ${p.ref || 'S/R'} | Bs. ${Number(p.amountBs).toFixed(2)} | ${p.customerName || 'Cliente'}`).join('\n') : ''}
+${cashSummary.puntoList?.length > 0 ? `\n💳 *VENTAS POR PUNTO DE VENTA (${cashSummary.puntoList.length}):*\n` + cashSummary.puntoList.map((p: any) => `• Ref: ${p.ref || 'S/R'} | Bs. ${Number(p.amountBs).toFixed(2)} | ${p.bank || 'Punto'} | ${p.customerName || 'Cliente'}`).join('\n') : ''}
+${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS (${cashSummary.pagoMovilList.length}):*\n` + cashSummary.pagoMovilList.map((p: any) => `• Ref: ${p.ref || 'S/R'} | Bs. ${Number(p.amountBs).toFixed(2)} | ${p.customerName || 'Cliente'}`).join('\n') : ''}
 `;
 
     if (navigator.clipboard) {
@@ -312,12 +318,20 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📝 *PAGOS MÓVILES REGISTRADOS ($
       }
     }
 
+    if (paymentMethod === 'PUNTO') {
+      if (!puntoRef) {
+        return presentToast({ message: 'El número de aprobación/referencia del voucher del punto es obligatorio', duration: 3000, color: 'warning' });
+      }
+    }
+
     let notes = '';
     if (paymentMethod === 'USD') {
       const received = typeof usdReceived === 'number' ? usdReceived : totalCart;
       const changeUsd = received - totalCart;
       const changeBs = changeUsd * exchangeRate;
       notes = `MÉTODO: Divisas (USD) | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`;
+    } else if (paymentMethod === 'PUNTO') {
+      notes = `MÉTODO: Punto de Venta | Ref: ${puntoRef} | Banco/Terminal: ${puntoBank || 'Punto de Venta'}`;
     }
 
     try {
@@ -327,11 +341,12 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📝 *PAGOS MÓVILES REGISTRADOS ($
         customerPhone,
         tableNumber,
         paymentStatus: paymentMethod === 'PENDING' ? PaymentStatus.PENDING : PaymentStatus.PAID,
+        paymentMethod,
         notes,
-        pagoMovilRef: paymentMethod === 'PAGO_MOVIL' ? pagoMovilRef : undefined,
+        pagoMovilRef: paymentMethod === 'PAGO_MOVIL' ? pagoMovilRef : (paymentMethod === 'PUNTO' ? puntoRef : undefined),
         pagoMovilPhone: paymentMethod === 'PAGO_MOVIL' ? pagoMovilPhone : undefined,
         pagoMovilCedula: paymentMethod === 'PAGO_MOVIL' ? pagoMovilCedula : undefined,
-        pagoMovilBank: paymentMethod === 'PAGO_MOVIL' ? pagoMovilBank : undefined,
+        pagoMovilBank: paymentMethod === 'PAGO_MOVIL' ? pagoMovilBank : (paymentMethod === 'PUNTO' ? (puntoBank || 'Punto de Venta') : undefined),
         amountBs: totalCart * exchangeRate,
         exchangeRate,
         deliveryMethod,
@@ -374,6 +389,8 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📝 *PAGOS MÓVILES REGISTRADOS ($
       setPagoMovilPhone('');
       setPagoMovilCedula('');
       setPagoMovilBank('');
+      setPuntoRef('');
+      setPuntoBank('');
       setDeliveryMethod(DeliveryMethod.IN_STORE);
       setDeliveryZoneId('');
       setUsdReceived('');
@@ -556,9 +573,10 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📝 *PAGOS MÓVILES REGISTRADOS ($
                   <IonItem className="ion-margin-bottom">
                     <IonLabel position="stacked">Método de Pago</IonLabel>
                     <IonSelect value={paymentMethod} onIonChange={e => setPaymentMethod(e.detail.value)}>
-                      <IonSelectOption value="PAGO_MOVIL">Pago Móvil Confirmado</IonSelectOption>
-                      <IonSelectOption value="USD">Divisas (USD Efectivo)</IonSelectOption>
-                      <IonSelectOption value="PENDING">Por Pagar / Cuenta Abierta</IonSelectOption>
+                      <IonSelectOption value="PAGO_MOVIL">📱 Pago Móvil (Bs.)</IonSelectOption>
+                      <IonSelectOption value="PUNTO">💳 Punto de Venta / Tarjeta (Bs.)</IonSelectOption>
+                      <IonSelectOption value="USD">💵 Divisas (USD Efectivo)</IonSelectOption>
+                      <IonSelectOption value="PENDING">⏳ Por Pagar / Cuenta Abierta</IonSelectOption>
                     </IonSelect>
                   </IonItem>
 
@@ -568,6 +586,23 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📝 *PAGOS MÓVILES REGISTRADOS ($
                       <IonItem color="light">
                         <IonLabel position="stacked">Monto (USD)</IonLabel>
                         <IonInput type="number" min="0" value={initialAbono} onIonInput={e => setInitialAbono(e.detail.value!)} placeholder="Ej. 10.00" />
+                      </IonItem>
+                    </div>
+                  )}
+
+                  {paymentMethod === 'PUNTO' && (
+                    <div style={{ background: '#f0fdf4', padding: '12px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #bbf7d0' }}>
+                      <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <IonIcon icon={cardOutline} />
+                        Cobro por Punto de Venta (Total: Bs. {(totalCart * exchangeRate).toFixed(2)})
+                      </h4>
+                      <IonItem color="light" className="ion-margin-bottom">
+                        <IonLabel position="stacked">N° de Aprobación / Referencia del Voucher *</IonLabel>
+                        <IonInput value={puntoRef} onIonInput={e => setPuntoRef(e.detail.value!)} placeholder="Ej. 084213 (del ticket del punto)" />
+                      </IonItem>
+                      <IonItem color="light">
+                        <IonLabel position="stacked">Banco / Terminal del Punto (Opcional)</IonLabel>
+                        <IonInput value={puntoBank} onIonInput={e => setPuntoBank(e.detail.value!)} placeholder="Ej. Punto Banesco, BDV, Bancamiga..." />
                       </IonItem>
                     </div>
                   )}
@@ -748,27 +783,40 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📝 *PAGOS MÓVILES REGISTRADOS ($
               <IonGrid style={{ padding: 0 }}>
                 <IonRow>
                   {/* Cash USD */}
-                  <IonCol size="12" sizeMd="6">
+                  <IonCol size="12" sizeMd="4">
                     <IonCard style={{ margin: '4px', background: '#e8f5e9', border: '1px solid #c8e6c9' }}>
                       <IonCardContent>
                         <div style={{ fontSize: '0.85rem', color: '#2e7d32', fontWeight: 'bold' }}>💵 EFECTIVO EN CAJA (USD)</div>
-                        <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1b5e20', margin: '6px 0' }}>
+                        <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#1b5e20', margin: '6px 0' }}>
                           ${Number(cashSummary.totalCashUSD || 0).toFixed(2)}
                         </h1>
-                        <small style={{ color: '#4caf50' }}>Total billetes físicos a cuadrar en gaveta</small>
+                        <small style={{ color: '#4caf50' }}>Total billetes en gaveta</small>
+                      </IonCardContent>
+                    </IonCard>
+                  </IonCol>
+
+                  {/* Punto de Venta Bs */}
+                  <IonCol size="12" sizeMd="4">
+                    <IonCard style={{ margin: '4px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                      <IonCardContent>
+                        <div style={{ fontSize: '0.85rem', color: '#166534', fontWeight: 'bold' }}>💳 PUNTO DE VENTA (BS.)</div>
+                        <h1 style={{ fontSize: '1.7rem', fontWeight: 'bold', color: '#14532d', margin: '6px 0' }}>
+                          Bs. {Number(cashSummary.totalPuntoBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </h1>
+                        <small style={{ color: '#15803d' }}>Equiv: ~${Number(cashSummary.totalPuntoUSD || 0).toFixed(2)} ({cashSummary.puntoList?.length || 0} vouchers para cuadre)</small>
                       </IonCardContent>
                     </IonCard>
                   </IonCol>
 
                   {/* Pago Movil Bs */}
-                  <IonCol size="12" sizeMd="6">
+                  <IonCol size="12" sizeMd="4">
                     <IonCard style={{ margin: '4px', background: '#e3f2fd', border: '1px solid #bbdefb' }}>
                       <IonCardContent>
                         <div style={{ fontSize: '0.85rem', color: '#1565c0', fontWeight: 'bold' }}>📱 PAGO MÓVIL (BS.)</div>
                         <h1 style={{ fontSize: '1.7rem', fontWeight: 'bold', color: '#0d47a1', margin: '6px 0' }}>
                           Bs. {Number(cashSummary.totalPagoMovilBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </h1>
-                        <small style={{ color: '#1976d2' }}>Equivalente: ~${Number(cashSummary.totalPagoMovilUSD || 0).toFixed(2)} USD ({cashSummary.pagoMovilList?.length || 0} transferencias)</small>
+                        <small style={{ color: '#1976d2' }}>Equiv: ~${Number(cashSummary.totalPagoMovilUSD || 0).toFixed(2)} ({cashSummary.pagoMovilList?.length || 0} transferencias)</small>
                       </IonCardContent>
                     </IonCard>
                   </IonCol>
@@ -831,6 +879,30 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📝 *PAGOS MÓVILES REGISTRADOS ($
                   </div>
                 </IonCardContent>
               </IonCard>
+
+              {/* Punto de Venta Vouchers List */}
+              {cashSummary.puntoList?.length > 0 && (
+                <IonCard style={{ margin: '8px 4px 16px 4px' }}>
+                  <IonCardHeader style={{ padding: '12px' }}>
+                    <IonCardTitle style={{ fontSize: '0.95rem' }}>💳 Vouchers de Punto de Venta ({cashSummary.puntoList.length})</IonCardTitle>
+                  </IonCardHeader>
+                  <IonCardContent style={{ padding: '0 12px 12px 12px' }}>
+                    <IonList lines="full">
+                      {cashSummary.puntoList.map((p: any, idx: number) => (
+                        <IonItem key={idx} style={{ '--padding-start': '0px' }}>
+                          <IonLabel>
+                            <h3><strong>Aprobación: {p.ref || 'Sin ref'}</strong> &bull; {p.customerName || 'Cliente'}</h3>
+                            <p style={{ fontSize: '0.8rem' }}>{p.bank || 'Punto de Venta'}</p>
+                          </IonLabel>
+                          <IonBadge slot="end" color="success" style={{ fontSize: '0.9rem' }}>
+                            Bs. {Number(p.amountBs).toFixed(2)}
+                          </IonBadge>
+                        </IonItem>
+                      ))}
+                    </IonList>
+                  </IonCardContent>
+                </IonCard>
+              )}
 
               {/* Pago Movil Reference List */}
               {cashSummary.pagoMovilList?.length > 0 && (
