@@ -63,6 +63,7 @@ export class SettingsService implements OnModuleInit {
     if (payload.companyPhone !== undefined) settings.companyPhone = payload.companyPhone;
     if (payload.allowPartialPayments !== undefined) settings.allowPartialPayments = payload.allowPartialPayments;
     if (payload.minDepositPercentage !== undefined) settings.minDepositPercentage = payload.minDepositPercentage;
+    if (payload.allowCashierBypassDeposit !== undefined) settings.allowCashierBypassDeposit = payload.allowCashierBypassDeposit;
     if (payload.acceptCashUsd !== undefined) settings.acceptCashUsd = payload.acceptCashUsd;
     if (payload.acceptPagoMovil !== undefined) settings.acceptPagoMovil = payload.acceptPagoMovil;
     if (payload.acceptCardPos !== undefined) settings.acceptCardPos = payload.acceptCardPos;

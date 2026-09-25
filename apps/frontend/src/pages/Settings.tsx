@@ -12,6 +12,7 @@ interface Settings {
   companyPhone?: string;
   allowPartialPayments?: boolean;
   minDepositPercentage?: number;
+  allowCashierBypassDeposit?: boolean;
   acceptCashUsd?: boolean;
   acceptPagoMovil?: boolean;
   acceptCardPos?: boolean;
@@ -61,6 +62,7 @@ const SettingsPage: React.FC = () => {
           companyPhone: settings.companyPhone,
           allowPartialPayments: settings.allowPartialPayments,
           minDepositPercentage: Number(settings.minDepositPercentage) || 0,
+          allowCashierBypassDeposit: settings.allowCashierBypassDeposit !== false,
           acceptCashUsd: settings.acceptCashUsd !== false,
           acceptPagoMovil: settings.acceptPagoMovil !== false,
           acceptCardPos: settings.acceptCardPos === true,
@@ -157,22 +159,37 @@ const SettingsPage: React.FC = () => {
                   </IonItem>
 
                   {settings.allowPartialPayments !== false && (
-                    <IonItem style={{ marginTop: '8px', background: '#f8fafc', borderRadius: '8px' }}>
-                      <IonLabel position="stacked">
-                        Porcentaje Mínimo de Abono Inicial (%)
-                        <small style={{ display: 'block', color: '#64748b' }}>
-                          0% = No exige mínimo. (Ej. 30% o 50% para apartados o créditos).
-                        </small>
-                      </IonLabel>
-                      <IonInput 
-                        type="number" 
-                        min="0" 
-                        max="100" 
-                        value={settings.minDepositPercentage !== undefined ? settings.minDepositPercentage : 0} 
-                        onIonInput={e => setSettings({...settings, minDepositPercentage: parseFloat(e.detail.value!) || 0})} 
-                        placeholder="0" 
-                      />
-                    </IonItem>
+                    <>
+                      <IonItem style={{ marginTop: '8px', background: '#f8fafc', borderRadius: '8px' }}>
+                        <IonLabel position="stacked">
+                          Porcentaje Mínimo de Abono Inicial (%)
+                          <small style={{ display: 'block', color: '#64748b' }}>
+                            0% = No exige mínimo. (Ej. 30% o 50% para apartados o créditos).
+                          </small>
+                        </IonLabel>
+                        <IonInput 
+                          type="number" 
+                          min="0" 
+                          max="100" 
+                          value={settings.minDepositPercentage !== undefined ? settings.minDepositPercentage : 0} 
+                          onIonInput={e => setSettings({...settings, minDepositPercentage: parseFloat(e.detail.value!) || 0})} 
+                          placeholder="0" 
+                        />
+                      </IonItem>
+
+                      <IonItem style={{ marginTop: '8px', background: '#f8fafc', borderRadius: '8px' }}>
+                        <IonLabel className="ion-text-wrap">
+                          <h2>Permitir en Caja exonerar abono mínimo</h2>
+                          <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
+                            Muestra el interruptor al cajero para abrir cuentas en $0.00 (ideal para consumo en mesas o clientes de confianza). Si lo desactivas, los cajeros estarán obligados a cobrar el mínimo configurado.
+                          </p>
+                        </IonLabel>
+                        <IonToggle 
+                          checked={settings.allowCashierBypassDeposit !== false} 
+                          onIonChange={e => setSettings({...settings, allowCashierBypassDeposit: e.detail.checked})} 
+                        />
+                      </IonItem>
+                    </>
                   )}
 
                   <IonItem>

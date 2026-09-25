@@ -224,6 +224,7 @@ export interface SettingsDTO {
   companyPhone?: string;
   allowPartialPayments?: boolean;
   minDepositPercentage?: number;
+  allowCashierBypassDeposit?: boolean;
   acceptCashUsd?: boolean;
   acceptPagoMovil?: boolean;
   acceptCardPos?: boolean;

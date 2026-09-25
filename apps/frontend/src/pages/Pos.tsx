@@ -329,14 +329,19 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
     if (cart.length === 0 && paymentMethod !== 'PENDING') return presentToast({ message: 'Carrito vacío', duration: 2000, color: 'warning' });
     if (!customerName.trim()) return presentToast({ message: 'Ingresa el nombre', duration: 2000, color: 'warning' });
 
+    const canBypassDeposit = (settings?.allowCashierBypassDeposit !== false) || (user?.role === UserRole.ADMIN);
+
     if (paymentMethod === 'PENDING') {
       const minDepositPct = Number(settings?.minDepositPercentage || 0);
-      if (minDepositPct > 0 && !bypassMinDeposit) {
+      const isBypassed = bypassMinDeposit && canBypassDeposit;
+      if (minDepositPct > 0 && !isBypassed) {
         const minRequired = totalCart * (minDepositPct / 100);
         const abonoVal = initialAbono ? Number(initialAbono) : 0;
         if (abonoVal < minRequired) {
           return presentToast({
-            message: `El abono inicial debe ser al menos el ${minDepositPct}% ($${minRequired.toFixed(2)}). Activa "Exonerar abono" si es consumo en mesa o cliente de confianza.`,
+            message: canBypassDeposit 
+              ? `El abono inicial debe ser al menos el ${minDepositPct}% ($${minRequired.toFixed(2)}). Activa "Exonerar abono" si es consumo en mesa o cliente de confianza.`
+              : `El abono inicial debe ser al menos el ${minDepositPct}% ($${minRequired.toFixed(2)}).`,
             duration: 4500,
             color: 'warning'
           });
@@ -652,55 +657,63 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
                     </IonSelect>
                   </IonItem>
 
-                  {paymentMethod === 'PENDING' && (
-                    <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', marginBottom: '15px', border: '1px solid #cbd5e1' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <h4 style={{ margin: 0, fontSize: '0.98rem', color: '#1e293b', fontWeight: 'bold' }}>
-                          Abono Inicial / Cuenta Abierta
-                        </h4>
-                        {Number(settings?.minDepositPercentage || 0) > 0 && (
-                          <IonBadge color={bypassMinDeposit ? 'success' : 'primary'}>
-                            {bypassMinDeposit ? 'Exonerado ($0.00)' : `Exige ${settings.minDepositPercentage}%`}
-                          </IonBadge>
-                        )}
-                      </div>
+                  {paymentMethod === 'PENDING' && (() => {
+                    const canBypassDeposit = (settings?.allowCashierBypassDeposit !== false) || (user?.role === UserRole.ADMIN);
+                    const isBypassed = bypassMinDeposit && canBypassDeposit;
+                    const minPct = Number(settings?.minDepositPercentage || 0);
 
-                      {Number(settings?.minDepositPercentage || 0) > 0 && (
-                        <div style={{ marginBottom: '12px', padding: '10px', background: bypassMinDeposit ? '#ecfdf5' : '#eff6ff', borderRadius: '8px', border: `1px solid ${bypassMinDeposit ? '#a7f3d0' : '#bfdbfe'}` }}>
-                          <p style={{ margin: '0 0 6px 0', fontSize: '0.84rem', color: bypassMinDeposit ? '#065f46' : '#1e40af', fontWeight: 600 }}>
-                            {bypassMinDeposit
-                              ? '✅ Abono inicial exonerado: la cuenta o mesa puede abrirse con $0.00.'
-                              : `💡 Abono mínimo requerido (${settings.minDepositPercentage}%): $${(totalCart * (Number(settings.minDepositPercentage) / 100)).toFixed(2)} USD`}
-                          </p>
-                          <IonItem lines="none" style={{ '--background': 'transparent' }}>
-                            <IonToggle 
-                              checked={bypassMinDeposit} 
-                              onIonChange={e => setBypassMinDeposit(e.detail.checked)}
-                            >
-                              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
-                                Exonerar abono (Mesa abierta / Tasca / Confianza)
-                              </span>
-                            </IonToggle>
-                          </IonItem>
+                    return (
+                      <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', marginBottom: '15px', border: '1px solid #cbd5e1' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <h4 style={{ margin: 0, fontSize: '0.98rem', color: '#1e293b', fontWeight: 'bold' }}>
+                            Abono Inicial / Cuenta Abierta
+                          </h4>
+                          {minPct > 0 && canBypassDeposit && (
+                            <IonBadge color={isBypassed ? 'success' : 'primary'}>
+                              {isBypassed ? 'Exonerado ($0.00)' : `Exige ${minPct}%`}
+                            </IonBadge>
+                          )}
                         </div>
-                      )}
 
-                      <IonItem color="light" style={{ borderRadius: '8px' }}>
-                        <IonLabel position="stacked">
-                          {bypassMinDeposit || Number(settings?.minDepositPercentage || 0) === 0
-                            ? 'Monto de Abono Inicial (USD - Opcional, puede ser $0)'
-                            : `Monto de Abono Inicial (USD - Mínimo $${(totalCart * (Number(settings.minDepositPercentage) / 100)).toFixed(2)})`}
-                        </IonLabel>
-                        <IonInput 
-                          type="number" 
-                          min="0" 
-                          value={initialAbono} 
-                          onIonInput={e => setInitialAbono(e.detail.value!)} 
-                          placeholder={!bypassMinDeposit && Number(settings?.minDepositPercentage || 0) > 0 ? `Mínimo: $${(totalCart * (Number(settings.minDepositPercentage) / 100)).toFixed(2)}` : '0.00'} 
-                        />
-                      </IonItem>
-                    </div>
-                  )}
+                        {minPct > 0 && (
+                          <div style={{ marginBottom: '12px', padding: '10px', background: isBypassed ? '#ecfdf5' : '#eff6ff', borderRadius: '8px', border: `1px solid ${isBypassed ? '#a7f3d0' : '#bfdbfe'}` }}>
+                            <p style={{ margin: '0 0 6px 0', fontSize: '0.84rem', color: isBypassed ? '#065f46' : '#1e40af', fontWeight: 600 }}>
+                              {isBypassed
+                                ? '✅ Abono inicial exonerado: la cuenta o mesa puede abrirse con $0.00.'
+                                : `💡 Abono mínimo requerido (${minPct}%): $${(totalCart * (minPct / 100)).toFixed(2)} USD`}
+                            </p>
+                            {canBypassDeposit && (
+                              <IonItem lines="none" style={{ '--background': 'transparent' }}>
+                                <IonToggle 
+                                  checked={bypassMinDeposit} 
+                                  onIonChange={e => setBypassMinDeposit(e.detail.checked)}
+                                >
+                                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                                    Exonerar abono (Mesa abierta / Tasca / Confianza)
+                                  </span>
+                                </IonToggle>
+                              </IonItem>
+                            )}
+                          </div>
+                        )}
+
+                        <IonItem color="light" style={{ borderRadius: '8px' }}>
+                          <IonLabel position="stacked">
+                            {isBypassed || minPct === 0
+                              ? 'Monto de Abono Inicial (USD - Opcional, puede ser $0)'
+                              : `Monto de Abono Inicial (USD - Mínimo $${(totalCart * (minPct / 100)).toFixed(2)})`}
+                          </IonLabel>
+                          <IonInput 
+                            type="number" 
+                            min="0" 
+                            value={initialAbono} 
+                            onIonInput={e => setInitialAbono(e.detail.value!)} 
+                            placeholder={!isBypassed && minPct > 0 ? `Mínimo: $${(totalCart * (minPct / 100)).toFixed(2)}` : '0.00'} 
+                          />
+                        </IonItem>
+                      </div>
+                    );
+                  })()}
 
                   {paymentMethod === 'PUNTO' && (
                     <div style={{ background: '#f0fdf4', padding: '12px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #bbf7d0' }}>

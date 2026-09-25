@@ -42,6 +42,9 @@ export class Settings {
   @Column('decimal', { precision: 5, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
   minDepositPercentage: number;
 
+  @Column('boolean', { default: true })
+  allowCashierBypassDeposit: boolean;
+
   // Feature Flags / Onboarding
   @Column('boolean', { default: false })
   featureCustomerSchedules: boolean;
