@@ -124,6 +124,7 @@ export interface EmployeeDTO {
 }
 
 export enum UserRole {
+  SUPERADMIN = 'SUPERADMIN',
   ADMIN = 'ADMIN',
   KITCHEN = 'KITCHEN',
   POS = 'POS',
@@ -249,5 +250,71 @@ export interface SettingsDTO {
   themePrimaryColor?: string;
   themeHeaderColor?: string;
   publicToken?: string;
+}
+
+export enum TenantStatus {
+  TRIAL = 'TRIAL',
+  ACTIVE = 'ACTIVE',
+  PAST_DUE = 'PAST_DUE',
+  SUSPENDED = 'SUSPENDED',
+}
+
+export enum TenantPlanType {
+  PIONEER = 'PIONEER',
+  REGULAR = 'REGULAR',
+}
+
+export enum SaaSPaymentMethod {
+  PAGO_MOVIL = 'PAGO_MOVIL',
+  BINANCE = 'BINANCE',
+  CASH = 'CASH',
+}
+
+export enum SaaSPaymentStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
+
+export interface SaaSPaymentReportDTO {
+  id: string;
+  tenantId: string;
+  tenantName?: string;
+  amount: number;
+  paymentMethod: SaaSPaymentMethod;
+  reference: string;
+  status: SaaSPaymentStatus;
+  rejectReason?: string;
+  createdAt: string;
+}
+
+export interface SuperAdminTenantDTO {
+  id: string;
+  name: string;
+  slug?: string;
+  status: TenantStatus;
+  planType: TenantPlanType;
+  basePrice: number;
+  trialEndsAt?: string;
+  currentPeriodEndsAt?: string;
+  referredByTenantId?: string;
+  referrerName?: string;
+  createdAt: string;
+  owner?: {
+    id: string;
+    name?: string;
+    email: string;
+  };
+  trialDaysLeft: number;
+  activeReferrals: number;
+  discountPercentage: number;
+  finalFee: number;
+}
+
+export interface UpdateTenantPlanDTO {
+  planType?: TenantPlanType;
+  status?: TenantStatus;
+  extendDays?: number;
+  basePrice?: number;
 }
 

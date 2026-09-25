@@ -21,6 +21,7 @@ import PublicBooking from './pages/PublicBooking';
 import PublicStore from './pages/PublicStore';
 import PublicAppointmentManage from './pages/PublicAppointmentManage';
 import FeedbackPage from './pages/Feedback';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { ImageViewerProvider } from './context/ImageViewerContext';
 import { UserRole } from '@nutrideli/shared-types';
@@ -73,6 +74,15 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const { isAuthenticated, isLoading } = useContext(AuthContext);
   if (isLoading) return null;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+};
+
+const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading, user } = useContext(AuthContext);
+  if (isLoading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || user?.email === 'superadmin@flujofino.com';
+  if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
 };
 
 const App: React.FC = () => {
@@ -136,6 +146,7 @@ const MainLayout: React.FC = () => {
         <Route path="/reservations" element={<PrivateRoute><Reservations /></PrivateRoute>} />
         <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
         <Route path="/feedback" element={<PrivateRoute><FeedbackPage /></PrivateRoute>} />
+        <Route path="/platform-admin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
       </IonRouterOutlet>
     </IonSplitPane>
   );

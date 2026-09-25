@@ -38,7 +38,8 @@ import {
   chevronDownOutline,
   checkmarkCircleOutline,
   chatbubbleOutline,
-  personCircleOutline
+  personCircleOutline,
+  shieldCheckmarkOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 
@@ -143,6 +144,16 @@ const Menu: React.FC = () => {
     appPages = appPages.filter(p => ['/orders'].includes(p.url));
   } else if (user?.role === UserRole.INVENTORY) {
     appPages = appPages.filter(p => ['/raw-materials', '/products'].includes(p.url));
+  }
+
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || user?.email === 'superadmin@flujofino.com';
+  if (isSuperAdmin) {
+    appPages.unshift({
+      title: 'Plataforma SaaS',
+      url: '/platform-admin',
+      iosIcon: shieldCheckmarkOutline,
+      mdIcon: shieldCheckmarkOutline,
+    });
   }
 
   const acceptedWorkspaces = workspaces.filter(w => !w.status || w.status === 'ACCEPTED');

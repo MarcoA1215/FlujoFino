@@ -7,6 +7,7 @@ import { Preferences } from '@capacitor/preferences';
 interface User {
   id: string;
   username: string;
+  email?: string;
   role: UserRole;
   tenantId?: string;
   tenantName?: string;

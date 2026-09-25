@@ -245,7 +245,7 @@ export class AuthService {
   }
 
   async login(user: any, tenantId: string, role: string, tenantName?: string) {
-    const payload = { username: user.username, sub: user.id, role: role, tenantId: tenantId, tenantName: tenantName || 'Flujo Fino' };
+    const payload = { username: user.username, email: user.email, sub: user.id, role: role, tenantId: tenantId, tenantName: tenantName || 'Flujo Fino' };
     return {
       access_token: this.jwtService.sign(payload),
       user: payload
@@ -258,10 +258,18 @@ export class AuthService {
     await queryRunner.startTransaction();
 
     try {
-      // 1. Create Tenant
+      // 1. Create Tenant with SaaS subscription details (15-day trial)
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 15);
+
       const tenant = queryRunner.manager.create('Tenant', {
         name: body.tenantName,
         isActive: true,
+        status: 'TRIAL',
+        plan_type: 'REGULAR',
+        trial_ends_at: trialEndsAt,
+        referred_by_tenant_id: body.referredByTenantId || null,
+        base_price: 20.00,
       });
       const savedTenant: any = await queryRunner.manager.save(tenant);
 
