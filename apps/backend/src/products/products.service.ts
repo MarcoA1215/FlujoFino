@@ -153,8 +153,21 @@ export class ProductsService {
       if (dto.is_service !== undefined) {
         product.is_service = dto.is_service;
       }
+      if (dto.product_type !== undefined) {
+        product.product_type = dto.product_type;
+      }
 
       Object.assign(product, dto);
+
+      if (product.product_type === 'SERVICIO' || product.is_service === true) {
+        product.stock = 0;
+        product.stockQuantity = 0;
+        product.physicalStock = 0;
+        product.cost = 0;
+        product.is_service = true;
+        product.product_type = 'SERVICIO';
+      }
+
       return manager.save(Product, product);
     });
   }

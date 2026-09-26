@@ -78,8 +78,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       if (p.isPreAssembled && onAdjustStock) {
         buttons.push({ text: 'Ajustar Stock Ensamblado', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) });
       }
+    } else if (isService) {
+      if (featureRecipes) {
+        buttons.push({ 
+          text: 'Configurar Insumos del Servicio', 
+          icon: buildOutline, 
+          cssClass: 'action-sheet-editar', 
+          handler: () => onConfigure(p) 
+        });
+      }
     }
-    // NOTA: Para SERVICIOS no se agrega ninguna opción de stock, fórmulas ni insumos.
 
     if (onConvertType) {
       if (currentType !== 'REVENTA' && featureBuySell) {
@@ -243,6 +251,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 {isService && (
                   <IonBadge color="success" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
                     Disponible
+                  </IonBadge>
+                )}
+                {isService && p.recipe && p.recipe.length > 0 && (
+                  <IonBadge color="tertiary" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                    🧪 {p.recipe.length} insumos
                   </IonBadge>
                 )}
                 {p.durationMinutes ? (
