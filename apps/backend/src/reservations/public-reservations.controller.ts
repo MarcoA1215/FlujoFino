@@ -251,14 +251,22 @@ export class PublicReservationsController {
     // This is fine for small to medium scale. For huge scale, we'd need a unified view or unified table.
     
     const products = await productRepo.find({ where: { tenantId: id } });
-    const productImages = products
+    const serviceProducts = products.filter(p => {
+      if (p.product_type === 'SERVICIO') return true;
+      if (p.product_type === 'REVENTA' || p.product_type === 'FORMULA') return false;
+      return p.is_service === true || p.category === 'Servicios';
+    });
+
+    const productImages = serviceProducts
       .filter(p => p.images && p.images.length > 0)
       .flatMap(p => p.images.map((img, i) => ({
         id: `prod-${p.id}-${i}`,
-        type: 'product',
+        type: 'service',
+        productId: p.id,
+        badge: 'Servicio',
         url: img,
         title: p.name,
-        subtitle: `Precio: $${p.salePrice.toFixed(2)}`,
+        subtitle: `Precio: $${Number(p.salePrice || 0).toFixed(2)}${p.durationMinutes ? ` • ${p.durationMinutes} min` : ''}`,
         date: p.updatedAt // Approximated
       })));
 
@@ -272,9 +280,10 @@ export class PublicReservationsController {
       .flatMap(oi => oi.media.map(m => ({
         id: `media-${m.id}`,
         type: 'work',
+        badge: 'Trabajo Realizado',
         url: m.imageUrl,
         title: oi.productName || 'Trabajo Realizado',
-        subtitle: oi.order?.customerName ? `Para: ${oi.order.customerName}` : 'Trabajo completado',
+        subtitle: oi.order?.customerName ? `Cliente: ${oi.order.customerName}` : 'Trabajo completado',
         date: m.createdAt
       })));
 

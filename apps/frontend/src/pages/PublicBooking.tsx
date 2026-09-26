@@ -78,6 +78,7 @@ const PublicBooking: React.FC = () => {
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
   const [catalogPage, setCatalogPage] = useState(1);
   const [hasMoreCatalog, setHasMoreCatalog] = useState(true);
+  const [portfolioTab, setPortfolioTab] = useState<'ALL' | 'SERVICE' | 'WORK'>('ALL');
 
   const fetchCatalog = async (page: number, append = false) => {
     try {
@@ -787,35 +788,135 @@ const PublicBooking: React.FC = () => {
       <IonModal isOpen={showCatalog} onDidDismiss={() => setShowCatalog(false)}>
         <IonHeader>
           <IonToolbar color="primary">
-            <IonTitle>Portafolio / Catálogo</IonTitle>
+            <IonTitle>Portafolio y Trabajos</IonTitle>
             <IonButtons slot="end">
               <IonButton onClick={() => setShowCatalog(false)}>Cerrar</IonButton>
             </IonButtons>
           </IonToolbar>
         </IonHeader>
-        <IonContent style={{ backgroundColor: '#f4f5f8' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', padding: '10px' }}>
-            {catalogItems.map(item => (
-              <IonCard key={item.id} style={{ margin: 0, padding: 0 }}>
-                <img 
-                  src={item.url} 
-                  style={{ width: '100%', height: '150px', objectFit: 'cover', cursor: 'zoom-in' }} 
-                  alt={item.title} 
-                  onClick={() => openImage(item.url, `${item.title}${item.subtitle ? ' - ' + item.subtitle : ''}`)}
-                  title="Toca para ver en grande"
-                />
-                <IonCardContent style={{ padding: '10px' }}>
-                  <h3 style={{ margin: '0 0 5px 0', fontSize: '14px', fontWeight: 'bold', lineHeight: '1.2' }}>{item.title}</h3>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>{item.subtitle}</p>
-                </IonCardContent>
-              </IonCard>
-            ))}
+        <IonContent style={{ backgroundColor: '#f8fafc' }}>
+          {/* Filter Pills */}
+          <div style={{ display: 'flex', gap: '8px', padding: '12px 14px', overflowX: 'auto', backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+            <button
+              onClick={() => setPortfolioTab('ALL')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '20px',
+                border: portfolioTab === 'ALL' ? '2px solid var(--ion-color-primary)' : '1px solid #cbd5e1',
+                backgroundColor: portfolioTab === 'ALL' ? '#eff6ff' : '#f8fafc',
+                color: portfolioTab === 'ALL' ? 'var(--ion-color-primary)' : '#475569',
+                fontWeight: 'bold',
+                fontSize: '12px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Todos ({catalogItems.length})
+            </button>
+            <button
+              onClick={() => setPortfolioTab('SERVICE')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '20px',
+                border: portfolioTab === 'SERVICE' ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                backgroundColor: portfolioTab === 'SERVICE' ? '#dbeafe' : '#f8fafc',
+                color: portfolioTab === 'SERVICE' ? '#1d4ed8' : '#475569',
+                fontWeight: 'bold',
+                fontSize: '12px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              💅 Servicios ({catalogItems.filter(i => i.type === 'service').length})
+            </button>
+            <button
+              onClick={() => setPortfolioTab('WORK')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '20px',
+                border: portfolioTab === 'WORK' ? '2px solid #059669' : '1px solid #cbd5e1',
+                backgroundColor: portfolioTab === 'WORK' ? '#d1fae5' : '#f8fafc',
+                color: portfolioTab === 'WORK' ? '#047857' : '#475569',
+                fontWeight: 'bold',
+                fontSize: '12px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              ✨ Trabajos Realizados ({catalogItems.filter(i => i.type === 'work').length})
+            </button>
           </div>
+
+          {/* Cards Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', padding: '12px' }}>
+            {catalogItems
+              .filter(item => {
+                if (portfolioTab === 'SERVICE') return item.type === 'service';
+                if (portfolioTab === 'WORK') return item.type === 'work';
+                return true;
+              })
+              .map(item => (
+                <IonCard key={item.id} style={{ margin: 0, padding: 0, borderRadius: '12px', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                  <div style={{ position: 'relative' }}>
+                    <img 
+                      src={item.url} 
+                      style={{ width: '100%', height: '150px', objectFit: 'cover', cursor: 'zoom-in', display: 'block' }} 
+                      alt={item.title} 
+                      onClick={() => openImage(item.url, `${item.title}${item.subtitle ? ' - ' + item.subtitle : ''}`)}
+                      title="Toca para ver en grande"
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      top: '8px',
+                      left: '8px',
+                      backgroundColor: item.type === 'service' ? 'rgba(37, 99, 235, 0.92)' : 'rgba(5, 150, 105, 0.92)',
+                      color: '#ffffff',
+                      fontSize: '10px',
+                      fontWeight: '700',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      backdropFilter: 'blur(4px)',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      zIndex: 2,
+                    }}>
+                      {item.type === 'service' ? '💅 Servicio' : '✨ Trabajo'}
+                    </div>
+                  </div>
+                  <IonCardContent style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#1e293b', lineHeight: '1.3' }}>{item.title}</h3>
+                      <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>{item.subtitle}</p>
+                    </div>
+                    {item.type === 'service' && item.productId && (
+                      <IonButton 
+                        size="small" 
+                        expand="block" 
+                        color="primary"
+                        style={{ marginTop: '10px', fontSize: '11px', fontWeight: 'bold', height: '32px' }}
+                        onClick={() => {
+                          const svc = availableServices.find((s: any) => s.id === item.productId);
+                          if (svc) {
+                            setSelectedService(svc);
+                          }
+                          setShowCatalog(false);
+                          setStep(1);
+                        }}
+                      >
+                        Agendar Este
+                      </IonButton>
+                    )}
+                  </IonCardContent>
+                </IonCard>
+              ))}
+          </div>
+
           {catalogItems.length === 0 && (
-            <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-              Aún no hay trabajos en el portafolio.
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
+              <IonIcon icon={imagesOutline} style={{ fontSize: '48px', color: '#cbd5e1', marginBottom: '8px' }} />
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: '500' }}>Aún no hay trabajos ni servicios en el portafolio.</p>
             </div>
           )}
+
           <IonInfiniteScroll onIonInfinite={loadMoreCatalog} disabled={!hasMoreCatalog}>
             <IonInfiniteScrollContent loadingSpinner="bubbles" loadingText="Cargando más..." />
           </IonInfiniteScroll>
