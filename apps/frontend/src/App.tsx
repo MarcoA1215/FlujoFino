@@ -46,11 +46,14 @@ const HomeRedirector: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useContext(AuthContext);
   if (isLoading) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!user?.tenantId) return <Navigate to="/select-workspace" replace />;
-  
-  if (user?.role === UserRole.SUPERADMIN || user?.email === 'superadmin@flujofino.com') {
+
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
+  if (isSuperAdmin) {
     return <Navigate to="/platform-admin" replace />;
   }
+  
+  if (!user?.tenantId) return <Navigate to="/select-workspace" replace />;
+  
   if (user?.role === UserRole.POS) return <Navigate to="/pos" replace />;
   if (user?.role === UserRole.KITCHEN) return <Navigate to="/orders" replace />;
   if (user?.role === UserRole.DELIVERY) return <Navigate to="/orders" replace />;
@@ -83,7 +86,7 @@ const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const { isAuthenticated, isLoading, user } = useContext(AuthContext);
   if (isLoading) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || user?.email === 'superadmin@flujofino.com';
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
   if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
@@ -122,9 +125,10 @@ const MainLayout: React.FC = () => {
                         location.pathname.startsWith('/store') || 
                         location.pathname.startsWith('/tienda') || 
                         location.pathname.startsWith('/appointment');
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
 
   return (
-    <IonSplitPane contentId="main" when={!isPublicRoute && user?.tenantId ? 'md' : false}>
+    <IonSplitPane contentId="main" when={!isPublicRoute && (user?.tenantId || isSuperAdmin) ? 'md' : false}>
       {!isPublicRoute && <Menu />}
       <IonRouterOutlet id="main">
         <Route path="/book/:tenantId" element={<PublicBooking />} />

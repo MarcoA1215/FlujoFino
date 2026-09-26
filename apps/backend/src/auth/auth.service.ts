@@ -5,6 +5,7 @@ import * as bcrypt from 'bcryptjs';
 import { DataSource } from 'typeorm';
 import { Settings } from '../entities/settings.entity';
 import { AccessRequest, AccessRequestStatus } from '../entities/access-request.entity';
+import { UserRole } from '@nutrideli/shared-types';
 
 function toMinutes(hhmm: string): number {
   const parts = hhmm.split(':');
@@ -63,19 +64,32 @@ export class AuthService {
     const { passwordHash, ...result } = user;
     
     // Build workspaces list for the frontend
-    const workspaces = user.tenantAccess.map(a => ({
+    const workspaces = (user.tenantAccess || []).map(a => ({
       tenantId: a.tenantId,
       name: a.tenant?.name || 'Sucursal',
       role: a.role,
       status: a.status
     }));
 
+    // Check if user is SuperAdmin
+    const isSuperAdmin = user.role === UserRole.SUPERADMIN || (user.role as string) === 'SUPERADMIN' || (user.email && user.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || 'superadmin@flujofino.com').toLowerCase());
+    if (isSuperAdmin) {
+      let activeAccess = requestedTenantId ? user.tenantAccess?.find(a => a.tenantId === requestedTenantId) : user.tenantAccess?.[0];
+      return {
+        user: result,
+        tenantId: requestedTenantId || (activeAccess?.tenantId || 'platform-admin'),
+        role: UserRole.SUPERADMIN,
+        tenantName: activeAccess?.tenant?.name || 'Plataforma Global',
+        workspaces
+      };
+    }
+
     // Find the first accepted active tenant to issue the default token
     let access: any;
     if (requestedTenantId) {
-      access = user.tenantAccess.find(a => a.tenantId === requestedTenantId && a.isActive && a.status === 'ACCEPTED');
+      access = (user.tenantAccess || []).find(a => a.tenantId === requestedTenantId && a.isActive && a.status === 'ACCEPTED');
     } else {
-      access = user.tenantAccess.find(a => a.isActive && a.status === 'ACCEPTED');
+      access = (user.tenantAccess || []).find(a => a.isActive && a.status === 'ACCEPTED');
     }
 
     const pending = workspaces.filter(w => w.status === 'PENDING');
@@ -90,7 +104,7 @@ export class AuthService {
     }
 
     if (!access) {
-      if (user.role === 'ADMIN') {
+      if ((user.role as string) === 'ADMIN' || isSuperAdmin) {
         return { user: result, tenantId: requestedTenantId || 'admin-system', role: user.role, tenantName: 'Sistema Central', workspaces };
       }
       throw new UnauthorizedException('El usuario no tiene acceso a ninguna sucursal');
@@ -225,16 +239,33 @@ export class AuthService {
     const user = await this.usersService.findByUsername(username);
     if (!user) throw new UnauthorizedException('Usuario no encontrado');
 
-    const access = user.tenantAccess.find(a => a.tenantId === requestedTenantId && a.isActive && a.status === 'ACCEPTED');
-    if (!access) throw new UnauthorizedException('No tiene acceso a esta sucursal o no ha aceptado la invitación');
-
+    const isSuperAdmin = user.role === UserRole.SUPERADMIN || (user.role as string) === 'SUPERADMIN' || (user.email && user.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || 'superadmin@flujofino.com').toLowerCase());
     const { passwordHash, ...result } = user;
-    const workspaces = user.tenantAccess.map(a => ({
+    const workspaces = (user.tenantAccess || []).map(a => ({
       tenantId: a.tenantId,
       name: a.tenant?.name || 'Sucursal',
       role: a.role,
       status: a.status
     }));
+
+    if (isSuperAdmin) {
+      let tenantName = 'Plataforma Global';
+      if (requestedTenantId && requestedTenantId !== 'platform-admin') {
+        const tenantRepo = this.dataSource.getRepository('Tenant');
+        const t: any = await tenantRepo.findOne({ where: { id: requestedTenantId } });
+        if (t) tenantName = t.name;
+      }
+      return {
+        user: result,
+        tenantId: requestedTenantId,
+        role: UserRole.SUPERADMIN,
+        tenantName,
+        workspaces
+      };
+    }
+
+    const access = (user.tenantAccess || []).find(a => a.tenantId === requestedTenantId && a.isActive && a.status === 'ACCEPTED');
+    if (!access) throw new UnauthorizedException('No tiene acceso a esta sucursal o no ha aceptado la invitación');
 
     const approvalCheck = await this.checkEmployeeAccess(user, access, workspaces);
     if (approvalCheck) {
@@ -355,7 +386,21 @@ export class AuthService {
 
   async getWorkspaces(username: string): Promise<any[]> {
     const user = await this.usersService.findByUsername(username);
-    if (!user || !user.tenantAccess) return [];
+    if (!user) return [];
+
+    const isSuperAdmin = user.role === UserRole.SUPERADMIN || (user.role as string) === 'SUPERADMIN' || (user.email && user.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || 'superadmin@flujofino.com').toLowerCase());
+    if (isSuperAdmin) {
+      const tenantRepo = this.dataSource.getRepository('Tenant');
+      const allTenants: any[] = await tenantRepo.find({ order: { name: 'ASC' } });
+      return allTenants.map(t => ({
+        tenantId: t.id,
+        name: t.name,
+        role: 'SUPERADMIN',
+        status: 'ACCEPTED'
+      }));
+    }
+
+    if (!user.tenantAccess) return [];
     return user.tenantAccess.map(a => ({
       tenantId: a.tenantId,
       name: a.tenant?.name || 'Sucursal',

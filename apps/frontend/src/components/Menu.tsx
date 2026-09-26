@@ -82,7 +82,9 @@ const Menu: React.FC = () => {
     }
   }, [isAuthenticated, user?.tenantId]);
 
-  if (!isAuthenticated || !user?.tenantId || location.pathname === '/select-workspace' || location.pathname.startsWith('/book') || location.pathname.startsWith('/appointment') || location.pathname.startsWith('/store')) {
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
+
+  if (!isAuthenticated || (!user?.tenantId && !isSuperAdmin) || location.pathname === '/select-workspace' || location.pathname.startsWith('/book') || location.pathname.startsWith('/appointment') || location.pathname.startsWith('/store')) {
     return null;
   }
   
@@ -146,14 +148,12 @@ const Menu: React.FC = () => {
     appPages = appPages.filter(p => ['/raw-materials', '/products'].includes(p.url));
   }
 
-  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || user?.email === 'superadmin@flujofino.com';
   if (isSuperAdmin) {
     appPages = [
       { title: 'Plataforma SaaS', url: '/platform-admin', iosIcon: shieldCheckmarkOutline, mdIcon: shieldCheckmarkOutline },
       { title: 'Mensajes de Soporte', url: '/feedback', iosIcon: chatbubbleOutline, mdIcon: chatbubbleOutline },
     ];
   }
-
 
   const acceptedWorkspaces = workspaces.filter(w => !w.status || w.status === 'ACCEPTED');
   const displayWorkspaces = acceptedWorkspaces.length > 0 ? acceptedWorkspaces : [
@@ -171,7 +171,6 @@ const Menu: React.FC = () => {
           <button 
             type="button"
             onClick={() => {
-              if (isSuperAdmin) return;
               loadWorkspaces();
               setShowBranchModal(true);
             }}
@@ -195,7 +194,7 @@ const Menu: React.FC = () => {
             <span style={{ fontSize: '14px', fontWeight: '700', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {isSuperAdmin ? 'Plataforma Flujo Fino' : (user?.tenantName || 'Flujo Fino')}
             </span>
-            {!isSuperAdmin && <IonIcon icon={chevronDownOutline} style={{ fontSize: '13px', color: '#64748b' }} />}
+            <IonIcon icon={chevronDownOutline} style={{ fontSize: '13px', color: '#64748b' }} />
           </button>
 
           <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#64748b' }}>
@@ -243,6 +242,41 @@ const Menu: React.FC = () => {
             </p>
 
             <IonList style={{ background: 'transparent' }}>
+              {isSuperAdmin && (
+                <IonItem
+                  button
+                  detail={false}
+                  disabled={isSwitching}
+                  onClick={() => handleSwitchTenant('platform-admin')}
+                  style={{
+                    '--background': user?.tenantId === 'platform-admin' ? '#eff6ff' : '#ffffff',
+                    marginBottom: '10px',
+                    borderRadius: '12px',
+                    border: user?.tenantId === 'platform-admin' ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  } as any}
+                >
+                  <IonIcon 
+                    icon={shieldCheckmarkOutline} 
+                    slot="start" 
+                    color={user?.tenantId === 'platform-admin' ? 'primary' : 'medium'} 
+                    style={{ fontSize: '24px' }}
+                  />
+                  <IonLabel>
+                    <h2 style={{ fontWeight: user?.tenantId === 'platform-admin' ? 'bold' : '600', color: '#1e293b' }}>
+                      Plataforma Global (SaaS)
+                    </h2>
+                    <p style={{ color: '#64748b', fontSize: '13px' }}>
+                      Panel administrativo de SuperAdmin
+                    </p>
+                  </IonLabel>
+                  {user?.tenantId === 'platform-admin' ? (
+                    <IonBadge slot="end" color="primary">Actual</IonBadge>
+                  ) : (
+                    <IonBadge slot="end" color="light">Ingresar</IonBadge>
+                  )}
+                </IonItem>
+              )}
               {displayWorkspaces.map((w: any) => {
                 const isCurrent = w.tenantId === user?.tenantId;
                 return (

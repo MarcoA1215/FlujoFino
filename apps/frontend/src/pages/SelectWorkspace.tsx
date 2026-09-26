@@ -1,9 +1,10 @@
 import React, { useContext } from 'react';
 import { IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, IonListHeader, useIonToast } from '@ionic/react';
 import { useIonRouter } from '@ionic/react';
-import { businessOutline } from 'ionicons/icons';
+import { businessOutline, shieldCheckmarkOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
+import { UserRole } from '@nutrideli/shared-types';
 
 const SelectWorkspace: React.FC = () => {
   const { user, login, logout } = useContext(AuthContext);
@@ -54,6 +55,7 @@ const SelectWorkspace: React.FC = () => {
     }
   };
 
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
   const workspaces = user?.workspaces || [];
   const pending = workspaces.filter((w: any) => w.status === 'PENDING');
   const active = workspaces.filter((w: any) => w.status === 'ACCEPTED');
@@ -71,6 +73,20 @@ const SelectWorkspace: React.FC = () => {
               <p style={{ margin: '5px 0 0 0', color: 'gray' }}>¿A dónde quieres entrar?</p>
             </IonCardHeader>
             <IonCardContent>
+              {isSuperAdmin && (
+                <div style={{ marginBottom: '16px' }}>
+                  <IonButton 
+                    expand="block" 
+                    color="secondary" 
+                    style={{ fontWeight: 'bold' }}
+                    onClick={() => router.push('/platform-admin', 'root', 'replace')}
+                  >
+                    <IonIcon icon={shieldCheckmarkOutline} slot="start" />
+                    Panel de SuperAdmin (SaaS)
+                  </IonButton>
+                </div>
+              )}
+
               {pending.length > 0 && (
                 <IonList>
                   <IonListHeader>Invitaciones Pendientes</IonListHeader>
@@ -108,8 +124,26 @@ const SelectWorkspace: React.FC = () => {
 
               {workspaces.length === 0 && (
                 <div className="ion-text-center ion-padding">
-                  <p>No tienes acceso a ninguna sucursal.</p>
-                  <IonButton fill="clear" onClick={() => router.push('/login', 'root', 'replace')}>Volver</IonButton>
+                  {isSuperAdmin ? (
+                    <>
+                      <p style={{ color: '#475569', fontSize: '14px', marginBottom: '14px' }}>
+                        Tienes rol de <strong>SuperAdmin</strong> sobre toda la plataforma.
+                      </p>
+                      <IonButton 
+                        expand="block" 
+                        color="primary" 
+                        onClick={() => router.push('/platform-admin', 'root', 'replace')}
+                      >
+                        <IonIcon icon={shieldCheckmarkOutline} slot="start" />
+                        Ir a Administración de Plataforma
+                      </IonButton>
+                    </>
+                  ) : (
+                    <>
+                      <p>No tienes acceso a ninguna sucursal.</p>
+                      <IonButton fill="clear" onClick={() => router.push('/login', 'root', 'replace')}>Volver</IonButton>
+                    </>
+                  )}
                 </div>
               )}
             </IonCardContent>
