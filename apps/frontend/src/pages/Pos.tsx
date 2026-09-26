@@ -369,6 +369,45 @@ const Pos: React.FC = () => {
       return;
     }
 
+    if (paymentMethod === 'PUNTO' && !puntoRef.trim()) {
+      presentToast({ message: 'Por favor ingresa la referencia o voucher del Punto de Venta', duration: 2500, color: 'warning' });
+      return;
+    }
+
+    if (paymentMethod === 'BINANCE' && !binanceRef.trim()) {
+      presentToast({ message: 'Por favor ingresa el ID de transacción de Binance Pay', duration: 2500, color: 'warning' });
+      return;
+    }
+
+    if (paymentMethod === 'TRANSFER' && !transferRef.trim()) {
+      presentToast({ message: 'Por favor ingresa la referencia de la Transferencia', duration: 2500, color: 'warning' });
+      return;
+    }
+
+    if (deliveryMethod === DeliveryMethod.DELIVERY && !deliveryZoneId) {
+      presentToast({ message: 'Por favor selecciona la zona de delivery', duration: 2500, color: 'warning' });
+      return;
+    }
+
+    if (paymentMethod === 'PENDING') {
+      const minPct = Number(settings?.minDepositPercentage || 0);
+      const canBypassDeposit = (settings?.allowCashierBypassDeposit !== false) || (user?.role === UserRole.ADMIN);
+      const isBypassed = bypassMinDeposit && canBypassDeposit;
+      const minRequired = isBypassed || minPct === 0 ? 0 : (totalCart * (minPct / 100));
+      const abonoNum = parseFloat(initialAbono) || 0;
+
+      if (!isBypassed && minRequired > 0 && abonoNum < minRequired) {
+        presentToast({
+          message: `El anticipo mínimo requerido es de $${minRequired.toFixed(2)} (${minPct}% del total).`,
+          duration: 3500,
+          color: 'warning'
+        });
+        return;
+      }
+    }
+
+    const abonoAmount = paymentMethod === 'PENDING' ? (parseFloat(initialAbono) || 0) : 0;
+
     const payload: any = {
       customerName: customerName.trim() || 'Cliente Mostrador',
       customerPhone: customerPhone.trim() || undefined,
@@ -378,7 +417,9 @@ const Pos: React.FC = () => {
       deliveryZoneId: deliveryMethod === DeliveryMethod.DELIVERY ? deliveryZoneId || undefined : undefined,
       employeeId: employeeId || undefined,
       paymentMethod,
-      paymentStatus: paymentMethod === 'PENDING' ? PaymentStatus.PENDING : PaymentStatus.PAID,
+      paymentStatus: paymentMethod === 'PENDING'
+        ? (abonoAmount >= totalCart ? PaymentStatus.PAID : (abonoAmount > 0 ? PaymentStatus.PARTIAL : PaymentStatus.PENDING))
+        : PaymentStatus.PAID,
       items: cart.map(item => ({
         productId: item.product.id,
         quantity: item.quantity,
@@ -396,14 +437,11 @@ const Pos: React.FC = () => {
       transferRef: paymentMethod === 'TRANSFER' ? transferRef : undefined,
       transferBank: paymentMethod === 'TRANSFER' ? transferBank : undefined,
       usdReceived: paymentMethod === 'USD' && typeof usdReceived === 'number' ? usdReceived : undefined,
+      initialAbono: paymentMethod === 'PENDING' ? abonoAmount : undefined,
+      bypassMinDeposit: paymentMethod === 'PENDING' ? bypassMinDeposit : undefined,
       exchangeRateBs: exchangeRate,
       linkedReservationId: linkedReservationId || undefined
     };
-
-    if (paymentMethod === 'PENDING' && initialAbono && parseFloat(initialAbono) > 0) {
-      payload.initialAbono = parseFloat(initialAbono);
-      payload.bypassMinDeposit = bypassMinDeposit;
-    }
 
     const isOffline = !navigator.onLine || localStorage.getItem('flujofino_simulating_offline') === 'true';
 
@@ -438,7 +476,11 @@ const Pos: React.FC = () => {
         setPuntoRef('');
         setBinanceRef('');
         setTransferRef('');
+        setTransferBank('');
         setUsdReceived('');
+        setInitialAbono('');
+        setBypassMinDeposit(false);
+        setDiscountValue('');
         setShowCheckoutModal(false);
         setLinkedReservationId(null);
         return;
@@ -468,7 +510,11 @@ const Pos: React.FC = () => {
       setPuntoRef('');
       setBinanceRef('');
       setTransferRef('');
+      setTransferBank('');
       setUsdReceived('');
+      setInitialAbono('');
+      setBypassMinDeposit(false);
+      setDiscountValue('');
       setShowCheckoutModal(false);
       setEditingOrderId(null);
       setLinkedReservationId(null);
@@ -829,30 +875,188 @@ const Pos: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Cliente / Mesa Input */}
-                <div style={{ marginBottom: '16px' }}>
+                {/* 1. Canal de Entrega (En Tienda vs Delivery) */}
+                <div style={{ marginBottom: '14px' }}>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '6px' }}>
-                    Cliente / Mesa
+                    Canal de Entrega
                   </label>
-                  <input
-                    type="text"
-                    value={customerName}
-                    onChange={e => setCustomerName(e.target.value)}
-                    placeholder="Ej. Mesa 4 - Carlos Mendoza"
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid #E2E8F0',
-                      outline: 'none',
-                      fontSize: '14px',
-                      color: '#0F172A',
-                      background: '#ffffff'
-                    }}
-                  />
+                  <div style={{ display: 'flex', background: '#F1F5F9', padding: '3px', borderRadius: '12px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryMethod(DeliveryMethod.IN_STORE)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        fontWeight: '700',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        background: deliveryMethod === DeliveryMethod.IN_STORE ? '#10B981' : 'transparent',
+                        color: deliveryMethod === DeliveryMethod.IN_STORE ? '#ffffff' : '#64748B',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      🏪 En Tienda / Mesa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryMethod(DeliveryMethod.DELIVERY)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        fontWeight: '700',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        background: deliveryMethod === DeliveryMethod.DELIVERY ? '#10B981' : 'transparent',
+                        color: deliveryMethod === DeliveryMethod.DELIVERY ? '#ffffff' : '#64748B',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      🛵 Delivery
+                    </button>
+                  </div>
                 </div>
 
-                {/* 2x2 Payment Method Grid (Figma Selector) */}
+                {/* Delivery Zone & Shipping Info */}
+                {deliveryMethod === DeliveryMethod.DELIVERY && (
+                  <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '12px', marginBottom: '14px' }}>
+                    <div style={{ marginBottom: '10px' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                        Zona de Envío *
+                      </label>
+                      <select
+                        value={deliveryZoneId}
+                        onChange={e => setDeliveryZoneId(e.target.value)}
+                        style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#ffffff', fontSize: '13px', color: '#0F172A' }}
+                      >
+                        <option value="">Selecciona zona de envío...</option>
+                        {deliveryZones.map(z => (
+                          <option key={z.id} value={z.id}>
+                            {z.name} (+${Number(z.feePrice).toFixed(2)})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                          Teléfono WhatsApp
+                        </label>
+                        <input
+                          type="tel"
+                          value={customerPhone}
+                          onChange={e => setCustomerPhone(e.target.value)}
+                          placeholder="0412..."
+                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                          Dirección de Entrega
+                        </label>
+                        <input
+                          type="text"
+                          value={customerAddress}
+                          onChange={e => setCustomerAddress(e.target.value)}
+                          placeholder="Calle, Casa..."
+                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Cliente / Mesa / Empleado */}
+                <div style={{ display: 'grid', gridTemplateColumns: employees.length > 0 ? '1fr 1fr' : '1fr', gap: '10px', marginBottom: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '6px' }}>
+                      Cliente {deliveryMethod === DeliveryMethod.IN_STORE ? '/ Mesa' : ''}
+                    </label>
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={e => setCustomerName(e.target.value)}
+                      placeholder={deliveryMethod === DeliveryMethod.IN_STORE ? "Ej. Mesa 4 - Carlos" : "Nombre del cliente"}
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '12px',
+                        border: '1px solid #E2E8F0',
+                        outline: 'none',
+                        fontSize: '14px',
+                        color: '#0F172A',
+                        background: '#ffffff'
+                      }}
+                    />
+                  </div>
+
+                  {employees.length > 0 && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '6px' }}>
+                        Atendido por (Opcional)
+                      </label>
+                      <select
+                        value={employeeId}
+                        onChange={e => setEmployeeId(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '11px 14px',
+                          borderRadius: '12px',
+                          border: '1px solid #E2E8F0',
+                          outline: 'none',
+                          fontSize: '14px',
+                          color: '#0F172A',
+                          background: '#ffffff'
+                        }}
+                      >
+                        <option value="">Sin asignar</option>
+                        {employees.map(emp => (
+                          <option key={emp.id} value={emp.id}>
+                            {emp.name || emp.username} {emp.jobTitle ? `(${emp.jobTitle})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Descuento (Opcional) */}
+                <div style={{ marginBottom: '16px', background: '#F8FAFC', borderRadius: '12px', padding: '10px 12px', border: '1px solid #E2E8F0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#475569' }}>
+                      🏷️ Descuento Especial
+                    </span>
+                    {discountAmount > 0 && (
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: '#10B981' }}>
+                        - ${discountAmount.toFixed(2)} USD
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <select
+                      value={discountType}
+                      onChange={e => setDiscountType(e.target.value as any)}
+                      style={{ width: '100px', padding: '8px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#ffffff', fontSize: '12px', color: '#0F172A' }}
+                    >
+                      <option value="FIXED">$ Fijo</option>
+                      <option value="PERCENTAGE">% Porc.</option>
+                    </select>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={discountValue}
+                      onChange={e => setDiscountValue(e.target.value)}
+                      placeholder={discountType === 'FIXED' ? 'Monto ($)' : 'Porcentaje (%)'}
+                      style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#ffffff', color: '#0F172A' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Grid Dinámico de Métodos de Pago */}
                 <div style={{ marginBottom: '16px' }}>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '8px' }}>
                     Método de Pago
@@ -860,99 +1064,161 @@ const Pos: React.FC = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                     
                     {/* Pago Movil */}
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('PAGO_MOVIL')}
-                      style={{
-                        padding: '12px 10px',
-                        borderRadius: '12px',
-                        border: paymentMethod === 'PAGO_MOVIL' ? '2px solid #10B981' : '1px solid #E2E8F0',
-                        background: paymentMethod === 'PAGO_MOVIL' ? '#ECFDF5' : '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <IonIcon icon={phonePortraitOutline} style={{ fontSize: '18px', color: paymentMethod === 'PAGO_MOVIL' ? '#10B981' : '#64748B' }} />
-                      <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'PAGO_MOVIL' ? '#065F46' : '#0F172A' }}>
-                        Pago Móvil
-                      </span>
-                    </button>
+                    {settings?.acceptPagoMovil !== false && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('PAGO_MOVIL')}
+                        style={{
+                          padding: '12px 10px',
+                          borderRadius: '12px',
+                          border: paymentMethod === 'PAGO_MOVIL' ? '2px solid #10B981' : '1px solid #E2E8F0',
+                          background: paymentMethod === 'PAGO_MOVIL' ? '#ECFDF5' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <IonIcon icon={phonePortraitOutline} style={{ fontSize: '18px', color: paymentMethod === 'PAGO_MOVIL' ? '#10B981' : '#64748B' }} />
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'PAGO_MOVIL' ? '#065F46' : '#0F172A' }}>
+                          Pago Móvil
+                        </span>
+                      </button>
+                    )}
 
                     {/* Efectivo USD */}
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('USD')}
-                      style={{
-                        padding: '12px 10px',
-                        borderRadius: '12px',
-                        border: paymentMethod === 'USD' ? '2px solid #10B981' : '1px solid #E2E8F0',
-                        background: paymentMethod === 'USD' ? '#ECFDF5' : '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <IonIcon icon={cashOutline} style={{ fontSize: '18px', color: paymentMethod === 'USD' ? '#10B981' : '#64748B' }} />
-                      <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'USD' ? '#065F46' : '#0F172A' }}>
-                        Efectivo USD
-                      </span>
-                    </button>
+                    {settings?.acceptCashUsd !== false && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('USD')}
+                        style={{
+                          padding: '12px 10px',
+                          borderRadius: '12px',
+                          border: paymentMethod === 'USD' ? '2px solid #10B981' : '1px solid #E2E8F0',
+                          background: paymentMethod === 'USD' ? '#ECFDF5' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <IonIcon icon={cashOutline} style={{ fontSize: '18px', color: paymentMethod === 'USD' ? '#10B981' : '#64748B' }} />
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'USD' ? '#065F46' : '#0F172A' }}>
+                          Efectivo USD
+                        </span>
+                      </button>
+                    )}
 
                     {/* Punto de Venta */}
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('PUNTO')}
-                      style={{
-                        padding: '12px 10px',
-                        borderRadius: '12px',
-                        border: paymentMethod === 'PUNTO' ? '2px solid #10B981' : '1px solid #E2E8F0',
-                        background: paymentMethod === 'PUNTO' ? '#ECFDF5' : '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <IonIcon icon={cardOutline} style={{ fontSize: '18px', color: paymentMethod === 'PUNTO' ? '#10B981' : '#64748B' }} />
-                      <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'PUNTO' ? '#065F46' : '#0F172A' }}>
-                        Punto de Venta
-                      </span>
-                    </button>
+                    {settings?.acceptCardPos !== false && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('PUNTO')}
+                        style={{
+                          padding: '12px 10px',
+                          borderRadius: '12px',
+                          border: paymentMethod === 'PUNTO' ? '2px solid #10B981' : '1px solid #E2E8F0',
+                          background: paymentMethod === 'PUNTO' ? '#ECFDF5' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <IonIcon icon={cardOutline} style={{ fontSize: '18px', color: paymentMethod === 'PUNTO' ? '#10B981' : '#64748B' }} />
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'PUNTO' ? '#065F46' : '#0F172A' }}>
+                          Punto de Venta
+                        </span>
+                      </button>
+                    )}
 
                     {/* Binance Pay */}
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('BINANCE')}
-                      style={{
-                        padding: '12px 10px',
-                        borderRadius: '12px',
-                        border: paymentMethod === 'BINANCE' ? '2px solid #10B981' : '1px solid #E2E8F0',
-                        background: paymentMethod === 'BINANCE' ? '#ECFDF5' : '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <IonIcon icon={logoBitcoin} style={{ fontSize: '18px', color: paymentMethod === 'BINANCE' ? '#10B981' : '#64748B' }} />
-                      <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'BINANCE' ? '#065F46' : '#0F172A' }}>
-                        Binance
-                      </span>
-                    </button>
+                    {settings?.acceptBinance === true && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('BINANCE')}
+                        style={{
+                          padding: '12px 10px',
+                          borderRadius: '12px',
+                          border: paymentMethod === 'BINANCE' ? '2px solid #10B981' : '1px solid #E2E8F0',
+                          background: paymentMethod === 'BINANCE' ? '#ECFDF5' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <IonIcon icon={logoBitcoin} style={{ fontSize: '18px', color: paymentMethod === 'BINANCE' ? '#10B981' : '#64748B' }} />
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'BINANCE' ? '#065F46' : '#0F172A' }}>
+                          Binance
+                        </span>
+                      </button>
+                    )}
+
+                    {/* Transferencia Bancaria */}
+                    {settings?.acceptTransfer === true && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('TRANSFER')}
+                        style={{
+                          padding: '12px 10px',
+                          borderRadius: '12px',
+                          border: paymentMethod === 'TRANSFER' ? '2px solid #10B981' : '1px solid #E2E8F0',
+                          background: paymentMethod === 'TRANSFER' ? '#ECFDF5' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <IonIcon icon={cardOutline} style={{ fontSize: '18px', color: paymentMethod === 'TRANSFER' ? '#10B981' : '#64748B' }} />
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'TRANSFER' ? '#065F46' : '#0F172A' }}>
+                          Transferencia
+                        </span>
+                      </button>
+                    )}
+
+                    {/* Cuenta Abierta / Abonos / Por Pagar */}
+                    {settings?.allowPartialPayments !== false && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('PENDING')}
+                        style={{
+                          padding: '12px 10px',
+                          borderRadius: '12px',
+                          border: paymentMethod === 'PENDING' ? '2px solid #F59E0B' : '1px solid #E2E8F0',
+                          background: paymentMethod === 'PENDING' ? '#FEF3C7' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <IonIcon icon={timeOutline} style={{ fontSize: '18px', color: paymentMethod === 'PENDING' ? '#D97706' : '#64748B' }} />
+                        <div>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'PENDING' ? '#92400E' : '#0F172A', display: 'block' }}>
+                            Cuenta Abierta
+                          </span>
+                          <span style={{ fontSize: '10px', color: '#64748B' }}>
+                            Abono / Por Pagar
+                          </span>
+                        </div>
+                      </button>
+                    )}
+
                   </div>
                 </div>
 
                 {/* Dynamic Fields: Pago Móvil */}
                 {paymentMethod === 'PAGO_MOVIL' && (
                   <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '14px', marginBottom: '16px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
                           Referencia *
@@ -1047,6 +1313,125 @@ const Pos: React.FC = () => {
                     />
                   </div>
                 )}
+
+                {/* Dynamic Fields: Transferencia */}
+                {paymentMethod === 'TRANSFER' && (
+                  <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '14px', marginBottom: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                          N° Referencia *
+                        </label>
+                        <input
+                          type="text"
+                          value={transferRef}
+                          onChange={e => setTransferRef(e.target.value)}
+                          placeholder="Ej. 987654"
+                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                          Banco Emisor
+                        </label>
+                        <input
+                          type="text"
+                          value={transferBank}
+                          onChange={e => setTransferBank(e.target.value)}
+                          placeholder="Banesco, Mercantil..."
+                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Dynamic Fields: Cuenta Abierta / Abono Inicial (PENDING) */}
+                {paymentMethod === 'PENDING' && (() => {
+                  const canBypassDeposit = (settings?.allowCashierBypassDeposit !== false) || (user?.role === UserRole.ADMIN);
+                  const isBypassed = bypassMinDeposit && canBypassDeposit;
+                  const minPct = Number(settings?.minDepositPercentage || 0);
+                  const minRequiredUSD = minPct > 0 ? (totalCart * (minPct / 100)) : 0;
+                  const abonoNum = parseFloat(initialAbono) || 0;
+                  const saldoPendiente = Math.max(0, totalCart - abonoNum);
+                  const saldoPendienteBs = saldoPendiente * exchangeRate;
+
+                  return (
+                    <div style={{ background: '#FFFBEB', borderRadius: '16px', border: '1px solid #FDE68A', padding: '16px', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#92400E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <IonIcon icon={timeOutline} style={{ fontSize: '18px' }} />
+                          Abono Inicial / Cuenta Abierta
+                        </h4>
+                        {minPct > 0 && (
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            padding: '3px 8px',
+                            borderRadius: '8px',
+                            background: isBypassed ? '#ECFDF5' : '#FEF3C7',
+                            color: isBypassed ? '#065F46' : '#92400E',
+                            border: `1px solid ${isBypassed ? '#A7F3D0' : '#FCD34D'}`
+                          }}>
+                            {isBypassed ? 'Exonerado ($0)' : `Exige ${minPct}% ($${minRequiredUSD.toFixed(2)})`}
+                          </span>
+                        )}
+                      </div>
+
+                      {minPct > 0 && canBypassDeposit && (
+                        <div style={{ marginBottom: '12px', padding: '10px 12px', background: '#ffffff', borderRadius: '10px', border: '1px solid #FCD34D', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ flex: 1, paddingRight: '10px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: '700', color: '#92400E' }}>
+                              Exonerar anticipo
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#78350F' }}>
+                              Permite abrir cuenta con $0 (mesa de confianza o cliente habitual)
+                            </div>
+                          </div>
+                          <IonToggle
+                            checked={bypassMinDeposit}
+                            onIonChange={e => setBypassMinDeposit(e.detail.checked)}
+                            color="warning"
+                          />
+                        </div>
+                      )}
+
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#78350F', marginBottom: '4px' }}>
+                          Monto del Abono Inicial (USD)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={initialAbono}
+                          onChange={e => setInitialAbono(e.target.value)}
+                          placeholder={minPct > 0 && !isBypassed ? `Mínimo: $${minRequiredUSD.toFixed(2)}` : '0.00 (Opcional, puede ser $0)'}
+                          style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #FCD34D', fontSize: '15px', fontWeight: '700', background: '#ffffff', color: '#0F172A' }}
+                        />
+                      </div>
+
+                      {/* Saldo Breakdown Card */}
+                      <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #FCD34D', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#64748B' }}>Abono Hoy:</div>
+                          <div style={{ fontSize: '14px', fontWeight: '800', color: '#10B981' }}>
+                            ${abonoNum.toFixed(2)}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '11px', color: '#64748B' }}>Saldo por Cobrar:</div>
+                          <div style={{ fontSize: '16px', fontWeight: '900', color: '#D97706' }}>
+                            ${saldoPendiente.toFixed(2)} USD
+                          </div>
+                          <div style={{ fontSize: '11px', fontWeight: '700', color: '#92400E' }}>
+                            Bs. {saldoPendienteBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Big Action: Confirmar Pedido */}
                 <button
