@@ -145,6 +145,8 @@ const PublicStore: React.FC = () => {
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
+      if (p.isService) return false;
+      if (p.category?.toLowerCase() === 'servicios') return false;
       const matchCat =
         selectedCategory === 'TODOS' ||
         p.category?.toLowerCase() === selectedCategory.toLowerCase();

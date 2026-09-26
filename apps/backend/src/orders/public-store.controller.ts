@@ -47,9 +47,15 @@ export class PublicStoreController {
       order: { category: 'ASC', name: 'ASC' },
     });
 
-    // Filter products: keep retail/physical products or items intended for sale
-    const storeProducts = products.map((p) => {
-      const isService = p.is_service === true || (p.is_service !== false && p.category === 'Servicios');
+    // Excluimos estrictamente los servicios: la tienda online es exclusivamente para productos físicos de compra-venta y preparados (delivery / retiro)
+    const nonServiceProducts = products.filter((p) => {
+      if (p.product_type === 'SERVICIO') return false;
+      if (p.is_service === true) return false;
+      if (p.category === 'Servicios') return false;
+      return true;
+    });
+
+    const storeProducts = nonServiceProducts.map((p) => {
       const availableStock = Math.max(0, Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.stockQuantity || 0)));
 
       return {
@@ -65,8 +71,8 @@ export class PublicStoreController {
           : [],
         stockQuantity: availableStock,
         stock: availableStock,
-        isService,
-        isOutOfStock: !isService && availableStock <= 0,
+        isService: false,
+        isOutOfStock: availableStock <= 0,
       };
     });
 
