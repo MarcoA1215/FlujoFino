@@ -7,8 +7,15 @@ import { OrderStatus } from '@nutrideli/shared-types';
 @Controller('orders')
 export class OrdersController {
   @Post(':id/abono')
-  addAbono(@Request() req: any, @Param('id') id: string, @Body('amount') amount: number) {
-    return this.ordersService.addAbono(req.user.tenantId, id, amount);}
+  addAbono(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body('amount') amount: number,
+    @Body('method') method?: string,
+    @Body('ref') ref?: string
+  ) {
+    return this.ordersService.addAbono(req.user.tenantId, id, amount, method, ref);
+  }
 
   @Delete(':id/abono/:index')
   revertAbono(@Request() req: any, @Param('id') id: string, @Param('index') index: string) {

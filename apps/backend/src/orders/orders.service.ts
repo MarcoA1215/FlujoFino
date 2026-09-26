@@ -78,14 +78,20 @@ export class OrdersService {
     private readonly customersService: CustomersService,
   ) {}
 
-  async addAbono(tenantId: string, orderId: string, amount: number) {
+  async addAbono(tenantId: string, orderId: string, amount: number, method?: string, ref?: string) {
     if (amount <= 0) throw new BadRequestException('El monto debe ser mayor a 0');
     const order = await this.dataSource.getRepository(Order).findOne({ where: { tenantId, id: orderId } });
     if (!order) throw new Error("Order not found");
     const history = order.abonosHistory || [];
-    history.push({ id: Date.now().toString(), amount, date: new Date().toISOString() });
+    history.push({ 
+      id: Date.now().toString(), 
+      amount: Number(amount), 
+      method: method || 'USD',
+      ref: ref || undefined,
+      date: new Date().toISOString() 
+    });
     order.abonosHistory = history;
-    order.abonosTotal = (order.abonosTotal || 0) + amount;
+    order.abonosTotal = Number(((order.abonosTotal || 0) + Number(amount)).toFixed(2));
     if (order.abonosTotal >= order.totalAmount) {
       order.paymentStatus = PaymentStatus.PAID;
     } else if (order.abonosTotal > 0 && order.abonosTotal < order.totalAmount) {

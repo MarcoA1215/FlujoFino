@@ -103,9 +103,12 @@ const Orders: React.FC = () => {
   const [presentAlert] = useIonAlert();
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<any>(null);
   const [selectedOrderForPartial, setSelectedOrderForPartial] = useState<any>(null);
+  const [selectedOrderForAbono, setSelectedOrderForAbono] = useState<any>(null);
   const [partialDeliveries, setPartialDeliveries] = useState<{ [key: string]: number }>({});
   const [abonoAmount, setAbonoAmount] = useState<string>('');
   const [abonoCurrency, setAbonoCurrency] = useState<'USD' | 'VES'>('USD');
+  const [abonoMethod, setAbonoMethod] = useState<string>('USD');
+  const [abonoRef, setAbonoRef] = useState<string>('');
   const [settings, setSettings] = useState<any>({});
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('');
@@ -165,25 +168,34 @@ const Orders: React.FC = () => {
   };
 
   const openPaymentAlert = (order: Order) => {
-    const remaining = order.totalAmount - (order.abonosTotal || 0);
+    const remaining = Math.max(0, order.totalAmount - (order.abonosTotal || 0));
     const remainingBs = (remaining * exchangeRate).toFixed(2);
 
     presentAlert({
       header: 'Cobrar Pedido',
-      subHeader: `Saldo pendiente: $${remaining.toFixed(2)} (Bs. ${remainingBs})`,
-      message: 'Selecciona cómo realizó el pago el cliente:',
+      subHeader: `Saldo restante: $${remaining.toFixed(2)} (Bs. ${remainingBs})`,
+      message: 'Selecciona cómo realizó el pago el cliente o registra un abono parcial:',
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         {
-          text: '📱 Pago Móvil',
+          text: '➕ Registrar Abono Parcial',
+          handler: () => {
+            setSelectedOrderForAbono(order);
+            setAbonoAmount('');
+            setAbonoMethod('USD');
+            setAbonoRef('');
+          }
+        },
+        {
+          text: '📱 Pago Móvil (Total)',
           handler: () => openPagoMovilAlert(order)
         },
         {
-          text: '💳 Punto de Venta',
+          text: '💳 Punto de Venta (Total)',
           handler: () => openPuntoAlert(order)
         },
         {
-          text: '💵 Divisas USD',
+          text: '💵 Divisas USD (Total)',
           handler: () => openUSDPaymentAlert(order)
         }
       ]
@@ -451,6 +463,9 @@ const Orders: React.FC = () => {
               const orderItems = Array.isArray(order.items) ? order.items : [];
               const totalUsd = Number(order.totalAmount || 0);
               const totalBs = (totalUsd * (Number(exchangeRate) || 40)).toFixed(2);
+              const abonosTotal = Number(order.abonosTotal || 0);
+              const remaining = Math.max(0, totalUsd - abonosTotal);
+              const remainingBs = (remaining * (Number(exchangeRate) || 40)).toFixed(2);
 
               return (
                 <div
@@ -547,43 +562,88 @@ const Orders: React.FC = () => {
                     </div>
 
                     {/* Price & Payment Status */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <div>
-                        <div style={{ fontSize: '18px', fontWeight: '900', color: '#10B981' }}>
-                          ${totalUsd.toFixed(2)}
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: '18px', fontWeight: '900', color: '#10B981' }}>
+                            ${totalUsd.toFixed(2)}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748B' }}>
+                            Bs. {totalBs}
+                          </div>
                         </div>
-                        <div style={{ fontSize: '11px', color: '#64748B' }}>
-                          Bs. {totalBs}
+
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            background: isPaid ? '#ECFDF5' : (isPartial ? '#FFFBEB' : '#FEF2F2'),
+                            color: isPaid ? '#047857' : (isPartial ? '#92400E' : '#B91C1C')
+                          }}
+                        >
+                          {isPaid ? '✓ Pagado' : (isPartial ? '⏳ Abono Parcial' : '⏳ Por Cobrar')}
                         </div>
                       </div>
 
-                      <div
-                        style={{
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          padding: '4px 10px',
-                          borderRadius: '8px',
-                          background: isPaid ? '#ECFDF5' : (isPartial ? '#FFFBEB' : '#FEF2F2'),
-                          color: isPaid ? '#047857' : (isPartial ? '#92400E' : '#B91C1C')
-                        }}
-                      >
-                        {isPaid ? '✓ Pagado' : (isPartial ? 'Abono Parcial' : '⏳ Por Cobrar')}
-                      </div>
+                      {/* Desglose de Abonos / Saldo Pendiente */}
+                      {!isPaid && !isCanceled && (
+                        <div style={{ marginTop: '8px', padding: '8px 10px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', fontSize: '11px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: abonosTotal > 0 ? '4px' : '0' }}>
+                            <span style={{ color: '#64748B' }}>Abonado: <b style={{ color: '#059669' }}>${abonosTotal.toFixed(2)}</b></span>
+                            <span style={{ color: '#64748B' }}>Resta: <b style={{ color: '#D97706' }}>${remaining.toFixed(2)}</b> (Bs. {remainingBs})</span>
+                          </div>
+                          {abonosTotal > 0 && (
+                            <div style={{ width: '100%', height: '6px', background: '#E2E8F0', borderRadius: '999px', overflow: 'hidden' }}>
+                              <div style={{ width: `${Math.min(100, (abonosTotal / (totalUsd || 1)) * 100)}%`, height: '100%', background: '#10B981' }} />
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Actions Footer */}
                   <div style={{ display: 'flex', gap: '8px', paddingTop: '10px', borderTop: '1px solid #F1F5F9', flexWrap: 'wrap' }}>
                     {!isPaid && !isCanceled && (
-                      <button
-                        type="button"
-                        onClick={() => openPaymentAlert(order)}
-                        className="ff-btn-primary"
-                        style={{ flex: 1, padding: '8px 12px', fontSize: '12px' }}
-                      >
-                        <IonIcon icon={cashOutline} />
-                        Cobrar
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOrderForAbono(order);
+                            setAbonoAmount('');
+                            setAbonoMethod('USD');
+                            setAbonoRef('');
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '8px 10px',
+                            borderRadius: '10px',
+                            border: '1px solid #FCD34D',
+                            background: '#FEF3C7',
+                            color: '#92400E',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ➕ Abonar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openPaymentAlert(order)}
+                          className="ff-btn-primary"
+                          style={{ flex: 1, padding: '8px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                        >
+                          <IonIcon icon={cashOutline} />
+                          Cobrar
+                        </button>
+                      </>
                     )}
 
                     {isPending && (
@@ -911,12 +971,80 @@ const Orders: React.FC = () => {
 
                   {/* Actions */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {selectedOrderForDetails.status !== OrderStatus.CANCELED && (
+                    {selectedOrderForDetails.paymentStatus !== PaymentStatus.PAID && selectedOrderForDetails.status !== OrderStatus.CANCELED && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const ord = selectedOrderForDetails;
+                            setSelectedOrderForDetails(null);
+                            setSelectedOrderForAbono(ord);
+                            setAbonoAmount('');
+                            setAbonoMethod('USD');
+                            setAbonoRef('');
+                          }}
+                          style={{
+                            padding: '12px',
+                            borderRadius: '12px',
+                            border: '1px solid #FCD34D',
+                            background: '#FEF3C7',
+                            color: '#92400E',
+                            fontWeight: '700',
+                            fontSize: '13px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ➕ Registrar Abono
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const ord = selectedOrderForDetails;
+                            setSelectedOrderForDetails(null);
+                            openPaymentAlert(ord);
+                          }}
+                          className="ff-btn-primary"
+                          style={{ padding: '12px', fontSize: '13px', justifyContent: 'center' }}
+                        >
+                          💵 Cobrar Total
+                        </button>
+                      </div>
+                    )}
+
+                    {selectedOrderForDetails.status === OrderStatus.DELIVERED && (
+                      <div style={{
+                        padding: '12px',
+                        borderRadius: '12px',
+                        background: '#ECFDF5',
+                        border: '1px solid #A7F3D0',
+                        color: '#065F46',
+                        fontWeight: '800',
+                        fontSize: '13px',
+                        textAlign: 'center'
+                      }}>
+                        ✓ Pedido Entregado y Finalizado
+                      </div>
+                    )}
+
+                    {selectedOrderForDetails.status !== OrderStatus.DELIVERED && selectedOrderForDetails.status !== OrderStatus.CANCELED && (
                       <button
                         type="button"
                         onClick={() => {
-                          updateStatus(selectedOrderForDetails.id, OrderStatus.CANCELED);
-                          setSelectedOrderForDetails(null);
+                          presentAlert({
+                            header: 'Confirmar Cancelación',
+                            message: '¿Estás seguro de cancelar este pedido? Se liberarán los productos reservados.',
+                            buttons: [
+                              { text: 'Volver', role: 'cancel' },
+                              {
+                                text: 'Sí, Cancelar',
+                                role: 'destructive',
+                                handler: () => {
+                                  updateStatus(selectedOrderForDetails.id, OrderStatus.CANCELED);
+                                  setSelectedOrderForDetails(null);
+                                }
+                              }
+                            ]
+                          });
                         }}
                         style={{
                           padding: '12px',
@@ -937,6 +1065,255 @@ const Orders: React.FC = () => {
               )}
             </div>
           </div>
+        </IonModal>
+
+        {/* Abono Modal */}
+        <IonModal isOpen={!!selectedOrderForAbono} onDidDismiss={() => setSelectedOrderForAbono(null)} style={{ '--border-radius': '20px' } as any}>
+          {selectedOrderForAbono && (() => {
+            const total = Number(selectedOrderForAbono.totalAmount || 0);
+            const yaAbonado = Number(selectedOrderForAbono.abonosTotal || 0);
+            const restante = Math.max(0, total - yaAbonado);
+            const restanteBs = restante * (Number(exchangeRate) || 40);
+            const parsedAmount = parseFloat(abonoAmount) || 0;
+            const effectiveUsd = abonoCurrency === 'VES' ? (parsedAmount / (Number(exchangeRate) || 40)) : parsedAmount;
+
+            const handleConfirmAbono = async () => {
+              if (effectiveUsd <= 0) {
+                presentToast({ message: 'Ingresa un monto válido para el abono', duration: 2500, color: 'warning' });
+                return;
+              }
+              if (effectiveUsd > restante + 0.01) {
+                presentToast({ message: `El abono no puede superar el saldo restante ($${restante.toFixed(2)})`, duration: 3000, color: 'warning' });
+                return;
+              }
+              if (abonoMethod === 'PAGO_MOVIL' && !abonoRef.trim()) {
+                presentToast({ message: 'Por favor indica la referencia del Pago Móvil', duration: 3000, color: 'warning' });
+                return;
+              }
+              if (abonoMethod === 'PUNTO' && !abonoRef.trim()) {
+                presentToast({ message: 'Por favor indica el N° de Voucher / Aprobación', duration: 3000, color: 'warning' });
+                return;
+              }
+
+              try {
+                await apiClient.post(`/orders/${selectedOrderForAbono.id}/abono`, {
+                  amount: effectiveUsd,
+                  method: abonoMethod,
+                  ref: abonoRef.trim() || undefined
+                });
+                presentToast({ message: `✓ ¡Abono de $${effectiveUsd.toFixed(2)} registrado con éxito!`, duration: 2500, color: 'success' });
+                setSelectedOrderForAbono(null);
+                fetchOrders();
+              } catch (err: any) {
+                console.error(err);
+                presentToast({ message: 'Error registrando abono', duration: 3000, color: 'danger' });
+              }
+            };
+
+            return (
+              <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                  <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
+                    Registrar Abono
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrderForAbono(null)}
+                    style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  >
+                    <IonIcon icon={closeOutline} style={{ color: '#64748B' }} />
+                  </button>
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
+                  {/* Summary Card */}
+                  <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#0F172A', marginBottom: '4px' }}>
+                      {selectedOrderForAbono.customerName || 'Cliente General'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '10px' }}>
+                      Pedido #{selectedOrderForAbono.id.slice(0, 8).toUpperCase()}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center' }}>
+                      <div style={{ background: '#ffffff', padding: '8px', borderRadius: '10px', border: '1px solid #EEF2F6' }}>
+                        <span style={{ fontSize: '10px', color: '#64748B', display: 'block', fontWeight: '600' }}>Total</span>
+                        <b style={{ fontSize: '13px', color: '#0F172A' }}>${total.toFixed(2)}</b>
+                      </div>
+                      <div style={{ background: '#ffffff', padding: '8px', borderRadius: '10px', border: '1px solid #EEF2F6' }}>
+                        <span style={{ fontSize: '10px', color: '#64748B', display: 'block', fontWeight: '600' }}>Abonado</span>
+                        <b style={{ fontSize: '13px', color: '#059669' }}>${yaAbonado.toFixed(2)}</b>
+                      </div>
+                      <div style={{ background: '#FFFBEB', padding: '8px', borderRadius: '10px', border: '1px solid #FDE68A' }}>
+                        <span style={{ fontSize: '10px', color: '#92400E', display: 'block', fontWeight: '700' }}>Resta</span>
+                        <b style={{ fontSize: '13px', color: '#D97706' }}>${restante.toFixed(2)}</b>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', marginTop: '6px', fontSize: '11px', color: '#92400E', fontWeight: '700' }}>
+                      Resta en Bs: {restanteBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+
+                  {/* Currency Toggle */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
+                      Moneda del Abono
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (abonoCurrency === 'VES' && abonoAmount) {
+                            setAbonoAmount((parseFloat(abonoAmount) / (Number(exchangeRate) || 40)).toFixed(2));
+                          }
+                          setAbonoCurrency('USD');
+                        }}
+                        style={{
+                          padding: '10px',
+                          borderRadius: '10px',
+                          border: abonoCurrency === 'USD' ? '2px solid #10B981' : '1px solid #CBD5E1',
+                          background: abonoCurrency === 'USD' ? '#ECFDF5' : '#ffffff',
+                          color: abonoCurrency === 'USD' ? '#065F46' : '#475569',
+                          fontWeight: '800',
+                          fontSize: '13px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        💵 Dólares ($ USD)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (abonoCurrency === 'USD' && abonoAmount) {
+                            setAbonoAmount((parseFloat(abonoAmount) * (Number(exchangeRate) || 40)).toFixed(2));
+                          }
+                          setAbonoCurrency('VES');
+                        }}
+                        style={{
+                          padding: '10px',
+                          borderRadius: '10px',
+                          border: abonoCurrency === 'VES' ? '2px solid #10B981' : '1px solid #CBD5E1',
+                          background: abonoCurrency === 'VES' ? '#ECFDF5' : '#ffffff',
+                          color: abonoCurrency === 'VES' ? '#065F46' : '#475569',
+                          fontWeight: '800',
+                          fontSize: '13px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🇻🇪 Bolívares (Bs. VES)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Monto Input */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                      Monto a Abonar ({abonoCurrency === 'USD' ? '$ USD' : 'Bs.'}) *
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={abonoAmount}
+                      onChange={e => setAbonoAmount(e.target.value)}
+                      placeholder={abonoCurrency === 'USD' ? `Ej. ${restante.toFixed(2)}` : `Ej. ${restanteBs.toFixed(2)}`}
+                      style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '16px', fontWeight: '800', outline: 'none' }}
+                    />
+                    {effectiveUsd > 0 && (
+                      <div style={{ fontSize: '12px', color: '#10B981', fontWeight: '700', marginTop: '4px' }}>
+                        {abonoCurrency === 'VES' ? `≈ $${effectiveUsd.toFixed(2)} USD` : `≈ Bs. ${(effectiveUsd * (Number(exchangeRate) || 40)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                      </div>
+                    )}
+
+                    {/* Quick chips */}
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+                      {[5, 10, 20].filter(n => n <= restante).map(n => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => {
+                            if (abonoCurrency === 'USD') setAbonoAmount(n.toString());
+                            else setAbonoAmount((n * (Number(exchangeRate) || 40)).toFixed(2));
+                          }}
+                          style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #E2E8F0', background: '#F8FAFC', fontSize: '11px', fontWeight: '700', color: '#475569', cursor: 'pointer' }}
+                        >
+                          +${n}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (abonoCurrency === 'USD') setAbonoAmount(restante.toFixed(2));
+                          else setAbonoAmount(restanteBs.toFixed(2));
+                        }}
+                        style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #A7F3D0', background: '#ECFDF5', fontSize: '11px', fontWeight: '800', color: '#047857', cursor: 'pointer' }}
+                      >
+                        Liquidar Total (${restante.toFixed(2)})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Método del Abono */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
+                      Método de Pago del Abono
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '10px' }}>
+                      {[
+                        { id: 'USD', label: '💵 Divisas ($)' },
+                        { id: 'PAGO_MOVIL', label: '📱 Pago Móvil' },
+                        { id: 'PUNTO', label: '💳 Punto de Venta' },
+                        { id: 'TRANSFER', label: '🏦 Transferencia' }
+                      ].map(m => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setAbonoMethod(m.id)}
+                          style={{
+                            padding: '10px',
+                            borderRadius: '10px',
+                            border: abonoMethod === m.id ? '2px solid #10B981' : '1px solid #CBD5E1',
+                            background: abonoMethod === m.id ? '#ECFDF5' : '#ffffff',
+                            color: abonoMethod === m.id ? '#065F46' : '#475569',
+                            fontWeight: '700',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            textAlign: 'left'
+                          }}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {(abonoMethod === 'PAGO_MOVIL' || abonoMethod === 'PUNTO' || abonoMethod === 'TRANSFER') && (
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                          N° Referencia / Voucher *
+                        </label>
+                        <input
+                          type="text"
+                          value={abonoRef}
+                          onChange={e => setAbonoRef(e.target.value)}
+                          placeholder="Ej. 984210"
+                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Confirm Button */}
+                  <button
+                    type="button"
+                    onClick={handleConfirmAbono}
+                    className="ff-btn-primary"
+                    style={{ width: '100%', padding: '14px', fontSize: '15px', justifyContent: 'center' }}
+                  >
+                    Confirmar Abono {effectiveUsd > 0 ? `($${effectiveUsd.toFixed(2)})` : ''}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </IonModal>
 
       </IonContent>
