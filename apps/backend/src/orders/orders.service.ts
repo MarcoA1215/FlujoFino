@@ -366,8 +366,8 @@ export class OrdersService {
         const cappedDiscount = Math.min(effectiveDiscount, effectiveTotal);
 
         savedOrder.discountAmount = cappedDiscount;
-        savedOrder.discountType = dto.discountType || (cappedDiscount > 0 ? 'FIXED' : undefined);
-        savedOrder.discountValue = dto.discountValue !== undefined ? Number(dto.discountValue) : (cappedDiscount > 0 ? cappedDiscount : undefined);
+        savedOrder.discountType = (dto.discountType || (cappedDiscount > 0 ? 'FIXED' : undefined)) as any;
+        savedOrder.discountValue = (dto.discountValue !== undefined ? Number(dto.discountValue) : (cappedDiscount > 0 ? cappedDiscount : undefined)) as any;
         savedOrder.totalAmount = effectiveTotal - cappedDiscount;
         savedOrder.totalCost = totalCost;
         savedOrder.netProfit = savedOrder.totalAmount - deliveryFee - totalCost;

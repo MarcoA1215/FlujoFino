@@ -77,10 +77,10 @@ export class Order {
   discountAmount: number;
 
   @Column({ nullable: true })
-  discountType: string;
+  discountType?: string;
 
   @Column('decimal', { nullable: true, precision: 12, scale: 4, transformer: new ColumnNumericTransformer() })
-  discountValue: number;
+  discountValue?: number;
 
   @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   totalCost: number;
