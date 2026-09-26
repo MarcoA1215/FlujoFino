@@ -33,7 +33,8 @@ import {
   phonePortraitOutline,
   bicycleOutline,
   storefrontOutline,
-  timeOutline
+  timeOutline,
+  cartOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';
