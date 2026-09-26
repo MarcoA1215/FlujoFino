@@ -12,10 +12,6 @@ export class Order {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Index({ unique: true })
-  @Column({ name: 'offline_id', nullable: true, unique: true })
-  offlineId: string;
-
   @Column()
   customerName: string;
 

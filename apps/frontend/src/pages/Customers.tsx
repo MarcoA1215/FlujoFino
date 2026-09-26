@@ -38,6 +38,7 @@ import {
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import type { CustomerDTO } from '@nutrideli/shared-types';
+import { offlineDb } from '../services/offline-db';
 
 const Customers: React.FC = () => {
   const [customers, setCustomers] = useState<CustomerDTO[]>([]);
@@ -54,19 +55,83 @@ const Customers: React.FC = () => {
   const [identification, setIdentification] = useState('');
   const [notes, setNotes] = useState('');
   const [totalVisits, setTotalVisits] = useState(0);
+  const [isOfflineMode, setIsOfflineMode] = useState<boolean>(!navigator.onLine);
+
+  const filterLocalCustomers = (all: any[], query: string) => {
+    if (!query) return all;
+    const q = query.toLowerCase();
+    return all.filter(c =>
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.includes(q)) ||
+      (c.identification && c.identification.toLowerCase().includes(q))
+    );
+  };
 
   const fetchCustomers = async () => {
+    const q = search.trim();
+
+    // 1. Stale: Leer de Dexie primero
+    try {
+      const cached = await offlineDb.cachedCustomers.toArray();
+      if (cached && cached.length > 0) {
+        setCustomers(filterLocalCustomers(cached, q));
+      }
+    } catch (err) {
+      console.error('Error leyendo cachedCustomers:', err);
+    }
+
+    if (!navigator.onLine) {
+      setIsOfflineMode(true);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const url = search.trim() ? `/customers?search=${encodeURIComponent(search.trim())}` : '/customers';
+      const url = q ? `/customers?search=${encodeURIComponent(q)}` : '/customers';
       const res = await apiClient.get<CustomerDTO[]>(url);
       setCustomers(res.data);
+      setIsOfflineMode(false);
+
+      // Si es consulta general sin filtro, actualizar caché completo
+      if (!q && res.data && res.data.length > 0) {
+        try {
+          await offlineDb.cachedCustomers.clear();
+          await offlineDb.cachedCustomers.bulkPut(res.data);
+        } catch (dbErr) {
+          console.error('Error guardando en cachedCustomers:', dbErr);
+        }
+      } else if (res.data && res.data.length > 0) {
+        try {
+          await offlineDb.cachedCustomers.bulkPut(res.data);
+        } catch (dbErr) {}
+      }
     } catch (e: any) {
-      presentToast({
-        message: 'Error al cargar directorio de clientes',
-        duration: 3000,
-        color: 'danger'
-      });
+      console.warn('Error al conectar con servidor para clientes, fallback a Dexie', e);
+      setIsOfflineMode(true);
+      try {
+        const cached = await offlineDb.cachedCustomers.toArray();
+        if (cached && cached.length > 0) {
+          setCustomers(filterLocalCustomers(cached, q));
+          presentToast({
+            message: '⚡ Modo Sin Conexión: Visualizando clientes guardados localmente.',
+            duration: 3000,
+            color: 'warning'
+          });
+        } else {
+          presentToast({
+            message: 'Error al cargar directorio de clientes',
+            duration: 3000,
+            color: 'danger'
+          });
+        }
+      } catch (err) {
+        presentToast({
+          message: 'Error al cargar directorio de clientes',
+          duration: 3000,
+          color: 'danger'
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -75,6 +140,24 @@ const Customers: React.FC = () => {
   useEffect(() => {
     fetchCustomers();
   }, [search]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOfflineMode(false);
+      fetchCustomers();
+    };
+    const handleOffline = () => {
+      setIsOfflineMode(true);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const openNew = () => {
     setEditingCustomer(null);
@@ -180,6 +263,13 @@ const Customers: React.FC = () => {
             debounce={300}
           />
         </IonToolbar>
+        {isOfflineMode && (
+          <IonToolbar color="warning">
+            <div style={{ textAlign: 'center', width: '100%', padding: '6px 12px', fontSize: '0.85rem', fontWeight: 'bold' }}>
+              ⚡ Modo Sin Conexión: Visualizando agenda, clientes y catálogo guardados localmente.
+            </div>
+          </IonToolbar>
+        )}
       </IonHeader>
 
       <IonContent className="ion-padding" style={{ backgroundColor: '#f4f5f8' }}>

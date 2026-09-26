@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { refreshOutline, cartOutline, cashOutline, trashOutline, personOutline, walletOutline, copyOutline, closeOutline, storefrontOutline, bicycleOutline, globeOutline, logoWhatsapp, cardOutline, cloudDoneOutline, cloudOfflineOutline, syncOutline, flashOutline } from 'ionicons/icons';
+import { refreshOutline, cartOutline, cashOutline, trashOutline, personOutline, walletOutline, copyOutline, closeOutline, storefrontOutline, bicycleOutline, globeOutline, logoWhatsapp, cardOutline } from 'ionicons/icons';
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonButton, IonList, IonLabel, IonBadge, IonToggle, useIonToast, useIonAlert, IonInput, IonSelect, IonSelectOption, IonText, IonIcon, IonSearchbar, useIonRouter, IonModal, IonSpinner } from '@ionic/react';
 import { useEffect, useState, useContext } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -8,7 +8,6 @@ import { DeliveryMethod, PaymentStatus, UserRole } from '@nutrideli/shared-types
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import { useImageViewer } from '../context/ImageViewerContext';
-import { offlineDb, type OfflineOrder } from '../services/offline-db';
 
 type Product = {
   id: string;
@@ -83,80 +82,6 @@ const Pos: React.FC = () => {
   const [cashSummary, setCashSummary] = useState<any>(null);
   const [loadingCashSummary, setLoadingCashSummary] = useState(false);
 
-  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
-  const [isSimulatingOffline, setIsSimulatingOffline] = useState<boolean>(false);
-  const [pendingOfflineCount, setPendingOfflineCount] = useState<number>(0);
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
-
-  const refreshPendingCount = async () => {
-    try {
-      const count = await offlineDb.offlineOrders.count();
-      setPendingOfflineCount(count);
-    } catch (err) {
-      console.error('Error counting offline orders:', err);
-    }
-  };
-
-  const syncPendingOrders = async () => {
-    if (isSimulatingOffline || !navigator.onLine) {
-      presentToast({ message: 'No hay conexión o la simulación offline está activa', duration: 2500, color: 'warning' });
-      return;
-    }
-    try {
-      const pending = await offlineDb.offlineOrders.toArray();
-      if (!pending || pending.length === 0) {
-        presentToast({ message: 'No hay ventas pendientes por sincronizar', duration: 2000, color: 'light' });
-        return;
-      }
-      setIsSyncing(true);
-
-      const response = await apiClient.post('/orders/sync-offline', { orders: pending });
-      const syncedIds: string[] = response.data?.syncedOfflineIds || [];
-
-      if (syncedIds.length > 0) {
-        await offlineDb.offlineOrders.bulkDelete(syncedIds);
-        await refreshPendingCount();
-        presentToast({
-          message: `✓ ${syncedIds.length} venta(s) sincronizada(s) con éxito con el servidor`,
-          duration: 3000,
-          color: 'success',
-        });
-        fetchProducts();
-      } else {
-        presentToast({ message: 'No se procesaron ventas para sincronizar', duration: 2500, color: 'medium' });
-      }
-    } catch (err: any) {
-      console.error('Error sincronizando órdenes offline:', err);
-      presentToast({
-        message: 'Error al sincronizar con el servidor: ' + (err.response?.data?.message || err.message),
-        duration: 3500,
-        color: 'danger',
-      });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const toggleOfflineSimulation = async () => {
-    const nextVal = !isSimulatingOffline;
-    setIsSimulatingOffline(nextVal);
-    if (nextVal) {
-      try {
-        const local = await offlineDb.cachedProducts.toArray();
-        if (local.length > 0) {
-          setProducts(local);
-        }
-      } catch (e) {}
-      presentToast({ message: '⚡ Modo offline simulado activado', duration: 2000, color: 'warning' });
-    } else {
-      presentToast({ message: '🟢 Simulación desactivada: Modo en línea activo', duration: 2000, color: 'success' });
-      fetchProducts();
-      if (navigator.onLine) {
-        syncPendingOrders();
-      }
-    }
-  };
-
   const fetchDailySummary = async () => {
     setLoadingCashSummary(true);
     try {
@@ -207,40 +132,11 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
   };
 
   const fetchProducts = async () => {
-    if (!navigator.onLine || isSimulatingOffline) {
-      try {
-        const localProducts = await offlineDb.cachedProducts.toArray();
-        if (localProducts && localProducts.length > 0) {
-          setProducts(localProducts);
-          return;
-        }
-      } catch (e) {
-        console.error('Error leyendo productos de Dexie:', e);
-      }
-    }
-
     try {
       const res = await apiClient.get<Product[]>('/products');
       setProducts(res.data);
-      if (res.data && res.data.length > 0) {
-        try {
-          await offlineDb.cachedProducts.bulkPut(res.data);
-        } catch (e) {
-          console.error('Error guardando productos en Dexie:', e);
-        }
-      }
     } catch (e) {
       console.error(e);
-      try {
-        const localProducts = await offlineDb.cachedProducts.toArray();
-        if (localProducts && localProducts.length > 0) {
-          setProducts(localProducts);
-          presentToast({ message: 'Sin conexión: Catálogo cargado desde la memoria local', duration: 2500, color: 'warning' });
-          return;
-        }
-      } catch (dbErr) {
-        console.error('Error fallback Dexie:', dbErr);
-      }
       presentToast({ message: 'Error cargando productos', duration: 3000, color: 'danger' });
     }
   };
@@ -347,10 +243,35 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
     }
     if (resId) {
       setLinkedReservationId(resId);
-      apiClient.get(`/reservations`).then(res => {
-        const found = res.data.find((r: any) => r.id === resId);
+      const loadReservationDetails = async () => {
+        let found: any = null;
+        try {
+          const res = await apiClient.get('/reservations');
+          found = res.data.find((r: any) => r.id === resId);
+        } catch (e) {
+          try {
+            found = await offlineDb.cachedReservations.get(resId);
+            if (!found) {
+              const allLocal = await offlineDb.cachedReservations.toArray();
+              found = allLocal.find((r: any) => r.id === resId);
+            }
+          } catch (dexErr) {
+            console.error('Error fetching cached reservation in POS:', dexErr);
+          }
+        }
+
+        if (!found) {
+          try {
+            found = await offlineDb.cachedReservations.get(resId);
+            if (!found) {
+              const allLocal = await offlineDb.cachedReservations.toArray();
+              found = allLocal.find((r: any) => r.id === resId);
+            }
+          } catch (e) {}
+        }
+
         if (found) {
-          setCustomerName(found.customerName);
+          setCustomerName(found.customerName || '');
           setCustomerPhone(found.customerPhone || '');
           setTableNumber(found.tableNumber || '');
           setPaymentMethod('PENDING');
@@ -359,40 +280,30 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
           }
           
           if (found.serviceName) {
-            apiClient.get('/products').then(pres => {
-              const prod = pres.data.find((p: any) => p.name === found.serviceName);
-              if (prod) {
-                setCart([{ product: prod, quantity: 1 }]);
-              } else {
-                presentToast({ message: 'El servicio no se encontró en los productos. Sincroniza configuraciones.', duration: 4000, color: 'warning' });
-              }
-            });
+            let prod: any = null;
+            try {
+              const pres = await apiClient.get('/products');
+              prod = pres.data.find((p: any) => p.name === found.serviceName);
+            } catch (e) {}
+
+            if (!prod) {
+              try {
+                const prods = await offlineDb.cachedProducts.toArray();
+                prod = prods.find((p: any) => p.name === found.serviceName);
+              } catch (e) {}
+            }
+
+            if (prod) {
+              setCart([{ product: prod, quantity: 1 }]);
+            } else {
+              presentToast({ message: `Servicio "${found.serviceName}" cargado para cobrar`, duration: 3000, color: 'primary' });
+            }
           }
         }
-      }).catch(() => {});
+      };
+      loadReservationDetails();
     }
   }, []);
-
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      if (!isSimulatingOffline) {
-        syncPendingOrders();
-      }
-    };
-    const handleOffline = () => {
-      setIsOnline(false);
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    refreshPendingCount();
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [isSimulatingOffline]);
 
   const openRateAlert = () => {
     presentAlert({
@@ -545,54 +456,6 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
         }))
       };
 
-      if (!isOnline || isSimulatingOffline) {
-        const offlineId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-          ? crypto.randomUUID()
-          : 'off-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
-
-        const offlineOrder: OfflineOrder = {
-          offlineId,
-          tenantId: user?.tenantId || '',
-          payload,
-          rateAtSale: exchangeRate,
-          createdAt: new Date().toISOString(),
-          synced: false,
-        };
-
-        await offlineDb.offlineOrders.add(offlineOrder);
-        await refreshPendingCount();
-        presentToast({
-          message: '✓ Venta guardada localmente (Modo Offline)',
-          duration: 3000,
-          color: 'success',
-        });
-
-        setCart([]);
-        setCustomerName('');
-        setCustomerPhone('');
-        setTableNumber('');
-        setCustomerAddress('');
-        setEmployeeId(user?.id || '');
-        setInitialAbono('');
-        setPagoMovilRef('');
-        setPagoMovilPhone('');
-        setPagoMovilCedula('');
-        setPagoMovilBank('');
-        setPuntoRef('');
-        setPuntoBank('');
-        setBinanceRef('');
-        setTransferRef('');
-        setTransferBank('');
-        setDeliveryMethod(DeliveryMethod.IN_STORE);
-        setDeliveryZoneId('');
-        setUsdReceived('');
-        setSearchTerm('');
-        setPaymentMethod('PAGO_MOVIL');
-        setBypassMinDeposit(false);
-        setLinkedReservationId(null);
-        return;
-      }
-
       if (editingOrderId) {
         await apiClient.put(`/orders/${editingOrderId}`, payload);
         presentToast({ message: 'Pedido actualizado exitosamente', duration: 2000, color: 'success' });
@@ -635,87 +498,6 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
       setLinkedReservationId(null);
       fetchProducts();
     } catch (e: any) {
-      if (!navigator.onLine || !e.response) {
-        try {
-          const offlineId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-            ? crypto.randomUUID()
-            : 'off-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
-
-          const initialAbonoVal = initialAbono ? Number(initialAbono) : undefined;
-          const fallbackPayload = {
-            customerName,
-            customerPhone,
-            tableNumber,
-            paymentStatus: paymentMethod === 'PENDING' ? PaymentStatus.PENDING : PaymentStatus.PAID,
-            paymentMethod,
-            notes,
-            pagoMovilRef: paymentMethod === 'PAGO_MOVIL' ? pagoMovilRef : 
-                          paymentMethod === 'PUNTO' ? puntoRef : 
-                          paymentMethod === 'BINANCE' ? binanceRef : 
-                          paymentMethod === 'TRANSFER' ? transferRef : undefined,
-            pagoMovilPhone: paymentMethod === 'PAGO_MOVIL' ? pagoMovilPhone : undefined,
-            pagoMovilCedula: paymentMethod === 'PAGO_MOVIL' ? pagoMovilCedula : undefined,
-            pagoMovilBank: paymentMethod === 'PAGO_MOVIL' ? pagoMovilBank : 
-                           paymentMethod === 'PUNTO' ? (puntoBank || 'Punto de Venta') : 
-                           paymentMethod === 'BINANCE' ? 'Binance Pay' : 
-                           paymentMethod === 'TRANSFER' ? (transferBank || 'Transferencia') : undefined,
-            amountBs: totalCart * exchangeRate,
-            exchangeRate,
-            deliveryMethod,
-            deliveryZoneId: (deliveryMethod === DeliveryMethod.DELIVERY && deliveryZoneId) ? deliveryZoneId : undefined,
-            employeeId: employeeId || undefined,
-            initialAbono: initialAbonoVal,
-            discountAmount,
-            items: cart.map(i => ({
-              productId: i.product.id,
-              quantity: i.quantity,
-              unitPrice: i.product.salePrice,
-            }))
-          };
-
-          const offlineOrder: OfflineOrder = {
-            offlineId,
-            tenantId: user?.tenantId || '',
-            payload: fallbackPayload,
-            rateAtSale: exchangeRate,
-            createdAt: new Date().toISOString(),
-            synced: false,
-          };
-          await offlineDb.offlineOrders.add(offlineOrder);
-          await refreshPendingCount();
-          presentToast({
-            message: '✓ Conexión interrumpida: Venta guardada localmente (Modo Offline)',
-            duration: 3500,
-            color: 'warning',
-          });
-          setCart([]);
-          setCustomerName('');
-          setCustomerPhone('');
-          setTableNumber('');
-          setCustomerAddress('');
-          setEmployeeId(user?.id || '');
-          setInitialAbono('');
-          setPagoMovilRef('');
-          setPagoMovilPhone('');
-          setPagoMovilCedula('');
-          setPagoMovilBank('');
-          setPuntoRef('');
-          setPuntoBank('');
-          setBinanceRef('');
-          setTransferRef('');
-          setTransferBank('');
-          setDeliveryMethod(DeliveryMethod.IN_STORE);
-          setDeliveryZoneId('');
-          setUsdReceived('');
-          setSearchTerm('');
-          setPaymentMethod('PAGO_MOVIL');
-          setBypassMinDeposit(false);
-          setLinkedReservationId(null);
-          return;
-        } catch (dbErr) {
-          console.error('Error guardando orden offline tras fallo de red:', dbErr);
-        }
-      }
       presentToast({ message: 'Error al crear pedido', duration: 3000, color: 'danger' });
     }
   };
@@ -740,74 +522,6 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
               </IonBadge>
             </IonButton>
           </IonButtons>
-        </IonToolbar>
-
-        {/* Connectivity Bar & Offline Controls */}
-        <IonToolbar color={(!isOnline || isSimulatingOffline) ? 'warning' : 'light'} style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 12px', flexWrap: 'wrap', gap: '8px', width: '100%' }}>
-            
-            {/* Status & Simulation Toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              {(!isOnline || isSimulatingOffline) ? (
-                <IonBadge color="dark" style={{ fontSize: '0.85rem', padding: '6px 12px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <IonIcon icon={cloudOfflineOutline} style={{ color: '#ffc409', fontSize: '1.1rem' }} />
-                  <span>🟠 Modo Offline Activo {isSimulatingOffline && '(Simulación)'}</span>
-                </IonBadge>
-              ) : (
-                <IonBadge color="success" style={{ fontSize: '0.85rem', padding: '6px 12px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <IonIcon icon={cloudDoneOutline} style={{ fontSize: '1.1rem' }} />
-                  <span>🟢 En línea</span>
-                </IonBadge>
-              )}
-
-              <IonButton 
-                fill={isSimulatingOffline ? 'solid' : 'outline'} 
-                color={isSimulatingOffline ? 'danger' : 'dark'}
-                size="small"
-                onClick={toggleOfflineSimulation}
-                style={{ fontWeight: '600', textTransform: 'none' }}
-              >
-                <IonIcon icon={flashOutline} slot="start" />
-                {isSimulatingOffline ? '⚡ Desactivar Simulación' : '⚡ Simular Offline'}
-              </IonButton>
-            </div>
-
-            {/* Pending Orders Counter & Sync Button */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              {pendingOfflineCount > 0 ? (
-                <>
-                  <IonBadge color="secondary" style={{ fontSize: '0.85rem', padding: '6px 12px', borderRadius: '16px' }}>
-                    📦 {pendingOfflineCount} {pendingOfflineCount === 1 ? 'venta por sincronizar' : 'ventas por sincronizar'}
-                  </IonBadge>
-                  <IonButton 
-                    size="small" 
-                    fill="solid" 
-                    color="primary"
-                    disabled={isSyncing || (!isOnline && !isSimulatingOffline)}
-                    onClick={syncPendingOrders}
-                    style={{ fontWeight: 'bold', textTransform: 'none' }}
-                  >
-                    {isSyncing ? (
-                      <>
-                        <IonSpinner name="crescent" slot="start" style={{ width: '16px', height: '16px', marginRight: '6px' }} />
-                        Sincronizando...
-                      </>
-                    ) : (
-                      <>
-                        <IonIcon icon={syncOutline} slot="start" />
-                        🔄 Sincronizar Ahora
-                      </>
-                    )}
-                  </IonButton>
-                </>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#666', fontSize: '0.85rem' }}>
-                  <span>✓ Sin ventas pendientes</span>
-                </div>
-              )}
-            </div>
-
-          </div>
         </IonToolbar>
       </IonHeader>
 

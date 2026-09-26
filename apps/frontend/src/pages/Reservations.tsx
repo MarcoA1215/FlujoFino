@@ -8,6 +8,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
 import { apiClient } from '../api/client';
 import { ReservationStatus } from '@nutrideli/shared-types';
+import { offlineDb } from '../services/offline-db';
 
 const Reservations: React.FC = () => {
   const [reservations, setReservations] = useState<any[]>([]);
@@ -35,13 +36,58 @@ const Reservations: React.FC = () => {
   const [shiftMinutes, setShiftMinutes] = useState(30);
   const [shiftAffected, setShiftAffected] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>({});
+  const [isOfflineMode, setIsOfflineMode] = useState<boolean>(!navigator.onLine);
 
   const fetchReservations = async () => {
+    // 1. Stale: Cargar inmediatamente desde IndexedDB si existen datos guardados
+    try {
+      const cached = await offlineDb.cachedReservations.toArray();
+      if (cached && cached.length > 0) {
+        setReservations(cached);
+      }
+    } catch (cacheErr) {
+      console.error('Error leyendo cachedReservations:', cacheErr);
+    }
+
+    if (!navigator.onLine) {
+      setIsOfflineMode(true);
+      return;
+    }
+
+    // 2. Revalidate: Consultar al servidor
     try {
       const res = await apiClient.get('/reservations');
-      setReservations(res.data);
+      const serverReservations = res.data || [];
+      setReservations(serverReservations);
+      setIsOfflineMode(false);
+
+      // Hidratar tabla local en Dexie
+      try {
+        await offlineDb.cachedReservations.clear();
+        if (serverReservations.length > 0) {
+          await offlineDb.cachedReservations.bulkPut(serverReservations);
+        }
+      } catch (saveErr) {
+        console.error('Error guardando en cachedReservations:', saveErr);
+      }
     } catch (e) {
-      presentToast({ message: 'Error al cargar reservaciones', duration: 3000, color: 'danger' });
+      console.warn('Fallo petición de reservaciones, activando modo offline:', e);
+      setIsOfflineMode(true);
+      try {
+        const cached = await offlineDb.cachedReservations.toArray();
+        if (cached && cached.length > 0) {
+          setReservations(cached);
+          presentToast({
+            message: '⚡ Modo Sin Conexión: Visualizando agenda guardada localmente.',
+            duration: 3000,
+            color: 'warning'
+          });
+        } else {
+          presentToast({ message: 'Error al cargar reservaciones', duration: 3000, color: 'danger' });
+        }
+      } catch (err) {
+        presentToast({ message: 'Error al cargar reservaciones', duration: 3000, color: 'danger' });
+      }
     }
   };
 
@@ -50,7 +96,12 @@ const Reservations: React.FC = () => {
       const res = await apiClient.get('/products');
       setProducts(res.data);
     } catch (e) {
-      console.error(e);
+      try {
+        const cached = await offlineDb.cachedProducts.toArray();
+        if (cached && cached.length > 0) {
+          setProducts(cached);
+        }
+      } catch (err) {}
     }
   };
 
@@ -70,6 +121,22 @@ const Reservations: React.FC = () => {
     setTimeout(() => {
       window.dispatchEvent(new Event('resize'));
     }, 500);
+
+    const handleOnline = () => {
+      setIsOfflineMode(false);
+      fetchReservations();
+    };
+    const handleOffline = () => {
+      setIsOfflineMode(true);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   const handleMassShift = async () => {
@@ -436,6 +503,13 @@ const Reservations: React.FC = () => {
                 <IonSelectOption value="timeGridDay">Vista de Hoy (Agenda)</IonSelectOption>
                 <IonSelectOption value="listWeek">Lista de la Semana</IonSelectOption>
               </IonSelect>
+            </div>
+          </IonToolbar>
+        )}
+        {isOfflineMode && (
+          <IonToolbar color="warning">
+            <div style={{ textAlign: 'center', width: '100%', padding: '6px 12px', fontSize: '0.85rem', fontWeight: 'bold' }}>
+              ⚡ Modo Sin Conexión: Visualizando agenda, clientes y catálogo guardados localmente.
             </div>
           </IonToolbar>
         )}

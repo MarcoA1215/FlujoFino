@@ -25,7 +25,7 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { ImageViewerProvider } from './context/ImageViewerContext';
 import { UserRole } from '@nutrideli/shared-types';
-import { useContext, useEffect } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 
 import '@ionic/react/css/core.css';
@@ -121,6 +121,21 @@ const App: React.FC = () => {
 const MainLayout: React.FC = () => {
   const { user } = useContext(AuthContext);
   const location = useLocation();
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   const isPublicRoute = location.pathname.startsWith('/book') || 
                         location.pathname.startsWith('/store') || 
                         location.pathname.startsWith('/tienda') || 
@@ -128,9 +143,28 @@ const MainLayout: React.FC = () => {
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
 
   return (
-    <IonSplitPane contentId="main" when={!isPublicRoute && (user?.tenantId || isSuperAdmin) ? 'md' : false}>
-      {!isPublicRoute && <Menu />}
-      <IonRouterOutlet id="main">
+    <>
+      {!isOnline && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: '#d97706',
+          color: '#ffffff',
+          textAlign: 'center',
+          padding: '6px 12px',
+          fontSize: '0.85rem',
+          fontWeight: 'bold',
+          zIndex: 99999,
+          boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+        }}>
+          ⚡ Modo Sin Conexión: Visualizando agenda, clientes y catálogo guardados localmente.
+        </div>
+      )}
+      <IonSplitPane contentId="main" when={!isPublicRoute && (user?.tenantId || isSuperAdmin) ? 'md' : false}>
+        {!isPublicRoute && <Menu />}
+        <IonRouterOutlet id="main">
         <Route path="/book/:tenantId" element={<PublicBooking />} />
         <Route path="/store/:tenantId" element={<PublicStore />} />
         <Route path="/tienda/:tenantId" element={<PublicStore />} />
@@ -156,6 +190,7 @@ const MainLayout: React.FC = () => {
         <Route path="/platform-admin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
       </IonRouterOutlet>
     </IonSplitPane>
+    </>
   );
 };
 
