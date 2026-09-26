@@ -1,7 +1,7 @@
-import { refreshOutline } from 'ionicons/icons';
+import { refreshOutline, cubeOutline, buildOutline, cutOutline, closeOutline } from 'ionicons/icons';
 import { IonList, IonItem, IonLabel, IonBadge } from '@ionic/react';
-import React, { useEffect, useState } from 'react';
-import { IonToggle, IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonToast, IonIcon } from '@ionic/react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { IonToggle, IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonActionSheet, useIonToast, IonIcon } from '@ionic/react';
 import { apiClient } from '../api/client';
 import type { Product } from '../types';
 import { ProductCard } from '../components/products/ProductCard';
@@ -14,6 +14,7 @@ const Products: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [presentAlert] = useIonAlert();
+  const [presentActionSheet] = useIonActionSheet();
   const [searchText, setSearchText] = useState('');
   const [isClientMode, setIsClientMode] = useState(false);
   const [presentToast] = useIonToast();
@@ -23,10 +24,44 @@ const Products: React.FC = () => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
   const [isCreatingCombo, setIsCreatingCombo] = useState(false);
-  const [isResaleModal, setIsResaleModal] = useState(false);
+  const [selectedArchetype, setSelectedArchetype] = useState<'REVENTA' | 'FORMULA' | 'SERVICIO'>('REVENTA');
 
-  const isRetailOnly = Boolean(settings?.featureBuySell && !settings?.featureCustomerSchedules && !settings?.featureRecipes);
-  const isHybrid = Boolean(settings?.featureBuySell && (settings?.featureCustomerSchedules || settings?.featureRecipes));
+  const activeArchetypes = useMemo(() => {
+    const list: { type: 'REVENTA' | 'FORMULA' | 'SERVICIO'; label: string; icon: any; buttonLabel: string }[] = [];
+    if (settings?.featureBuySell) {
+      list.push({ 
+        type: 'REVENTA', 
+        label: 'Producto para Reventa Directa', 
+        icon: cubeOutline,
+        buttonLabel: 'Nuevo Producto'
+      });
+    }
+    if (settings?.featureRecipes) {
+      list.push({ 
+        type: 'FORMULA', 
+        label: 'Producto Armable / Con Fórmula', 
+        icon: buildOutline,
+        buttonLabel: 'Nuevo Producto Armable'
+      });
+    }
+    if (settings?.featureCustomerSchedules) {
+      list.push({ 
+        type: 'SERVICIO', 
+        label: 'Servicio / Cita', 
+        icon: cutOutline,
+        buttonLabel: 'Nuevo Servicio'
+      });
+    }
+    if (list.length === 0) {
+      list.push({ 
+        type: 'REVENTA', 
+        label: 'Producto', 
+        icon: cubeOutline,
+        buttonLabel: 'Nuevo Producto'
+      });
+    }
+    return list;
+  }, [settings]);
 
   const fetchData = async () => {
     try {
@@ -54,20 +89,48 @@ const Products: React.FC = () => {
     fetchUsers();
   }, []);
 
-  const openCreateModal = (isCombo: boolean, isResale: boolean = false) => {
+  const openCreateModal = (isCombo: boolean, archetype: 'REVENTA' | 'FORMULA' | 'SERVICIO' = 'REVENTA') => {
     setProductToEdit(null);
     setIsCreatingCombo(isCombo);
-    setIsResaleModal(isRetailOnly || isResale);
+    setSelectedArchetype(archetype);
     setShowProductModal(true);
   };
 
   const openEditModal = (p: Product) => {
     setProductToEdit(p);
     setIsCreatingCombo(!!p.isCombo);
-    const isService = p.is_service === true || p.category === 'Servicios' || Boolean(p.durationMinutes);
-    const isResale = isRetailOnly || (!isService && !p.isCombo && (!p.recipe || p.recipe.length === 0));
-    setIsResaleModal(isResale);
+    const pType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = 
+      p.product_type || 
+      (p.is_service === true || p.category === 'Servicios' ? 'SERVICIO' : 
+      ((p.recipe && p.recipe.length > 0) || p.isCombo ? 'FORMULA' : 'REVENTA'));
+    setSelectedArchetype(pType);
     setShowProductModal(true);
+  };
+
+  const handleNewProductClick = () => {
+    if (activeArchetypes.length <= 1) {
+      openCreateModal(false, activeArchetypes[0].type);
+      return;
+    }
+
+    presentActionSheet({
+      header: '¿Qué tipo deseas registrar?',
+      subHeader: 'Selecciona según el modelo de negocio',
+      buttons: [
+        ...activeArchetypes.map(item => ({
+          text: item.label,
+          icon: item.icon,
+          handler: () => {
+            openCreateModal(false, item.type);
+          }
+        })),
+        {
+          text: 'Cancelar',
+          icon: closeOutline,
+          role: 'cancel'
+        }
+      ]
+    });
   };
 
   const openAddStockAlert = (p: Product) => {
@@ -269,38 +332,17 @@ const Products: React.FC = () => {
         <IonGrid>
           {!isClientMode && (
             <IonRow className="ion-margin-bottom">
-              {isRetailOnly ? (
-                <IonCol size="12" sizeSm="6" sizeMd="4">
-                  <IonButton expand="block" color="primary" onClick={() => openCreateModal(false, true)}>
-                    + Nuevo Producto
+              <IonCol size="12" sizeSm={settings?.featureRecipes || settings?.featureProduction !== false ? "8" : "12"} sizeMd={settings?.featureRecipes || settings?.featureProduction !== false ? "6" : "4"}>
+                <IonButton expand="block" color="primary" onClick={handleNewProductClick}>
+                  {activeArchetypes.length <= 1 ? `+ ${activeArchetypes[0].buttonLabel}` : '+ Nuevo Producto / Servicio'}
+                </IonButton>
+              </IonCol>
+              {(settings?.featureRecipes || settings?.featureProduction !== false) && (
+                <IonCol size="12" sizeSm="4" sizeMd="3">
+                  <IonButton expand="block" fill="outline" color="tertiary" onClick={() => openCreateModal(true, 'FORMULA')}>
+                    + Crear Combo
                   </IonButton>
                 </IonCol>
-              ) : isHybrid ? (
-                <>
-                  <IonCol size="12" sizeSm="6" sizeMd="4">
-                    <IonButton expand="block" color="success" onClick={() => openCreateModal(false, true)}>
-                      + Producto para Reventa
-                    </IonButton>
-                  </IonCol>
-                  <IonCol size="12" sizeSm="6" sizeMd="4">
-                    <IonButton expand="block" color="primary" onClick={() => openCreateModal(false, false)}>
-                      + Servicio / Con Fórmula
-                    </IonButton>
-                  </IonCol>
-                </>
-              ) : (
-                <>
-                  <IonCol size="12" sizeSm="6" sizeMd="4">
-                    <IonButton expand="block" color="primary" onClick={() => openCreateModal(false, false)}>
-                      + Crear Producto / Servicio
-                    </IonButton>
-                  </IonCol>
-                  <IonCol size="12" sizeSm="6" sizeMd="4">
-                    <IonButton expand="block" color="tertiary" onClick={() => openCreateModal(true, false)}>
-                      + Crear Combo
-                    </IonButton>
-                  </IonCol>
-                </>
               )}
             </IonRow>
           )}
@@ -392,7 +434,8 @@ const Products: React.FC = () => {
           }}
           product={productToEdit}
           isCombo={isCreatingCombo}
-          isResaleOnly={isResaleModal}
+          archetype={selectedArchetype}
+          isResaleOnly={selectedArchetype === 'REVENTA'}
           users={users}
         />
       </IonContent>

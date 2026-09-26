@@ -14,4 +14,5 @@ export class CreateProductDto {
   @IsOptional() @IsNumber() stock?: number;
   @IsOptional() @IsNumber() stockQuantity?: number;
   @IsOptional() @IsBoolean() is_service?: boolean;
+  @IsOptional() @IsString() product_type?: string;
 }

@@ -18,6 +18,7 @@ export type Product = {
   cost?: number;
   stock?: number;
   is_service?: boolean;
+  product_type?: 'REVENTA' | 'FORMULA' | 'SERVICIO';
 };
 
 export type RawMaterial = {

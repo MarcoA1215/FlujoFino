@@ -43,9 +43,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const [present] = useIonActionSheet();
 
   const openOptions = () => {
-    const isService = p.is_service === true || (p.is_service !== false && p.category === 'Servicios');
-    const isFormula = !isService && Boolean((p.recipe && p.recipe.length > 0) || p.isCombo);
-    const isResale = !isService && !isFormula;
+    const currentType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = 
+      p.product_type || 
+      (p.is_service === true || p.category === 'Servicios' ? 'SERVICIO' : 
+      ((p.recipe && p.recipe.length > 0) || p.isCombo ? 'FORMULA' : 'REVENTA'));
+    const isService = currentType === 'SERVICIO';
+    const isFormula = currentType === 'FORMULA';
+    const isResale = currentType === 'REVENTA';
 
     const buttons: any[] = [
       { text: 'Editar Info / Precio', icon: pencilOutline, cssClass: 'action-sheet-editar', handler: () => onEdit(p) }
@@ -57,11 +61,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
     if (p.isCombo) {
       buttons.push({ text: 'Configurar Combo', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
-    } else if (featureRecipes) {
+    } else if (featureRecipes && (isFormula || !isService)) {
       buttons.push({ text: 'Configurar Fórmula / Receta', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
     }
 
-    buttons.push({ text: 'Stock Inicial / Ajuste', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) });
+    if (!isService) {
+      buttons.push({ text: 'Stock Inicial / Ajuste', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) });
+    }
 
     if (featureProduction !== false && (p.isCombo || (p.recipe && p.recipe.length > 0)) && onToggleKitting && (p.isCombo || featureRecipes)) {
       buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Hecho al Instante' : 'Pre-Fabricado'}`, icon: swapHorizontalOutline, cssClass: 'action-sheet-cambiar', handler: () => onToggleKitting(p) });
@@ -72,7 +78,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     }
 
     if (onConvertType) {
-      if (!isResale && featureBuySell) {
+      if (currentType !== 'REVENTA' && featureBuySell) {
         buttons.push({
           text: 'Convertir a Reventa Directa',
           icon: cubeOutline,
@@ -80,7 +86,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           handler: () => onConvertType(p, 'REVENTA')
         });
       }
-      if (!isFormula && featureRecipes) {
+      if (currentType !== 'FORMULA' && featureRecipes) {
         buttons.push({
           text: 'Convertir a Producto Armable / Fórmula',
           icon: buildOutline,
@@ -88,7 +94,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           handler: () => onConvertType(p, 'FORMULA')
         });
       }
-      if (!isService && featureCustomerSchedules) {
+      if (currentType !== 'SERVICIO' && featureCustomerSchedules) {
         buttons.push({
           text: 'Convertir a Servicio / Cita',
           icon: cutOutline,
@@ -139,8 +145,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     return null;
   };
   const imageUrl = getProductImage();
-  const isService = p.is_service === true || (p.is_service !== false && p.category === 'Servicios');
-  const isResale = !isService && !p.isCombo && (!p.recipe || p.recipe.length === 0);
+  const currentType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = 
+    p.product_type || 
+    (p.is_service === true || p.category === 'Servicios' ? 'SERVICIO' : 
+    ((p.recipe && p.recipe.length > 0) || p.isCombo ? 'FORMULA' : 'REVENTA'));
+  const isService = currentType === 'SERVICIO';
+  const isFormula = currentType === 'FORMULA';
+  const isResale = currentType === 'REVENTA';
   const costValue = p.cost !== undefined && p.cost !== null && Number(p.cost) > 0 ? Number(p.cost) : (p.estimatedCost ? Number(p.estimatedCost) : 0);
   const currentStock = p.stock !== undefined && p.stock !== null ? p.stock : p.stockQuantity;
 
@@ -163,9 +174,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 5px 0', lineHeight: '1.3' }}>{p.name}</h2>
             
             {!isClientMode && (
-              <p style={{ margin: '0 0 8px 0', color: 'gray', fontSize: '0.85rem' }}>
-                {p.category || 'Sin categoría'} - {p.isCombo ? 'Combo' : isResale ? 'Reventa' : 'Base'}
-              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0 0 8px 0', flexWrap: 'wrap' }}>
+                <span style={{ color: '#64748b', fontSize: '0.85rem' }}>{p.category || 'Sin categoría'}</span>
+                <span style={{
+                  fontSize: '0.72rem',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  fontWeight: 'bold',
+                  backgroundColor: isResale ? '#dcfce7' : isFormula ? '#fef3c7' : '#e0e7ff',
+                  color: isResale ? '#166534' : isFormula ? '#92400e' : '#3730a3',
+                }}>
+                  {isResale ? '📦 Reventa' : isFormula ? '🧪 Armable / Fórmula' : '💆 Servicio'}
+                </span>
+              </div>
             )}
             
             <p style={{ margin: '0 0 12px 0', fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--ion-color-dark)' }}>

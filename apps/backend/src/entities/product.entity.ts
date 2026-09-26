@@ -49,6 +49,9 @@ export class Product {
   @Column({ name: 'is_service', default: false })
   is_service: boolean;
 
+  @Column({ name: 'product_type', type: 'varchar', nullable: true, default: 'REVENTA' })
+  product_type: string;
+
   @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   physicalStock: number;
 

@@ -72,11 +72,14 @@ export class ProductsService {
         baseCost = Number(p.estimatedCost);
       }
 
+      const computedType = p.product_type || (p.is_service === true || p.category === 'Servicios' ? 'SERVICIO' : ((p.recipe && p.recipe.length > 0) || p.isCombo ? 'FORMULA' : 'REVENTA'));
+
       return {
         ...p,
+        product_type: computedType,
         cost: p.cost !== undefined && p.cost !== null ? Number(p.cost) : (p.estimatedCost ? Number(p.estimatedCost) : 0),
         stock: finalStock,
-        is_service: p.is_service === true || (p.is_service !== false && p.category === 'Servicios'),
+        is_service: computedType === 'SERVICIO',
         baseCost,
         stockQuantity: finalStock,
         physicalStock: finalPhysical,
@@ -94,15 +97,17 @@ export class ProductsService {
   async create(tenantId: string, dto: CreateProductDto) {
     const stockVal = dto.stock !== undefined ? dto.stock : (dto.stockQuantity || 0);
     const costVal = dto.cost !== undefined ? dto.cost : (dto.estimatedCost || 0);
-    const isServiceVal = dto.is_service !== undefined ? dto.is_service : false;
+    const isServiceVal = dto.product_type === 'SERVICIO' || dto.is_service === true;
+    const finalType = dto.product_type || (isServiceVal ? 'SERVICIO' : (dto.category === 'Servicios' ? 'SERVICIO' : 'REVENTA'));
     const product = this.productRepo.create({
       ...dto,
-      stock: stockVal,
-      stockQuantity: stockVal,
-      physicalStock: stockVal,
+      stock: isServiceVal ? 0 : stockVal,
+      stockQuantity: isServiceVal ? 0 : stockVal,
+      physicalStock: isServiceVal ? 0 : stockVal,
       cost: costVal,
       estimatedCost: costVal,
       is_service: isServiceVal,
+      product_type: finalType,
       tenantId
     });
     return this.productRepo.save(product);
@@ -396,6 +401,7 @@ export class ProductsService {
 
     switch (dto.targetType) {
       case ProductArchetype.SERVICIO:
+        product.product_type = 'SERVICIO';
         product.is_service = true;
         product.category = dto.newCategory || (product.category === 'General' ? 'Servicios' : (product.category || 'Servicios'));
         product.durationMinutes = dto.durationMinutes || product.durationMinutes || 30;
@@ -407,6 +413,7 @@ export class ProductsService {
         break;
 
       case ProductArchetype.REVENTA:
+        product.product_type = 'REVENTA';
         product.is_service = false;
         product.durationMinutes = null;
         if (product.category === 'Servicios') {
@@ -422,6 +429,7 @@ export class ProductsService {
         break;
 
       case ProductArchetype.FORMULA:
+        product.product_type = 'FORMULA';
         product.is_service = false;
         product.durationMinutes = null;
         if (product.category === 'Servicios') {
