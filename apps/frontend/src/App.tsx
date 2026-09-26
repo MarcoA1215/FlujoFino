@@ -41,6 +41,7 @@ import '@ionic/react/css/display.css';
 import './theme.css';
 
 import BottomNav from './components/BottomNav';
+import ErrorBoundary from './components/ErrorBoundary';
 
 setupIonicReact();
 
@@ -112,7 +113,9 @@ const App: React.FC = () => {
       <ImageViewerProvider>
         <IonApp>
           <IonReactRouter>
-            <MainLayout />
+            <ErrorBoundary>
+              <MainLayout />
+            </ErrorBoundary>
           </IonReactRouter>
         </IonApp>
       </ImageViewerProvider>

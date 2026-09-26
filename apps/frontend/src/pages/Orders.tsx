@@ -101,9 +101,10 @@ const Orders: React.FC = () => {
   const fetchOrders = async () => {
     try {
       const res = await apiClient.get<Order[]>('/orders');
-      setOrders(res.data);
+      setOrders(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       console.error(e);
+      setOrders([]);
       presentToast({ message: 'Error cargando pedidos', duration: 3000, color: 'danger' });
     }
   };
@@ -120,9 +121,11 @@ const Orders: React.FC = () => {
 
   const fetchEmployees = async () => {
     try {
-      const res = await apiClient.get<any[]>('/users');
-      setEmployees(res.data || []);
-    } catch (e) {}
+      const res = await apiClient.get<any[]>('/users/employees');
+      setEmployees(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      setEmployees([]);
+    }
   };
 
   useEffect(() => {
@@ -291,14 +294,17 @@ const Orders: React.FC = () => {
   };
 
   const counts = useMemo(() => {
-    const activos = orders.filter(o => o.status === OrderStatus.PENDING || o.status === OrderStatus.PREPARING).length;
-    const porCobrar = orders.filter(o => [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED).length;
-    const historial = orders.filter(o => o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED).length;
+    if (!Array.isArray(orders)) return { activos: 0, porCobrar: 0, historial: 0 };
+    const activos = orders.filter(o => o && (o.status === OrderStatus.PENDING || o.status === OrderStatus.PREPARING)).length;
+    const porCobrar = orders.filter(o => o && [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED).length;
+    const historial = orders.filter(o => o && (o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED)).length;
     return { activos, porCobrar, historial };
   }, [orders]);
 
   const filteredOrders = useMemo(() => {
+    if (!Array.isArray(orders)) return [];
     return orders.filter(o => {
+      if (!o) return false;
       const isActivo = o.status === OrderStatus.PENDING || o.status === OrderStatus.PREPARING;
       const isHistorial = o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED;
       const isPorCobrar = [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED;
@@ -313,12 +319,17 @@ const Orders: React.FC = () => {
 
       if (!searchText.trim()) return true;
       const q = searchText.toLowerCase();
+      const custName = String(o.customerName || '').toLowerCase();
+      const orderId = String(o.id || '').toLowerCase();
+      const notes = String(o.notes || '').toLowerCase();
+      const empUser = String(o.employee?.username || '').toLowerCase();
+      const empName = String(o.employee?.name || '').toLowerCase();
       return (
-        o.customerName.toLowerCase().includes(q) ||
-        (o.id && o.id.toLowerCase().includes(q)) ||
-        (o.notes && o.notes.toLowerCase().includes(q)) ||
-        (o.employee?.username && o.employee.username.toLowerCase().includes(q)) ||
-        (o.employee?.name && o.employee.name.toLowerCase().includes(q))
+        custName.includes(q) ||
+        orderId.includes(q) ||
+        notes.includes(q) ||
+        empUser.includes(q) ||
+        empName.includes(q)
       );
     });
   }, [orders, tab, searchText, selectedEmployeeFilter]);
@@ -404,6 +415,7 @@ const Orders: React.FC = () => {
           {/* Orders Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '14px' }}>
             {filteredOrders.map(order => {
+              if (!order) return null;
               const isDelivered = order.status === OrderStatus.DELIVERED;
               const isCanceled = order.status === OrderStatus.CANCELED;
               const isPreparing = order.status === OrderStatus.PREPARING;
@@ -412,9 +424,25 @@ const Orders: React.FC = () => {
               const isPaid = order.paymentStatus === PaymentStatus.PAID;
               const isPartial = order.paymentStatus === PaymentStatus.PARTIAL;
 
+              const cleanPhone = String(order.customerPhone || '').replace(/\D/g, '');
+              const shortId = String(order.id || '').slice(0, 8).toUpperCase();
+              const formattedDate = (() => {
+                if (!order.createdAt) return '';
+                try {
+                  const d = new Date(order.createdAt);
+                  return isNaN(d.getTime()) ? '' : d.toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' });
+                } catch {
+                  return '';
+                }
+              })();
+
+              const orderItems = Array.isArray(order.items) ? order.items : [];
+              const totalUsd = Number(order.totalAmount || 0);
+              const totalBs = (totalUsd * (Number(exchangeRate) || 40)).toFixed(2);
+
               return (
                 <div
-                  key={order.id}
+                  key={order.id || Math.random()}
                   className="ff-card"
                   style={{
                     padding: '16px',
@@ -429,10 +457,10 @@ const Orders: React.FC = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                       <div>
                         <div style={{ fontSize: '16px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>{order.customerName}</span>
-                          {order.customerPhone && (
+                          <span>{order.customerName || 'Cliente General'}</span>
+                          {cleanPhone && (
                             <a
-                              href={`https://wa.me/${order.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola ${order.customerName}, te escribimos respecto a tu pedido #${order.id.slice(0, 8).toUpperCase()}.`)}`}
+                              href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(`Hola ${order.customerName || 'Cliente'}, te escribimos respecto a tu pedido #${shortId}.`)}`}
                               target="_blank"
                               rel="noreferrer"
                               style={{ color: '#10B981', display: 'inline-flex' }}
@@ -442,9 +470,11 @@ const Orders: React.FC = () => {
                             </a>
                           )}
                         </div>
-                        <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
-                          {new Date(order.createdAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
-                        </div>
+                        {formattedDate && (
+                          <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+                            {formattedDate}
+                          </div>
+                        )}
                       </div>
 
                       {/* Status Badge */}
@@ -456,7 +486,7 @@ const Orders: React.FC = () => {
                           className="ff-pill-dot"
                           style={{ background: isDelivered ? '#10B981' : (isPreparing ? '#3B82F6' : (isCanceled ? '#EF4444' : '#F59E0B')) }}
                         />
-                        <span>{order.status}</span>
+                        <span>{order.status || 'PENDING'}</span>
                       </div>
                     </div>
 
@@ -473,34 +503,45 @@ const Orders: React.FC = () => {
                           {order.deliveryMethod}
                         </span>
                       )}
-                      {order.employee && (
+                      {order.employee && typeof order.employee === 'object' && (
                         <span style={{ fontSize: '11px', fontWeight: '600', padding: '3px 8px', borderRadius: '6px', background: '#ECFDF5', color: '#065F46', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <IonIcon icon={personOutline} />
-                          {order.employee.username || order.employee.name}
+                          {order.employee.username || order.employee.name || 'Personal'}
                         </span>
                       )}
                     </div>
 
                     {/* Items List */}
                     <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '10px 12px', marginBottom: '12px', border: '1px solid #E2E8F0' }}>
-                      {order.items?.map((it, idx) => (
-                        <div key={idx} style={{ fontSize: '13px', color: '#334155', padding: '2px 0', display: 'flex', justifyContent: 'space-between' }}>
-                          <span>{it.quantity}x {it.productName || it.product?.name}</span>
-                          <span style={{ fontWeight: '600', color: '#0F172A' }}>
-                            ${Number(it.unitPrice ? it.unitPrice * it.quantity : 0).toFixed(2)}
-                          </span>
+                      {orderItems.map((it, idx) => {
+                        if (!it) return null;
+                        const pName = it.productName || it.product?.name || 'Producto';
+                        const qty = Number(it.quantity) || 1;
+                        const uPrice = Number(it.unitPrice) || 0;
+                        return (
+                          <div key={it.id || idx} style={{ fontSize: '13px', color: '#334155', padding: '2px 0', display: 'flex', justifyContent: 'space-between' }}>
+                            <span>{qty}x {pName}</span>
+                            <span style={{ fontWeight: '600', color: '#0F172A' }}>
+                              ${(uPrice * qty).toFixed(2)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {orderItems.length === 0 && (
+                        <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
+                          Sin desglose de items
                         </div>
-                      ))}
+                      )}
                     </div>
 
                     {/* Price & Payment Status */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                       <div>
                         <div style={{ fontSize: '18px', fontWeight: '900', color: '#10B981' }}>
-                          ${Number(order.totalAmount || 0).toFixed(2)}
+                          ${totalUsd.toFixed(2)}
                         </div>
                         <div style={{ fontSize: '11px', color: '#64748B' }}>
-                          Bs. {(Number(order.totalAmount || 0) * exchangeRate).toFixed(2)}
+                          Bs. {totalBs}
                         </div>
                       </div>
 
@@ -630,7 +671,7 @@ const Orders: React.FC = () => {
                 <div style={{ padding: '20px' }}>
                   <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
                     <div style={{ fontSize: '16px', fontWeight: '800', color: '#0F172A', marginBottom: '4px' }}>
-                      {selectedOrderForDetails.customerName}
+                      {selectedOrderForDetails.customerName || 'Cliente General'}
                     </div>
                     {selectedOrderForDetails.customerPhone && (
                       <div style={{ fontSize: '13px', color: '#64748B', marginBottom: '4px' }}>
@@ -651,14 +692,20 @@ const Orders: React.FC = () => {
                     Productos y Servicios
                   </h4>
                   <div style={{ background: '#F8FAFC', borderRadius: '14px', padding: '12px', border: '1px solid #E2E8F0', marginBottom: '16px' }}>
-                    {selectedOrderForDetails.items?.map((it, idx) => (
-                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #EEF2F6', fontSize: '13px' }}>
-                        <span>{it.quantity}x {it.productName || it.product?.name}</span>
-                        <span style={{ fontWeight: '700', color: '#0F172A' }}>
-                          ${Number(it.unitPrice ? it.unitPrice * it.quantity : 0).toFixed(2)}
-                        </span>
-                      </div>
-                    ))}
+                    {Array.isArray(selectedOrderForDetails.items) && selectedOrderForDetails.items.map((it, idx) => {
+                      if (!it) return null;
+                      const pName = it.productName || it.product?.name || 'Producto';
+                      const qty = Number(it.quantity) || 1;
+                      const uPrice = Number(it.unitPrice) || 0;
+                      return (
+                        <div key={it.id || idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #EEF2F6', fontSize: '13px' }}>
+                          <span>{qty}x {pName}</span>
+                          <span style={{ fontWeight: '700', color: '#0F172A' }}>
+                            ${(uPrice * qty).toFixed(2)}
+                          </span>
+                        </div>
+                      );
+                    })}
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', paddingTop: '8px', borderTop: '2px dashed #E2E8F0', fontWeight: '800', fontSize: '16px', color: '#10B981' }}>
                       <span>Total:</span>
                       <span>${Number(selectedOrderForDetails.totalAmount || 0).toFixed(2)}</span>
