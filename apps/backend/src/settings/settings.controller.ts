@@ -17,13 +17,13 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get('exchange-rate')
-  getRate() {
-    return this.settingsService.getExchangeRate();
+  getRate(@Request() req: any) {
+    return this.settingsService.getExchangeRate(req.user?.tenantId);
   }
 
   @Put('exchange-rate')
-  updateRate(@Body('rate') rate: number) {
-    return this.settingsService.updateExchangeRate(rate);
+  updateRate(@Request() req: any, @Body('rate') rate: number) {
+    return this.settingsService.updateExchangeRate(rate, req.user?.tenantId);
   }
 }
 

@@ -809,95 +809,57 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
           </IonButtons>
           <IonTitle>POS / Caja</IonTitle>
           <IonButtons slot="end">
+            {/* Único botón/indicador de estado y simulación offline */}
             <IonButton 
-              fill={isSimulatingOffline ? "solid" : "outline"} 
-              color={isSimulatingOffline ? "danger" : "dark"}
+              fill={isSimulatingOffline ? 'solid' : 'outline'} 
+              color={isSimulatingOffline ? 'danger' : 'light'}
               onClick={toggleOfflineSimulation} 
-              style={{ fontWeight: 'bold', marginRight: '6px', textTransform: 'none' }}
-              title="Simular Offline para pruebas inmediatas"
+              style={{ fontWeight: '600', marginRight: '6px', textTransform: 'none' }}
+              title={isSimulatingOffline ? 'Desactivar simulación offline' : 'Clic para simular modo sin internet'}
             >
-              <IonIcon icon={flashOutline} slot="start" />
-              {isSimulatingOffline ? '⚡ Desactivar Simulación' : '⚡ Simular Offline'}
+              <IonIcon icon={(!isOnline || isSimulatingOffline) ? cloudOfflineOutline : cloudDoneOutline} slot="start" />
+              {(!isOnline || isSimulatingOffline) 
+                ? (isSimulatingOffline ? '⚡ Offline (Simulado)' : '🟠 Modo Offline') 
+                : '🟢 En línea'}
             </IonButton>
+
+            {/* Botón sincronizar: solo aparece cuando hay ventas pendientes */}
+            {pendingOfflineCount > 0 && (
+              <IonButton 
+                fill="solid" 
+                color="warning" 
+                onClick={syncPendingOrders}
+                disabled={isSyncing || (!isOnline && !isSimulatingOffline)}
+                style={{ fontWeight: 'bold', marginRight: '6px', textTransform: 'none' }}
+                title="Sincronizar ventas offline con el servidor"
+              >
+                {isSyncing ? (
+                  <>
+                    <IonSpinner name="crescent" slot="start" style={{ width: '14px', height: '14px', marginRight: '4px' }} />
+                    Sincronizando...
+                  </>
+                ) : (
+                  <>
+                    <IonIcon icon={syncOutline} slot="start" />
+                    📦 {pendingOfflineCount} Sincronizar
+                  </>
+                )}
+              </IonButton>
+            )}
+
             <IonButton fill="solid" color="dark" onClick={openCashClose} style={{ fontWeight: 'bold', marginRight: '6px' }}>
               <IonIcon icon={walletOutline} slot="start" />
-              Cierre de Caja
+              Cierre
             </IonButton>
-            <IonButton onClick={fetchProducts}><IonIcon icon={refreshOutline} /></IonButton>
+            <IonButton onClick={fetchProducts} title="Recargar catálogo">
+              <IonIcon icon={refreshOutline} />
+            </IonButton>
             <IonButton onClick={() => (user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'ADMIN' || (user?.role as string) === 'SUPERADMIN') ? openRateAlert() : presentToast({message: 'Solo el administrador puede configurar la tasa', duration: 2000, color: 'warning'})}>
-              <IonBadge color="light" style={{ padding: '8px', fontSize: '1rem', color: '#000' }}>
+              <IonBadge color="light" style={{ padding: '8px', fontSize: '0.95rem', color: '#000', fontWeight: 'bold' }}>
                 Tasa: Bs. {exchangeRate.toFixed(2)}
               </IonBadge>
             </IonButton>
           </IonButtons>
-        </IonToolbar>
-
-        {/* Connectivity Bar & Offline Controls */}
-        <IonToolbar color={(!isOnline || isSimulatingOffline) ? 'warning' : 'light'} style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 12px', flexWrap: 'wrap', gap: '8px', width: '100%' }}>
-            
-            {/* Status & Simulation Toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              {(!isOnline || isSimulatingOffline) ? (
-                <IonBadge color="dark" style={{ fontSize: '0.85rem', padding: '6px 12px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <IonIcon icon={cloudOfflineOutline} style={{ color: '#ffc409', fontSize: '1.1rem' }} />
-                  <span>🟠 Modo Offline Activo {isSimulatingOffline && '(Simulación)'}</span>
-                </IonBadge>
-              ) : (
-                <IonBadge color="success" style={{ fontSize: '0.85rem', padding: '6px 12px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <IonIcon icon={cloudDoneOutline} style={{ fontSize: '1.1rem' }} />
-                  <span>🟢 En línea</span>
-                </IonBadge>
-              )}
-
-              <IonButton 
-                fill={isSimulatingOffline ? 'solid' : 'outline'} 
-                color={isSimulatingOffline ? 'danger' : 'dark'}
-                size="small"
-                onClick={toggleOfflineSimulation}
-                style={{ fontWeight: '600', textTransform: 'none' }}
-              >
-                <IonIcon icon={flashOutline} slot="start" />
-                {isSimulatingOffline ? '⚡ Desactivar Simulación' : '⚡ Simular Offline'}
-              </IonButton>
-            </div>
-
-            {/* Pending Orders Counter & Sync Button */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              {pendingOfflineCount > 0 ? (
-                <>
-                  <IonBadge color="secondary" style={{ fontSize: '0.85rem', padding: '6px 12px', borderRadius: '16px' }}>
-                    📦 {pendingOfflineCount} {pendingOfflineCount === 1 ? 'venta por sincronizar' : 'ventas por sincronizar'}
-                  </IonBadge>
-                  <IonButton 
-                    size="small" 
-                    fill="solid" 
-                    color="primary"
-                    disabled={isSyncing || (!isOnline && !isSimulatingOffline)}
-                    onClick={syncPendingOrders}
-                    style={{ fontWeight: 'bold', textTransform: 'none' }}
-                  >
-                    {isSyncing ? (
-                      <>
-                        <IonSpinner name="crescent" slot="start" style={{ width: '16px', height: '16px', marginRight: '6px' }} />
-                        Sincronizando...
-                      </>
-                    ) : (
-                      <>
-                        <IonIcon icon={syncOutline} slot="start" />
-                        🔄 Sincronizar Ahora
-                      </>
-                    )}
-                  </IonButton>
-                </>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#666', fontSize: '0.85rem' }}>
-                  <span>✓ Sin ventas pendientes</span>
-                </div>
-              )}
-            </div>
-
-          </div>
         </IonToolbar>
       </IonHeader>
 

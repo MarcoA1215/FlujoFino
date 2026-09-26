@@ -31,15 +31,24 @@ export class SettingsService implements OnModuleInit {
   }
 
   async getSettings(tenantId?: string) {
+    const globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+    const globalRate = globalSettings?.exchangeRateBs ? Number(globalSettings.exchangeRateBs) : 40.0;
+
     if (tenantId) {
       const tenantSettings = await this.settingsRepo.findOne({ where: { tenantId } });
       if (tenantSettings) {
         const { encodeTenantId } = require('../utils/tenant-crypto');
-        return { ...tenantSettings, publicToken: encodeTenantId(tenantId) };
+        const tenantRate = Number(tenantSettings.exchangeRateBs || 0);
+        // Si el tenant tiene la tasa en 40.0 (default) o vacía, toma la tasa real activa sincronizada
+        const effectiveRate = (tenantRate > 0 && tenantRate !== 40.0) ? tenantRate : globalRate;
+        return { 
+          ...tenantSettings, 
+          exchangeRateBs: effectiveRate,
+          publicToken: encodeTenantId(tenantId) 
+        };
       }
     }
-    const globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
-    return globalSettings || { exchangeRateBs: 40.0 };
+    return globalSettings || { exchangeRateBs: globalRate };
   }
 
   async updateSettings(tenantId: string | undefined, payload: Partial<Settings>) {
@@ -127,14 +136,27 @@ export class SettingsService implements OnModuleInit {
     return this.getSettings(tenantId);
   }
 
-  async getExchangeRate() {
-    const settings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
-    return { exchangeRateBs: settings?.exchangeRateBs || 40.0 };
+  async getExchangeRate(tenantId?: string) {
+    const s = await this.getSettings(tenantId);
+    return { exchangeRateBs: Number(s.exchangeRateBs || 40.0) };
   }
 
-  async updateExchangeRate(rate: number) {
-    await this.settingsRepo.update('GLOBAL', { exchangeRateBs: rate });
-    return this.getExchangeRate();
+  async updateExchangeRate(rate: number, tenantId?: string) {
+    await this.settingsRepo.update({ id: 'GLOBAL' }, { exchangeRateBs: rate });
+    if (tenantId) {
+      const tenantSettings = await this.settingsRepo.findOne({ where: { tenantId } });
+      if (tenantSettings) {
+        tenantSettings.exchangeRateBs = rate;
+        await this.settingsRepo.save(tenantSettings);
+      }
+    } else {
+      await this.settingsRepo.createQueryBuilder()
+        .update(Settings)
+        .set({ exchangeRateBs: rate })
+        .where('exchangeRateBs = :def OR exchangeRateBs IS NULL', { def: 40.0 })
+        .execute();
+    }
+    return this.getExchangeRate(tenantId);
   }
 
   async syncCotizave() {
