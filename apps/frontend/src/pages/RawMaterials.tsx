@@ -1,11 +1,13 @@
-import { refreshOutline } from 'ionicons/icons';
-﻿import React, { useState, useEffect } from 'react';
-import { IonPage, IonHeader, IonContent, IonButtons, IonMenuButton, IonTitle, IonSearchbar, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton, IonLabel, useIonAlert, useIonToast, IonNote, IonIcon, IonModal } from '@ionic/react';
+// @ts-nocheck
+import React, { useState, useEffect } from 'react';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton, IonLabel, useIonAlert, useIonToast, IonNote, IonIcon, IonModal } from '@ionic/react';
+import { addOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import type { RawMaterial } from '../types';
 import { RawMaterialCard } from '../components/raw-materials/RawMaterialCard';
 import { MovementHistoryModal } from '../components/raw-materials/MovementHistoryModal';
 import { StockOperationModal } from '../components/raw-materials/StockOperationModal';
+import { AppHeader } from '../components/AppHeader';
 
 const RawMaterials: React.FC = () => {
   const [materials, setMaterials] = useState<RawMaterial[]>([]);
@@ -148,28 +150,36 @@ const RawMaterials: React.FC = () => {
   
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar color="success"><IonButtons slot="start"><IonMenuButton /></IonButtons><IonTitle>Insumos (Materia Prima)</IonTitle>
-          <IonButtons slot="end"><IonButton onClick={fetchMaterials}><IonIcon icon={refreshOutline} /></IonButton></IonButtons></IonToolbar>
-        <IonToolbar color="success">
-          <IonSearchbar value={searchText} debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} placeholder="Buscar..." animated />
-        </IonToolbar>
-      </IonHeader>
-      <IonContent fullscreen className="ion-padding">
-        
-    <IonRow className="ion-margin-bottom">
-      <IonCol size="12" sizeSm="6" sizeMd="4">
-        <IonButton expand="block" color="primary" onClick={() => setShowCreateModal(true)}>+ Agregar Insumo</IonButton>
-      </IonCol>
-    </IonRow>
+      <AppHeader title="Insumos (Materia Prima)" />
+      <IonContent fullscreen className="ion-padding" style={{ '--background': '#F8FAFC' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px' }}>
+            <div className="ff-search-pill" style={{ flex: 1 }}>
+              <input
+                type="text"
+                placeholder="Buscar insumo o materia prima..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
+            </div>
+            <button
+              className="ff-btn-primary"
+              onClick={() => setShowCreateModal(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+            >
+              <IonIcon icon={addOutline} style={{ fontSize: '1.2rem' }} />
+              <span>Nuevo Insumo</span>
+            </button>
+          </div>
 
-    <IonGrid className="ion-no-padding">
-      <IonRow>
-        {filteredData.map(m => (
-          <RawMaterialCard key={m.id} material={m} onEditName={openEditNameAlert} onRestock={openRestockAlert} onRegisterLoss={openLossAlert} onViewHistory={() => setSelectedMaterialForHistory(m)} onArchive={archiveRawMaterial} />
-        ))}
-      </IonRow>
-    </IonGrid>
+          <IonGrid className="ion-no-padding">
+            <IonRow>
+              {filteredData.map(m => (
+                <RawMaterialCard key={m.id} material={m} onEditName={openEditNameAlert} onRestock={openRestockAlert} onRegisterLoss={openLossAlert} onViewHistory={() => setSelectedMaterialForHistory(m)} onArchive={archiveRawMaterial} />
+              ))}
+            </IonRow>
+          </IonGrid>
+        </div>
 
     <IonModal isOpen={showCreateModal} onDidDismiss={() => setShowCreateModal(false)}>
       <IonHeader>

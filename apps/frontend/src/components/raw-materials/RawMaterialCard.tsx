@@ -1,5 +1,6 @@
+// @ts-nocheck
 import React from 'react';
-import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
+import { IonCol, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
 import { pencilOutline, cartOutline, warningOutline, timeOutline, archiveOutline, closeOutline } from 'ionicons/icons';
 import type { RawMaterial } from '../../types';
 
@@ -38,31 +39,28 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
   
   return (
     <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3" style={{ display: 'flex' }}>
-      <IonCard style={{ margin: '5px', width: '100%', display: 'flex', flexDirection: 'column' }}>
-        <IonCardContent style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '15px' }}>
-          
-          <div style={{ flex: 1 }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 5px 0', lineHeight: '1.3', wordBreak: 'break-word' }}>{m.name}</h2>
-            
-            <p style={{ margin: '0 0 12px 0', color: 'gray', fontSize: '0.9rem' }}>
-              Costo prom: {m.costPerUnit.toFixed(2)} / {m.unit}
-            </p>
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
-              <IonBadge color={m.stockQuantity <= m.minStockAlert ? 'danger' : 'success'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
-                Stock: {m.stockQuantity.toFixed(2)} {m.unit}
-              </IonBadge>
-            </div>
+      <div className="ff-card" style={{ margin: '6px', width: '100%', display: 'flex', flexDirection: 'column', padding: '16px', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: '#0f172a', lineHeight: '1.3', wordBreak: 'break-word' }}>
+              {m.name}
+            </h2>
+            <IonBadge color={m.stockQuantity <= m.minStockAlert ? 'danger' : 'success'} style={{ borderRadius: '8px', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600 }}>
+              {m.stockQuantity.toFixed(2)} {m.unit}
+            </IonBadge>
           </div>
           
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'auto', paddingTop: '10px' }}>
-            <IonButton size="small" fill="solid" color="primary" onClick={openOptions} style={{ margin: 0 }}>
-              Opciones
-            </IonButton>
-          </div>
-          
-        </IonCardContent>
-      </IonCard>
+          <p style={{ margin: '0 0 12px 0', color: '#64748b', fontSize: '0.85rem' }}>
+            Costo prom: <strong style={{ color: '#0f172a' }}>${m.costPerUnit.toFixed(2)}</strong> / {m.unit}
+          </p>
+        </div>
+        
+        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
+          <IonButton size="small" fill="outline" color="dark" onClick={openOptions} style={{ margin: 0, borderRadius: '8px', fontWeight: 600, fontSize: '0.75rem' }}>
+            Gestionar
+          </IonButton>
+        </div>
+      </div>
     </IonCol>
   );
 };

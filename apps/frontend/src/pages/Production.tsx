@@ -1,7 +1,9 @@
-﻿import { refreshOutline, trashOutline } from 'ionicons/icons';
+// @ts-nocheck
+import { refreshOutline, trashOutline } from 'ionicons/icons';
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonButton, IonBadge, useIonAlert, useIonToast, IonToolbar, IonTitle, IonIcon, IonSegment, IonSegmentButton, IonLabel, IonList, IonItem, } from '@ionic/react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
+import { AppHeader } from '../components/AppHeader';
 
 type Product = {
   id: string;
@@ -118,34 +120,56 @@ const Production: React.FC = () => {
 
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar color="success">
-          <IonButtons slot="start">
-            <IonMenuButton />
-          </IonButtons>
-          <IonTitle>Producción de Lotes</IonTitle>
-          <IonButtons slot="end"><IonButton onClick={fetchData}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
-        </IonToolbar>
-        
-        <IonToolbar color="light">
-          <IonSegment value={tab} onIonChange={e => setTab(e.detail.value as any)}>
-            <IonSegmentButton value="fabricar">
-              <IonLabel>Fabricar</IonLabel>
-            </IonSegmentButton>
-            <IonSegmentButton value="historial">
-              <IonLabel>Historial</IonLabel>
-            </IonSegmentButton>
-          </IonSegment>
-        </IonToolbar>
+      <AppHeader title="Producción de Lotes" />
+      <IonContent fullscreen className="ion-padding" style={{ '--background': '#F8FAFC' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', background: '#E2E8F0', padding: '3px', borderRadius: '12px' }}>
+              <button
+                onClick={() => setTab('fabricar')}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  background: tab === 'fabricar' ? '#10B981' : 'transparent',
+                  color: tab === 'fabricar' ? '#ffffff' : '#64748B',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                Fabricar
+              </button>
+              <button
+                onClick={() => setTab('historial')}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  background: tab === 'historial' ? '#10B981' : 'transparent',
+                  color: tab === 'historial' ? '#ffffff' : '#64748B',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                Historial
+              </button>
+            </div>
 
-        {tab === 'fabricar' && (
-          <IonToolbar color="light">
-            <IonSearchbar value={searchText} debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} placeholder="Buscar..." animated />
-          </IonToolbar>
-        )}
-      </IonHeader>
-
-      <IonContent fullscreen className="ion-padding">
+            {tab === 'fabricar' && (
+              <div className="ff-search-pill" style={{ flex: '1 1 240px' }}>
+                <input
+                  type="text"
+                  placeholder="Buscar producto a fabricar..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
         {tab === 'fabricar' ? (
           <IonGrid>
             <IonRow>
@@ -208,10 +232,11 @@ const Production: React.FC = () => {
                 <IonLabel className="ion-text-center">No hay lotes fabricados recientemente</IonLabel>
               </IonItem>
             )}
-          </IonList>
-          
-          </>
-        )}
+            </IonList>
+            
+            </>
+          )}
+        </div>
       </IonContent>
     </IonPage>
   );

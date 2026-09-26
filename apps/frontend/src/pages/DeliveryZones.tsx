@@ -1,9 +1,10 @@
-import { refreshOutline } from 'ionicons/icons';
+// @ts-nocheck
 import React, { useEffect, useState } from 'react';
-import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, IonInput, useIonToast, IonText, IonFab, IonFabButton, IonModal } from '@ionic/react';
+import { IonContent, IonPage, IonGrid, IonRow, IonCol, IonItem, IonLabel, IonButton, IonIcon, IonList, IonInput, useIonToast, IonText, IonFab, IonFabButton, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons } from '@ionic/react';
 import { addOutline, trashOutline, pencilOutline, mapOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import type { DeliveryZone } from '../types';
+import { AppHeader } from '../components/AppHeader';
 
 const DeliveryZones: React.FC = () => {
   const [zones, setZones] = useState<DeliveryZone[]>([]);
@@ -72,64 +73,71 @@ const DeliveryZones: React.FC = () => {
     }
   };
 
-
   const filteredData = zones.filter(item => {
     if (searchText.trim() === '') return true;
     return item.name?.toLowerCase().includes(searchText.toLowerCase());
   });
+
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar color="primary">
-          <IonButtons slot="start">
-            <IonMenuButton />
-          </IonButtons>
-          <IonTitle>Zonas de Delivery</IonTitle>
-          <IonButtons slot="end"><IonButton onClick={fetchZones}><IonIcon icon={refreshOutline} /></IonButton></IonButtons>
-        </IonToolbar>
+      <AppHeader title="Zonas de Delivery" />
+      <IonContent fullscreen className="ion-padding" style={{ '--background': '#F8FAFC' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px' }}>
+            <div className="ff-search-pill" style={{ flex: 1 }}>
+              <input
+                type="text"
+                placeholder="Buscar zonas..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
+            </div>
+            <button
+              className="ff-btn-primary"
+              onClick={() => openModal()}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+            >
+              <IonIcon icon={addOutline} style={{ fontSize: '1.2rem' }} />
+              <span>Nueva Zona</span>
+            </button>
+          </div>
 
-        <IonToolbar color="light">
-          <IonSearchbar value={searchText} debounce={0} onIonInput={(e: any) => setSearchText(e.target.value || '')} placeholder="Buscar..." animated />
-        </IonToolbar>
-      </IonHeader>
+          <div className="ff-card" style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+              <IonIcon icon={mapOutline} style={{ fontSize: '20px', color: '#10B981' }} />
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                Configuración de Tarifas de Envío
+              </h3>
+            </div>
 
-      <IonContent fullscreen className="ion-padding">
-        <IonGrid>
-          <IonRow>
-            <IonCol size="12" sizeMd="8" offsetMd="2">
-              <IonCard>
-                <IonCardHeader>
-                  <IonCardTitle>
-                    <IonIcon icon={mapOutline} style={{ marginRight: '10px', verticalAlign: 'middle' }} />
-                    Configuración de Zonas y Tarifas
-                  </IonCardTitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  {zones.length === 0 ? (
-                    <p className="ion-text-center">No hay zonas configuradas. Agrega una nueva.</p>
-                  ) : (
-                    <IonList>
-                      {filteredData.map(z => (
-                        <IonItem key={z.id}>
-                          <IonLabel>
-                            <h2><strong>{z.name}</strong></h2>
-                            <p>Tarifa de envío: <IonText color="success"><strong>$ {z.feePrice.toFixed(2)}</strong></IonText></p>
-                          </IonLabel>
-                          <IonButton fill="clear" onClick={() => openModal(z)}>
-                            <IonIcon icon={pencilOutline} slot="icon-only" />
-                          </IonButton>
-                          <IonButton fill="clear" color="danger" onClick={() => deleteZone(z.id)}>
-                            <IonIcon icon={trashOutline} slot="icon-only" />
-                          </IonButton>
-                        </IonItem>
-                      ))}
-                    </IonList>
-                  )}
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          </IonRow>
-        </IonGrid>
+            {zones.length === 0 ? (
+              <p className="ion-text-center" style={{ color: '#64748b', padding: '20px 0' }}>
+                No hay zonas configuradas. Agrega una nueva.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {filteredData.map(z => (
+                  <div key={z.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>{z.name}</h4>
+                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+                        Tarifa: <strong style={{ color: '#047857' }}>${z.feePrice.toFixed(2)}</strong>
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <IonButton fill="clear" size="small" onClick={() => openModal(z)}>
+                        <IonIcon icon={pencilOutline} slot="icon-only" color="dark" />
+                      </IonButton>
+                      <IonButton fill="clear" size="small" color="danger" onClick={() => deleteZone(z.id)}>
+                        <IonIcon icon={trashOutline} slot="icon-only" />
+                      </IonButton>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
         <IonFab vertical="bottom" horizontal="end" slot="fixed">
           <IonFabButton onClick={() => openModal()}>

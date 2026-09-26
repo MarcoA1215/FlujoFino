@@ -1,17 +1,38 @@
 // @ts-nocheck
-﻿import { useContext } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  IonPage,
+  IonContent,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonIcon,
+  IonSpinner,
+  useIonToast
+} from '@ionic/react';
+import {
+  trendingUpOutline,
+  trendingDownOutline,
+  walletOutline,
+  cartOutline,
+  pieChartOutline,
+  alertCircleOutline,
+  addOutline,
+  calendarOutline,
+  peopleOutline,
+  cardOutline
+} from 'ionicons/icons';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
-import {
-  IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonIcon, IonText, useIonToast, IonList, IonItem, IonLabel, IonBadge, IonButton } from '@ionic/react';
-import { refreshOutline, alertCircleOutline, trendingDownOutline, basketOutline, trendingUpOutline, pieChartOutline, walletOutline, cartOutline } from 'ionicons/icons';
-import React, { useEffect, useState } from 'react';
-import { apiClient } from '../api/client';
 import type { DashboardSummary } from '../types';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import AppHeader from '../components/AppHeader';
 
 const Dashboard: React.FC = () => {
   const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [settings, setSettings] = useState<any>({});
   const [presentToast] = useIonToast();
@@ -27,242 +48,305 @@ const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchSummary(); apiClient.get('/settings').then(res => setSettings(res.data));
+    fetchSummary();
+    apiClient.get('/settings').then(res => setSettings(res.data)).catch(() => {});
   }, []);
 
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar color="success">
-          <IonButtons slot="start">
-            <IonMenuButton />
-          </IonButtons>
-          <IonTitle>Tablero de Inventario y Alertas</IonTitle>
-          <IonButtons slot="end">
-            <IonButton onClick={fetchSummary}>
-              <IonIcon icon={refreshOutline} />
-            </IonButton>
-          </IonButtons>
-        </IonToolbar>
-      </IonHeader>
+      <AppHeader title="Inicio" subtitle={user?.tenantName} onRefresh={fetchSummary} />
 
-      <IonContent fullscreen className="ion-padding">
-        {!summary ? (
-          <p>Cargando datos...</p>
-        ) : (
-          <IonGrid>
-            {/* Main KPIs Row */}
-            {user?.role === UserRole.ADMIN && (
-              <IonRow>
-              <IonCol size="12" sizeSm="6" sizeMd="3">
-              <IonCard color="tertiary">
-                <IonCardHeader>
-                  <IonCardTitle className="ion-text-center">
-                    <IonIcon icon={walletOutline} style={{ fontSize: '2rem' }} />
-                    <br />
-                    Ingresos Históricos
-                  </IonCardTitle>
-                </IonCardHeader>
-                <IonCardContent className="ion-text-center">
-                  <h2>$ {(summary.historicalRevenue || 0).toFixed(2)}</h2>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
+      <IonContent fullscreen className="ff-has-bottom-nav" style={{ '--background': '#F8FAFC' } as any}>
+        <div style={{ maxWidth: '1050px', margin: '0 auto', padding: '16px 16px 80px 16px' }}>
 
-            <IonCol size="12" sizeSm="6" sizeMd="3">
-              <IonCard color="warning">
-                <IonCardHeader>
-                  <IonCardTitle className="ion-text-center">
-                    <IonIcon icon={cartOutline} style={{ fontSize: '2rem' }} />
-                    <br />
-                    Gastos de Reinversión
-                  </IonCardTitle>
-                </IonCardHeader>
-                <IonCardContent className="ion-text-center">
-                  <h2 style={{ color: 'white' }}>$ {(summary.reinvestmentExpense || 0).toFixed(2)}</h2>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'white' }}>Inv: $ {(summary.historicalInvestment || 0).toFixed(2)} - Cap: $ {(summary.totalInventoryCapital || 0).toFixed(2)}</p>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
+          {/* Quick Actions Bar */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+            <button
+              type="button"
+              onClick={() => navigate('/pos')}
+              className="ff-btn-primary"
+              style={{ padding: '12px 14px', borderRadius: '14px', fontSize: '13px' }}
+            >
+              <IonIcon icon={cardOutline} style={{ fontSize: '18px' }} />
+              Nueva Venta
+            </button>
 
-            <IonCol size="12" sizeSm="6" sizeMd="4">
-              <IonCard color="success">
-                <IonCardHeader>
-                  <IonCardTitle className="ion-text-center">
-                    <IonIcon icon={trendingUpOutline} style={{ fontSize: '2rem' }} />
-                    <br />
-                    Ganancia Neta Real
-                  </IonCardTitle>
-                </IonCardHeader>
-                <IonCardContent className="ion-text-center">
-                  <h2>$ {(summary.historicalProfit || 0).toFixed(2)}</h2>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
+            <button
+              type="button"
+              onClick={() => navigate('/reservations')}
+              style={{
+                background: '#ffffff',
+                border: '1px solid #E2E8F0',
+                color: '#0F172A',
+                borderRadius: '14px',
+                padding: '12px 14px',
+                fontSize: '13px',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                boxShadow: 'var(--ff-shadow-sm)'
+              }}
+            >
+              <IonIcon icon={calendarOutline} style={{ fontSize: '18px', color: '#10B981' }} />
+              Agenda / Citas
+            </button>
 
-            <IonCol size="12" sizeSm="6" sizeMd="4">
-              <IonCard color="tertiary">
-                <IonCardHeader>
-                  <IonCardTitle className="ion-text-center">
-                    <IonIcon icon={trendingDownOutline} style={{ fontSize: '2rem' }} />
-                    <br />
-                    Nómina y Sueldos
-                  </IonCardTitle>
-                </IonCardHeader>
-                <IonCardContent className="ion-text-center">
-                  <h2>$ {(summary.payrollExpenses || 0).toFixed(2)}</h2>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
+            <button
+              type="button"
+              onClick={() => navigate('/customers')}
+              style={{
+                background: '#ffffff',
+                border: '1px solid #E2E8F0',
+                color: '#0F172A',
+                borderRadius: '14px',
+                padding: '12px 14px',
+                fontSize: '13px',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                boxShadow: 'var(--ff-shadow-sm)'
+              }}
+            >
+              <IonIcon icon={peopleOutline} style={{ fontSize: '18px', color: '#3B82F6' }} />
+              Clientes
+            </button>
+          </div>
 
-            <IonCol size="12" sizeSm="6" sizeMd="4">
-              <IonCard color="danger">
-                <IonCardHeader>
-                  <IonCardTitle className="ion-text-center">
-                    <IonIcon icon={trendingDownOutline} style={{ fontSize: '2rem' }} />
-                    <br />
-                    Mermas y Pérdidas
-                  </IonCardTitle>
-                </IonCardHeader>
-                <IonCardContent className="ion-text-center">
-                  <h2>$ {(summary.totalLosses || 0).toFixed(2)}</h2>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          </IonRow>
+          {!summary ? (
+            <div style={{ textAlign: 'center', padding: '60px 0' }}>
+              <IonSpinner name="crescent" color="primary" />
+              <p style={{ marginTop: '12px', color: '#64748B', fontWeight: '500' }}>Cargando métricas...</p>
+            </div>
+          ) : (
+            <div>
+              {/* Main KPIs (Cards) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+                
+                {/* Ingresos Históricos */}
+                <div className="ff-card" style={{ padding: '16px', background: '#ffffff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#64748B' }}>Ingresos Totales</span>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#ECFDF5', color: '#047857', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <IonIcon icon={walletOutline} style={{ fontSize: '20px' }} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#0F172A' }}>
+                    ${(summary.historicalRevenue || 0).toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#10B981', fontWeight: '700', marginTop: '4px' }}>
+                    Ventas facturadas
+                  </div>
+                </div>
+
+                {/* Ganancia Neta Real */}
+                <div className="ff-card" style={{ padding: '16px', background: '#ffffff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#64748B' }}>Ganancia Neta Real</span>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#ECFDF5', color: '#047857', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <IonIcon icon={trendingUpOutline} style={{ fontSize: '20px' }} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#10B981' }}>
+                    ${(summary.historicalProfit || 0).toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: '600', marginTop: '4px' }}>
+                    Margen después de costos
+                  </div>
+                </div>
+
+                {/* Gastos de Reinversión */}
+                <div className="ff-card" style={{ padding: '16px', background: '#ffffff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#64748B' }}>Reinversión / Stock</span>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FFFBEB', color: '#B45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <IonIcon icon={cartOutline} style={{ fontSize: '20px' }} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#0F172A' }}>
+                    ${(summary.reinvestmentExpense || 0).toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
+                    Cap. Insumos: ${(summary.totalInventoryCapital || 0).toFixed(2)}
+                  </div>
+                </div>
+
+                {/* Nómina y Mermas */}
+                <div className="ff-card" style={{ padding: '16px', background: '#ffffff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#64748B' }}>Mermas & Pérdidas</span>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FEF2F2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <IonIcon icon={trendingDownOutline} style={{ fontSize: '20px' }} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#DC2626' }}>
+                    ${(summary.totalLosses || 0).toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
+                    Nómina: ${(summary.payrollExpenses || 0).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Chart & Top Products Row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+                
+                {/* Sales Chart */}
+                <div className="ff-card" style={{ padding: '20px', background: '#ffffff' }}>
+                  <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '800', color: '#0F172A' }}>
+                    📈 Ventas de los Últimos 7 Días
+                  </h3>
+                  <div style={{ height: '240px', width: '100%' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={summary.salesChart || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                        <XAxis dataKey="date" fontSize={11} stroke="#64748B" tickLine={false} />
+                        <YAxis fontSize={11} stroke="#64748B" tickLine={false} />
+                        <Tooltip
+                          contentStyle={{ background: '#0F172A', borderRadius: '10px', color: '#fff', border: 'none', fontSize: '12px' }}
+                          formatter={(value: any) => ['$' + Number(value).toFixed(2), 'Ventas']}
+                        />
+                        <Bar dataKey="total" fill="#10B981" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Top Products */}
+                <div className="ff-card" style={{ padding: '20px', background: '#ffffff' }}>
+                  <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <IonIcon icon={pieChartOutline} style={{ color: '#10B981' }} />
+                    Productos Más Vendidos
+                  </h3>
+
+                  {summary.topProducts.length === 0 ? (
+                    <p style={{ color: '#64748B', fontSize: '13px' }}>Aún no se han registrado ventas.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {summary.topProducts.map((p, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '8px 12px',
+                            background: '#F8FAFC',
+                            borderRadius: '10px',
+                            border: '1px solid #E2E8F0'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>
+                              {p.name}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#64748B' }}>
+                              {parseFloat(Number(p.quantity).toFixed(2))} unidades vendidas
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '14px', fontWeight: '800', color: '#10B981' }}>
+                            ${Number(p.revenue).toFixed(2)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Inventory Alerts */}
+              {settings?.featureRecipes && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+                  
+                  {/* Insumos por comprar */}
+                  <div className="ff-card" style={{ padding: '20px', background: '#ffffff' }}>
+                    <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <IonIcon icon={alertCircleOutline} style={{ color: '#EF4444' }} />
+                      Insumos por Reabastecer
+                    </h3>
+                    {summary.lowStockMaterials.length === 0 ? (
+                      <p style={{ color: '#64748B', fontSize: '13px' }}>Todos los insumos están en niveles óptimos.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {summary.lowStockMaterials.map(alert => (
+                          <div
+                            key={'mat-' + alert.id}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '10px 12px',
+                              borderRadius: '10px',
+                              background: '#FEF2F2',
+                              border: '1px solid #FECACA'
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: '800', color: '#991B1B' }}>
+                                {alert.name}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#7F1D1D' }}>
+                                Stock: {parseFloat(Number(alert.realStock).toFixed(2))} {alert.unit}
+                              </div>
+                            </div>
+                            <div style={{ background: '#EF4444', color: '#ffffff', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700' }}>
+                              Efectivo: {parseFloat(Number(alert.effectiveStock).toFixed(2))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Productos por Fabricar */}
+                  <div className="ff-card" style={{ padding: '20px', background: '#ffffff' }}>
+                    <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <IonIcon icon={alertCircleOutline} style={{ color: '#F59E0B' }} />
+                      Pedidos por Fabricar
+                    </h3>
+                    {summary.lowStockProducts.length === 0 ? (
+                      <p style={{ color: '#64748B', fontSize: '13px' }}>No hay pedidos pendientes por fabricar.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {summary.lowStockProducts.map(prod => (
+                          <div
+                            key={'prod-' + prod.id}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '10px 12px',
+                              borderRadius: '10px',
+                              background: '#FFFBEB',
+                              border: '1px solid #FDE68A'
+                            }}
+                          >
+                            <div style={{ fontSize: '13px', fontWeight: '800', color: '#92400E' }}>
+                              {prod.name}
+                            </div>
+                            <div style={{ background: '#F59E0B', color: '#ffffff', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700' }}>
+                              Fabricar: {parseFloat(Number(prod.toProduce).toFixed(2))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+            </div>
           )}
 
-            {/* Charts and Lists Row */}
-            {user?.role === UserRole.ADMIN && (
-              <IonRow className="ion-margin-top">
-                <IonCol size="12" sizeLg="8">
-                  <IonCard style={{ height: '100%' }}>
-                    <IonCardHeader>
-                      <IonCardTitle style={{ fontSize: '1.2rem' }}>Ventas de los últimos 7 días</IonCardTitle>
-                    </IonCardHeader>
-                    <IonCardContent style={{ height: '300px' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={summary.salesChart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" fontSize={12} />
-                          <YAxis fontSize={12} />
-                          <Tooltip formatter={(value: any) => ['$ ' + Number(value).toFixed(2), 'Ventas']} />
-                          <Bar dataKey="total" fill="#2dd36f" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </IonCardContent>
-                  </IonCard>
-                </IonCol>
-
-                <IonCol size="12" sizeLg="4">
-                  <IonCard style={{ height: '100%' }}>
-                    <IonCardHeader>
-                      <IonCardTitle style={{ fontSize: '1.2rem' }}>
-                        <IonIcon icon={pieChartOutline} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                        Productos más vendidos
-                      </IonCardTitle>
-                    </IonCardHeader>
-                    <IonCardContent>
-                      {summary.topProducts.length === 0 ? (
-                        <p style={{ color: 'gray', fontStyle: 'italic' }}>No hay ventas registradas aún.</p>
-                      ) : (
-                        <IonList>
-                          {summary.topProducts.map((p, i) => (
-                            <IonItem key={i}>
-                              <IonLabel>
-                                <h2>{p.name}</h2>
-                                <p>{parseFloat(Number(p.quantity).toFixed(4))} unidades vendidas</p>
-                              </IonLabel>
-                              <IonText slot="end" color="success">
-                                <strong>$ {p.revenue.toFixed(2)}</strong>
-                              </IonText>
-                            </IonItem>
-                          ))}
-                        </IonList>
-                      )}
-                    </IonCardContent>
-                  </IonCard>
-                </IonCol>
-              </IonRow>
-            )}
-
-            {settings?.featureRecipes && (
-              <IonRow className="ion-margin-top">
-                <IonCol size="12" sizeMd={summary.lowStockProducts.length === 0 ? "12" : "6"}>
-                  <IonCard>
-                    <IonCardHeader>
-                      <IonCardTitle style={{ fontSize: '1.2rem' }}>
-                        <IonIcon icon={alertCircleOutline} color="warning" style={{ verticalAlign: 'middle', marginRight: '8px' }} /> 
-                        Productos por Fabricar
-                      </IonCardTitle>
-                    </IonCardHeader>
-                    <IonCardContent>
-                      {summary.lowStockProducts.length === 0 ? (
-                        <p style={{ color: 'gray', fontStyle: 'italic' }}>No hay pedidos pendientes por fabricar.</p>
-                      ) : (
-                        <IonList>
-                          {summary.lowStockProducts.map(prod => (
-                            <IonItem key={'prod-' + prod.id}>
-                              <IonLabel>
-                                <IonText color="warning">
-                                  <h2 style={{ fontWeight: 'bold' }}>{prod.name}</h2>
-                                </IonText>
-                              </IonLabel>
-                              <div slot="end" style={{ textAlign: 'right' }}>
-                                <IonBadge color="warning">Fabricar: {parseFloat(Number(prod.toProduce).toFixed(4))}</IonBadge>
-                                <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>Pendientes</div>
-                              </div>
-                            </IonItem>
-                          ))}
-                        </IonList>
-                      )}
-                    </IonCardContent>
-                  </IonCard>
-                </IonCol>
-
-                <IonCol size="12" sizeMd="6">
-                  <IonCard>
-                    <IonCardHeader>
-                      <IonCardTitle style={{ fontSize: '1.2rem' }}>
-                        <IonIcon icon={alertCircleOutline} color="danger" style={{ verticalAlign: 'middle', marginRight: '8px' }} /> 
-                        Insumos por Comprar
-                      </IonCardTitle>
-                    </IonCardHeader>
-                    <IonCardContent>
-                      {summary.lowStockMaterials.length === 0 ? (
-                        <p style={{ color: 'gray', fontStyle: 'italic' }}>Todos los insumos están en niveles óptimos.</p>
-                      ) : (
-                        <IonList>
-                          {summary.lowStockMaterials.map(alert => (
-                            <IonItem key={'mat-' + alert.id}>
-                              <IonLabel>
-                                <IonText color="danger">
-                                  <h2 style={{ fontWeight: 'bold' }}>{alert.name}</h2>
-                                </IonText>
-                                <p style={{ fontSize: '0.85rem' }}>Stock físico: {parseFloat(Number(alert.realStock).toFixed(4))} {alert.unit}</p>
-                                {alert.debt > 0 && <p style={{ fontSize: '0.85rem', color: 'orange' }}>Reservado (Pedidos): -{parseFloat(Number(alert.debt).toFixed(4))} {alert.unit}</p>}
-                              </IonLabel>
-                              <div slot="end" style={{ textAlign: 'right' }}>
-                                <IonBadge color="danger">Efectivo: {parseFloat(Number(alert.effectiveStock).toFixed(4))} {alert.unit}</IonBadge>
-                                <div style={{ fontSize: '0.8rem', color: 'gray', marginTop: '4px' }}>¡Reabastecer!</div>
-                              </div>
-                            </IonItem>
-                          ))}
-                        </IonList>
-                      )}
-                    </IonCardContent>
-                  </IonCard>
-                </IonCol>
-              </IonRow>
-            )}
-          </IonGrid>
-        )}
+        </div>
       </IonContent>
     </IonPage>
   );
 };
+
 export default Dashboard;
-
-
-
-

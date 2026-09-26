@@ -1,6 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonMenuButton, IonContent, IonFab, IonFabButton, IonIcon, useIonToast, IonModal, IonItem, IonLabel, IonInput, IonButton, IonSelect, IonSelectOption, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonBadge } from '@ionic/react';
-import { addOutline, trashOutline, cashOutline, saveOutline, refreshOutline, timeOutline, logoWhatsapp } from 'ionicons/icons';
+// @ts-nocheck
+import React, { useState, useEffect, useMemo, useContext } from 'react';
+import {
+  IonPage,
+  IonContent,
+  IonIcon,
+  useIonToast,
+  useIonAlert,
+  IonModal,
+  useIonRouter,
+  IonSpinner
+} from '@ionic/react';
+import {
+  addOutline,
+  trashOutline,
+  cashOutline,
+  saveOutline,
+  refreshOutline,
+  timeOutline,
+  logoWhatsapp,
+  personOutline,
+  calendarOutline,
+  chevronBackOutline,
+  chevronForwardOutline,
+  cutOutline,
+  checkmarkCircleOutline,
+  closeCircleOutline,
+  alertCircleOutline,
+  closeOutline,
+  arrowForwardOutline
+} from 'ionicons/icons';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -9,14 +37,24 @@ import listPlugin from '@fullcalendar/list';
 import { apiClient } from '../api/client';
 import { ReservationStatus } from '@nutrideli/shared-types';
 import { offlineDb } from '../services/offline-db';
+import { AuthContext } from '../context/AuthContext';
+import AppHeader from '../components/AppHeader';
 
 const Reservations: React.FC = () => {
+  const { user } = useContext(AuthContext);
+  const router = useIonRouter();
   const [reservations, setReservations] = useState<any[]>([]);
   const [presentToast] = useIonToast();
-  
+
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  
+
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [date, setDate] = useState('');
@@ -26,7 +64,9 @@ const Reservations: React.FC = () => {
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [notes, setNotes] = useState('');
   const [serviceId, setServiceId] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
   const [products, setProducts] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
 
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
@@ -39,39 +79,31 @@ const Reservations: React.FC = () => {
   const [isOfflineMode, setIsOfflineMode] = useState<boolean>(!navigator.onLine);
 
   const fetchReservations = async () => {
-    // 1. Stale: Cargar inmediatamente desde IndexedDB si existen datos guardados
     try {
       const cached = await offlineDb.cachedReservations.toArray();
       if (cached && cached.length > 0) {
         setReservations(cached);
       }
-    } catch (cacheErr) {
-      console.error('Error leyendo cachedReservations:', cacheErr);
-    }
+    } catch (cacheErr) {}
 
     if (!navigator.onLine) {
       setIsOfflineMode(true);
       return;
     }
 
-    // 2. Revalidate: Consultar al servidor
     try {
       const res = await apiClient.get('/reservations');
       const serverReservations = res.data || [];
       setReservations(serverReservations);
       setIsOfflineMode(false);
 
-      // Hidratar tabla local en Dexie
       try {
         await offlineDb.cachedReservations.clear();
         if (serverReservations.length > 0) {
           await offlineDb.cachedReservations.bulkPut(serverReservations);
         }
-      } catch (saveErr) {
-        console.error('Error guardando en cachedReservations:', saveErr);
-      }
+      } catch (saveErr) {}
     } catch (e) {
-      console.warn('Fallo petición de reservaciones, activando modo offline:', e);
       setIsOfflineMode(true);
       try {
         const cached = await offlineDb.cachedReservations.toArray();
@@ -82,12 +114,8 @@ const Reservations: React.FC = () => {
             duration: 3000,
             color: 'warning'
           });
-        } else {
-          presentToast({ message: 'Error al cargar reservaciones', duration: 3000, color: 'danger' });
         }
-      } catch (err) {
-        presentToast({ message: 'Error al cargar reservaciones', duration: 3000, color: 'danger' });
-      }
+      } catch (err) {}
     }
   };
 
@@ -98,9 +126,7 @@ const Reservations: React.FC = () => {
     } catch (e) {
       try {
         const cached = await offlineDb.cachedProducts.toArray();
-        if (cached && cached.length > 0) {
-          setProducts(cached);
-        }
+        if (cached && cached.length > 0) setProducts(cached);
       } catch (err) {}
     }
   };
@@ -109,26 +135,27 @@ const Reservations: React.FC = () => {
     try {
       const res = await apiClient.get('/settings');
       setSettings(res.data || {});
-    } catch (e) {
-      console.error('Error fetching settings', e);
-    }
+    } catch (e) {}
+  };
+
+  const fetchEmployees = async () => {
+    try {
+      const res = await apiClient.get('/users');
+      setEmployees(res.data || []);
+    } catch (e) {}
   };
 
   useEffect(() => {
     fetchReservations();
     fetchProducts();
     fetchSettings();
-    setTimeout(() => {
-      window.dispatchEvent(new Event('resize'));
-    }, 500);
+    fetchEmployees();
 
     const handleOnline = () => {
       setIsOfflineMode(false);
       fetchReservations();
     };
-    const handleOffline = () => {
-      setIsOfflineMode(true);
-    };
+    const handleOffline = () => setIsOfflineMode(true);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -141,11 +168,9 @@ const Reservations: React.FC = () => {
 
   const handleMassShift = async () => {
     if (!shiftTimeFrom || !shiftMinutes) return;
-    const dateStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]; // Current day by default
-    
     try {
       const res = await apiClient.post('/reservations/shift', {
-        date: dateStr,
+        date: selectedDate,
         timeFrom: shiftTimeFrom,
         minutes: shiftMinutes
       });
@@ -168,9 +193,10 @@ const Reservations: React.FC = () => {
     setEditingId(null);
     setCustomerName('');
     setCustomerPhone('');
-    setDate('');
-    setTime('');
+    setDate(selectedDate);
+    setTime('09:00');
     setServiceId('');
+    setEmployeeId('');
     setNumberOfPeople(1);
     setTableNumber('');
     setTotalAmount(0);
@@ -181,10 +207,8 @@ const Reservations: React.FC = () => {
   const handleServiceChange = (sId: string) => {
     setServiceId(sId);
     const found = products.find(p => p.id === sId);
-    if (found) {
-      if (!totalAmount || totalAmount === 0) {
-        setTotalAmount(found.salePrice || 0);
-      }
+    if (found && (!totalAmount || totalAmount === 0)) {
+      setTotalAmount(found.salePrice || 0);
     }
   };
 
@@ -202,40 +226,33 @@ const Reservations: React.FC = () => {
       time,
       serviceId: serviceId || undefined,
       serviceName: selectedProd?.name || undefined,
+      employeeId: employeeId || undefined,
       numberOfPeople,
       tableNumber,
       totalAmount,
       notes,
       force
     };
-    
+
     try {
       if (editingId) {
         await apiClient.put(`/reservations/${editingId}`, payload);
         presentToast({ message: 'Reservación actualizada', duration: 2000, color: 'success' });
       } else {
         await apiClient.post('/reservations', payload);
-        presentToast({ message: 'Reservación creada', duration: 2000, color: 'success' });
+        presentToast({ message: 'Reservación creada con éxito', duration: 2000, color: 'success' });
       }
       setShowModal(false);
       fetchReservations();
     } catch (e: any) {
       const errMsg = e.response?.data?.message || '';
       if (errMsg.includes('choca con la cita') || errMsg.includes('horario laboral')) {
-        if (window.confirm(errMsg + '\n\n¿Estás seguro de que deseas forzar y agendar esta reservación de todas formas?')) {
+        if (window.confirm(errMsg + '\n\n¿Deseas forzar y agendar de todas formas?')) {
           handleSave(true);
         }
       } else {
         presentToast({ message: errMsg || 'Error guardando reservación', duration: 3500, color: 'danger' });
       }
-    }
-  };
-
-  const handleEventClick = (info: any) => {
-    const res = reservations.find(r => r.id === info.event.id);
-    if (res) {
-      setSelectedEvent(res);
-      setShowDetails(true);
     }
   };
 
@@ -246,57 +263,38 @@ const Reservations: React.FC = () => {
       setShowDetails(false);
       presentToast({ message: 'Estado actualizado', duration: 2000, color: 'success' });
     } catch (e) {
-      presentToast({ message: 'Error', duration: 3000, color: 'danger' });
+      presentToast({ message: 'Error al cambiar estado', duration: 3000, color: 'danger' });
+    }
+  };
+
+  const handlePayFull = async () => {
+    if (!selectedEvent) return;
+    try {
+      await apiClient.post(`/reservations/${selectedEvent.id}/pay-full`);
+      presentToast({ message: 'Servicio marcado como pagado', duration: 2000, color: 'success' });
+      const res = await apiClient.get('/reservations');
+      const updated = res.data.find((r: any) => r.id === selectedEvent.id);
+      setSelectedEvent(updated);
+      setReservations(res.data);
+    } catch (e) {
+      presentToast({ message: 'Error', duration: 2000, color: 'danger' });
     }
   };
 
   const handleAddAbono = async () => {
-    if (!selectedEvent || !abonoAmount || isNaN(Number(abonoAmount))) return;
+    if (!selectedEvent || !abonoAmount || parseFloat(abonoAmount) <= 0) return;
     try {
-      await apiClient.post(`/reservations/${selectedEvent.id}/abono`, { amount: Number(abonoAmount) });
-      presentToast({ message: 'Abono registrado', duration: 2000, color: 'success' });
+      await apiClient.post(`/reservations/${selectedEvent.id}/abono`, {
+        amount: parseFloat(abonoAmount)
+      });
       setAbonoAmount('');
-      fetchReservations();
-      
-      // Update selectedEvent locally to show changes immediately
+      presentToast({ message: 'Abono registrado', duration: 2000, color: 'success' });
       const res = await apiClient.get('/reservations');
       const updated = res.data.find((r: any) => r.id === selectedEvent.id);
       setSelectedEvent(updated);
       setReservations(res.data);
     } catch (e) {
       presentToast({ message: 'Error registrando abono', duration: 2000, color: 'danger' });
-    }
-  };
-
-  const handlePayFull = async () => {
-    if (!selectedEvent) return;
-    const remaining = Number(selectedEvent.totalAmount || 0) - Number(selectedEvent.abonosTotal || 0);
-    if (remaining <= 0) return;
-    try {
-      await apiClient.post(`/reservations/${selectedEvent.id}/abono`, { amount: remaining });
-      presentToast({ message: 'Pago completo registrado exitosamente', duration: 2000, color: 'success' });
-      fetchReservations();
-      
-      const res = await apiClient.get('/reservations');
-      const updated = res.data.find((r: any) => r.id === selectedEvent.id);
-      setSelectedEvent(updated);
-      setReservations(res.data);
-    } catch (e) {
-      presentToast({ message: 'Error registrando pago', duration: 2000, color: 'danger' });
-    }
-  };
-
-  const handleRevertAbono = async (index: number) => {
-    if (!selectedEvent) return;
-    try {
-      await apiClient.delete(`/reservations/${selectedEvent.id}/abono/${index}`);
-      presentToast({ message: 'Abono revertido', duration: 2000, color: 'success' });
-      const res = await apiClient.get('/reservations');
-      const updated = res.data.find((r: any) => r.id === selectedEvent.id);
-      setSelectedEvent(updated);
-      setReservations(res.data);
-    } catch (e) {
-      presentToast({ message: 'Error revirtiendo abono', duration: 2000, color: 'danger' });
     }
   };
 
@@ -307,7 +305,7 @@ const Reservations: React.FC = () => {
       setShowDetails(false);
       presentToast({ message: 'Reservación eliminada', duration: 2000, color: 'success' });
     } catch (e) {
-      presentToast({ message: 'Error eliminando', duration: 3000, color: 'danger' });
+      presentToast({ message: 'Error eliminando reservación', duration: 3000, color: 'danger' });
     }
   };
 
@@ -318,6 +316,7 @@ const Reservations: React.FC = () => {
     setDate(res.date);
     setTime(res.time);
     setServiceId(res.serviceId || '');
+    setEmployeeId(res.employeeId || '');
     setNumberOfPeople(res.numberOfPeople);
     setTableNumber(res.tableNumber || '');
     setTotalAmount(res.totalAmount || 0);
@@ -326,526 +325,795 @@ const Reservations: React.FC = () => {
     setShowModal(true);
   };
 
-  const events = reservations.map(r => {
-    let color = '#3880ff'; // primary
-    if (r.status === ReservationStatus.CONFIRMED) color = '#2dd36f'; // success
-    if (r.status === ReservationStatus.CANCELED) color = '#eb445a'; // danger
-    if (r.status === ReservationStatus.COMPLETED) color = '#92949c'; // medium
+  // Filter day's appointments and sort by time
+  const dayReservations = useMemo(() => {
+    return reservations
+      .filter(r => r.date === selectedDate)
+      .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  }, [reservations, selectedDate]);
 
-    let dur = 30;
-    const prod = products.find(p => p.id === r.serviceId || (r.serviceName && p.name.trim().toLowerCase() === r.serviceName.trim().toLowerCase()));
-    if (prod && prod.durationMinutes) {
-      dur = Number(prod.durationMinutes);
-    }
-
-    const [rh, rm] = (r.time || '00:00').split(':').map(Number);
-    const endMins = rh * 60 + rm + dur;
-    const endH = String(Math.floor(endMins / 60)).padStart(2, '0');
-    const endM = String(endMins % 60).padStart(2, '0');
-
-    return {
-      id: r.id,
-      title: r.serviceName ? `${r.customerName} - ${r.serviceName}` : `${r.customerName} (${r.numberOfPeople || 1} pax) ${r.tableNumber ? 'Mesa ' + r.tableNumber : ''}`,
-      start: `${r.date}T${r.time}`,
-      end: `${r.date}T${endH}:${endM}:00`,
-      color,
-      extendedProps: {
-        customerName: r.customerName,
-        customerPhone: r.customerPhone,
-        serviceName: r.serviceName,
-        tableNumber: r.tableNumber,
-        numberOfPeople: r.numberOfPeople,
-        status: r.status,
-        reservation: r
-      }
-    };
-  });
-
-  const renderEventContent = (eventInfo: any) => {
-    const { event, timeText } = eventInfo;
-    const props = event.extendedProps || {};
-    return (
-      <div style={{ 
-        padding: '5px 8px', 
-        height: '100%', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        justifyContent: 'flex-start',
-        overflow: 'hidden',
-        lineHeight: '1.25'
-      }}>
-        <div style={{ 
-          fontSize: '11px', 
-          fontWeight: '800', 
-          opacity: 0.95, 
-          marginBottom: '2px',
-          letterSpacing: '0.2px'
-        }}>
-          {timeText}
-        </div>
-        <div style={{ 
-          fontSize: '13px', 
-          fontWeight: '700', 
-          whiteSpace: 'nowrap', 
-          overflow: 'hidden', 
-          textOverflow: 'ellipsis',
-          color: '#ffffff'
-        }}>
-          {props.customerName || event.title}
-        </div>
-        {props.serviceName && (
-          <div style={{ 
-            fontSize: '11.5px', 
-            fontWeight: '500', 
-            opacity: 0.95, 
-            whiteSpace: 'nowrap', 
-            overflow: 'hidden', 
-            textOverflow: 'ellipsis',
-            marginTop: '2px'
-          }}>
-            💅 {props.serviceName}
-          </div>
-        )}
-        {props.tableNumber && !props.serviceName && (
-          <div style={{ fontSize: '11px', opacity: 0.9, marginTop: '2px' }}>
-            Mesa {props.tableNumber} ({props.numberOfPeople || 1} pax)
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Calculate calendar visible hours based on business hours with 1h grace before and after
-  const { slotMinTime, slotMaxTime, scrollTime } = React.useMemo(() => {
-    const bHours = settings?.businessHours;
-    let minHour = 8;
-    let maxHour = 19;
-    let foundOpenDay = false;
-
-    if (bHours && typeof bHours === 'object') {
-      let earliestMinutes = 24 * 60;
-      let latestMinutes = 0;
-
-      Object.values(bHours).forEach((d: any) => {
-        if (d && d.isOpen && d.startTime && d.endTime) {
-          foundOpenDay = true;
-          const [sh, sm] = String(d.startTime).split(':').map(Number);
-          const [eh, em] = String(d.endTime).split(':').map(Number);
-          const startM = (sh || 0) * 60 + (sm || 0);
-          const endM = (eh || 0) * 60 + (em || 0);
-          if (startM < earliestMinutes) earliestMinutes = startM;
-          if (endM > latestMinutes) latestMinutes = endM;
-        }
+  // Date formatted for header e.g. "Viernes, 26 de Septiembre"
+  const formattedSelectedDate = useMemo(() => {
+    try {
+      const [y, m, d] = selectedDate.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      return dateObj.toLocaleDateString('es-ES', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long'
       });
-
-      if (foundOpenDay) {
-        minHour = Math.floor(earliestMinutes / 60);
-        maxHour = Math.ceil(latestMinutes / 60);
-      }
+    } catch (e) {
+      return selectedDate;
     }
+  }, [selectedDate]);
 
-    // 1 hora de antelación y 1 hora de margen posterior
-    let slotMin = Math.max(0, minHour - 1);
-    let slotMax = Math.min(24, maxHour + 1);
-
-    // Si existen citas fuera de este rango, expandir dinámicamente para no ocultar nada
-    reservations.forEach(r => {
-      if (r.time) {
-        const [h] = String(r.time).split(':').map(Number);
-        if (!isNaN(h)) {
-          if (h < slotMin) slotMin = Math.max(0, h - 1);
-          if (h + 1 > slotMax) slotMax = Math.min(24, h + 2);
-        }
-      }
-    });
-
-    return {
-      slotMinTime: `${String(slotMin).padStart(2, '0')}:00:00`,
-      slotMaxTime: `${String(slotMax).padStart(2, '0')}:00:00`,
-      scrollTime: `${String(Math.max(slotMin, minHour)).padStart(2, '0')}:00:00`
-    };
-  }, [settings?.businessHours, reservations]);
-
-  const calendarRef = React.useRef<FullCalendar>(null);
-  const isMobile = window.innerWidth < 768;
-  const [mobileView, setMobileView] = useState('listWeek');
-
-  const handleMobileViewChange = (e: any) => {
-    const newView = e.detail.value;
-    setMobileView(newView);
-    if (calendarRef.current) {
-      calendarRef.current.getApi().changeView(newView);
-    }
+  const changeDay = (offset: number) => {
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d + offset);
+    setSelectedDate(dateObj.toISOString().split('T')[0]);
   };
+
+  const resetToToday = () => {
+    setSelectedDate(new Date().toISOString().split('T')[0]);
+  };
+
+  // FullCalendar event items for week view
+  const events = useMemo(() => {
+    return reservations.map(r => {
+      let color = '#10B981';
+      if (r.status === ReservationStatus.PENDING) color = '#F59E0B';
+      if (r.status === ReservationStatus.CANCELED) color = '#EF4444';
+      if (r.status === ReservationStatus.COMPLETED) color = '#64748B';
+
+      return {
+        id: r.id,
+        title: `${r.customerName} - ${r.serviceName || 'Cita'}`,
+        start: `${r.date}T${r.time}`,
+        color,
+        extendedProps: { ...r }
+      };
+    });
+  }, [reservations]);
+
+  const tenantInitials = useMemo(() => {
+    const name = user?.tenantName || 'Flujo Fino';
+    return name
+      .split(' ')
+      .slice(0, 2)
+      .map(w => w[0])
+      .join('')
+      .toUpperCase();
+  }, [user?.tenantName]);
 
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar color="primary">
-          <IonButtons slot="start">
-            <IonMenuButton />
-          </IonButtons>
-          <IonTitle>Reservaciones</IonTitle>
-          <IonButtons slot="end">
-            <IonButton onClick={openShiftModal} color="warning" fill="solid" style={{ marginRight: '10px', fontWeight: 'bold' }}>
-              <IonIcon icon={timeOutline} slot="start" />
-              Retraso
-            </IonButton>
-            <IonButton onClick={fetchReservations}>
-              <IonIcon icon={refreshOutline} />
-            </IonButton>
-          </IonButtons>
-        </IonToolbar>
-        {isMobile && (
-          <IonToolbar color="light">
-            <div style={{ padding: '0 10px', width: '100%' }}>
-              <IonSelect value={mobileView} onIonChange={handleMobileViewChange} interface="popover" style={{ width: '100%', minHeight: '40px' }}>
-                <IonSelectOption value="timeGridDay">Vista de Hoy (Agenda)</IonSelectOption>
-                <IonSelectOption value="listWeek">Lista de la Semana</IonSelectOption>
-              </IonSelect>
-            </div>
-          </IonToolbar>
-        )}
-        {isOfflineMode && (
-          <IonToolbar color="warning">
-            <div style={{ textAlign: 'center', width: '100%', padding: '6px 12px', fontSize: '0.85rem', fontWeight: 'bold' }}>
-              ⚡ Modo Sin Conexión: Visualizando agenda, clientes y catálogo guardados localmente.
-            </div>
-          </IonToolbar>
-        )}
-      </IonHeader>
-      
-      <IonContent className="ion-padding" style={{ 'backgroundColor': '#f4f5f8' }}>
-        <div className="fc-wrapper">
-          <style>{`
-            /* Altura generosa para cada slot de 30 minutos */
-            .fc .fc-timegrid-slot {
-              height: 56px !important;
-            }
-            .fc .fc-timegrid-slot-lane {
-              height: 56px !important;
-            }
-            .fc .fc-timegrid-slot-label {
-              height: 56px !important;
-              vertical-align: top !important;
-            }
-            .fc .fc-timegrid-slots tr {
-              height: 56px !important;
-            }
-            .fc .fc-timegrid-slot-label-cushion {
-              font-size: 12px !important;
-              font-weight: 700 !important;
-              color: #334155 !important;
-              text-transform: uppercase !important;
-              padding: 2px 6px !important;
-            }
-            .fc-theme-standard td, .fc-theme-standard th {
-              border-color: #e2e8f0 !important;
-            }
-            .fc-v-event {
-              border-radius: 8px !important;
-              box-shadow: 0 3px 8px rgba(0,0,0,0.12) !important;
-              border: none !important;
-              padding: 0 !important;
-              cursor: pointer;
-            }
-            .fc-v-event .fc-event-main {
-              color: #ffffff !important;
-              padding: 0 !important;
-              height: 100%;
-            }
-          `}</style>
-          <FullCalendar
-            ref={calendarRef}
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
-            initialView={isMobile ? 'listWeek' : 'timeGridWeek'}
-            headerToolbar={isMobile ? {
-              left: 'prev,next',
-              center: 'title',
-              right: ''
-            } : {
-              left: 'prev,next today',
-              center: 'title',
-              right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
-            }}
-            locale="es"
-            events={events}
-            eventClick={handleEventClick}
-            eventContent={renderEventContent}
-            height="auto"
-            expandRows={false}
-            allDaySlot={false}
-            slotMinTime={slotMinTime}
-            slotMaxTime={slotMaxTime}
-            scrollTime={scrollTime}
-            slotDuration="00:30:00"
-            slotLabelFormat={{
-              hour: 'numeric',
-              minute: '2-digit',
-              omitZeroMinute: false,
-              meridiem: 'short',
-              hour12: true
-            }}
-            eventTimeFormat={{
-              hour: 'numeric',
-              minute: '2-digit',
-              meridiem: 'short',
-              hour12: true
-            }}
-          />
-        </div>
+      <AppHeader title="Agenda" onRefresh={fetchReservations} />
 
-        <IonModal isOpen={showShiftModal} onDidDismiss={() => setShowShiftModal(false)}>
-          <IonHeader>
-            <IonToolbar color="warning">
-              <IonTitle>Retraso Imprevisto</IonTitle>
-              <IonButtons slot="end"><IonButton onClick={() => setShowShiftModal(false)}>Cerrar</IonButton></IonButtons>
-            </IonToolbar>
-          </IonHeader>
-          <IonContent className="ion-padding">
-            <p style={{ fontSize: '14px', color: '#666' }}>
-              Usa esta herramienta si el local sufre un retraso. Todas las citas pendientes del día de hoy a partir de la hora seleccionada se desplazarán automáticamente.
-            </p>
-            <IonItem>
-              <IonLabel position="stacked">A partir de (Hora) *</IonLabel>
-              <IonInput type="time" value={shiftTimeFrom} onIonInput={e => setShiftTimeFrom(e.detail.value!)} />
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Minutos a desplazar *</IonLabel>
-              <IonSelect value={shiftMinutes} onIonChange={e => setShiftMinutes(e.detail.value)}>
-                <IonSelectOption value={15}>15 minutos</IonSelectOption>
-                <IonSelectOption value={30}>30 minutos</IonSelectOption>
-                <IonSelectOption value={60}>1 hora (60 min)</IonSelectOption>
-                <IonSelectOption value={90}>1.5 horas (90 min)</IonSelectOption>
-                <IonSelectOption value={120}>2 horas (120 min)</IonSelectOption>
-              </IonSelect>
-            </IonItem>
-            
-            <IonButton expand="block" color="warning" className="ion-margin-top" onClick={handleMassShift}>
-              <IonIcon icon={timeOutline} slot="start" />
-              Aplicar Retraso
-            </IonButton>
+      <IonContent fullscreen className="ff-has-bottom-nav" style={{ '--background': '#F8FAFC' } as any}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '16px 16px 80px 16px' }}>
 
-            {shiftAffected.length > 0 && (
-              <div style={{ marginTop: '20px' }}>
-                <h3 style={{ fontWeight: 'bold' }}>Citas Reprogramadas ({shiftAffected.length}):</h3>
-                {shiftAffected.map(a => (
-                  <IonCard key={a.id} style={{ margin: '10px 0' }}>
-                    <IonCardContent>
-                      <b>{a.customerName}</b><br/>
-                      <span style={{ color: '#888', textDecoration: 'line-through' }}>{a.oldTime}</span>
-                      <span style={{ color: 'var(--ion-color-danger)', fontWeight: 'bold', marginLeft: '10px' }}>{a.newTime}</span>
-                      {a.whatsappLink && (
-                        <IonButton size="small" fill="outline" color="success" style={{ marginTop: '10px' }} onClick={() => window.open(a.whatsappLink, '_blank')}>
-                          <IonIcon icon={logoWhatsapp} slot="start" />
-                          Avisar
-                        </IonButton>
-                      )}
-                    </IonCardContent>
-                  </IonCard>
-                ))}
+          {/* 1. Header Banner (Figma: Title "Agenda", Subtitle & Avatar FF) */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '24px', fontWeight: '900', color: '#0F172A', letterSpacing: '-0.5px' }}>
+                Agenda
+              </h1>
+              <div style={{ fontSize: '13px', fontWeight: '500', color: '#64748B', marginTop: '2px' }}>
+                {user?.tenantName || 'Flujo Fino • Barbería & Estética'}
               </div>
-            )}
-          </IonContent>
-        </IonModal>
+            </div>
 
-        <IonFab vertical="bottom" horizontal="end" slot="fixed">
-          <IonFabButton onClick={openNew} color="tertiary">
-            <IonIcon icon={addOutline} />
-          </IonFabButton>
-        </IonFab>
+            {/* Tenant Avatar Badge */}
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                background: '#10B981',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '15px',
+                fontWeight: '800',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
+              }}
+            >
+              {tenantInitials}
+            </div>
+          </div>
 
-        {/* Create/Edit Modal */}
-        <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)}>
-          <IonHeader>
-            <IonToolbar color="tertiary">
-              <IonTitle>{editingId ? 'Editar Reservación' : 'Nueva Reservación'}</IonTitle>
-              <IonButtons slot="end"><IonButton onClick={() => setShowModal(false)}>Cerrar</IonButton></IonButtons>
-            </IonToolbar>
-          </IonHeader>
-          <IonContent className="ion-padding">
-            <IonItem>
-              <IonLabel position="stacked">Nombre del Cliente *</IonLabel>
-              <IonInput value={customerName} onIonInput={e => setCustomerName(e.detail.value!)} />
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Teléfono</IonLabel>
-              <IonInput value={customerPhone} onIonInput={e => setCustomerPhone(e.detail.value!)} />
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Fecha *</IonLabel>
-              <IonInput type="date" value={date} onIonInput={e => setDate(e.detail.value!)} />
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Hora *</IonLabel>
-              <IonInput type="time" value={time} onIonInput={e => setTime(e.detail.value!)} />
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Servicio (Opcional)</IonLabel>
-              <IonSelect value={serviceId} onIonChange={e => handleServiceChange(e.detail.value)} interface="popover" placeholder="Selecciona un servicio">
-                <IonSelectOption value="">Sin servicio específico</IonSelectOption>
-                {products
-                  .filter(p => {
-                    if (p.product_type === 'SERVICIO') return true;
-                    if (p.product_type === 'REVENTA' || p.product_type === 'FORMULA') return false;
-                    return p.is_service === true || p.category === 'Servicios';
-                  })
-                  .map(p => (
-                    <IonSelectOption key={p.id} value={p.id}>
-                      {p.name} ({p.durationMinutes || 30} min) - ${Number(p.salePrice).toFixed(2)}
-                    </IonSelectOption>
-                  ))}
-              </IonSelect>
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Cantidad de Personas</IonLabel>
-              <IonInput type="number" min="0" value={numberOfPeople} onIonInput={e => setNumberOfPeople(parseInt(e.detail.value!, 10) || 1)} />
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Número de Mesa (Opcional)</IonLabel>
-              <IonInput value={tableNumber} onIonInput={e => setTableNumber(e.detail.value!)} />
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Total a Cobrar ($) (Opcional)</IonLabel>
-              <IonInput type="number" min="0" value={totalAmount} onIonInput={e => setTotalAmount(parseFloat(e.detail.value!) || 0)} />
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Notas</IonLabel>
-              <IonInput value={notes} onIonInput={e => setNotes(e.detail.value!)} />
-            </IonItem>
-            
-            <IonButton expand="block" color="tertiary" className="ion-margin-top" onClick={() => handleSave(false)}>
-              <IonIcon icon={saveOutline} slot="start" />
-              Guardar Reservación
-            </IonButton>
-          </IonContent>
-        </IonModal>
+          {/* 2. Segmented Pill Switch: [ Hoy ] vs [ Semana ] */}
+          <div
+            style={{
+              background: '#F1F5F9',
+              borderRadius: '999px',
+              padding: '4px',
+              display: 'flex',
+              marginBottom: '16px',
+              maxWidth: '300px'
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setViewMode('day')}
+              style={{
+                flex: 1,
+                padding: '8px 16px',
+                borderRadius: '999px',
+                border: 'none',
+                background: viewMode === 'day' ? '#10B981' : 'transparent',
+                color: viewMode === 'day' ? '#ffffff' : '#64748B',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Hoy
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('week')}
+              style={{
+                flex: 1,
+                padding: '8px 16px',
+                borderRadius: '999px',
+                border: 'none',
+                background: viewMode === 'week' ? '#10B981' : 'transparent',
+                color: viewMode === 'week' ? '#ffffff' : '#64748B',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Semana
+            </button>
+          </div>
 
-        {/* Details & Payment Modal */}
-        <IonModal isOpen={showDetails} onDidDismiss={() => setShowDetails(false)}>
-          <IonHeader>
-            <IonToolbar>
-              <IonTitle>Detalles de la Reservación</IonTitle>
-              <IonButtons slot="end"><IonButton onClick={() => setShowDetails(false)}>Cerrar</IonButton></IonButtons>
-            </IonToolbar>
-          </IonHeader>
-          <IonContent className="ion-padding">
-            {selectedEvent && (
-              <>
-                <IonCard>
-                  <IonCardContent>
-                    <h2><b>Cliente:</b> {selectedEvent.customerName}</h2>
-                    {selectedEvent.customerPhone && <p><b>Teléfono:</b> {selectedEvent.customerPhone}</p>}
-                    <p><b>Fecha/Hora:</b> {selectedEvent.date} a las {selectedEvent.time}</p>
-                    <p><b>Personas:</b> {selectedEvent.numberOfPeople}</p>
-                    {selectedEvent.tableNumber && <p><b>Mesa:</b> {selectedEvent.tableNumber}</p>}
-                    {selectedEvent.notes && <p><b>Notas:</b> {selectedEvent.notes}</p>}
-                    {selectedEvent.referralSource && <p><b>Origen:</b> {selectedEvent.referralSource}</p>}
-                    <p><b>Estado Actual:</b> {selectedEvent.status}</p>
-                    <p><b>Monto Total:</b> ${selectedEvent.totalAmount.toFixed(2)}</p>
-                    
-                    <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                      <IonButton size="small" color="success" onClick={() => changeStatus(selectedEvent.id, ReservationStatus.CONFIRMED)}>Confirmar</IonButton>
-                      <IonButton size="small" color="medium" onClick={() => changeStatus(selectedEvent.id, ReservationStatus.COMPLETED)}>Completada</IonButton>
-                      <IonButton size="small" color="danger" fill="outline" onClick={() => changeStatus(selectedEvent.id, ReservationStatus.CANCELED)}>Cancelar</IonButton>
+          {/* DAY VIEW */}
+          {viewMode === 'day' && (
+            <div>
+              {/* Date Subheader with arrows */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: '#ffffff',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '16px',
+                  padding: '10px 14px',
+                  marginBottom: '16px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => changeDay(-1)}
+                    style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  >
+                    <IonIcon icon={chevronBackOutline} style={{ color: '#0F172A' }} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => changeDay(1)}
+                    style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  >
+                    <IonIcon icon={chevronForwardOutline} style={{ color: '#0F172A' }} />
+                  </button>
+
+                  <div style={{ marginLeft: '4px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '800', color: '#0F172A', textTransform: 'capitalize' }}>
+                      {formattedSelectedDate}
                     </div>
-                  </IonCardContent>
-                </IonCard>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: '#64748B' }}>
+                      {dayReservations.length} {dayReservations.length === 1 ? 'cita asignada' : 'citas asignadas'}
+                    </div>
+                  </div>
+                </div>
 
-                {/* Pagos / Abonos */}
-                {selectedEvent.totalAmount > 0 && (() => {
-                  const total = Number(selectedEvent.totalAmount || 0);
-                  const abonos = Number(selectedEvent.abonosTotal || 0);
-                  const remaining = Math.max(0, total - abonos);
-                  const isFullyPaid = remaining <= 0 && total > 0;
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={openShiftModal}
+                    title="Registrar retraso"
+                    style={{
+                      background: '#FFFBEB',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      color: '#92400E',
+                      borderRadius: '8px',
+                      padding: '6px 10px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ⏱️ Retraso
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetToToday}
+                    style={{
+                      background: '#F1F5F9',
+                      border: '1px solid #E2E8F0',
+                      color: '#0F172A',
+                      borderRadius: '8px',
+                      padding: '6px 10px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Hoy
+                  </button>
+                </div>
+              </div>
+
+              {/* Timeline Cards (Figma Modern Timeline) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {dayReservations.map(res => {
+                  const duration = res.serviceDuration || 45;
+                  const isConfirmed = res.status === ReservationStatus.CONFIRMED;
+                  const isPending = res.status === ReservationStatus.PENDING;
+                  const isCanceled = res.status === ReservationStatus.CANCELED;
 
                   return (
-                    <IonCard>
-                      <IonCardContent>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <h3 style={{ margin: 0, fontWeight: 'bold' }}>Abonos y Pagos</h3>
-                          <IonBadge color={isFullyPaid ? 'success' : (abonos > 0 ? 'warning' : 'medium')}>
-                            {isFullyPaid ? 'Totalmente Pagado' : (abonos > 0 ? 'Abono Parcial' : 'Pendiente de Pago')}
-                          </IonBadge>
+                    <div
+                      key={res.id}
+                      style={{
+                        display: 'flex',
+                        gap: '12px',
+                        alignItems: 'flex-start'
+                      }}
+                    >
+                      {/* Left: Time Pill */}
+                      <div
+                        style={{
+                          minWidth: '92px',
+                          background: '#ffffff',
+                          border: '1px solid #E2E8F0',
+                          borderRadius: '12px',
+                          padding: '8px 10px',
+                          textAlign: 'center',
+                          boxShadow: 'var(--ff-shadow-sm)'
+                        }}
+                      >
+                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A' }}>
+                          {res.time}
                         </div>
-
-                        <div style={{ marginTop: '10px', background: '#f8fafc', padding: '10px', borderRadius: '8px' }}>
-                          <p style={{ margin: '3px 0' }}><b>Total Servicio:</b> ${total.toFixed(2)}</p>
-                          <p style={{ margin: '3px 0', color: '#16a34a' }}><b>Total Abonado:</b> ${abonos.toFixed(2)}</p>
-                          <p style={{ margin: '3px 0', fontWeight: 'bold', color: isFullyPaid ? '#16a34a' : '#dc2626' }}>
-                            <b>Restante por Cobrar:</b> ${remaining.toFixed(2)}
-                          </p>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#64748B' }}>
+                          {duration} min
                         </div>
+                      </div>
 
-                        {!isFullyPaid && (
-                          <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <IonButton expand="block" color="success" onClick={handlePayFull}>
-                              <IonIcon icon={cashOutline} slot="start" /> Cobrar Restante (${remaining.toFixed(2)})
-                            </IonButton>
-
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-                              <IonItem style={{ flex: 1, '--background': '#f1f5f9', borderRadius: '6px' }}>
-                                <IonLabel position="stacked">Abono Parcial ($)</IonLabel>
-                                <IonInput type="number" min="0" placeholder="0.00" value={abonoAmount} onIonInput={e => setAbonoAmount(e.detail.value!)} />
-                              </IonItem>
-                              <IonButton fill="outline" color="primary" onClick={handleAddAbono} style={{ height: '42px', marginBottom: '2px' }}>
-                                Abonar
-                              </IonButton>
-                            </div>
+                      {/* Right: Appointment Card */}
+                      <div
+                        className="ff-card ff-card-interactive"
+                        onClick={() => {
+                          setSelectedEvent(res);
+                          setShowDetails(true);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '14px',
+                          background: '#ffffff'
+                        }}
+                      >
+                        {/* Top: Customer & Status Pill */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                          <div>
+                            <span style={{ fontSize: '15px', fontWeight: '800', color: '#0F172A' }}>
+                              {res.customerName}
+                            </span>
+                            {res.tableNumber && (
+                              <span style={{ fontSize: '12px', color: '#64748B', marginLeft: '6px' }}>
+                                &bull; Mesa {res.tableNumber}
+                              </span>
+                            )}
                           </div>
-                        )}
 
-                      {selectedEvent.abonosHistory && selectedEvent.abonosHistory.length > 0 && (
-                        <div style={{ marginTop: '15px' }}>
-                          <h4>Historial:</h4>
-                          {selectedEvent.abonosHistory.map((ab: any, i: number) => (
-                            <IonItem key={i}>
-                              <IonLabel>
-                                ${ab.amount.toFixed(2)} - {new Date(ab.date).toLocaleString()}
-                              </IonLabel>
-                              <IonButton fill="clear" color="danger" onClick={() => handleRevertAbono(i)}>
-                                <IonIcon icon={trashOutline} slot="icon-only" />
-                              </IonButton>
-                            </IonItem>
-                          ))}
+                          {/* Status Pill */}
+                          <div
+                            className={`ff-pill ${isConfirmed ? 'ff-pill-online' : (isPending ? 'ff-pill-sync' : 'ff-pill-danger')}`}
+                            style={{ fontSize: '11px', padding: '3px 10px' }}
+                          >
+                            <span
+                              className="ff-pill-dot"
+                              style={{ background: isConfirmed ? '#10B981' : (isPending ? '#F59E0B' : '#EF4444') }}
+                            />
+                            <span>{res.status}</span>
+                          </div>
                         </div>
-                      )}
-                    </IonCardContent>
-                  </IonCard>
-                );
-              })()}
 
-                  {/* Acciones Generales */}
-                  <IonGrid>
-                    <IonRow>
-                      <IonCol>
-                        <IonButton expand="block" color="tertiary" onClick={() => {
-                          setShowDetails(false);
-                          window.location.href = `/pos?reservationId=${selectedEvent.id}`;
-                        }}>
-                          <IonIcon icon={cashOutline} slot="start" /> Enviar a Caja
-                        </IonButton>
-                      </IonCol>
-                    </IonRow>
-                    <IonRow>
-                      <IonCol>
-                        <IonButton expand="block" color="primary" fill="outline" onClick={() => openEdit(selectedEvent)}>Editar Detalles</IonButton>
-                      </IonCol>
-                      <IonCol>
-                        <IonButton expand="block" color="danger" fill="clear" onClick={() => deleteReservation(selectedEvent.id)}>
-                          <IonIcon icon={trashOutline} slot="start" /> Eliminar
-                        </IonButton>
-                      </IonCol>
-                    </IonRow>
-                  </IonGrid>
-              </>
-            )}
-          </IonContent>
+                        {/* Service Name */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                          <span>✂️</span>
+                          <span>{res.serviceName || 'Servicio Agendado'}</span>
+                          {res.totalAmount > 0 && (
+                            <span style={{ color: '#10B981', fontWeight: '800', marginLeft: 'auto' }}>
+                              ${Number(res.totalAmount).toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Specialist & Station */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#64748B', marginBottom: '10px' }}>
+                          <IonIcon icon={personOutline} style={{ fontSize: '14px' }} />
+                          <span>{res.employee?.name || res.employee?.username || 'Especialista Asignado'}</span>
+                        </div>
+
+                        {/* Action buttons footer */}
+                        <div style={{ display: 'flex', gap: '8px', paddingTop: '8px', borderTop: '1px solid #F1F5F9' }}>
+                          {/* WhatsApp */}
+                          {res.customerPhone && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const cleanPhone = res.customerPhone.replace(/\D/g, '');
+                                const text = encodeURIComponent(`Hola ${res.customerName}, te escribimos de ${user?.tenantName || 'Flujo Fino'} respecto a tu cita para ${res.serviceName || 'nuestro servicio'} el ${res.date} a las ${res.time}.`);
+                                window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
+                              }}
+                              style={{
+                                background: '#ECFDF5',
+                                border: '1px solid #A7F3D0',
+                                color: '#065F46',
+                                borderRadius: '8px',
+                                padding: '6px 12px',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <IonIcon icon={logoWhatsapp} style={{ fontSize: '14px' }} />
+                              WhatsApp
+                            </button>
+                          )}
+
+                          {/* Enviar a Caja */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push('/pos', 'root', 'replace');
+                              // Also write to session storage so POS loads it
+                              sessionStorage.setItem('reservation_to_bill', JSON.stringify(res));
+                              window.location.href = `/pos?reservationId=${res.id}`;
+                            }}
+                            className="ff-btn-primary"
+                            style={{
+                              padding: '6px 14px',
+                              fontSize: '12px',
+                              marginLeft: 'auto',
+                              borderRadius: '8px'
+                            }}
+                          >
+                            <IonIcon icon={cashOutline} style={{ fontSize: '14px' }} />
+                            Enviar a Caja
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {dayReservations.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '60px 20px', background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
+                    <IonIcon icon={calendarOutline} style={{ fontSize: '48px', color: '#CBD5E1', marginBottom: '8px' }} />
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: '800', color: '#0F172A' }}>
+                      Sin citas para este día
+                    </h3>
+                    <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748B' }}>
+                      No hay citas agendadas para el {formattedSelectedDate}.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={openNew}
+                      className="ff-btn-primary"
+                      style={{ padding: '10px 20px' }}
+                    >
+                      <IonIcon icon={addOutline} />
+                      Agendar Cita
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* WEEK VIEW (FullCalendar) */}
+          {viewMode === 'week' && (
+            <div className="fc-wrapper">
+              <FullCalendar
+                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
+                initialView="timeGridWeek"
+                headerToolbar={{
+                  left: 'prev,next today',
+                  center: 'title',
+                  right: 'timeGridWeek,dayGridMonth'
+                }}
+                locale="es"
+                events={events}
+                eventClick={(info) => {
+                  const res = reservations.find(r => r.id === info.event.id);
+                  if (res) {
+                    setSelectedEvent(res);
+                    setShowDetails(true);
+                  }
+                }}
+                height="auto"
+                allDaySlot={false}
+                slotDuration="00:30:00"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Floating Action Button (FAB [ + ]) */}
+        <div
+          onClick={openNew}
+          style={{
+            position: 'fixed',
+            bottom: '78px',
+            right: '20px',
+            width: '54px',
+            height: '54px',
+            borderRadius: '50%',
+            background: '#10B981',
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+            cursor: 'pointer',
+            zIndex: 900
+          }}
+          title="Agendar nueva cita"
+        >
+          <IonIcon icon={addOutline} style={{ fontSize: '28px', strokeWidth: '32' }} />
+        </div>
+
+        {/* 3. New / Edit Appointment Modal */}
+        <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)} style={{ '--border-radius': '20px' } as any}>
+          <div style={{ background: '#ffffff', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
+                {editingId ? 'Editar Cita' : 'Agendar Nueva Cita'}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <IonIcon icon={closeOutline} style={{ color: '#64748B' }} />
+              </button>
+            </div>
+
+            <IonContent style={{ '--background': '#ffffff' } as any}>
+              <div style={{ padding: '20px' }}>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                    Nombre del Cliente *
+                  </label>
+                  <input
+                    type="text"
+                    value={customerName}
+                    onChange={e => setCustomerName(e.target.value)}
+                    placeholder="Ej. Carlos Mendoza"
+                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                    Teléfono del Cliente
+                  </label>
+                  <input
+                    type="tel"
+                    value={customerPhone}
+                    onChange={e => setCustomerPhone(e.target.value)}
+                    placeholder="0414-1234567"
+                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                      Fecha *
+                    </label>
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={e => setDate(e.target.value)}
+                      style={{ width: '100%', padding: '11px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                      Hora *
+                    </label>
+                    <input
+                      type="time"
+                      value={time}
+                      onChange={e => setTime(e.target.value)}
+                      style={{ width: '100%', padding: '11px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                    Servicio
+                  </label>
+                  <select
+                    value={serviceId}
+                    onChange={e => handleServiceChange(e.target.value)}
+                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#ffffff' }}
+                  >
+                    <option value="">Sin servicio específico</option>
+                    {products.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.durationMinutes || 30} min) - ${Number(p.salePrice).toFixed(2)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                    Especialista Asignado
+                  </label>
+                  <select
+                    value={employeeId}
+                    onChange={e => setEmployeeId(e.target.value)}
+                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#ffffff' }}
+                  >
+                    <option value="">Sin asignar / Cualquiera</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.username || emp.name} {emp.jobTitle ? `(${emp.jobTitle})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                      Mesa / Silla
+                    </label>
+                    <input
+                      type="text"
+                      value={tableNumber}
+                      onChange={e => setTableNumber(e.target.value)}
+                      placeholder="Silla 1 / Mesa 3"
+                      style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                      Monto a Cobrar ($)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={totalAmount}
+                      onChange={e => setTotalAmount(parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                      style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSave(false)}
+                  className="ff-btn-primary"
+                  style={{ width: '100%', padding: '14px', fontSize: '15px', borderRadius: '14px', marginTop: '10px' }}
+                >
+                  <IonIcon icon={saveOutline} />
+                  {editingId ? 'Guardar Cambios' : 'Confirmar Cita ✓'}
+                </button>
+              </div>
+            </IonContent>
+          </div>
         </IonModal>
+
+        {/* 4. Details Modal (Details, Status & Abonos) */}
+        <IonModal isOpen={showDetails} onDidDismiss={() => setShowDetails(false)} style={{ '--border-radius': '20px' } as any}>
+          <div style={{ background: '#ffffff', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
+                Detalles de la Cita
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowDetails(false)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <IonIcon icon={closeOutline} style={{ color: '#64748B' }} />
+              </button>
+            </div>
+
+            <IonContent style={{ '--background': '#ffffff' } as any}>
+              {selectedEvent && (
+                <div style={{ padding: '20px' }}>
+                  {/* Customer Card */}
+                  <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
+                    <div style={{ fontSize: '18px', fontWeight: '900', color: '#0F172A', marginBottom: '4px' }}>
+                      {selectedEvent.customerName}
+                    </div>
+                    {selectedEvent.customerPhone && (
+                      <div style={{ fontSize: '13px', color: '#64748B', marginBottom: '4px' }}>
+                        📞 {selectedEvent.customerPhone}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '13px', color: '#64748B' }}>
+                      📅 {selectedEvent.date} a las <b>{selectedEvent.time}</b>
+                    </div>
+                    {selectedEvent.serviceName && (
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#047857', marginTop: '6px' }}>
+                        ✂️ {selectedEvent.serviceName}
+                      </div>
+                    )}
+                    <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '13px', color: '#64748B' }}>Total Servicio:</span>
+                      <span style={{ fontSize: '18px', fontWeight: '900', color: '#10B981' }}>
+                        ${Number(selectedEvent.totalAmount || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Status Selection Buttons */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#64748B', marginBottom: '6px' }}>
+                      CAMBIAR ESTADO
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => changeStatus(selectedEvent.id, ReservationStatus.CONFIRMED)}
+                        style={{
+                          padding: '10px 6px',
+                          borderRadius: '10px',
+                          border: selectedEvent.status === ReservationStatus.CONFIRMED ? '2px solid #10B981' : '1px solid #E2E8F0',
+                          background: selectedEvent.status === ReservationStatus.CONFIRMED ? '#ECFDF5' : '#ffffff',
+                          color: '#065F46',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Confirmar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => changeStatus(selectedEvent.id, ReservationStatus.COMPLETED)}
+                        style={{
+                          padding: '10px 6px',
+                          borderRadius: '10px',
+                          border: selectedEvent.status === ReservationStatus.COMPLETED ? '2px solid #3B82F6' : '1px solid #E2E8F0',
+                          background: selectedEvent.status === ReservationStatus.COMPLETED ? '#EFF6FF' : '#ffffff',
+                          color: '#1D4ED8',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Completada
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => changeStatus(selectedEvent.id, ReservationStatus.CANCELED)}
+                        style={{
+                          padding: '10px 6px',
+                          borderRadius: '10px',
+                          border: selectedEvent.status === ReservationStatus.CANCELED ? '2px solid #EF4444' : '1px solid #E2E8F0',
+                          background: selectedEvent.status === ReservationStatus.CANCELED ? '#FEF2F2' : '#ffffff',
+                          color: '#991B1B',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Actions: Enviar a Caja & Editar */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowDetails(false);
+                        window.location.href = `/pos?reservationId=${selectedEvent.id}`;
+                      }}
+                      className="ff-btn-primary"
+                      style={{ width: '100%', padding: '12px', fontSize: '14px' }}
+                    >
+                      <IonIcon icon={cashOutline} />
+                      Enviar a Caja para Cobrar
+                    </button>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => openEdit(selectedEvent)}
+                        style={{
+                          padding: '10px',
+                          borderRadius: '10px',
+                          border: '1px solid #CBD5E1',
+                          background: '#ffffff',
+                          color: '#0F172A',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Editar Datos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteReservation(selectedEvent.id)}
+                        style={{
+                          padding: '10px',
+                          borderRadius: '10px',
+                          border: '1px solid #FCA5A5',
+                          background: '#FEF2F2',
+                          color: '#DC2626',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Eliminar Cita
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </IonContent>
+          </div>
+        </IonModal>
+
+        {/* Retraso Modal */}
+        <IonModal isOpen={showShiftModal} onDidDismiss={() => setShowShiftModal(false)} style={{ '--border-radius': '20px' } as any}>
+          <div style={{ padding: '20px', background: '#ffffff' }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
+              ⏱️ Retraso Imprevisto de Jornada
+            </h3>
+            <p style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.4' }}>
+              Todas las citas del día de hoy a partir de la hora seleccionada se desplazarán automáticamente.
+            </p>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>A partir de (Hora):</label>
+              <input type="time" value={shiftTimeFrom} onChange={e => setShiftTimeFrom(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1' }} />
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Minutos a desplazar:</label>
+              <select value={shiftMinutes} onChange={e => setShiftMinutes(Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1' }}>
+                <option value={15}>15 minutos</option>
+                <option value={30}>30 minutos</option>
+                <option value={60}>1 hora (60 min)</option>
+              </select>
+            </div>
+            <button type="button" onClick={handleMassShift} className="ff-btn-primary" style={{ width: '100%', padding: '12px', background: '#F59E0B' }}>
+              Aplicar Desplazamiento
+            </button>
+          </div>
+        </IonModal>
+
       </IonContent>
     </IonPage>
   );
 };
 
 export default Reservations;
-

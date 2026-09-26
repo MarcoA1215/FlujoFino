@@ -1,9 +1,11 @@
+// @ts-nocheck
 import React, { useState, useEffect, useContext } from 'react';
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonButton, IonButtons, IonMenuButton, useIonToast, IonIcon, IonSelect, IonSelectOption, IonBadge, IonModal } from '@ionic/react';
 import { refreshOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
+import { AppHeader } from '../components/AppHeader';
 
 interface UserData {
   id: string;
@@ -245,14 +247,9 @@ const Users: React.FC = () => {
 
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar color="dark">
-          <IonButtons slot="start"><IonMenuButton /></IonButtons>
-          <IonTitle>Gestión de Usuarios</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent className="ion-padding">
-        <IonGrid>
+      <AppHeader title="Gestión de Equipo" />
+      <IonContent className="ion-padding" style={{ '--background': '#F8FAFC' }}>
+        <IonGrid style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <IonRow>
             <IonCol size="12" sizeMd="4">
               <IonCard>

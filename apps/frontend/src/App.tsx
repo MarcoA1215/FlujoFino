@@ -40,6 +40,8 @@ import '@ionic/react/css/flex-utils.css';
 import '@ionic/react/css/display.css';
 import './theme.css';
 
+import BottomNav from './components/BottomNav';
+
 setupIonicReact();
 
 const HomeRedirector: React.FC = () => {
@@ -189,7 +191,8 @@ const MainLayout: React.FC = () => {
         <Route path="/feedback" element={<PrivateRoute><FeedbackPage /></PrivateRoute>} />
         <Route path="/platform-admin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
       </IonRouterOutlet>
-    </IonSplitPane>
+      </IonSplitPane>
+      <BottomNav />
     </>
   );
 };

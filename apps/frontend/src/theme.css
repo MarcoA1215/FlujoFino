@@ -1,134 +1,417 @@
-/* Vibrant but Professional Color Palette (Green, Blue, White) */
-:root {
-  /* Primary - Vibrant Blue */
-  --ion-color-primary: #1E293B;
-  --ion-color-primary-rgb: 30,41,59;
-  --ion-color-primary-contrast: #ffffff;
-  --ion-color-primary-contrast-rgb: 255,255,255;
-  --ion-color-primary-shade: #1a2434;
-  --ion-color-primary-tint: #354153;
+/* ==========================================================================
+   FLUJO FINO - DESIGN SYSTEM TOKENS & MOBILE-FIRST STYLES
+   Inspired by Modern Figma POS Design (Emerald, Slate, White)
+   ========================================================================== */
 
-  /* Secondary - Light Sky Blue */
-  --ion-color-secondary: #475569;
-  --ion-color-secondary-rgb: 71,85,105;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+:root {
+  /* Fonts */
+  --ff-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--ff-font-family);
+
+  /* Primary Palette - Modern Emerald */
+  --ion-color-primary: #10B981;
+  --ion-color-primary-rgb: 16, 185, 129;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #059669;
+  --ion-color-primary-tint: #34D399;
+
+  /* Secondary - Dark Slate */
+  --ion-color-secondary: #0F172A;
+  --ion-color-secondary-rgb: 15, 23, 42;
   --ion-color-secondary-contrast: #ffffff;
-  
-  /* Tertiary - Teal / Blue-Green */
-  --ion-color-tertiary: #334155;
-  --ion-color-tertiary-rgb: 51,65,85;
+  --ion-color-secondary-shade: #020617;
+  --ion-color-secondary-tint: #1E293B;
+
+  /* Tertiary - Forest / Deep Emerald */
+  --ion-color-tertiary: #047857;
+  --ion-color-tertiary-rgb: 4, 120, 87;
   --ion-color-tertiary-contrast: #ffffff;
 
-  /* Success - Vibrant Emerald Green (Used in App Headers) */
-  --ion-color-success: #0F766E;
-  --ion-color-success-rgb: 15,118,110;
+  /* Success - Vibrant Emerald */
+  --ion-color-success: #10B981;
+  --ion-color-success-rgb: 16, 185, 129;
   --ion-color-success-contrast: #ffffff;
 
-  /* Warning - Amber (Kept for UI warnings) */
+  /* Warning / Sync - Warm Amber */
   --ion-color-warning: #F59E0B;
-  --ion-color-warning-rgb: 245,158,11;
+  --ion-color-warning-rgb: 245, 158, 11;
   --ion-color-warning-contrast: #ffffff;
 
-  /* Danger - Soft Vibrant Red (Kept for Merma/Delete) */
+  /* Danger / Cancelled - Coral Red */
   --ion-color-danger: #EF4444;
-  --ion-color-danger-rgb: 239,68,68;
+  --ion-color-danger-rgb: 239, 68, 68;
   --ion-color-danger-contrast: #ffffff;
 
-  /* Background nuances - Clean White */
-  --ion-background-color: #ffffff;
-  --ion-color-light: #F3F4F6;
-  --ion-color-light-rgb: 243,244,246;
+  /* Neutral Backgrounds & Surfaces */
+  --ion-background-color: #F8FAFC;
+  --ion-item-background: #ffffff;
+  --ion-card-background: #ffffff;
+  --ion-color-light: #F1F5F9;
+  --ion-color-light-rgb: 241, 245, 249;
+  --ion-color-medium: #64748B;
+  --ion-color-medium-rgb: 100, 116, 139;
+  --ion-color-dark: #0F172A;
+  --ion-color-dark-rgb: 15, 23, 42;
+
+  /* Custom Design Tokens */
+  --ff-emerald: #10B981;
+  --ff-emerald-dark: #047857;
+  --ff-emerald-light: #ECFDF5;
+  --ff-slate-900: #0F172A;
+  --ff-slate-800: #1E293B;
+  --ff-slate-500: #64748B;
+  --ff-slate-200: #E2E8F0;
+  --ff-slate-100: #F1F5F9;
+  --ff-slate-50: #F8FAFC;
+  --ff-orange: #F97316;
+  --ff-orange-light: #FFF7ED;
+  --ff-amber: #F59E0B;
+  --ff-amber-light: #FFFBEB;
+  --ff-red: #EF4444;
+  --ff-red-light: #FEF2F2;
+
+  --ff-radius-sm: 8px;
+  --ff-radius-md: 12px;
+  --ff-radius-lg: 16px;
+  --ff-radius-full: 9999px;
+
+  --ff-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  --ff-shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --ff-shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+  --ff-shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
 }
 
-/* Fix for mobile tables */
-.table-responsive {
+/* Base Body Styling */
+body {
+  font-family: var(--ff-font-family);
+  background-color: var(--ff-slate-50);
+  color: var(--ff-slate-900);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ==========================================================================
+   REUSABLE FIGMA DESIGN UTILITIES (.ff-*)
+   ========================================================================== */
+
+/* Clean Card Surface */
+.ff-card {
+  background: #ffffff;
+  border-radius: var(--ff-radius-lg);
+  border: 1px solid var(--ff-slate-200);
+  box-shadow: var(--ff-shadow-sm);
+  transition: all 0.2s ease-in-out;
+  overflow: hidden;
+}
+
+.ff-card-interactive {
+  cursor: pointer;
+}
+.ff-card-interactive:active {
+  transform: scale(0.985);
+}
+
+/* Status Badges & Pills */
+.ff-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--ff-radius-full);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  cursor: default;
+  transition: all 0.15s ease;
+}
+
+.ff-pill-interactive {
+  cursor: pointer;
+  user-select: none;
+}
+.ff-pill-interactive:active {
+  transform: scale(0.96);
+}
+
+.ff-pill-online {
+  background: var(--ff-emerald-light);
+  color: #065F46;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.ff-pill-offline {
+  background: var(--ff-orange-light);
+  color: #9A3412;
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+.ff-pill-sync {
+  background: var(--ff-amber-light);
+  color: #92400E;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.ff-pill-rate {
+  background: #ffffff;
+  color: var(--ff-slate-900);
+  border-color: var(--ff-slate-200);
+  box-shadow: var(--ff-shadow-sm);
+}
+
+.ff-pill-danger {
+  background: var(--ff-red-light);
+  color: #991B1B;
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.ff-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Category Filter Chips */
+.ff-chips-container {
+  display: flex;
+  gap: 8px;
   overflow-x: auto;
+  padding: 4px 2px 12px 2px;
   -webkit-overflow-scrolling: touch;
-  width: 100%;
+  scrollbar-width: none;
+}
+.ff-chips-container::-webkit-scrollbar {
+  display: none;
 }
 
-.table-responsive table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 600px; /* Forces scrolling on very small screens so content isn't crushed */
-}
-
-.table-responsive th {
-  background-color: var(--ion-color-light);
+.ff-chip {
+  padding: 7px 16px;
+  border-radius: var(--ff-radius-full);
+  font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid var(--ff-slate-200);
+  background: #ffffff;
+  color: var(--ff-slate-500);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
 }
 
-.table-responsive th, .table-responsive td {
-  padding: 12px 8px;
-  border-bottom: 1px solid #eee;
+.ff-chip.active {
+  background: var(--ff-emerald);
+  color: #ffffff;
+  border-color: var(--ff-emerald);
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
 }
 
-/* Custom styling for the POS layout on mobile */
-@media (max-width: 768px) {
-  .ion-hide-sm-down {
-    display: none !important;
+/* Search Bar Pill */
+.ff-search-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid var(--ff-slate-200);
+  border-radius: var(--ff-radius-full);
+  padding: 8px 16px;
+  box-shadow: var(--ff-shadow-sm);
+  width: 100%;
+}
+.ff-search-pill input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+  width: 100%;
+  color: var(--ff-slate-900);
+  font-family: inherit;
+}
+.ff-search-pill input::placeholder {
+  color: var(--ff-slate-500);
+}
+
+/* Floating Sticky Bottom Cart Capsule */
+.ff-floating-cart {
+  position: fixed;
+  bottom: 74px; /* Above bottom nav */
+  left: 16px;
+  right: 16px;
+  max-width: 500px;
+  margin: 0 auto;
+  background: var(--ff-slate-800);
+  color: #ffffff;
+  border-radius: var(--ff-radius-full);
+  padding: 8px 10px 8px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.35);
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+  animation: ffSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ffSlideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
   }
 }
 
+/* Primary Button */
+.ff-btn-primary {
+  background: var(--ff-emerald);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--ff-radius-md);
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+  transition: all 0.15s ease;
+  outline: none;
+}
+.ff-btn-primary:active {
+  transform: scale(0.97);
+  background: var(--ff-emerald-dark);
+}
 
+/* Bottom Sheet Modal Styling */
+.ff-bottom-sheet-content {
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  background: #ffffff;
+  box-shadow: var(--ff-shadow-xl);
+  overflow: hidden;
+}
 
-/* Prevenir que las palabras se rompan verticalmente letra por letra en pantallas angostas */
+.ff-drag-handle {
+  width: 44px;
+  height: 5px;
+  background: #CBD5E1;
+  border-radius: var(--ff-radius-full);
+  margin: 12px auto 8px auto;
+}
+
+/* Bottom Navigation Bar (Mobile) */
+.ff-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 62px;
+  background: #ffffff;
+  border-top: 1px solid var(--ff-slate-200);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  z-index: 999;
+  box-shadow: 0 -2px 10px rgba(15, 23, 42, 0.03);
+}
+
+.ff-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--ff-slate-500);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--ff-radius-md);
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.ff-nav-item ion-icon {
+  font-size: 20px;
+  transition: transform 0.15s ease;
+}
+
+.ff-nav-item.active {
+  color: var(--ff-emerald);
+}
+
+.ff-nav-item.active ion-icon {
+  transform: scale(1.1);
+}
+
+/* Hide bottom nav on desktop screens */
+@media (min-width: 769px) {
+  .ff-bottom-nav {
+    display: none !important;
+  }
+  .ff-floating-cart {
+    bottom: 24px;
+  }
+}
+
+/* Content bottom spacing so bottom nav does not overlap */
+@media (max-width: 768px) {
+  .ff-has-bottom-nav {
+    padding-bottom: 74px !important;
+  }
+}
+
+/* Clean Header Toolbar */
+.ff-header-toolbar {
+  --background: #ffffff;
+  --border-color: var(--ff-slate-200);
+  --border-width: 0 0 1px 0;
+  --min-height: 56px;
+  box-shadow: none;
+}
+
+/* Word break rule */
 ion-badge, ion-button, th, td, ion-card-title, h1, h2, h3, p {
   word-break: normal !important;
   overflow-wrap: break-word !important;
 }
 
-/* FullCalendar Ionic Fixes */
-.fc table {
-  width: 100% !important;
-  border-collapse: collapse !important;
+/* Menu Navigation Styling */
+#inbox-list ion-item {
+  border-radius: var(--ff-radius-md);
+  margin: 3px 10px;
+  font-weight: 600;
+  --color: var(--ff-slate-900);
+  font-size: 14px;
+  transition: all 0.15s ease;
 }
-.fc th, .fc td {
-  padding: 0;
-  vertical-align: top;
+#inbox-list ion-item.selected {
+  --background: var(--ff-emerald-light) !important;
+  --color: var(--ff-emerald-dark) !important;
+  font-weight: 800 !important;
 }
-.fc .fc-scrollgrid-sync-table {
-  width: 100% !important;
-}
-.fc .fc-view-harness {
-  background-color: white;
-}
-
-.fc-wrapper { display: block; width: 100%; background: white; padding: 10px; border-radius: 8px; }
-.fc { --fc-page-bg-color: #fff; }
-
-/* Altura uniforme y espaciosa para las ranuras de tiempo */
-.fc .fc-timegrid-slot,
-.fc .fc-timegrid-slot-lane,
-.fc .fc-timegrid-slot-label,
-.fc .fc-timegrid-slots tr {
-  height: 56px !important;
+#inbox-list ion-item.selected ion-icon {
+  color: var(--ff-emerald) !important;
 }
 
-/* Android Calendar Mobile Design */
-@media (max-width: 768px) {
-  /* Minimal header */
-  .fc .fc-toolbar.fc-header-toolbar {
-    margin-bottom: 0.5em !important;
-  }
-  .fc-toolbar-chunk:first-child {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-  }
-  .fc .fc-toolbar-title {
-    font-size: 1.2rem !important;
-    font-weight: bold;
-    text-transform: capitalize;
-  }
-  
-  /* Hide the desktop view buttons */
-  .fc-toolbar-chunk:nth-child(2), .fc-toolbar-chunk:nth-child(3) {
-    display: none !important;
-  }
-  
-  /* Soft borders */
-  .fc-theme-standard td, .fc-theme-standard th {
-    border-color: #f0f0f0 !important;
-  }
+/* Calendar styling adjustments */
+.fc-wrapper {
+  background: #ffffff;
+  border-radius: var(--ff-radius-lg);
+  border: 1px solid var(--ff-slate-200);
+  box-shadow: var(--ff-shadow-sm);
+  padding: 12px;
 }
-
+.fc-toolbar-title {
+  font-size: 1.15rem !important;
+  font-weight: 700 !important;
+  color: var(--ff-slate-900) !important;
+}
