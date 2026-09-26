@@ -162,10 +162,17 @@ export class PublicReservationsController {
     const productRepo = this.tenantRepo.manager.getRepository(Product);
     let serviceDetails: any = null;
     if (reservation.serviceId) {
-      const p = await productRepo.findOne({ where: { id: reservation.serviceId } });
-      if (p) {
-        serviceDetails = { price: p.salePrice, durationMinutes: p.durationMinutes };
+      const ids = reservation.serviceId.split(',').map(s => s.trim()).filter(Boolean);
+      let totalPrice = 0;
+      let totalDuration = 0;
+      for (const sId of ids) {
+        const p = await productRepo.findOne({ where: { id: sId } });
+        if (p) {
+          totalPrice += Number(p.salePrice || 0);
+          totalDuration += Number(p.durationMinutes || 0);
+        }
       }
+      serviceDetails = { price: totalPrice, durationMinutes: totalDuration };
     }
 
     // Auto-acceptance logic:
@@ -194,7 +201,8 @@ export class PublicReservationsController {
       status: reservation.status,
       tenantName: reservation.tenant.name,
       tenantId: reservation.tenantId, // Real tenant UUID is OK to return here since they already have the appointment UUID
-      servicePrice: serviceDetails?.price || 0,
+      servicePrice: Number(reservation.totalAmount) || serviceDetails?.price || 0,
+      durationMinutes: serviceDetails?.durationMinutes || 30,
       bankInfo: settings?.companyBank,
       companyCedula: settings?.companyCedula,
       companyPhone: settings?.companyPhone,
@@ -414,24 +422,52 @@ export class PublicReservationsController {
     const productMap = new Map<string, Product>(allProducts.map(p => [p.id, p]));
     const productNameMap = new Map<string, Product>(allProducts.map(p => [p.name.trim().toLowerCase(), p]));
 
-    let duration = interval;
-    if (serviceId && productMap.has(serviceId)) {
-      const sp = productMap.get(serviceId);
-      if (sp && sp.durationMinutes) duration = Number(sp.durationMinutes);
+    let duration = 0;
+    if (serviceId) {
+      const sIds = serviceId.split(',').map(s => s.trim()).filter(Boolean);
+      for (const sId of sIds) {
+        const sp = productMap.get(sId);
+        if (sp && sp.durationMinutes) {
+          duration += Number(sp.durationMinutes);
+        } else {
+          duration += interval;
+        }
+      }
+    }
+    if (duration <= 0) {
+      duration = interval;
     }
 
     // Map existing into busy intervals [startMins, endMins]
     const busyIntervals = existing.map(r => {
       const [rh, rm] = r.time.split(':').map(Number);
       const startMins = rh * 60 + rm;
-      let rDuration = interval;
+      let rDuration = 0;
       
-      let sp = r.serviceId ? productMap.get(r.serviceId) : null;
-      if (!sp && r.serviceName) {
-        sp = productNameMap.get(r.serviceName.trim().toLowerCase());
+      if (r.serviceId) {
+        const ids = r.serviceId.split(',').map(s => s.trim()).filter(Boolean);
+        for (const id of ids) {
+          const sp = productMap.get(id);
+          if (sp && sp.durationMinutes) {
+            rDuration += Number(sp.durationMinutes);
+          } else {
+            rDuration += interval;
+          }
+        }
       }
-      if (sp && sp.durationMinutes) {
-        rDuration = Number(sp.durationMinutes);
+      if (rDuration === 0 && r.serviceName) {
+        const names = r.serviceName.split(',').map(s => s.trim().toLowerCase());
+        for (const nm of names) {
+          const sp = productNameMap.get(nm);
+          if (sp && sp.durationMinutes) {
+            rDuration += Number(sp.durationMinutes);
+          } else {
+            rDuration += interval;
+          }
+        }
+      }
+      if (rDuration === 0) {
+        rDuration = interval;
       }
 
       return { start: startMins, end: startMins + rDuration };

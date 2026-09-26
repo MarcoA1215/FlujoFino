@@ -15,26 +15,56 @@ const PublicBooking: React.FC = () => {
   const [presentToast] = useIonToast();
 
   const [step, setStep] = useState(1);
-  const [selectedService, setSelectedService] = useState<any>(null);
+  const [selectedServices, setSelectedServices] = useState<any[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string>('');
 
-  // Specialists available specifically for the currently selected service
-  const availableStaffForService = useMemo(() => {
-    if (!tenantInfo?.staff || !tenantInfo?.bookingAllowStaffSelection || !selectedService) return [];
-    const assigned = selectedService.assignedStaffIds;
-    if (Array.isArray(assigned) && assigned.length > 0) {
-      return tenantInfo.staff.filter((st: any) => assigned.includes(st.id));
-    } else if (typeof assigned === 'string' && (assigned as string).trim().length > 0) {
-      const ids = (assigned as string).split(',').map((s: string) => s.trim()).filter(Boolean);
-      return tenantInfo.staff.filter((st: any) => ids.includes(st.id));
-    }
-    // If no specific staff is restricted, all staff in tenant can perform it
-    return tenantInfo.staff;
-  }, [tenantInfo?.staff, tenantInfo?.bookingAllowStaffSelection, selectedService]);
+  const toggleService = (svc: any) => {
+    setSelectedServices(prev => {
+      const exists = prev.some(s => s.id === svc.id);
+      if (exists) {
+        return prev.filter(s => s.id !== svc.id);
+      } else {
+        return [...prev, svc];
+      }
+    });
+    setSelectedTime(''); // Reset time because combined duration changes
+  };
 
-  // When selected service changes, reset staff if current staff cannot do this service
+  const totalDurationMinutes = useMemo(() => {
+    return selectedServices.reduce((sum, s) => sum + (Number(s.durationMinutes) || 30), 0);
+  }, [selectedServices]);
+
+  const totalServicePrice = useMemo(() => {
+    return selectedServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+  }, [selectedServices]);
+
+  const selectedServiceNames = useMemo(() => {
+    return selectedServices.map(s => s.name).join(' + ');
+  }, [selectedServices]);
+
+  const selectedServiceIds = useMemo(() => {
+    return selectedServices.map(s => s.id).join(',');
+  }, [selectedServices]);
+
+  // Specialists available specifically for all currently selected services
+  const availableStaffForService = useMemo(() => {
+    if (!tenantInfo?.staff || !tenantInfo?.bookingAllowStaffSelection || selectedServices.length === 0) return [];
+    
+    return tenantInfo.staff.filter((st: any) => {
+      return selectedServices.every((svc: any) => {
+        const assigned = svc.assignedStaffIds;
+        if (!assigned || (Array.isArray(assigned) && assigned.length === 0) || (typeof assigned === 'string' && !assigned.trim())) {
+          return true;
+        }
+        const ids = Array.isArray(assigned) ? assigned : (assigned as string).split(',').map((s: string) => s.trim());
+        return ids.includes(st.id);
+      });
+    });
+  }, [tenantInfo?.staff, tenantInfo?.bookingAllowStaffSelection, selectedServices]);
+
+  // When selected services change, reset staff if current staff cannot do all selected services
   useEffect(() => {
     if (selectedStaff && availableStaffForService.length > 0) {
       const isStillAvailable = availableStaffForService.some((st: any) => st.id === selectedStaff.id);
@@ -42,7 +72,7 @@ const PublicBooking: React.FC = () => {
         setSelectedStaff(null);
       }
     }
-  }, [selectedService, availableStaffForService]);
+  }, [selectedServices, availableStaffForService]);
 
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -177,14 +207,14 @@ const PublicBooking: React.FC = () => {
         identification: identification || undefined,
         date: (selectedDate ? new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : undefined), 
         time: selectedTime, 
-        numberOfPeople: (tenantInfo?.bookingRequireService || selectedService) ? 1 : numberOfPeople, 
+        numberOfPeople: (tenantInfo?.bookingRequireService || selectedServices.length > 0) ? 1 : numberOfPeople, 
         notes,
         referralSource,
-        serviceId: selectedService?.id,
-        serviceName: selectedService?.name,
+        serviceId: selectedServiceIds || undefined,
+        serviceName: selectedServiceNames || undefined,
         employeeId: selectedStaff?.id || undefined,
         employeeName: selectedStaff?.name || undefined,
-        totalAmount: selectedService?.price || 0
+        totalAmount: totalServicePrice
       });
 
       // Persist customer profile locally for recurring visits
@@ -238,7 +268,7 @@ const PublicBooking: React.FC = () => {
       setLoadingSlots(true);
       try {
         const dStr = new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-        const sId = selectedService ? `&serviceId=${selectedService.id}` : '';
+        const sId = selectedServiceIds ? `&serviceId=${selectedServiceIds}` : '';
         const empId = selectedStaff?.id ? `&employeeId=${selectedStaff.id}` : '';
         const res = await axios.get(`${apiBase}/public/reservations/tenant/${tenantId}/availability?date=${dStr}${sId}${empId}`);
         setAvailableSlots(res.data);
@@ -249,7 +279,7 @@ const PublicBooking: React.FC = () => {
       }
     };
     fetchSlots();
-  }, [selectedDate, selectedService, selectedStaff, tenantId]);
+  }, [selectedDate, selectedServiceIds, selectedStaff, tenantId]);
 
   if (loading) return <IonPage><IonContent className="ion-padding ion-text-center"><IonSpinner /></IonContent></IonPage>;
 
@@ -267,7 +297,14 @@ const PublicBooking: React.FC = () => {
                 <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px', textAlign: 'left' }}>
                   <p><b>Fecha:</b> {selectedDate?.toLocaleDateString()}</p>
                   <p><b>Hora:</b> {selectedTime}</p>
-                  {selectedService && <p><b>Servicio:</b> {selectedService.name}</p>}
+                  {selectedServices.length > 0 && (
+                    <>
+                      <p><b>Servicio(s):</b> {selectedServiceNames}</p>
+                      <p><b>Duración estimada:</b> {totalDurationMinutes} min</p>
+                      <p><b>Total:</b> ${totalServicePrice.toFixed(2)}</p>
+                    </>
+                  )}
+                  {selectedStaff && <p><b>Especialista:</b> {selectedStaff.name}</p>}
                 </div>
 
                 <div style={{ marginTop: '25px', padding: '15px', backgroundColor: '#eef8ff', borderRadius: '8px', border: '1px dashed var(--ion-color-primary)' }}>
@@ -303,7 +340,7 @@ const PublicBooking: React.FC = () => {
   const hasStore = Boolean(tenantInfo?.hasStore ?? (tenantInfo?.featureBuySell || tenantInfo?.featureRecipes));
 
   const goBack = () => {
-    if (step === 2 && (tenantInfo?.bookingRequireService || selectedService || hasServices)) {
+    if (step === 2 && (tenantInfo?.bookingRequireService || selectedServices.length > 0 || hasServices)) {
       setStep(1);
     } else if (step === 3) {
       setStep(2);
@@ -412,26 +449,23 @@ const PublicBooking: React.FC = () => {
               {step === 1 && (
                 <div>
                   <h3 style={{ fontWeight: 'bold', marginBottom: '4px', textAlign: 'center', fontSize: '18px' }}>
-                    {isServiceRequired ? 'Elige tu Servicio' : 'Selecciona un Servicio (Opcional)'}
+                    {isServiceRequired ? 'Elige tu(s) Servicio(s)' : 'Selecciona tu(s) Servicio(s) (Opcional)'}
                   </h3>
                   <p style={{ textAlign: 'center', color: '#64748b', fontSize: '13px', margin: '0 0 16px 0' }}>
                     {isServiceRequired 
-                      ? 'Escoge el tratamiento o atención que deseas agendar' 
-                      : 'Elige un servicio o avanza directamente para reservar'}
+                      ? 'Puedes seleccionar uno o varios servicios para agendarlos en una sola cita' 
+                      : 'Elige uno o más servicios o avanza directamente para reservar'}
                   </p>
 
                   {/* Services List */}
                   {hasServices ? (
                     <div>
                       {availableServices.map((svc: any) => {
-                        const isSelected = selectedService?.id === svc.id;
+                        const isSelected = selectedServices.some(s => s.id === svc.id);
                         return (
                           <div 
                             key={svc.id} 
-                            onClick={() => {
-                              setSelectedService(svc);
-                              setSelectedTime('');
-                            }}
+                            onClick={() => toggleService(svc)}
                             style={{ 
                               padding: '12px', 
                               border: isSelected ? '2px solid var(--ion-color-primary)' : '1px solid #e2e8f0', 
@@ -468,9 +502,13 @@ const PublicBooking: React.FC = () => {
                               <div style={{ fontWeight: '800', fontSize: '16px', color: 'var(--ion-color-primary)' }}>
                                 ${Number(svc.price).toFixed(2)}
                               </div>
-                              {isSelected && (
-                                <div style={{ fontSize: '11px', color: 'var(--ion-color-success)', fontWeight: 'bold', marginTop: '2px' }}>
-                                  Seleccionado
+                              {isSelected ? (
+                                <div style={{ fontSize: '11px', color: 'var(--ion-color-success)', fontWeight: 'bold', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px', justifyContent: 'flex-end' }}>
+                                  <IonIcon icon={checkmarkCircleOutline} /> Seleccionado
+                                </div>
+                              ) : (
+                                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                                  + Agregar
                                 </div>
                               )}
                             </div>
@@ -478,17 +516,45 @@ const PublicBooking: React.FC = () => {
                         );
                       })}
 
+                      {/* Live Summary Box when at least 1 service is picked */}
+                      {selectedServices.length > 0 && (
+                        <div style={{
+                          marginTop: '12px',
+                          marginBottom: '14px',
+                          padding: '12px 14px',
+                          backgroundColor: '#f0fdf4',
+                          border: '1px solid #86efac',
+                          borderRadius: '10px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}>
+                          <div>
+                            <div style={{ fontWeight: 'bold', color: '#166534', fontSize: '13px' }}>
+                              {selectedServices.length === 1 ? '1 servicio seleccionado' : `${selectedServices.length} servicios seleccionados`}
+                            </div>
+                            <div style={{ color: '#15803d', fontSize: '12px', marginTop: '2px' }}>
+                              ⏱️ Duración total: <b>{totalDurationMinutes} min</b>
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '11px', color: '#166534' }}>Total estimado</div>
+                            <div style={{ fontWeight: '800', fontSize: '17px', color: '#166534' }}>
+                              ${totalServicePrice.toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Specialist Selection: Exclusively shown once a service is selected */}
-                      {selectedService && tenantInfo?.bookingAllowStaffSelection && availableStaffForService.length > 0 && (
+                      {selectedServices.length > 0 && tenantInfo?.bookingAllowStaffSelection && availableStaffForService.length > 0 && (
                         <div style={{ marginTop: '16px', marginBottom: '8px', backgroundColor: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                           <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <IonIcon icon={personOutline} color="primary" />
-                            ¿Con quién deseas atenderte para {selectedService.name}?
+                            ¿Con quién deseas atenderte?
                           </div>
                           <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '10px' }}>
-                            {selectedService.assignedStaffIds && (Array.isArray(selectedService.assignedStaffIds) ? selectedService.assignedStaffIds.length > 0 : String(selectedService.assignedStaffIds).trim().length > 0)
-                              ? 'Personal especialista capacitado para este servicio:'
-                              : 'Personal disponible:'}
+                            Personal especialista capacitado para tu selección:
                           </div>
                           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
                             <div 
@@ -541,11 +607,11 @@ const PublicBooking: React.FC = () => {
                       <IonButton 
                         expand="block" 
                         color="primary" 
-                        disabled={isServiceRequired && !selectedService}
+                        disabled={isServiceRequired && selectedServices.length === 0}
                         onClick={() => setStep(2)}
                         style={{ marginTop: '16px', height: '48px', fontWeight: 'bold' }}
                       >
-                        Continuar a Fecha y Hora
+                        Continuar a Fecha y Hora {selectedServices.length > 0 ? `(${totalDurationMinutes} min)` : ''}
                       </IonButton>
                     </div>
                   ) : (
@@ -619,14 +685,14 @@ const PublicBooking: React.FC = () => {
                 <div>
                   <h3 style={{fontWeight: 'bold', marginBottom: '8px', textAlign: 'center'}}>Elige una Fecha</h3>
                   
-                  {selectedService && (
+                  {selectedServices.length > 0 && (
                     <div style={{ backgroundColor: '#f1f5f9', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <b>{selectedService.name}</b> • ⏱️ {selectedService.durationMinutes} min
+                        <b>{selectedServiceNames}</b> • ⏱️ {totalDurationMinutes} min
                         {selectedStaff && <div><span style={{ color: '#64748b' }}>Especialista:</span> <b>{selectedStaff.name}</b></div>}
                       </div>
                       <div style={{ fontWeight: 'bold', color: 'var(--ion-color-primary)', fontSize: '15px' }}>
-                        ${Number(selectedService.price).toFixed(2)}
+                        ${totalServicePrice.toFixed(2)}
                       </div>
                     </div>
                   )}
@@ -658,7 +724,7 @@ const PublicBooking: React.FC = () => {
                 <div>
                   <h3 style={{fontWeight: 'bold', marginBottom: '6px', textAlign: 'center'}}>Horas Disponibles</h3>
                   <div style={{textAlign: 'center', marginBottom: '14px', color: '#64748b', fontSize: '13px'}}>
-                    Para el <b>{selectedDate?.toLocaleDateString()}</b>
+                    Para el <b>{selectedDate?.toLocaleDateString()}</b> {selectedServices.length > 0 ? `(${totalDurationMinutes} min)` : ''}
                     {selectedStaff && ` con ${selectedStaff.name}`}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
@@ -698,10 +764,10 @@ const PublicBooking: React.FC = () => {
                     <div style={{ fontWeight: 'bold', color: '#0369a1', marginBottom: '6px' }}>Resumen de Cita:</div>
                     <div style={{ color: '#1e293b', lineHeight: '1.5' }}>
                       📅 <b>Fecha:</b> {selectedDate?.toLocaleDateString()} a las {selectedTime}<br/>
-                      {selectedService && (
+                      {selectedServices.length > 0 && (
                         <>
-                          💅 <b>Servicio:</b> {selectedService.name} (⏱️ {selectedService.durationMinutes} min)<br/>
-                          💰 <b>Inversión:</b> ${Number(selectedService.price).toFixed(2)}<br/>
+                          💅 <b>Servicio(s):</b> {selectedServiceNames} (⏱️ {totalDurationMinutes} min)<br/>
+                          💰 <b>Inversión:</b> ${totalServicePrice.toFixed(2)}<br/>
                         </>
                       )}
                       {selectedStaff && (
@@ -761,7 +827,7 @@ const PublicBooking: React.FC = () => {
                   </IonItem>
 
                   {/* Only show "Cantidad de Personas" if it's NOT a required service mode and no service was picked */}
-                  {!isServiceRequired && !selectedService && (
+                  {!isServiceRequired && selectedServices.length === 0 && (
                     <IonItem lines="none" style={{ marginBottom: '10px', border: '1px solid #ddd', borderRadius: '8px' }}>
                       <IonLabel position="stacked">Cantidad de Personas / Puestos</IonLabel>
                       <IonInput type="number" value={numberOfPeople} onIonInput={e => setNumberOfPeople(parseInt(e.detail.value!, 10))} min={1} />
@@ -907,13 +973,16 @@ const PublicBooking: React.FC = () => {
                         onClick={() => {
                           const svc = availableServices.find((s: any) => s.id === item.productId);
                           if (svc) {
-                            setSelectedService(svc);
+                            setSelectedServices(prev => {
+                              if (prev.some(s => s.id === svc.id)) return prev;
+                              return [...prev, svc];
+                            });
                           }
                           setShowCatalog(false);
                           setStep(1);
                         }}
                       >
-                        Agendar Este
+                        {selectedServices.some(s => s.id === item.productId) ? '✓ Agregado' : '+ Agregar a mi cita'}
                       </IonButton>
                     )}
                   </IonCardContent>
