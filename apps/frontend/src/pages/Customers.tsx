@@ -450,8 +450,8 @@ const Customers: React.FC = () => {
 
         {/* Create / Edit Modal */}
         <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)} style={{ '--border-radius': '20px' } as any}>
-          <div style={{ background: '#ffffff', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
                 {editingCustomer ? 'Editar Cliente' : 'Registrar Nuevo Cliente'}
               </h2>
@@ -464,8 +464,7 @@ const Customers: React.FC = () => {
               </button>
             </div>
 
-            <IonContent style={{ '--background': '#ffffff' } as any}>
-              <div style={{ padding: '20px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
                     Nombre Completo *
@@ -540,8 +539,7 @@ const Customers: React.FC = () => {
                 >
                   {editingCustomer ? 'Guardar Cambios' : 'Registrar Cliente ✓'}
                 </button>
-              </div>
-            </IonContent>
+            </div>
           </div>
         </IonModal>
       </IonContent>

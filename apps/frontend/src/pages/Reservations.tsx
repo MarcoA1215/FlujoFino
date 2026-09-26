@@ -780,8 +780,8 @@ const Reservations: React.FC = () => {
 
         {/* 3. New / Edit Appointment Modal */}
         <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)} style={{ '--border-radius': '20px' } as any}>
-          <div style={{ background: '#ffffff', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
                 {editingId ? 'Editar Cita' : 'Agendar Nueva Cita'}
               </h2>
@@ -794,8 +794,7 @@ const Reservations: React.FC = () => {
               </button>
             </div>
 
-            <IonContent style={{ '--background': '#ffffff' } as any}>
-              <div style={{ padding: '20px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
                     Nombre del Cliente *
@@ -921,15 +920,14 @@ const Reservations: React.FC = () => {
                   <IonIcon icon={saveOutline} />
                   {editingId ? 'Guardar Cambios' : 'Confirmar Cita ✓'}
                 </button>
-              </div>
-            </IonContent>
+            </div>
           </div>
         </IonModal>
 
         {/* 4. Details Modal (Details, Status & Abonos) */}
         <IonModal isOpen={showDetails} onDidDismiss={() => setShowDetails(false)} style={{ '--border-radius': '20px' } as any}>
-          <div style={{ background: '#ffffff', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
                 Detalles de la Cita
               </h2>
@@ -942,9 +940,9 @@ const Reservations: React.FC = () => {
               </button>
             </div>
 
-            <IonContent style={{ '--background': '#ffffff' } as any}>
+            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
               {selectedEvent && (
-                <div style={{ padding: '20px' }}>
+                <div>
                   {/* Customer Card */}
                   <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
                     <div style={{ fontSize: '18px', fontWeight: '900', color: '#0F172A', marginBottom: '4px' }}>
@@ -1080,7 +1078,7 @@ const Reservations: React.FC = () => {
                   </div>
                 </div>
               )}
-            </IonContent>
+            </div>
           </div>
         </IonModal>
 

@@ -611,8 +611,8 @@ const Orders: React.FC = () => {
 
         {/* Order Details Modal */}
         <IonModal isOpen={!!selectedOrderForDetails} onDidDismiss={() => setSelectedOrderForDetails(null)} style={{ '--border-radius': '20px' } as any}>
-          <div style={{ background: '#ffffff', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
                 Detalles del Pedido
               </h2>
@@ -625,7 +625,7 @@ const Orders: React.FC = () => {
               </button>
             </div>
 
-            <IonContent style={{ '--background': '#ffffff' } as any}>
+            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
               {selectedOrderForDetails && (
                 <div style={{ padding: '20px' }}>
                   <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
@@ -697,7 +697,7 @@ const Orders: React.FC = () => {
                   </div>
                 </div>
               )}
-            </IonContent>
+            </div>
           </div>
         </IonModal>
 

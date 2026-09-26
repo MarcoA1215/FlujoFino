@@ -733,11 +733,20 @@ const Pos: React.FC = () => {
           onDidDismiss={() => setShowCheckoutModal(false)}
           style={{ '--border-radius': '24px' } as any}
         >
-          <div className="ff-bottom-sheet-content" style={{ maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+          <div
+            className="ff-bottom-sheet-content"
+            style={{
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              background: '#ffffff',
+              overflow: 'hidden'
+            }}
+          >
             {/* Drag handle */}
-            <div className="ff-drag-handle" />
+            <div className="ff-drag-handle" style={{ flexShrink: 0 }} />
 
-            <div style={{ padding: '8px 20px 14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0' }}>
+            <div style={{ padding: '8px 20px 14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0', flexShrink: 0 }}>
               <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>
                 Resumen del Pedido
               </h2>
@@ -750,8 +759,7 @@ const Pos: React.FC = () => {
               </button>
             </div>
 
-            <IonContent style={{ '--background': '#ffffff' } as any}>
-              <div style={{ padding: '16px 20px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '16px 20px 40px 20px' }}>
 
                 {/* Items Breakdown */}
                 <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '12px', marginBottom: '16px' }}>
@@ -1050,8 +1058,7 @@ const Pos: React.FC = () => {
                   <IonIcon icon={checkmarkCircle} style={{ fontSize: '20px' }} />
                   {editingOrderId ? 'Guardar Cambios del Pedido' : 'Confirmar Pedido ✓'}
                 </button>
-              </div>
-            </IonContent>
+            </div>
           </div>
         </IonModal>
       </IonContent>
