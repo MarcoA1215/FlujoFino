@@ -32,6 +32,8 @@ export class CreateOrderDto {
   items: { productId: string; quantity: number; unitPrice: number }[];
   initialAbono?: number;
   discountAmount?: number;
+  offlineId?: string;
+  createdAt?: string | Date;
 }
 
 export class UpdatePaymentDto {
@@ -199,9 +201,15 @@ export class OrdersService {
         pagoMovilBank: dto.pagoMovilBank,
         amountBs: dto.amountBs,
         exchangeRate: dto.exchangeRate,
+        offlineId: dto.offlineId,
+        createdAt: dto.createdAt ? new Date(dto.createdAt) : undefined,
         abonosTotal: dto.initialAbono || 0,
         abonosHistory: (dto.initialAbono && dto.initialAbono > 0) ? [{ id: Date.now().toString(), amount: dto.initialAbono, date: new Date().toISOString() }] : []
       });
+
+      if (dto.createdAt) {
+        order.createdAt = new Date(dto.createdAt);
+      }
         
       const savedOrder = await manager.save(Order, order);
 
@@ -964,5 +972,38 @@ export class OrdersService {
       puntoList,
       recentOrders: recentOrders.slice(0, 15),
     };
+  }
+
+  async syncOfflineOrders(tenantId: string, orders: any[], authUserId?: string) {
+    const syncedOfflineIds: string[] = [];
+
+    for (const item of orders || []) {
+      if (!item || !item.offlineId) continue;
+
+      try {
+        const existing = await this.dataSource.getRepository(Order).findOne({
+          where: { offlineId: item.offlineId },
+        });
+
+        if (existing) {
+          syncedOfflineIds.push(item.offlineId);
+          continue;
+        }
+
+        const dto: CreateOrderDto = {
+          ...(item.payload || {}),
+          offlineId: item.offlineId,
+          createdAt: item.createdAt || new Date().toISOString(),
+          exchangeRate: item.rateAtSale !== undefined ? item.rateAtSale : item.payload?.exchangeRate,
+        };
+
+        await this.createOrder(tenantId, dto, authUserId);
+        syncedOfflineIds.push(item.offlineId);
+      } catch (error) {
+        console.error(`[syncOfflineOrders] Error syncing offline order ${item.offlineId}:`, error);
+      }
+    }
+
+    return { syncedOfflineIds };
   }
 }

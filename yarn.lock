@@ -5545,6 +5545,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"dexie@npm:^4.4.6":
+  version: 4.4.6
+  resolution: "dexie@npm:4.4.6"
+  checksum: 10c0/fc8be52970dc33c2a904ee77bfc459084afe6bb44f80cdce2ff5da989f0992bf56a5413cf3c3599d6e58f1fc1136632dde52cbf2d441cb9d430a92f5e99b28fc
+  languageName: node
+  linkType: hard
+
 "dezalgo@npm:^1.0.4":
   version: 1.0.4
   resolution: "dezalgo@npm:1.0.4"
@@ -6406,6 +6413,7 @@ __metadata:
     "@types/react-is": "npm:^19"
     "@vitejs/plugin-react": "npm:^6.1.1"
     axios: "npm:^1.20.0"
+    dexie: "npm:^4.4.6"
     ionicons: "npm:^8.1.0"
     jsdom: "npm:^30.1.0"
     oxlint: "npm:^1.81.0"
