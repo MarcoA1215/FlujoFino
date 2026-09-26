@@ -2,7 +2,17 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { IonPage, IonContent, IonCard, IonCardContent, IonInput, IonLabel, IonItem, IonButton, useIonToast, IonSpinner, IonIcon, IonSelect, IonSelectOption, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { checkmarkCircleOutline, timeOutline, chevronBackOutline, imagesOutline, personOutline, sparklesOutline } from 'ionicons/icons';
+import { 
+  checkmarkCircleOutline, 
+  timeOutline, 
+  chevronBackOutline, 
+  imagesOutline, 
+  personOutline, 
+  sparklesOutline,
+  copyOutline,
+  walletOutline,
+  businessOutline
+} from 'ionicons/icons';
 import { useImageViewer } from '../context/ImageViewerContext';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -87,6 +97,36 @@ const PublicBooking: React.FC = () => {
   const [referralSource, setReferralSource] = useState('');
   const [success, setSuccess] = useState(false);
   const [magicLink, setMagicLink] = useState('');
+
+  // Payment reporting states for booking
+  const [bookingPaymentMethod, setBookingPaymentMethod] = useState<string>('PAGO_MOVIL');
+  const [bookingPaymentOption, setBookingPaymentOption] = useState<'FULL' | 'DEPOSIT'>('FULL');
+  const [bookingPaymentAmount, setBookingPaymentAmount] = useState<string>('');
+  const [bookingPaymentRef, setBookingPaymentRef] = useState<string>('');
+  const [bookingPaymentNotes, setBookingPaymentNotes] = useState<string>('');
+
+  const rateBs = Number(tenantInfo?.exchangeRateBs || 40.0);
+  const minDepositPercentage = Number(tenantInfo?.minDepositPercentage || 0);
+
+  const copyToClipboard = (text: string, label: string) => {
+    if (!text) return;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(text);
+      presentToast({ message: `${label} copiado al portapapeles`, duration: 2000, color: 'success' });
+    }
+  };
+
+  useEffect(() => {
+    if (totalServicePrice > 0) {
+      if (bookingPaymentOption === 'FULL') {
+        setBookingPaymentAmount(totalServicePrice.toString());
+      } else {
+        const minPct = minDepositPercentage > 0 ? minDepositPercentage : 30;
+        const minDep = Math.round((totalServicePrice * (minPct / 100)) * 100) / 100;
+        setBookingPaymentAmount(minDep.toString());
+      }
+    }
+  }, [totalServicePrice, bookingPaymentOption, minDepositPercentage]);
 
   // Preload returning customer data from localStorage
   useEffect(() => {
@@ -200,7 +240,50 @@ const PublicBooking: React.FC = () => {
       return;
     }
 
+    if (totalServicePrice > 0) {
+      if (bookingPaymentMethod !== 'CASH') {
+        if (!bookingPaymentRef.trim()) {
+          presentToast({ 
+            message: 'Por favor, ingresa el número de referencia del comprobante de pago.', 
+            duration: 3500, 
+            color: 'warning' 
+          });
+          return;
+        }
+        const payNum = parseFloat(bookingPaymentAmount);
+        if (isNaN(payNum) || payNum <= 0) {
+          presentToast({ 
+            message: 'El monto de abono o pago debe ser mayor a 0.', 
+            duration: 3000, 
+            color: 'warning' 
+          });
+          return;
+        }
+        if (minDepositPercentage > 0) {
+          const minReq = Math.round((totalServicePrice * (minDepositPercentage / 100)) * 100) / 100;
+          if (payNum < minReq) {
+            presentToast({ 
+              message: `El abono mínimo requerido es de $${minReq.toFixed(2)} (${minDepositPercentage}%)`, 
+              duration: 3500, 
+              color: 'warning' 
+            });
+            return;
+          }
+        }
+      } else {
+        if (minDepositPercentage > 0) {
+          presentToast({ 
+            message: `Este negocio requiere un abono previo del ${minDepositPercentage}% para apartar la cita. Selecciona un método de pago electrónico e ingresa la referencia.`, 
+            duration: 4000, 
+            color: 'warning' 
+          });
+          return;
+        }
+      }
+    }
+
     try {
+      const payAmtNum = parseFloat(bookingPaymentAmount) || totalServicePrice;
       const res = await axios.post(`${apiBase}/public/reservations/${tenantId}`, {
         customerName, 
         customerPhone, 
@@ -214,7 +297,12 @@ const PublicBooking: React.FC = () => {
         serviceName: selectedServiceNames || undefined,
         employeeId: selectedStaff?.id || undefined,
         employeeName: selectedStaff?.name || undefined,
-        totalAmount: totalServicePrice
+        totalAmount: totalServicePrice,
+        paymentMethod: totalServicePrice > 0 ? bookingPaymentMethod : undefined,
+        paymentReference: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? bookingPaymentRef.trim() : undefined,
+        paymentAmount: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? payAmtNum : undefined,
+        paymentAmountBs: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? Math.round(payAmtNum * rateBs * 100) / 100 : undefined,
+        paymentNotes: totalServicePrice > 0 ? (bookingPaymentNotes.trim() || undefined) : undefined,
       });
 
       // Persist customer profile locally for recurring visits
@@ -877,7 +965,232 @@ const PublicBooking: React.FC = () => {
                       <IonSelectOption value="Otro">Otro</IonSelectOption>
                     </IonSelect>
                   </IonItem>
-                  
+
+                  {/* Payment & Deposit Block */}
+                  {totalServicePrice > 0 && (
+                    <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <h3 style={{ margin: 0, fontWeight: 'bold', fontSize: '15px', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <IonIcon icon={walletOutline} /> Inversión & Forma de Pago
+                        </h3>
+                        <span style={{ fontSize: '11px', fontWeight: 'bold', backgroundColor: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: '10px' }}>
+                          Tasa BCV: Bs. {rateBs.toFixed(2)}
+                        </span>
+                      </div>
+
+                      {/* Amounts Breakdown */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#ffffff', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '12px' }}>
+                        <div>
+                          <span style={{ fontSize: '11px', color: '#64748b', display: 'block', fontWeight: 600 }}>TOTAL A PAGAR</span>
+                          <span style={{ fontSize: '17px', fontWeight: 'bold', color: '#0f172a' }}>${totalServicePrice.toFixed(2)}</span>
+                          <div style={{ fontSize: '12px', color: '#475569', marginTop: '2px' }}>
+                            ≈ Bs. {(totalServicePrice * rateBs).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '11px', color: '#64748b', display: 'block', fontWeight: 600 }}>TASA DE CAMBIO</span>
+                          <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#0284c7' }}>Bs. {rateBs.toFixed(2)} / USD</span>
+                          {minDepositPercentage > 0 && (
+                            <div style={{ fontSize: '11px', color: '#b45309', fontWeight: 'bold', marginTop: '3px' }}>
+                              Seña mín ({minDepositPercentage}%): ${(totalServicePrice * (minDepositPercentage / 100)).toFixed(2)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {minDepositPercentage > 0 && (
+                        <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px', marginBottom: '12px', fontSize: '12px', color: '#92400e' }}>
+                          ⚠️ <strong>Abono previo requerido:</strong> Este negocio requiere un abono o seña mínima del <strong>{minDepositPercentage}% (${(totalServicePrice * (minDepositPercentage / 100)).toFixed(2)})</strong> para apartar tu turno en agenda.
+                        </div>
+                      )}
+
+                      {/* Payment Method Selector */}
+                      <div style={{ marginBottom: '12px' }}>
+                        <IonLabel style={{ fontWeight: 'bold', fontSize: '13px', color: '#334155', display: 'block', marginBottom: '6px' }}>
+                          Método de Pago: *
+                        </IonLabel>
+                        <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', backgroundColor: '#ffffff' }}>
+                          <IonSelect 
+                            value={bookingPaymentMethod} 
+                            onIonChange={e => {
+                              const m = e.detail.value;
+                              setBookingPaymentMethod(m);
+                              if (m === 'CASH') {
+                                setBookingPaymentOption('FULL');
+                                setBookingPaymentAmount(totalServicePrice.toString());
+                              }
+                            }}
+                            placeholder="Selecciona método de pago"
+                          >
+                            {tenantInfo?.acceptPagoMovil !== false && <IonSelectOption value="PAGO_MOVIL">📲 Pago Móvil</IonSelectOption>}
+                            {tenantInfo?.acceptTransfer && <IonSelectOption value="TRANSFER">🏦 Transferencia Bancaria</IonSelectOption>}
+                            {tenantInfo?.acceptBinance && <IonSelectOption value="BINANCE">🟡 Binance Pay (USDT)</IonSelectOption>}
+                            {minDepositPercentage === 0 && tenantInfo?.acceptCashUsd !== false && (
+                              <IonSelectOption value="CASH">💵 Pagar en Efectivo (Al asistir)</IonSelectOption>
+                            )}
+                          </IonSelect>
+                        </IonItem>
+                      </div>
+
+                      {/* Bank Coordinates */}
+                      {bookingPaymentMethod !== 'CASH' && (
+                        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', marginBottom: '12px', fontSize: '12px', color: '#334155' }}>
+                          <div style={{ fontWeight: 'bold', color: '#0f172a', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <IonIcon icon={businessOutline} /> 
+                            {bookingPaymentMethod === 'PAGO_MOVIL' && 'Datos para Pago Móvil:'}
+                            {bookingPaymentMethod === 'TRANSFER' && 'Datos de Cuenta Bancaria:'}
+                            {bookingPaymentMethod === 'BINANCE' && 'Datos Binance Pay:'}
+                          </div>
+
+                          {bookingPaymentMethod === 'PAGO_MOVIL' && (
+                            <div>
+                              {tenantInfo?.bankInfo && <div><strong>Banco:</strong> {tenantInfo.bankInfo}</div>}
+                              {tenantInfo?.companyPhone && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '3px 0' }}>
+                                  <span><strong>Teléfono:</strong> {tenantInfo.companyPhone}</span>
+                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '22px' }} onClick={() => copyToClipboard(tenantInfo.companyPhone, 'Teléfono')}>
+                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '13px' }} />
+                                  </IonButton>
+                                </div>
+                              )}
+                              {tenantInfo?.companyCedula && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span><strong>Cédula/RIF:</strong> {tenantInfo.companyCedula}</span>
+                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '22px' }} onClick={() => copyToClipboard(tenantInfo.companyCedula, 'Cédula')}>
+                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '13px' }} />
+                                  </IonButton>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {bookingPaymentMethod === 'TRANSFER' && (
+                            <div>
+                              {tenantInfo?.bankInfo && <div><strong>Banco:</strong> {tenantInfo.bankInfo}</div>}
+                              {tenantInfo?.companyAccountHolder && <div><strong>Titular:</strong> {tenantInfo.companyAccountHolder}</div>}
+                              {tenantInfo?.companyCedula && <div><strong>Cédula/RIF:</strong> {tenantInfo.companyCedula}</div>}
+                              {tenantInfo?.companyAccountNumber && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '3px 0' }}>
+                                  <span style={{ wordBreak: 'break-all' }}><strong>Cuenta:</strong> {tenantInfo.companyAccountNumber}</span>
+                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '22px' }} onClick={() => copyToClipboard(tenantInfo.companyAccountNumber, 'Número de cuenta')}>
+                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '13px' }} />
+                                  </IonButton>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {bookingPaymentMethod === 'BINANCE' && (
+                            <div>
+                              {tenantInfo?.binancePayId && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '3px 0' }}>
+                                  <span><strong>Binance Pay ID:</strong> {tenantInfo.binancePayId}</span>
+                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '22px' }} onClick={() => copyToClipboard(tenantInfo.binancePayId, 'Binance Pay ID')}>
+                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '13px' }} />
+                                  </IonButton>
+                                </div>
+                              )}
+                              {tenantInfo?.binanceEmail && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span><strong>Email:</strong> {tenantInfo.binanceEmail}</span>
+                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '22px' }} onClick={() => copyToClipboard(tenantInfo.binanceEmail, 'Binance Email')}>
+                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '13px' }} />
+                                  </IonButton>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Type of payment: Full vs Deposit (if electronic) */}
+                      {bookingPaymentMethod !== 'CASH' && (
+                        <>
+                          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                            <IonButton 
+                              size="small" 
+                              fill={bookingPaymentOption === 'FULL' ? 'solid' : 'outline'} 
+                              color="primary"
+                              style={{ flex: 1, margin: 0, fontSize: '11px', fontWeight: 'bold' }}
+                              onClick={() => {
+                                setBookingPaymentOption('FULL');
+                                setBookingPaymentAmount(totalServicePrice.toString());
+                              }}
+                            >
+                              Pago Completo (${totalServicePrice.toFixed(2)})
+                            </IonButton>
+                            <IonButton 
+                              size="small" 
+                              fill={bookingPaymentOption === 'DEPOSIT' ? 'solid' : 'outline'} 
+                              color="primary"
+                              style={{ flex: 1, margin: 0, fontSize: '11px', fontWeight: 'bold' }}
+                              onClick={() => {
+                                setBookingPaymentOption('DEPOSIT');
+                                const minPct = minDepositPercentage > 0 ? minDepositPercentage : 30;
+                                const minDep = Math.round((totalServicePrice * (minPct / 100)) * 100) / 100;
+                                setBookingPaymentAmount(minDep.toString());
+                              }}
+                            >
+                              Abono / Seña
+                            </IonButton>
+                          </div>
+
+                          {/* Amount to report */}
+                          <div style={{ marginBottom: '12px' }}>
+                            <IonLabel style={{ fontWeight: 'bold', fontSize: '12px', color: '#334155', display: 'block', marginBottom: '4px' }}>
+                              Monto a pagar (USD):
+                            </IonLabel>
+                            <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', backgroundColor: '#ffffff' }}>
+                              <IonInput 
+                                type="number"
+                                value={bookingPaymentAmount}
+                                disabled={bookingPaymentOption === 'FULL'}
+                                onIonInput={e => setBookingPaymentAmount(e.detail.value!)}
+                                placeholder="0.00"
+                              />
+                            </IonItem>
+                            {parseFloat(bookingPaymentAmount) > 0 && (
+                              <div style={{ marginTop: '4px', fontSize: '12px', color: '#0284c7', fontWeight: 600 }}>
+                                Equivalente: <strong>Bs. {(parseFloat(bookingPaymentAmount) * rateBs).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</strong>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Reference Number - MANDATORY */}
+                          <div style={{ marginBottom: '12px' }}>
+                            <IonLabel style={{ fontWeight: 'bold', fontSize: '12px', color: '#334155', display: 'block', marginBottom: '4px' }}>
+                              Número de Referencia / Comprobante: <span style={{ color: '#ef4444' }}>* (Obligatorio)</span>
+                            </IonLabel>
+                            <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', backgroundColor: '#ffffff' }}>
+                              <IonInput 
+                                value={bookingPaymentRef}
+                                placeholder="Ej. 12345678"
+                                onIonInput={e => setBookingPaymentRef(e.detail.value!)}
+                              />
+                            </IonItem>
+                            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                              Ingresa los dígitos de la referencia de tu pago móvil, transferencia o billetera.
+                            </div>
+                          </div>
+
+                          {/* Payment Notes */}
+                          <div style={{ marginBottom: '10px' }}>
+                            <IonLabel style={{ fontWeight: 'bold', fontSize: '12px', color: '#334155', display: 'block', marginBottom: '4px' }}>
+                              Observación del pago (Opcional):
+                            </IonLabel>
+                            <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', backgroundColor: '#ffffff' }}>
+                              <IonInput 
+                                value={bookingPaymentNotes}
+                                placeholder="Ej. Pago desde Banco Provincial a nombre de..."
+                                onIonInput={e => setBookingPaymentNotes(e.detail.value!)}
+                              />
+                            </IonItem>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
                   <IonButton expand="block" color="primary" onClick={handleSubmit} style={{ height: '50px', fontWeight: 'bold' }}>
                     CONFIRMAR CITA
                   </IonButton>

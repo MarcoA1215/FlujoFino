@@ -94,7 +94,21 @@ export class PublicReservationsController {
       featureRecipes: settings?.featureRecipes ?? false,
       featureCustomerSchedules: settings?.featureCustomerSchedules ?? false,
       hasStore: Boolean(hasStore),
-      staff: staff
+      staff: staff,
+      exchangeRateBs: Number(settings?.exchangeRateBs || 40.0),
+      minDepositPercentage: Number(settings?.minDepositPercentage || 0),
+      allowPartialPayments: settings?.allowPartialPayments ?? true,
+      bankInfo: settings?.companyBank || '',
+      companyCedula: settings?.companyCedula || '',
+      companyPhone: settings?.companyPhone || '',
+      companyAccountNumber: settings?.companyAccountNumber || '',
+      companyAccountHolder: settings?.companyAccountHolder || '',
+      binancePayId: settings?.binancePayId || '',
+      binanceEmail: settings?.binanceEmail || '',
+      acceptCashUsd: settings?.acceptCashUsd ?? true,
+      acceptPagoMovil: settings?.acceptPagoMovil ?? true,
+      acceptTransfer: settings?.acceptTransfer ?? false,
+      acceptBinance: settings?.acceptBinance ?? false,
     };
   }
 
@@ -129,6 +143,21 @@ export class PublicReservationsController {
       throw new BadRequestException('El horario seleccionado ya no está disponible.');
     }
 
+    const settingsRepo = this.tenantRepo.manager.getRepository(Settings);
+    const settings = await settingsRepo.findOne({ where: { tenantId: id } });
+
+    const totalAmount = Number(dto.totalAmount || 0);
+    const minDepositPct = Number(settings?.minDepositPercentage || 0);
+
+    // Validate payment reference
+    if (dto.paymentMethod && dto.paymentMethod !== 'CASH') {
+      if (!dto.paymentReference || !dto.paymentReference.trim()) {
+        throw new BadRequestException('Por favor ingresa el número de referencia del comprobante de pago.');
+      }
+    } else if (minDepositPct > 0 && totalAmount > 0 && (!dto.paymentReference || !dto.paymentReference.trim())) {
+      throw new BadRequestException(`Este negocio requiere un abono mínimo del ${minDepositPct}% para reservar. Por favor ingresa el comprobante de pago.`);
+    }
+
     // Synchronize customer profile
     if (dto.customerName && dto.customerPhone) {
       try {
@@ -147,7 +176,42 @@ export class PublicReservationsController {
     }
 
     // Create reservation natively
-    return this.reservationsService.create(id, dto);
+    const res = await this.reservationsService.create(id, dto);
+
+    // If payment was reported during booking, attach it to abonosHistory and calculate status
+    if (dto.paymentReference && dto.paymentReference.trim()) {
+      const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
+      const resDb = await reservationRepo.findOne({ where: { id: res.id } });
+      if (resDb) {
+        const payAmt = Number(dto.paymentAmount || totalAmount);
+        const rate = Number(settings?.exchangeRateBs || 40.0);
+        const payAmtBs = dto.paymentAmountBs ? Number(dto.paymentAmountBs) : Math.round(payAmt * rate * 100) / 100;
+
+        const paymentEntry = {
+          id: Date.now().toString(),
+          amount: payAmt,
+          amountBs: payAmtBs,
+          method: dto.paymentMethod || 'PAGO_MOVIL',
+          reference: dto.paymentReference.trim(),
+          date: new Date().toISOString(),
+          notes: dto.paymentNotes ? dto.paymentNotes.trim() : 'Pago inicial al reservar',
+          status: 'REPORTED',
+        };
+
+        resDb.abonosHistory = [paymentEntry];
+        resDb.abonosTotal = payAmt;
+        if (totalAmount > 0) {
+          resDb.paymentStatus = payAmt >= totalAmount ? PaymentStatus.PAID : PaymentStatus.PARTIAL;
+        }
+        const methodLabel = dto.paymentMethod === 'PAGO_MOVIL' ? 'Pago Móvil' : dto.paymentMethod === 'BINANCE' ? 'Binance' : dto.paymentMethod === 'TRANSFER' ? 'Transferencia' : 'Pago';
+        const noteTag = `[Pago Inicial: $${payAmt.toFixed(2)} vía ${methodLabel} Ref: ${dto.paymentReference.trim()}]`;
+        resDb.notes = resDb.notes ? `${resDb.notes} | ${noteTag}` : noteTag;
+        await reservationRepo.save(resDb);
+        return resDb;
+      }
+    }
+
+    return res;
   }
 
   @Get('appointment/:id')
