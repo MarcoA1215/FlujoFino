@@ -112,9 +112,20 @@ const PublicBooking: React.FC = () => {
 
   const copyToClipboard = (text: string, label: string) => {
     if (!text) return;
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(text);
-      presentToast({ message: `${label} copiado al portapapeles`, duration: 2000, color: 'success' });
+    try {
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      presentToast({ message: `${label} copiado: ${text}`, duration: 2000, color: 'success' });
+    } catch {
+      presentToast({ message: `Copiado: ${text}`, duration: 2000, color: 'success' });
     }
   };
 
@@ -1145,81 +1156,10 @@ const PublicBooking: React.FC = () => {
                         </IonItem>
                       </div>
 
-                      {/* Bank Coordinates */}
-                      {bookingPaymentMethod !== 'CASH' && (
-                        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', marginBottom: '12px', fontSize: '12px', color: '#334155' }}>
-                          <div style={{ fontWeight: 'bold', color: '#0f172a', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <IonIcon icon={businessOutline} /> 
-                            {bookingPaymentMethod === 'PAGO_MOVIL' && 'Datos para Pago Móvil:'}
-                            {bookingPaymentMethod === 'TRANSFER' && 'Datos de Cuenta Bancaria:'}
-                            {bookingPaymentMethod === 'BINANCE' && 'Datos Binance Pay:'}
-                          </div>
-
-                          {bookingPaymentMethod === 'PAGO_MOVIL' && (
-                            <div>
-                              {tenantInfo?.bankInfo && <div><strong>Banco:</strong> {tenantInfo.bankInfo}</div>}
-                              {tenantInfo?.companyPhone && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '3px 0' }}>
-                                  <span><strong>Teléfono:</strong> {tenantInfo.companyPhone}</span>
-                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '22px' }} onClick={() => copyToClipboard(tenantInfo.companyPhone, 'Teléfono')}>
-                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '13px' }} />
-                                  </IonButton>
-                                </div>
-                              )}
-                              {tenantInfo?.companyCedula && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span><strong>Cédula/RIF:</strong> {tenantInfo.companyCedula}</span>
-                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '22px' }} onClick={() => copyToClipboard(tenantInfo.companyCedula, 'Cédula')}>
-                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '13px' }} />
-                                  </IonButton>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {bookingPaymentMethod === 'TRANSFER' && (
-                            <div>
-                              {tenantInfo?.bankInfo && <div><strong>Banco:</strong> {tenantInfo.bankInfo}</div>}
-                              {tenantInfo?.companyAccountHolder && <div><strong>Titular:</strong> {tenantInfo.companyAccountHolder}</div>}
-                              {tenantInfo?.companyCedula && <div><strong>Cédula/RIF:</strong> {tenantInfo.companyCedula}</div>}
-                              {tenantInfo?.companyAccountNumber && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '3px 0' }}>
-                                  <span style={{ wordBreak: 'break-all' }}><strong>Cuenta:</strong> {tenantInfo.companyAccountNumber}</span>
-                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '22px' }} onClick={() => copyToClipboard(tenantInfo.companyAccountNumber, 'Número de cuenta')}>
-                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '13px' }} />
-                                  </IonButton>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {bookingPaymentMethod === 'BINANCE' && (
-                            <div>
-                              {tenantInfo?.binancePayId && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '3px 0' }}>
-                                  <span><strong>Binance Pay ID:</strong> {tenantInfo.binancePayId}</span>
-                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '22px' }} onClick={() => copyToClipboard(tenantInfo.binancePayId, 'Binance Pay ID')}>
-                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '13px' }} />
-                                  </IonButton>
-                                </div>
-                              )}
-                              {tenantInfo?.binanceEmail && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span><strong>Email:</strong> {tenantInfo.binanceEmail}</span>
-                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '22px' }} onClick={() => copyToClipboard(tenantInfo.binanceEmail, 'Binance Email')}>
-                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '13px' }} />
-                                  </IonButton>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
                       {/* Type of payment: Full vs Deposit (if electronic) */}
                       {bookingPaymentMethod !== 'CASH' && (
-                        <>
-                          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                        <div style={{ marginBottom: '14px' }}>
+                          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
                             <IonButton 
                               size="small" 
                               fill={bookingPaymentOption === 'FULL' ? 'solid' : 'outline'} 
@@ -1249,7 +1189,7 @@ const PublicBooking: React.FC = () => {
                           </div>
 
                           {/* Amount to report */}
-                          <div style={{ marginBottom: '12px' }}>
+                          <div>
                             <IonLabel style={{ fontWeight: 'bold', fontSize: '12px', color: '#334155', display: 'block', marginBottom: '4px' }}>
                               Monto a pagar (USD):
                             </IonLabel>
@@ -1263,12 +1203,210 @@ const PublicBooking: React.FC = () => {
                               />
                             </IonItem>
                             {parseFloat(bookingPaymentAmount) > 0 && (
-                              <div style={{ marginTop: '4px', fontSize: '12px', color: '#0284c7', fontWeight: 600 }}>
-                                Equivalente: <strong>Bs. {(parseFloat(bookingPaymentAmount) * rateBs).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</strong>
+                              <div style={{ marginTop: '4px', fontSize: '12px', color: '#059669', fontWeight: 600 }}>
+                                Equivalente: <strong>Bs. {(Math.round((parseFloat(bookingPaymentAmount) || 0) * rateBs * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
                               </div>
                             )}
                           </div>
+                        </div>
+                      )}
 
+                      {/* Bank Coordinates */}
+                      {bookingPaymentMethod !== 'CASH' && (
+                        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px', marginBottom: '14px', fontSize: '13px', color: '#334155', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+                          <div style={{ fontWeight: 'bold', color: '#0f172a', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <IonIcon icon={businessOutline} style={{ color: '#10B981', fontSize: '16px' }} /> 
+                            {bookingPaymentMethod === 'PAGO_MOVIL' && 'Datos para Pago Móvil:'}
+                            {bookingPaymentMethod === 'TRANSFER' && 'Datos de Cuenta Bancaria:'}
+                            {bookingPaymentMethod === 'BINANCE' && 'Datos Binance Pay:'}
+                          </div>
+
+                          {bookingPaymentMethod === 'PAGO_MOVIL' && (
+                            <div>
+                              {tenantInfo?.bankInfo && <div style={{ marginBottom: '4px' }}><strong>Banco:</strong> {tenantInfo.bankInfo}</div>}
+                              {tenantInfo?.companyPhone && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' }}>
+                                  <span><strong>Teléfono:</strong> {tenantInfo.companyPhone}</span>
+                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '24px' }} onClick={() => copyToClipboard(tenantInfo.companyPhone, 'Teléfono')}>
+                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '14px' }} />
+                                  </IonButton>
+                                </div>
+                              )}
+                              {tenantInfo?.companyCedula && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' }}>
+                                  <span><strong>Cédula/RIF:</strong> {tenantInfo.companyCedula}</span>
+                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '24px' }} onClick={() => copyToClipboard(tenantInfo.companyCedula, 'Cédula')}>
+                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '14px' }} />
+                                  </IonButton>
+                                </div>
+                              )}
+                              {parseFloat(bookingPaymentAmount) > 0 && (
+                                <div style={{ 
+                                  marginTop: '10px', 
+                                  padding: '10px 12px', 
+                                  backgroundColor: '#ecfdf5', 
+                                  border: '1.5px solid #10B981', 
+                                  borderRadius: '8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '8px'
+                                }}>
+                                  <div>
+                                    <div style={{ fontSize: '11px', color: '#065f46', fontWeight: 600 }}>Monto exacto a transferir:</div>
+                                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#047857' }}>
+                                      Bs. {(Math.round((parseFloat(bookingPaymentAmount) || 0) * rateBs * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      <span style={{ fontSize: '11px', fontWeight: 'normal', color: '#059669', marginLeft: '5px' }}>(${parseFloat(bookingPaymentAmount).toFixed(2)})</span>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => copyToClipboard((Math.round((parseFloat(bookingPaymentAmount) || 0) * rateBs * 100) / 100).toFixed(2), 'Monto en Bs.')}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      padding: '6px 12px',
+                                      backgroundColor: '#10B981',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: '700',
+                                      cursor: 'pointer',
+                                      boxShadow: '0 1px 3px rgba(16, 185, 129, 0.2)'
+                                    }}
+                                  >
+                                    <IonIcon icon={copyOutline} style={{ fontSize: '14px' }} />
+                                    Copiar Bs
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {bookingPaymentMethod === 'TRANSFER' && (
+                            <div>
+                              {tenantInfo?.bankInfo && <div style={{ marginBottom: '4px' }}><strong>Banco:</strong> {tenantInfo.bankInfo}</div>}
+                              {tenantInfo?.companyAccountHolder && <div style={{ marginBottom: '4px' }}><strong>Titular:</strong> {tenantInfo.companyAccountHolder}</div>}
+                              {tenantInfo?.companyCedula && <div style={{ marginBottom: '4px' }}><strong>Cédula/RIF:</strong> {tenantInfo.companyCedula}</div>}
+                              {tenantInfo?.companyAccountNumber && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' }}>
+                                  <span style={{ wordBreak: 'break-all' }}><strong>Cuenta:</strong> {tenantInfo.companyAccountNumber}</span>
+                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '24px' }} onClick={() => copyToClipboard(tenantInfo.companyAccountNumber, 'Número de cuenta')}>
+                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '14px' }} />
+                                  </IonButton>
+                                </div>
+                              )}
+                              {parseFloat(bookingPaymentAmount) > 0 && (
+                                <div style={{ 
+                                  marginTop: '10px', 
+                                  padding: '10px 12px', 
+                                  backgroundColor: '#ecfdf5', 
+                                  border: '1.5px solid #10B981', 
+                                  borderRadius: '8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '8px'
+                                }}>
+                                  <div>
+                                    <div style={{ fontSize: '11px', color: '#065f46', fontWeight: 600 }}>Monto exacto a transferir:</div>
+                                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#047857' }}>
+                                      Bs. {(Math.round((parseFloat(bookingPaymentAmount) || 0) * rateBs * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => copyToClipboard((Math.round((parseFloat(bookingPaymentAmount) || 0) * rateBs * 100) / 100).toFixed(2), 'Monto en Bs.')}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      padding: '6px 12px',
+                                      backgroundColor: '#10B981',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: '700',
+                                      cursor: 'pointer',
+                                      boxShadow: '0 1px 3px rgba(16, 185, 129, 0.2)'
+                                    }}
+                                  >
+                                    <IonIcon icon={copyOutline} style={{ fontSize: '14px' }} />
+                                    Copiar Bs
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {bookingPaymentMethod === 'BINANCE' && (
+                            <div>
+                              {tenantInfo?.binancePayId && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' }}>
+                                  <span><strong>Binance Pay ID:</strong> {tenantInfo.binancePayId}</span>
+                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '24px' }} onClick={() => copyToClipboard(tenantInfo.binancePayId, 'Binance Pay ID')}>
+                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '14px' }} />
+                                  </IonButton>
+                                </div>
+                              )}
+                              {tenantInfo?.binanceEmail && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' }}>
+                                  <span><strong>Email:</strong> {tenantInfo.binanceEmail}</span>
+                                  <IonButton fill="clear" size="small" style={{ margin: 0, height: '24px' }} onClick={() => copyToClipboard(tenantInfo.binanceEmail, 'Binance Email')}>
+                                    <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '14px' }} />
+                                  </IonButton>
+                                </div>
+                              )}
+                              {parseFloat(bookingPaymentAmount) > 0 && (
+                                <div style={{ 
+                                  marginTop: '10px', 
+                                  padding: '10px 12px', 
+                                  backgroundColor: '#fef9c3', 
+                                  border: '1.5px solid #eab308', 
+                                  borderRadius: '8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '8px'
+                                }}>
+                                  <div>
+                                    <div style={{ fontSize: '11px', color: '#854d0e', fontWeight: 600 }}>Monto a transferir en USDT:</div>
+                                    <div style={{ fontSize: '15px', fontWeight: '800', color: '#a16207' }}>
+                                      ${parseFloat(bookingPaymentAmount).toFixed(2)} USDT
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => copyToClipboard(parseFloat(bookingPaymentAmount).toFixed(2), 'Monto USDT')}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      padding: '6px 12px',
+                                      backgroundColor: '#ca8a04',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: '700',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    <IonIcon icon={copyOutline} style={{ fontSize: '14px' }} />
+                                    Copiar USDT
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {bookingPaymentMethod !== 'CASH' && (
+                        <>
                           {/* Reference Number - MANDATORY */}
                           <div style={{ marginBottom: '12px' }}>
                             <IonLabel style={{ fontWeight: 'bold', fontSize: '12px', color: '#334155', display: 'block', marginBottom: '4px' }}>

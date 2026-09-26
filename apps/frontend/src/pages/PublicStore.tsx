@@ -391,8 +391,22 @@ const PublicStore: React.FC = () => {
   };
 
   const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    presentToast({ message: `${label} copiado`, duration: 1800, color: 'success' });
+    if (!text) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      presentToast({ message: `${label} copiado: ${text}`, duration: 2000, color: 'success' });
+    } catch {
+      presentToast({ message: `Copiado: ${text}`, duration: 2000, color: 'success' });
+    }
   };
 
   const headerColor = storeData?.settings?.themeHeaderColor || '#0f172a';
@@ -1160,6 +1174,35 @@ const PublicStore: React.FC = () => {
                           </IonButton>
                         </div>
                       )}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '8px 0', background: '#ecfdf5', padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #10B981' }}>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#065f46', fontWeight: 600 }}>Monto exacto a transferir:</div>
+                          <span style={{ fontSize: '14px', fontWeight: '800', color: '#047857' }}>
+                            Bs. {grandTotalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(grandTotalBs.toFixed(2), 'Monto en Bs.')}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '6px 12px',
+                            backgroundColor: '#10B981',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 3px rgba(16, 185, 129, 0.2)'
+                          }}
+                        >
+                          <IonIcon icon={copyOutline} style={{ fontSize: '13px' }} />
+                          Copiar Bs
+                        </button>
+                      </div>
                       <IonItem lines="none" style={{ '--background': '#fff', borderRadius: '6px', marginTop: '8px' }}>
                         <IonLabel position="stacked">Referencia de Pago Móvil (Últimos 4 o 6 dígitos)</IonLabel>
                         <IonInput
@@ -1202,6 +1245,35 @@ const PublicStore: React.FC = () => {
                           </IonButton>
                         </div>
                       )}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '8px 0', background: '#ecfdf5', padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #10B981' }}>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#065f46', fontWeight: 600 }}>Monto exacto a transferir:</div>
+                          <span style={{ fontSize: '14px', fontWeight: '800', color: '#047857' }}>
+                            Bs. {grandTotalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(grandTotalBs.toFixed(2), 'Monto en Bs.')}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '6px 12px',
+                            backgroundColor: '#10B981',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 3px rgba(16, 185, 129, 0.2)'
+                          }}
+                        >
+                          <IonIcon icon={copyOutline} style={{ fontSize: '13px' }} />
+                          Copiar Bs
+                        </button>
+                      </div>
                       <IonItem lines="none" style={{ '--background': '#fff', borderRadius: '6px', marginTop: '10px' }}>
                         <IonLabel position="stacked">N° de Referencia de Transferencia *</IonLabel>
                         <IonInput
@@ -1236,6 +1308,35 @@ const PublicStore: React.FC = () => {
                           </IonButton>
                         </div>
                       )}
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '8px 0', background: '#fffbeb', padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #eab308' }}>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#854d0e', fontWeight: 600 }}>Monto en USDT:</div>
+                          <span style={{ fontSize: '14px', fontWeight: '800', color: '#a16207' }}>
+                            ${grandTotalUSD.toFixed(2)} USDT
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(grandTotalUSD.toFixed(2), 'Monto USDT')}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '6px 12px',
+                            backgroundColor: '#ca8a04',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <IonIcon icon={copyOutline} style={{ fontSize: '13px' }} />
+                          Copiar USDT
+                        </button>
+                      </div>
 
                       {storeData?.settings?.binancePhone && (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0', background: '#fff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #fef08a' }}>
