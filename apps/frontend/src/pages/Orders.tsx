@@ -610,6 +610,28 @@ const Orders: React.FC = () => {
                       <>
                         <button
                           type="button"
+                          onClick={() => router.push(`/pos?editOrderId=${order.id}`)}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: '10px',
+                            border: '1px solid #CBD5E1',
+                            background: '#F8FAFC',
+                            color: '#334155',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            cursor: 'pointer'
+                          }}
+                          title="Agregar más productos o modificar la cuenta abierta"
+                        >
+                          <IonIcon icon={cartOutline} />
+                          Agregar
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => {
                             setSelectedOrderForAbono(order);
                             setAbonoAmount('');
@@ -972,42 +994,69 @@ const Orders: React.FC = () => {
                   {/* Actions */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {selectedOrderForDetails.paymentStatus !== PaymentStatus.PAID && selectedOrderForDetails.status !== OrderStatus.CANCELED && (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <button
                           type="button"
                           onClick={() => {
                             const ord = selectedOrderForDetails;
                             setSelectedOrderForDetails(null);
-                            setSelectedOrderForAbono(ord);
-                            setAbonoAmount('');
-                            setAbonoMethod('USD');
-                            setAbonoRef('');
+                            router.push(`/pos?editOrderId=${ord.id}`);
                           }}
                           style={{
                             padding: '12px',
                             borderRadius: '12px',
-                            border: '1px solid #FCD34D',
-                            background: '#FEF3C7',
-                            color: '#92400E',
+                            border: '1px solid #93C5FD',
+                            background: '#EFF6FF',
+                            color: '#1D4ED8',
                             fontWeight: '700',
                             fontSize: '13px',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
                           }}
                         >
-                          ➕ Registrar Abono
+                          <IonIcon icon={cartOutline} />
+                          🛒 Agregar Productos a la Cuenta (Abrir en POS)
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const ord = selectedOrderForDetails;
-                            setSelectedOrderForDetails(null);
-                            openPaymentAlert(ord);
-                          }}
-                          className="ff-btn-primary"
-                          style={{ padding: '12px', fontSize: '13px', justifyContent: 'center' }}
-                        >
-                          💵 Cobrar Total
-                        </button>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const ord = selectedOrderForDetails;
+                              setSelectedOrderForDetails(null);
+                              setSelectedOrderForAbono(ord);
+                              setAbonoAmount('');
+                              setAbonoMethod('USD');
+                              setAbonoRef('');
+                            }}
+                            style={{
+                              padding: '12px',
+                              borderRadius: '12px',
+                              border: '1px solid #FCD34D',
+                              background: '#FEF3C7',
+                              color: '#92400E',
+                              fontWeight: '700',
+                              fontSize: '13px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ➕ Registrar Abono
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const ord = selectedOrderForDetails;
+                              setSelectedOrderForDetails(null);
+                              openPaymentAlert(ord);
+                            }}
+                            className="ff-btn-primary"
+                            style={{ padding: '12px', fontSize: '13px', justifyContent: 'center' }}
+                          >
+                            💵 Cobrar Total
+                          </button>
+                        </div>
                       </div>
                     )}
 

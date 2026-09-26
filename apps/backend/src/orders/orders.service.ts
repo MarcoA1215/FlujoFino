@@ -662,8 +662,11 @@ export class OrdersService {
         relations: { items: true }
       });
       if (!order) throw new BadRequestException('Pedido no encontrado');
-      if (order.status === OrderStatus.CANCELED || order.status === OrderStatus.DELIVERED) {
-        throw new BadRequestException('No se puede editar un pedido entregado o cancelado');
+      if (order.status === OrderStatus.CANCELED) {
+        throw new BadRequestException('No se puede editar un pedido cancelado');
+      }
+      if (order.status === OrderStatus.DELIVERED && order.paymentStatus === PaymentStatus.PAID) {
+        throw new BadRequestException('No se puede editar un pedido que ya está finalizado, entregado y pagado');
       }
   
       const oldItemsMap = new Map<string, OrderItem>();
@@ -819,6 +822,12 @@ export class OrdersService {
       order.totalAmount = effectiveTotalEdit - cappedDiscountEdit;
       order.netProfit = order.totalAmount - order.deliveryFee - totalCost;
       
+      const currentItems = await manager.find(OrderItem, { where: { orderId: order.id } });
+      const hasUndelivered = currentItems.some(it => (it.deliveredQuantity || 0) < it.quantity);
+      if (hasUndelivered && order.status === OrderStatus.DELIVERED) {
+        order.status = OrderStatus.PARTIALLY_DELIVERED;
+      }
+
       return manager.save(Order, order);
     });
   }

@@ -254,8 +254,46 @@ const Pos: React.FC = () => {
           }
         }).catch(() => {});
       }
+    } else {
+      const params = new URLSearchParams(location.search || window.location.search);
+      const editOrderIdFromUrl = params.get('editOrderId');
+      if (editOrderIdFromUrl && !editingOrderId) {
+        apiClient.get(`/orders/${editOrderIdFromUrl}`).then(res => {
+          const order = res.data;
+          if (order) {
+            setEditingOrderId(order.id);
+            setCustomerName(order.customerName || '');
+            setCustomerPhone(order.customerPhone || '');
+            setCustomerAddress(order.customerAddress || '');
+            setTableNumber(order.tableNumber || '');
+            setDeliveryMethod(order.deliveryMethod || DeliveryMethod.IN_STORE);
+            setDeliveryZoneId(order.deliveryZoneId || '');
+            setEmployeeId(order.employeeId || '');
+            setPaymentMethod(order.paymentMethod || 'PENDING');
+
+            if (order.items && order.items.length > 0) {
+              const loadedCart: CartItem[] = order.items.map((it: any) => ({
+                product: {
+                  id: it.productId || it.product?.id || it.id,
+                  name: it.productName || it.product?.name || 'Producto',
+                  salePrice: Number(it.unitPrice || it.product?.salePrice || 0),
+                  baseCost: Number(it.product?.baseCost || 0),
+                  stockQuantity: 999
+                },
+                quantity: it.quantity
+              }));
+              setCart(loadedCart);
+            }
+            presentToast({
+              message: `Modificando Cuenta Abierta #${order.id.slice(0, 8).toUpperCase()}`,
+              duration: 3000,
+              color: 'primary'
+            });
+          }
+        }).catch(console.error);
+      }
     }
-  }, [location.state]);
+  }, [location.state, location.search]);
 
   // Categories list
   const categories = useMemo(() => {
@@ -580,6 +618,52 @@ const Pos: React.FC = () => {
       <IonContent fullscreen className="ff-has-bottom-nav" style={{ '--background': '#F8FAFC' } as any}>
         <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '12px 16px 80px 16px' }}>
           
+          {/* Editing Order Banner */}
+          {editingOrderId && (
+            <div style={{
+              background: '#EFF6FF',
+              border: '1px solid #BFDBFE',
+              borderRadius: '14px',
+              padding: '10px 14px',
+              marginBottom: '12px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <span style={{ fontSize: '11px', color: '#1E40AF', fontWeight: '800', display: 'block' }}>
+                  📝 MODIFICANDO CUENTA ABIERTA
+                </span>
+                <span style={{ fontSize: '13px', color: '#1E3A8A', fontWeight: '700' }}>
+                  Pedido #{editingOrderId.slice(0, 8).toUpperCase()} {customerName ? `• ${customerName}` : ''}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingOrderId(null);
+                  setCart([]);
+                  setCustomerName('');
+                  setCustomerPhone('');
+                  setTableNumber('');
+                  window.history.replaceState({}, '', '/pos');
+                }}
+                style={{
+                  background: '#DBEAFE',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  color: '#1E40AF',
+                  cursor: 'pointer'
+                }}
+              >
+                ✖ Salir / Limpiar
+              </button>
+            </div>
+          )}
+
           {/* 1. Search Bar (Figma Pill) */}
           <div className="ff-search-pill" style={{ marginBottom: '12px' }}>
             <IonIcon icon={searchOutline} style={{ fontSize: '18px', color: '#64748B' }} />
