@@ -27,11 +27,24 @@ export class CreateOrderDto {
   pagoMovilPhone?: string;
   pagoMovilCedula?: string;
   pagoMovilBank?: string;
+  puntoRef?: string;
+  puntoBank?: string;
+  binanceRef?: string;
+  transferRef?: string;
+  transferBank?: string;
+  usdReceived?: number;
+  changeAmount?: number;
+  changeAmountBs?: number;
+  changeMethod?: string;
+  changeRef?: string;
   amountBs?: number;
   exchangeRate?: number;
+  exchangeRateBs?: number;
   items: { productId: string; quantity: number; unitPrice: number }[];
   initialAbono?: number;
   discountAmount?: number;
+  bypassMinDeposit?: boolean;
+  linkedReservationId?: string;
 }
 
 export class UpdatePaymentDto {
@@ -42,6 +55,16 @@ export class UpdatePaymentDto {
   pagoMovilPhone?: string;
   pagoMovilCedula?: string;
   pagoMovilBank?: string;
+  puntoRef?: string;
+  puntoBank?: string;
+  binanceRef?: string;
+  transferRef?: string;
+  transferBank?: string;
+  usdReceived?: number;
+  changeAmount?: number;
+  changeAmountBs?: number;
+  changeMethod?: string;
+  changeRef?: string;
   amountBs?: number;
   exchangeRate?: number;
 }
@@ -174,13 +197,34 @@ export class OrdersService {
         }
       }
 
+      let finalNotes = dto.notes || '';
+      if (dto.changeAmount && Number(dto.changeAmount) > 0) {
+        let vueltoNote = '';
+        if (dto.changeMethod === 'PAGO_MOVIL') {
+          vueltoNote = `[Vuelto: $${Number(dto.changeAmount).toFixed(2)} (Bs. ${Number(dto.changeAmountBs || 0).toFixed(2)}) vía Pago Móvil Ref: ${dto.changeRef || 'S/R'}]`;
+        } else if (dto.changeMethod === 'CASH_BS') {
+          vueltoNote = `[Vuelto: $${Number(dto.changeAmount).toFixed(2)} en Efectivo Bs. ${Number(dto.changeAmountBs || 0).toFixed(2)}]`;
+        } else {
+          vueltoNote = `[Vuelto: $${Number(dto.changeAmount).toFixed(2)} USD en Efectivo]`;
+        }
+        if (!finalNotes.includes('Vuelto:')) {
+          finalNotes = finalNotes ? `${finalNotes} | ${vueltoNote}` : vueltoNote;
+        }
+      }
+      if (dto.paymentMethod === 'USD' && dto.usdReceived) {
+        const recNote = `[Efectivo Recibido: $${Number(dto.usdReceived).toFixed(2)}]`;
+        if (!finalNotes.includes('Efectivo Recibido:')) {
+          finalNotes = finalNotes ? `${recNote} | ${finalNotes}` : recNote;
+        }
+      }
+
       const order = manager.create(Order, { tenantId,
         customerId,
         identification,
         customerName: dto.customerName,
         customerPhone: dto.customerPhone || '',
         customerAddress: dto.customerAddress || '',
-        notes: dto.notes || '',
+        notes: finalNotes,
         tableNumber: dto.tableNumber || '',
         paymentStatus: dto.paymentStatus,
         status: initialStatus,
@@ -197,6 +241,16 @@ export class OrdersService {
         pagoMovilPhone: dto.pagoMovilPhone,
         pagoMovilCedula: dto.pagoMovilCedula,
         pagoMovilBank: dto.pagoMovilBank,
+        puntoRef: dto.puntoRef,
+        puntoBank: dto.puntoBank,
+        binanceRef: dto.binanceRef,
+        transferRef: dto.transferRef,
+        transferBank: dto.transferBank,
+        usdReceived: dto.usdReceived,
+        changeAmount: dto.changeAmount,
+        changeAmountBs: dto.changeAmountBs,
+        changeMethod: dto.changeMethod,
+        changeRef: dto.changeRef,
         amountBs: dto.amountBs,
         exchangeRate: dto.exchangeRate,
         abonosTotal: dto.initialAbono || 0,
@@ -348,12 +402,22 @@ export class OrdersService {
     order.paymentStatus = dto.status;
     if (dto.paymentMethod) order.paymentMethod = dto.paymentMethod;
     if (dto.notes) order.notes = dto.notes;
-    if (dto.pagoMovilRef) order.pagoMovilRef = dto.pagoMovilRef;
-    if (dto.pagoMovilPhone) order.pagoMovilPhone = dto.pagoMovilPhone;
-    if (dto.pagoMovilCedula) order.pagoMovilCedula = dto.pagoMovilCedula;
-    if (dto.pagoMovilBank) order.pagoMovilBank = dto.pagoMovilBank;
-    if (dto.amountBs) order.amountBs = dto.amountBs;
-    if (dto.exchangeRate) order.exchangeRate = dto.exchangeRate;
+    if (dto.pagoMovilRef !== undefined) order.pagoMovilRef = dto.pagoMovilRef;
+    if (dto.pagoMovilPhone !== undefined) order.pagoMovilPhone = dto.pagoMovilPhone;
+    if (dto.pagoMovilCedula !== undefined) order.pagoMovilCedula = dto.pagoMovilCedula;
+    if (dto.pagoMovilBank !== undefined) order.pagoMovilBank = dto.pagoMovilBank;
+    if (dto.puntoRef !== undefined) order.puntoRef = dto.puntoRef;
+    if (dto.puntoBank !== undefined) order.puntoBank = dto.puntoBank;
+    if (dto.binanceRef !== undefined) order.binanceRef = dto.binanceRef;
+    if (dto.transferRef !== undefined) order.transferRef = dto.transferRef;
+    if (dto.transferBank !== undefined) order.transferBank = dto.transferBank;
+    if (dto.usdReceived !== undefined) order.usdReceived = dto.usdReceived;
+    if (dto.changeAmount !== undefined) order.changeAmount = dto.changeAmount;
+    if (dto.changeAmountBs !== undefined) order.changeAmountBs = dto.changeAmountBs;
+    if (dto.changeMethod !== undefined) order.changeMethod = dto.changeMethod;
+    if (dto.changeRef !== undefined) order.changeRef = dto.changeRef;
+    if (dto.amountBs !== undefined) order.amountBs = dto.amountBs;
+    if (dto.exchangeRate !== undefined) order.exchangeRate = dto.exchangeRate;
 
     return orderRepo.save(order);
   }
@@ -861,6 +925,9 @@ export class OrdersService {
     let totalPuntoBs = 0;
     let totalPuntoUSD = 0;
     let totalCashUSD = 0;
+    let totalCashReceivedUSD = 0;
+    let totalCashChangeUSD = 0;
+    let totalPagoMovilChangeBs = 0;
 
     let deliveryOrdersCount = 0;
     let inStoreOrdersCount = 0;
@@ -869,6 +936,7 @@ export class OrdersService {
     const pagoMovilList: any[] = [];
     const puntoList: any[] = [];
     const recentOrders: any[] = [];
+    const vueltosList: any[] = [];
 
     for (const o of orders) {
       if (o.status === OrderStatus.CANCELED) continue;
@@ -892,10 +960,55 @@ export class OrdersService {
 
       if (!o.employeeId) webOrdersCount++;
 
+      // Track Vueltos
+      const changeAmt = Number(o.changeAmount || 0);
+      if (changeAmt > 0) {
+        if (o.changeMethod === 'PAGO_MOVIL') {
+          const bsChange = Number(o.changeAmountBs || (changeAmt * exchangeRate));
+          totalPagoMovilChangeBs += bsChange;
+          vueltosList.push({
+            orderId: o.id,
+            orderNumber: o.id.slice(0, 8).toUpperCase(),
+            customerName: o.customerName,
+            method: 'PAGO_MOVIL',
+            amountUsd: changeAmt,
+            amountBs: bsChange,
+            ref: o.changeRef || 'N/A',
+            createdAt: o.createdAt
+          });
+        } else if (o.changeMethod === 'CASH_BS') {
+          const bsChange = Number(o.changeAmountBs || (changeAmt * exchangeRate));
+          vueltosList.push({
+            orderId: o.id,
+            orderNumber: o.id.slice(0, 8).toUpperCase(),
+            customerName: o.customerName,
+            method: 'CASH_BS',
+            amountUsd: changeAmt,
+            amountBs: bsChange,
+            ref: 'Efectivo Bs',
+            createdAt: o.createdAt
+          });
+        } else {
+          totalCashChangeUSD += changeAmt;
+          vueltosList.push({
+            orderId: o.id,
+            orderNumber: o.id.slice(0, 8).toUpperCase(),
+            customerName: o.customerName,
+            method: 'CASH_USD',
+            amountUsd: changeAmt,
+            amountBs: changeAmt * exchangeRate,
+            ref: 'Efectivo USD',
+            createdAt: o.createdAt
+          });
+        }
+      }
+
       // Punto de Venta vs Pago Movil vs Cash Divisas
       const isPunto = o.paymentMethod === 'PUNTO' || 
                       o.pagoMovilBank?.toLowerCase().includes('punto') || 
                       o.notes?.toLowerCase().includes('punto');
+
+      const isPagoMovil = o.paymentMethod === 'PAGO_MOVIL' || (o.paymentMethod !== 'USD' && o.pagoMovilRef && o.pagoMovilRef.trim().length > 0);
 
       if (isPunto) {
         const bs = Number(o.amountBs || (orderTotal * exchangeRate));
@@ -905,12 +1018,12 @@ export class OrdersService {
           orderId: o.id,
           orderNumber: o.id.slice(0, 8).toUpperCase(),
           customerName: o.customerName,
-          ref: o.pagoMovilRef,
-          bank: o.pagoMovilBank || 'Punto de Venta',
+          ref: o.puntoRef || o.pagoMovilRef,
+          bank: o.puntoBank || o.pagoMovilBank || 'Punto de Venta',
           amountBs: bs,
           createdAt: o.createdAt,
         });
-      } else if (o.pagoMovilRef && o.pagoMovilRef.trim().length > 0) {
+      } else if (isPagoMovil) {
         const bs = Number(o.amountBs || (orderTotal * exchangeRate));
         totalPagoMovilBs += bs;
         totalPagoMovilUSD += bs / exchangeRate;
@@ -925,7 +1038,15 @@ export class OrdersService {
           createdAt: o.createdAt,
         });
       } else if (o.paymentStatus === PaymentStatus.PAID) {
-        totalCashUSD += orderTotal;
+        const usdIn = Number(o.usdReceived) || orderTotal;
+        totalCashReceivedUSD += usdIn;
+        if (o.changeMethod === 'PAGO_MOVIL' || o.changeMethod === 'CASH_BS') {
+          // Cash drawer kept the full usdReceived!
+          totalCashUSD += usdIn;
+        } else {
+          // Cash drawer gave change in USD cash, so net cash added is orderTotal
+          totalCashUSD += (usdIn - changeAmt);
+        }
       }
 
       recentOrders.push({
@@ -938,6 +1059,14 @@ export class OrdersService {
         status: o.status,
         deliveryMethod: o.deliveryMethod,
         pagoMovilRef: o.pagoMovilRef,
+        puntoRef: o.puntoRef,
+        binanceRef: o.binanceRef,
+        transferRef: o.transferRef,
+        usdReceived: o.usdReceived,
+        changeAmount: o.changeAmount,
+        changeAmountBs: o.changeAmountBs,
+        changeMethod: o.changeMethod,
+        changeRef: o.changeRef,
         createdAt: o.createdAt,
       });
     }
@@ -953,6 +1082,9 @@ export class OrdersService {
       totalPuntoBs: Number(totalPuntoBs.toFixed(2)),
       totalPuntoUSD: Number(totalPuntoUSD.toFixed(2)),
       totalCashUSD: Number(totalCashUSD.toFixed(2)),
+      totalCashReceivedUSD: Number(totalCashReceivedUSD.toFixed(2)),
+      totalCashChangeUSD: Number(totalCashChangeUSD.toFixed(2)),
+      totalPagoMovilChangeBs: Number(totalPagoMovilChangeBs.toFixed(2)),
       ordersCount: orders.filter(o => o.status !== OrderStatus.CANCELED).length,
       paidOrdersCount: orders.filter(o => o.paymentStatus === PaymentStatus.PAID && o.status !== OrderStatus.CANCELED).length,
       pendingOrdersCount: orders.filter(o => o.paymentStatus !== PaymentStatus.PAID && o.status !== OrderStatus.CANCELED).length,
@@ -962,6 +1094,7 @@ export class OrdersService {
       webOrdersCount,
       pagoMovilList,
       puntoList,
+      vueltosList,
       recentOrders: recentOrders.slice(0, 15),
     };
   }

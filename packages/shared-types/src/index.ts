@@ -114,6 +114,25 @@ export interface OrderDTO {
     exitTime?: string;
   };
   items: OrderItemDTO[];
+  paymentMethod?: string;
+  usdReceived?: number;
+  changeAmount?: number;
+  changeAmountBs?: number;
+  changeMethod?: string;
+  changeRef?: string;
+  pagoMovilRef?: string;
+  pagoMovilPhone?: string;
+  pagoMovilCedula?: string;
+  pagoMovilBank?: string;
+  puntoRef?: string;
+  puntoBank?: string;
+  binanceRef?: string;
+  transferRef?: string;
+  transferBank?: string;
+  amountBs?: number;
+  exchangeRate?: number;
+  abonosTotal?: number;
+  abonosHistory?: any[];
 }
 
 export interface EmployeeDTO {

@@ -103,6 +103,36 @@ export class Order {
   @Column('decimal', { nullable: true , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   exchangeRate: number;
 
+  @Column('decimal', { nullable: true, precision: 12, scale: 4, transformer: new ColumnNumericTransformer() })
+  usdReceived: number;
+
+  @Column('decimal', { nullable: true, precision: 12, scale: 4, transformer: new ColumnNumericTransformer() })
+  changeAmount: number;
+
+  @Column('decimal', { nullable: true, precision: 12, scale: 4, transformer: new ColumnNumericTransformer() })
+  changeAmountBs: number;
+
+  @Column({ nullable: true })
+  changeMethod: string; // 'CASH_USD' | 'PAGO_MOVIL' | 'CASH_BS'
+
+  @Column({ nullable: true })
+  changeRef: string;
+
+  @Column({ nullable: true })
+  puntoRef: string;
+
+  @Column({ nullable: true })
+  puntoBank: string;
+
+  @Column({ nullable: true })
+  binanceRef: string;
+
+  @Column({ nullable: true })
+  transferRef: string;
+
+  @Column({ nullable: true })
+  transferBank: string;
+
   @Index()
   @CreateDateColumn()
   createdAt: Date;

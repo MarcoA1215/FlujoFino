@@ -57,11 +57,22 @@ type Order = {
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   paymentMethod?: string;
+  usdReceived?: number;
+  changeAmount?: number;
+  changeAmountBs?: number;
+  changeMethod?: string;
+  changeRef?: string;
   pagoMovilRef?: string;
   pagoMovilPhone?: string;
   pagoMovilCedula?: string;
   pagoMovilBank?: string;
+  puntoRef?: string;
+  puntoBank?: string;
+  binanceRef?: string;
+  transferRef?: string;
+  transferBank?: string;
   amountBs?: number;
+  exchangeRate?: number;
   notes?: string;
   tableNumber?: string;
   items: OrderItem[];
@@ -711,6 +722,185 @@ const Orders: React.FC = () => {
                       <span>Total:</span>
                       <span>${Number(selectedOrderForDetails.totalAmount || 0).toFixed(2)}</span>
                     </div>
+                  </div>
+
+                  {/* Desglose de Pago & Arqueo */}
+                  <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        💳 Información de Pago y Arqueo
+                      </h4>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        background: selectedOrderForDetails.paymentStatus === PaymentStatus.PAID ? '#ECFDF5' : selectedOrderForDetails.paymentStatus === PaymentStatus.PARTIAL ? '#FEF3C7' : '#FEE2E2',
+                        color: selectedOrderForDetails.paymentStatus === PaymentStatus.PAID ? '#065F46' : selectedOrderForDetails.paymentStatus === PaymentStatus.PARTIAL ? '#92400E' : '#991B1B'
+                      }}>
+                        {selectedOrderForDetails.paymentStatus === PaymentStatus.PAID ? '✓ Pagado' : selectedOrderForDetails.paymentStatus === PaymentStatus.PARTIAL ? '⏳ Abono Parcial' : '⚠️ Pendiente'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '13px' }}>
+                      <div style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                        <div style={{ fontSize: '11px', color: '#64748B', fontWeight: '600', marginBottom: '2px' }}>Método de Cobro</div>
+                        <div style={{ fontWeight: '800', color: '#0F172A' }}>
+                          {selectedOrderForDetails.paymentMethod === 'USD' && '💵 Efectivo Divisas ($)'}
+                          {selectedOrderForDetails.paymentMethod === 'PAGO_MOVIL' && '📱 Pago Móvil (Bs.)'}
+                          {selectedOrderForDetails.paymentMethod === 'PUNTO' && '💳 Punto de Venta'}
+                          {selectedOrderForDetails.paymentMethod === 'BINANCE' && '🟡 Binance Pay'}
+                          {selectedOrderForDetails.paymentMethod === 'TRANSFER' && '🏦 Transferencia'}
+                          {selectedOrderForDetails.paymentMethod === 'PENDING' && '⏳ Cuenta Abierta'}
+                          {!['USD','PAGO_MOVIL','PUNTO','BINANCE','TRANSFER','PENDING'].includes(selectedOrderForDetails.paymentMethod) && (selectedOrderForDetails.paymentMethod || 'Efectivo')}
+                        </div>
+                      </div>
+
+                      <div style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                        <div style={{ fontSize: '11px', color: '#64748B', fontWeight: '600', marginBottom: '2px' }}>Tasa Cambiaria</div>
+                        <div style={{ fontWeight: '800', color: '#10B981' }}>
+                          Bs. {Number(selectedOrderForDetails.exchangeRate || exchangeRate).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Si pagó con USD (Monto Recibido y Vuelto) */}
+                    {(selectedOrderForDetails.paymentMethod === 'USD' || selectedOrderForDetails.usdReceived) && (
+                      <div style={{ marginTop: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '14px', padding: '14px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '13px', color: '#166534', fontWeight: '700' }}>💵 Efectivo Recibido:</span>
+                          <span style={{ fontSize: '16px', fontWeight: '900', color: '#15803D' }}>
+                            ${Number(selectedOrderForDetails.usdReceived || selectedOrderForDetails.totalAmount).toFixed(2)} USD
+                          </span>
+                        </div>
+
+                        {Number(selectedOrderForDetails.changeAmount || 0) > 0 ? (
+                          <div style={{ paddingTop: '10px', borderTop: '1px dashed #86EFAC' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                              <span style={{ fontSize: '13px', color: '#166534', fontWeight: '700' }}>Vuelto Entregado:</span>
+                              <span style={{ fontSize: '16px', fontWeight: '900', color: '#047857' }}>
+                                ${Number(selectedOrderForDetails.changeAmount).toFixed(2)} USD
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#15803D', marginBottom: '8px' }}>
+                              <span>Equivalente en Bs:</span>
+                              <span style={{ fontWeight: '800' }}>
+                                Bs. {Number(selectedOrderForDetails.changeAmountBs || (selectedOrderForDetails.changeAmount * (selectedOrderForDetails.exchangeRate || exchangeRate))).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                            <div style={{ background: '#DCFCE7', padding: '8px 10px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#166534' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>Canal de Entrega:</span>
+                                <b>{selectedOrderForDetails.changeMethod === 'PAGO_MOVIL' ? '📱 Pago Móvil' : selectedOrderForDetails.changeMethod === 'CASH_BS' ? '🇻🇪 Efectivo Bolívares' : '💵 Efectivo Divisas'}</b>
+                              </div>
+                              {selectedOrderForDetails.changeRef && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span>N° Referencia Vuelto:</span>
+                                  <b style={{ color: '#0F172A' }}>{selectedOrderForDetails.changeRef}</b>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '11px', color: '#15803D', fontStyle: 'italic', marginTop: '4px' }}>
+                            ✓ Cobro exacto sin vuelto
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Si fue Pago Móvil */}
+                    {(selectedOrderForDetails.paymentMethod === 'PAGO_MOVIL' || (selectedOrderForDetails.pagoMovilRef && selectedOrderForDetails.paymentMethod !== 'USD')) && (
+                      <div style={{ marginTop: '12px', background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: '14px', padding: '12px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                          <div>
+                            <span style={{ color: '#6D28D9', display: 'block', fontSize: '11px', fontWeight: '600' }}>Referencia</span>
+                            <span style={{ fontWeight: '800', color: '#4C1D95' }}>{selectedOrderForDetails.pagoMovilRef || 'N/A'}</span>
+                          </div>
+                          <div>
+                            <span style={{ color: '#6D28D9', display: 'block', fontSize: '11px', fontWeight: '600' }}>Banco</span>
+                            <span style={{ fontWeight: '800', color: '#4C1D95' }}>{selectedOrderForDetails.pagoMovilBank || 'Pago Móvil'}</span>
+                          </div>
+                          <div style={{ gridColumn: 'span 2' }}>
+                            <span style={{ color: '#6D28D9', display: 'block', fontSize: '11px', fontWeight: '600' }}>Monto Bs.</span>
+                            <span style={{ fontWeight: '900', color: '#4C1D95', fontSize: '14px' }}>
+                              Bs. {Number(selectedOrderForDetails.amountBs || (selectedOrderForDetails.totalAmount * (selectedOrderForDetails.exchangeRate || exchangeRate))).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          {selectedOrderForDetails.pagoMovilPhone && (
+                            <div style={{ gridColumn: 'span 2' }}>
+                              <span style={{ color: '#6D28D9', fontSize: '11px', fontWeight: '600' }}>Teléfono/Cédula: </span>
+                              <span style={{ fontWeight: '700', color: '#4C1D95' }}>{selectedOrderForDetails.pagoMovilPhone}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Si fue Punto de Venta */}
+                    {selectedOrderForDetails.paymentMethod === 'PUNTO' && (
+                      <div style={{ marginTop: '12px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '14px', padding: '12px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                          <div>
+                            <span style={{ color: '#1D4ED8', display: 'block', fontSize: '11px', fontWeight: '600' }}>N° Voucher / Ref</span>
+                            <span style={{ fontWeight: '800', color: '#1E3A8A' }}>{selectedOrderForDetails.puntoRef || selectedOrderForDetails.pagoMovilRef || 'N/A'}</span>
+                          </div>
+                          <div>
+                            <span style={{ color: '#1D4ED8', display: 'block', fontSize: '11px', fontWeight: '600' }}>Banco / Terminal</span>
+                            <span style={{ fontWeight: '800', color: '#1E3A8A' }}>{selectedOrderForDetails.puntoBank || selectedOrderForDetails.pagoMovilBank || 'Punto de Venta'}</span>
+                          </div>
+                          <div style={{ gridColumn: 'span 2' }}>
+                            <span style={{ color: '#1D4ED8', display: 'block', fontSize: '11px', fontWeight: '600' }}>Monto Cobrado Bs.</span>
+                            <span style={{ fontWeight: '900', color: '#1E3A8A', fontSize: '14px' }}>
+                              Bs. {Number(selectedOrderForDetails.amountBs || (selectedOrderForDetails.totalAmount * (selectedOrderForDetails.exchangeRate || exchangeRate))).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Si fue Binance o Transferencia */}
+                    {(selectedOrderForDetails.paymentMethod === 'BINANCE' || selectedOrderForDetails.paymentMethod === 'TRANSFER') && (
+                      <div style={{ marginTop: '12px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '12px', fontSize: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ color: '#64748B', fontWeight: '600' }}>Referencia / ID:</span>
+                          <b style={{ color: '#0F172A' }}>{selectedOrderForDetails.binanceRef || selectedOrderForDetails.transferRef || selectedOrderForDetails.pagoMovilRef || 'N/A'}</b>
+                        </div>
+                        {selectedOrderForDetails.transferBank && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: '#64748B', fontWeight: '600' }}>Banco Emisor:</span>
+                            <b style={{ color: '#0F172A' }}>{selectedOrderForDetails.transferBank}</b>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Si fue Cuenta Abierta */}
+                    {selectedOrderForDetails.paymentMethod === 'PENDING' && (
+                      <div style={{ marginTop: '12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '14px', padding: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
+                          <span style={{ color: '#92400E', fontWeight: '600' }}>Total Abonado:</span>
+                          <span style={{ fontWeight: '800', color: '#10B981' }}>${Number(selectedOrderForDetails.abonosTotal || 0).toFixed(2)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingTop: '4px', borderTop: '1px dashed #FCD34D' }}>
+                          <span style={{ color: '#92400E', fontWeight: '700' }}>Saldo Pendiente:</span>
+                          <span style={{ fontWeight: '900', color: '#D97706' }}>
+                            ${Math.max(0, Number(selectedOrderForDetails.totalAmount) - Number(selectedOrderForDetails.abonosTotal || 0)).toFixed(2)}
+                          </span>
+                        </div>
+                        {Array.isArray(selectedOrderForDetails.abonosHistory) && selectedOrderForDetails.abonosHistory.length > 0 && (
+                          <div style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px solid #FEF3C7', fontSize: '11px', color: '#92400E' }}>
+                            <div style={{ fontWeight: '700', marginBottom: '4px' }}>Historial de Abonos:</div>
+                            {selectedOrderForDetails.abonosHistory.map((ab: any, i: number) => (
+                              <div key={ab.id || i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                                <span>Abono #{i + 1} ({new Date(ab.date).toLocaleDateString()})</span>
+                                <b>${Number(ab.amount).toFixed(2)}</b>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {selectedOrderForDetails.notes && (

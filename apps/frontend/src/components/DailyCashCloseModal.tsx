@@ -61,9 +61,9 @@ export const DailyCashCloseModal: React.FC<DailyCashCloseModalProps> = ({ isOpen
 - 🏪 En Tienda: ${cashSummary.inStoreOrdersCount}
 - 🛵 Delivery: ${cashSummary.deliveryOrdersCount}
 - 🛒 Tienda Web: ${cashSummary.webOrdersCount}
-${cashSummary.cancelledOrdersCount > 0 ? `- ❌ Cancelados: ${cashSummary.cancelledOrdersCount}\n` : ''}
 ${cashSummary.puntoList?.length > 0 ? `\n💳 *VENTAS POR PUNTO DE VENTA (${cashSummary.puntoList.length}):*\n` + cashSummary.puntoList.map((p: any) => `• Ref: ${p.ref || 'S/R'} | Bs. ${Number(p.amountBs).toFixed(2)} | ${p.bank || 'Punto'} | ${p.customerName || 'Cliente'}`).join('\n') : ''}
 ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS (${cashSummary.pagoMovilList.length}):*\n` + cashSummary.pagoMovilList.map((p: any) => `• Ref: ${p.ref || 'S/R'} | Bs. ${Number(p.amountBs).toFixed(2)} | ${p.customerName || 'Cliente'}`).join('\n') : ''}
+${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSummary.vueltosList.length}):*\n` + cashSummary.vueltosList.map((v: any) => `• #${v.orderNumber} - ${v.customerName}: $${Number(v.amountUsd).toFixed(2)} (${v.method === 'PAGO_MOVIL' ? `Pago Móvil Ref: ${v.ref}` : v.method === 'CASH_BS' ? 'Efectivo Bs' : 'Efectivo USD'})`).join('\n') : ''}
 `;
 
     if (navigator.clipboard) {
@@ -148,6 +148,45 @@ ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS ($
                   <small style={{ color: '#64748B', fontSize: '11px' }}>≈ ${Number(cashSummary.totalPagoMovilUSD || 0).toFixed(2)} ({cashSummary.pagoMovilList?.length || 0} tr.)</small>
                 </div>
               </div>
+
+              {/* Sección de Vueltos Registrados */}
+              {Array.isArray(cashSummary.vueltosList) && cashSummary.vueltosList.length > 0 && (
+                <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '14px 16px', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A' }}>
+                      💵 Vueltos Entregados en el Día ({cashSummary.vueltosList.length})
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                    <div style={{ background: '#F0FDF4', padding: '8px 10px', borderRadius: '10px', border: '1px solid #BBF7D0' }}>
+                      <span style={{ fontSize: '10px', color: '#166534', fontWeight: '700', display: 'block' }}>Vuelto en Divisas ($)</span>
+                      <span style={{ fontSize: '14px', fontWeight: '900', color: '#15803D' }}>-${Number(cashSummary.totalCashChangeUSD || 0).toFixed(2)} USD</span>
+                    </div>
+                    <div style={{ background: '#F5F3FF', padding: '8px 10px', borderRadius: '10px', border: '1px solid #DDD6FE' }}>
+                      <span style={{ fontSize: '10px', color: '#6D28D9', fontWeight: '700', display: 'block' }}>Vuelto en Pago Móvil (Bs)</span>
+                      <span style={{ fontSize: '14px', fontWeight: '900', color: '#4C1D95' }}>-Bs. {Number(cashSummary.totalPagoMovilChangeBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                  <div style={{ maxHeight: '140px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {cashSummary.vueltosList.map((v: any, idx: number) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', background: '#F8FAFC', padding: '6px 8px', borderRadius: '8px', border: '1px solid #F1F5F9' }}>
+                        <div>
+                          <b>#{v.orderNumber}</b> - {v.customerName}
+                          <span style={{ display: 'block', color: '#64748B', fontSize: '10px' }}>
+                            {v.method === 'PAGO_MOVIL' ? `📱 Pago Móvil (Ref: ${v.ref})` : v.method === 'CASH_BS' ? '🇻🇪 Efectivo Bs' : '💵 Efectivo USD'}
+                          </span>
+                        </div>
+                        <div style={{ textAlign: 'right', fontWeight: '800', color: v.method === 'PAGO_MOVIL' ? '#6D28D9' : '#059669' }}>
+                          ${Number(v.amountUsd).toFixed(2)}
+                          {v.method === 'PAGO_MOVIL' && (
+                            <span style={{ display: 'block', fontSize: '9px', fontWeight: '600' }}>Bs. {Number(v.amountBs).toFixed(2)}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Totals Summary Card */}
               <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '14px' }}>

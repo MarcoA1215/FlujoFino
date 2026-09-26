@@ -124,6 +124,10 @@ const Pos: React.FC = () => {
   const [transferBank, setTransferBank] = useState('');
 
   const [usdReceived, setUsdReceived] = useState<number | ''>('');
+  const [changeMethod, setChangeMethod] = useState<'CASH_USD' | 'PAGO_MOVIL' | 'CASH_BS'>('CASH_USD');
+  const [changeRef, setChangeRef] = useState('');
+  const [changePhone, setChangePhone] = useState('');
+  const [changeBank, setChangeBank] = useState('');
 
   // Delivery
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(DeliveryMethod.IN_STORE);
@@ -406,6 +410,17 @@ const Pos: React.FC = () => {
       }
     }
 
+    if (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) {
+      if (changeMethod === 'PAGO_MOVIL' && !changeRef.trim()) {
+        presentToast({
+          message: 'Por favor indica la Referencia del Pago Móvil del vuelto para el arqueo de caja',
+          duration: 3500,
+          color: 'warning'
+        });
+        return;
+      }
+    }
+
     const abonoAmount = paymentMethod === 'PENDING' ? (parseFloat(initialAbono) || 0) : 0;
 
     const payload: any = {
@@ -437,6 +452,10 @@ const Pos: React.FC = () => {
       transferRef: paymentMethod === 'TRANSFER' ? transferRef : undefined,
       transferBank: paymentMethod === 'TRANSFER' ? transferBank : undefined,
       usdReceived: paymentMethod === 'USD' && typeof usdReceived === 'number' ? usdReceived : undefined,
+      changeAmount: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? vueltoUsd : undefined,
+      changeAmountBs: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? vueltoBs : undefined,
+      changeMethod: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? changeMethod : undefined,
+      changeRef: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? (changeRef.trim() || undefined) : undefined,
       initialAbono: paymentMethod === 'PENDING' ? abonoAmount : undefined,
       bypassMinDeposit: paymentMethod === 'PENDING' ? bypassMinDeposit : undefined,
       exchangeRateBs: exchangeRate,
@@ -478,6 +497,10 @@ const Pos: React.FC = () => {
         setTransferRef('');
         setTransferBank('');
         setUsdReceived('');
+        setChangeMethod('CASH_USD');
+        setChangeRef('');
+        setChangePhone('');
+        setChangeBank('');
         setInitialAbono('');
         setBypassMinDeposit(false);
         setDiscountValue('');
@@ -512,6 +535,10 @@ const Pos: React.FC = () => {
       setTransferRef('');
       setTransferBank('');
       setUsdReceived('');
+      setChangeMethod('CASH_USD');
+      setChangeRef('');
+      setChangePhone('');
+      setChangeBank('');
       setInitialAbono('');
       setBypassMinDeposit(false);
       setDiscountValue('');
@@ -1265,18 +1292,138 @@ const Pos: React.FC = () => {
 
                     {/* Vuelto Interactive Card */}
                     {typeof usdReceived === 'number' && usdReceived >= totalCart && (
-                      <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '12px', padding: '12px', marginTop: '6px' }}>
+                      <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '14px', padding: '14px', marginTop: '8px' }}>
                         <div style={{ fontSize: '12px', fontWeight: '700', color: '#065F46', marginBottom: '4px' }}>
                           💵 Vuelto a Entregar
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '18px', fontWeight: '900', color: '#047857' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: vueltoUsd > 0 ? '12px' : '0' }}>
+                          <span style={{ fontSize: '20px', fontWeight: '900', color: '#047857' }}>
                             ${vueltoUsd.toFixed(2)} USD
                           </span>
-                          <span style={{ fontSize: '14px', fontWeight: '800', color: '#065F46' }}>
+                          <span style={{ fontSize: '15px', fontWeight: '800', color: '#065F46' }}>
                             Bs. {vueltoBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                         </div>
+
+                        {vueltoUsd > 0 && (
+                          <div style={{ borderTop: '1px solid #A7F3D0', paddingTop: '10px' }}>
+                            <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#065F46', marginBottom: '6px' }}>
+                              ¿CÓMO ENTREGARÁS EL VUELTO? *
+                            </label>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '10px' }}>
+                              <button
+                                type="button"
+                                onClick={() => setChangeMethod('CASH_USD')}
+                                style={{
+                                  padding: '8px 4px',
+                                  borderRadius: '10px',
+                                  border: changeMethod === 'CASH_USD' ? '2px solid #059669' : '1px solid #CBD5E1',
+                                  background: changeMethod === 'CASH_USD' ? '#D1FAE5' : '#ffffff',
+                                  color: changeMethod === 'CASH_USD' ? '#065F46' : '#475569',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                💵 Divisas ($)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setChangeMethod('PAGO_MOVIL');
+                                  if (!changePhone && customerPhone) setChangePhone(customerPhone);
+                                }}
+                                style={{
+                                  padding: '8px 4px',
+                                  borderRadius: '10px',
+                                  border: changeMethod === 'PAGO_MOVIL' ? '2px solid #059669' : '1px solid #CBD5E1',
+                                  background: changeMethod === 'PAGO_MOVIL' ? '#D1FAE5' : '#ffffff',
+                                  color: changeMethod === 'PAGO_MOVIL' ? '#065F46' : '#475569',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                📱 Pago Móvil
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setChangeMethod('CASH_BS')}
+                                style={{
+                                  padding: '8px 4px',
+                                  borderRadius: '10px',
+                                  border: changeMethod === 'CASH_BS' ? '2px solid #059669' : '1px solid #CBD5E1',
+                                  background: changeMethod === 'CASH_BS' ? '#D1FAE5' : '#ffffff',
+                                  color: changeMethod === 'CASH_BS' ? '#065F46' : '#475569',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                🇻🇪 Efectivo Bs
+                              </button>
+                            </div>
+
+                            {/* Detalle si es Pago Móvil */}
+                            {changeMethod === 'PAGO_MOVIL' && (
+                              <div style={{ background: '#ffffff', border: '1px solid #A7F3D0', borderRadius: '10px', padding: '10px' }}>
+                                <div style={{ fontSize: '11px', fontWeight: '700', color: '#047857', marginBottom: '8px' }}>
+                                  📲 Registra la transferencia de vuelto (Bs. {vueltoBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                                </div>
+                                <div style={{ marginBottom: '8px' }}>
+                                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '2px' }}>
+                                    N° Referencia Pago Móvil *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={changeRef}
+                                    onChange={e => setChangeRef(e.target.value)}
+                                    placeholder="Últimos 4 o 6 dígitos..."
+                                    style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', fontWeight: '600' }}
+                                  />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                  <div>
+                                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '2px' }}>
+                                      Teléfono / Cédula
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={changePhone}
+                                      onChange={e => setChangePhone(e.target.value)}
+                                      placeholder="0414... / V-..."
+                                      style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '2px' }}>
+                                      Banco
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={changeBank}
+                                      onChange={e => setChangeBank(e.target.value)}
+                                      placeholder="Banesco, BDV..."
+                                      style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {changeMethod === 'CASH_USD' && (
+                              <div style={{ fontSize: '11px', color: '#065F46', background: '#ffffff', padding: '8px 10px', borderRadius: '8px', border: '1px solid #A7F3D0' }}>
+                                💡 Se entregarán <b>${vueltoUsd.toFixed(2)} USD</b> en billetes físicos desde la gaveta.
+                              </div>
+                            )}
+
+                            {changeMethod === 'CASH_BS' && (
+                              <div style={{ fontSize: '11px', color: '#065F46', background: '#ffffff', padding: '8px 10px', borderRadius: '8px', border: '1px solid #A7F3D0' }}>
+                                💡 Se entregarán <b>Bs. {vueltoBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> en billetes de bolívares desde la gaveta.
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
