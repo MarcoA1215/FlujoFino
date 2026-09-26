@@ -357,89 +357,96 @@ const Users: React.FC = () => {
             </IonCol>
 
             <IonCol size="12" sizeMd="8">
-              <IonCard>
-                <IonCardContent style={{ padding: 0 }}>
-                  <div className="table-responsive">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Usuario / Cargo</th>
-                          <th>Correo</th>
-                          <th>Rol</th>
-                          <th>Horario</th>
-                          <th>Estado</th>
-                          <th>Fecha de Creación</th>
-                          <th>Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {users.map((u: any) => {
-                          const isCurrentUser = (user?.id && user.id === u.id) || (user?.username && user.username === u.username);
-                          return (
-                            <tr key={u.id}>
-                              <td>
-                                <div><strong>{u.username}</strong></div>
-                                {u.jobTitle && (
-                                  <div style={{ fontSize: '0.85em', color: '#92949c' }}>
-                                    {u.jobTitle}
-                                  </div>
-                                )}
-                              </td>
-                              <td>{u.email}</td>
-                              <td>
-                                <IonBadge color={u.role === UserRole.ADMIN ? 'danger' : 'primary'}>{getRoleLabel(u.role)}</IonBadge>
-                              </td>
-                              <td>
-                                {u.entryTime && u.exitTime ? (
-                                  <span style={{ fontSize: '0.85rem' }}>{u.entryTime} - {u.exitTime}</span>
-                                ) : (
-                                  <span style={{ fontSize: '0.85rem', color: '#888' }}>Sin definir</span>
-                                )}
-                              </td>
-                              <td>
-                                <IonBadge color={u.status === 'PENDING' ? 'warning' : 'success'}>
-                                  {u.status === 'PENDING' ? 'Invitado' : 'Activo'}
-                                </IonBadge>
-                              </td>
-                              <td>{new Date(u.createdAt).toLocaleDateString()}</td>
-                              <td>
-                                <IonButton size="small" color="primary" fill="clear" onClick={() => handleOpenEdit(u)}>
-                                  ✏️ Editar
+              <div className="ff-card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div style={{ padding: '14px 18px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
+                    Equipo de Trabajo ({users.length})
+                  </h3>
+                  <span style={{ fontSize: '12px', fontWeight: '600', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    ↔ Desliza para ver pagos y acciones
+                  </span>
+                </div>
+
+                <div className="table-responsive" style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', display: 'block' }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Usuario / Cargo</th>
+                        <th>Correo</th>
+                        <th>Rol</th>
+                        <th>Horario</th>
+                        <th>Estado</th>
+                        <th>Fecha de Creación</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((u: any) => {
+                        const isCurrentUser = (user?.id && user.id === u.id) || (user?.username && user.username === u.username);
+                        return (
+                          <tr key={u.id}>
+                            <td>
+                              <div><strong>{u.username}</strong></div>
+                              {u.jobTitle && (
+                                <div style={{ fontSize: '0.85em', color: '#92949c' }}>
+                                  {u.jobTitle}
+                                </div>
+                              )}
+                            </td>
+                            <td>{u.email}</td>
+                            <td>
+                              <IonBadge color={u.role === UserRole.ADMIN ? 'danger' : 'primary'}>{getRoleLabel(u.role)}</IonBadge>
+                            </td>
+                            <td>
+                              {u.entryTime && u.exitTime ? (
+                                <span style={{ fontSize: '0.85rem' }}>{u.entryTime} - {u.exitTime}</span>
+                              ) : (
+                                <span style={{ fontSize: '0.85rem', color: '#888' }}>Sin definir</span>
+                              )}
+                            </td>
+                            <td>
+                              <IonBadge color={u.status === 'PENDING' ? 'warning' : 'success'}>
+                                {u.status === 'PENDING' ? 'Invitado' : 'Activo'}
+                              </IonBadge>
+                            </td>
+                            <td>{new Date(u.createdAt).toLocaleDateString()}</td>
+                            <td>
+                              <IonButton size="small" color="primary" fill="clear" onClick={() => handleOpenEdit(u)}>
+                                ✏️ Editar
+                              </IonButton>
+                              <IonButton size="small" color="success" fill="clear" onClick={() => setSelectedUserForPay(u)}>
+                                💵 Pagar
+                              </IonButton>
+                              {u.username !== 'admin' && !isCurrentUser && (
+                                <IonButton size="small" color="danger" fill="clear" onClick={() => handleDelete(u.id)}>
+                                  Eliminar
                                 </IonButton>
-                                <IonButton size="small" color="success" fill="clear" onClick={() => setSelectedUserForPay(u)}>
-                                  💵 Pagar
-                                </IonButton>
-                                {u.username !== 'admin' && !isCurrentUser && (
-                                  <IonButton size="small" color="danger" fill="clear" onClick={() => handleDelete(u.id)}>
-                                    Eliminar
-                                  </IonButton>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {users.length === 0 && (
-                          <tr><td colSpan={7} className="ion-text-center">Cargando...</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </IonCardContent>
-              </IonCard>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {users.length === 0 && (
+                        <tr><td colSpan={7} className="ion-text-center">Cargando...</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </IonCol>
           </IonRow>
 
           {/* Solicitudes de Acceso Pendientes */}
           <IonRow className="ion-margin-top">
             <IonCol size="12">
-              <IonCard>
-                <IonCardHeader style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="ff-card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div style={{ padding: '14px 18px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <IonCardTitle style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
                       ⏳ Solicitudes de Acceso Pendientes
-                    </IonCardTitle>
+                    </h3>
                     {accessRequests.length > 0 && (
-                      <IonBadge color="warning" style={{ fontSize: '0.85rem' }}>
+                      <IonBadge color="warning" style={{ fontSize: '0.8rem', borderRadius: '6px' }}>
                         {accessRequests.length} pendientes
                       </IonBadge>
                     )}
@@ -448,8 +455,9 @@ const Users: React.FC = () => {
                     <IonIcon icon={refreshOutline} slot="start" />
                     Actualizar
                   </IonButton>
-                </IonCardHeader>
-                <IonCardContent style={{ padding: accessRequests.length === 0 ? '20px' : 0 }}>
+                </div>
+
+                <div style={{ padding: accessRequests.length === 0 ? '20px' : 0 }}>
                   {accessRequests.length === 0 ? (
                     <div className="ion-text-center" style={{ color: '#64748b', padding: '15px' }}>
                       <p style={{ margin: 0 }}>No hay solicitudes de acceso pendientes en este momento.</p>
@@ -458,7 +466,7 @@ const Users: React.FC = () => {
                       </p>
                     </div>
                   ) : (
-                    <div className="table-responsive">
+                    <div className="table-responsive" style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', display: 'block' }}>
                       <table>
                         <thead>
                           <tr>
@@ -510,7 +518,7 @@ const Users: React.FC = () => {
                                 <IonButton 
                                   size="small" 
                                   color="danger" 
-                                  fill="outline"
+                                  fill="outline" 
                                   onClick={() => handleRejectAccess(req.id, req.userName)}
                                 >
                                   ❌ Rechazar
@@ -522,8 +530,8 @@ const Users: React.FC = () => {
                       </table>
                     </div>
                   )}
-                </IonCardContent>
-              </IonCard>
+                </div>
+              </div>
             </IonCol>
           </IonRow>
         </IonGrid>

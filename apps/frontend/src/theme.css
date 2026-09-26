@@ -415,3 +415,49 @@ ion-badge, ion-button, th, td, ion-card-title, h1, h2, h3, p {
   font-weight: 700 !important;
   color: var(--ff-slate-900) !important;
 }
+
+/* Responsive Tables with Smooth Horizontal Scroll */
+.table-responsive {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  display: block !important;
+  margin: 0 !important;
+}
+
+.table-responsive table {
+  min-width: 680px;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-responsive th {
+  background: #F8FAFC;
+  color: var(--ff-slate-500);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--ff-slate-200);
+  white-space: nowrap;
+}
+
+.table-responsive td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #F1F5F9;
+  font-size: 13px;
+  color: var(--ff-slate-900);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.table-responsive tr:last-child td {
+  border-bottom: none;
+}
+
+.table-responsive tr:hover td {
+  background: #F8FAFC;
+}
