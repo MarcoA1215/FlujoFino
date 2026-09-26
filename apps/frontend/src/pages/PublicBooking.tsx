@@ -304,7 +304,11 @@ const PublicBooking: React.FC = () => {
                       <p><b>Total:</b> ${totalServicePrice.toFixed(2)}</p>
                     </>
                   )}
-                  {selectedStaff && <p><b>Especialista:</b> {selectedStaff.name}</p>}
+                  {selectedStaff ? (
+                    <p><b>Especialista:</b> {selectedStaff.name}</p>
+                  ) : selectedServices.length > 1 ? (
+                    <p><b>Atención:</b> Equipo del Local (Coordinación continua)</p>
+                  ) : null}
                 </div>
 
                 <div style={{ marginTop: '25px', padding: '15px', backgroundColor: '#eef8ff', borderRadius: '8px', border: '1px dashed var(--ion-color-primary)' }}>
@@ -604,6 +608,27 @@ const PublicBooking: React.FC = () => {
                         </div>
                       )}
 
+                      {/* Info box when staff selection is enabled, but no single specialist performs ALL selected services */}
+                      {selectedServices.length > 1 && tenantInfo?.bookingAllowStaffSelection && availableStaffForService.length === 0 && (
+                        <div style={{
+                          marginTop: '16px',
+                          marginBottom: '8px',
+                          backgroundColor: '#f8fafc',
+                          padding: '14px',
+                          borderRadius: '12px',
+                          border: '1px solid #e2e8f0',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                        }}>
+                          <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <IonIcon icon={sparklesOutline} color="primary" />
+                            👥 Atención Coordinada por el Equipo
+                          </div>
+                          <p style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>
+                            Los servicios seleccionados cuentan con especialistas específicos en nuestro equipo. Tu cita se reservará en un solo bloque continuo y el personal coordinará tu atención al momento de tu llegada.
+                          </p>
+                        </div>
+                      )}
+
                       <IonButton 
                         expand="block" 
                         color="primary" 
@@ -770,9 +795,11 @@ const PublicBooking: React.FC = () => {
                           💰 <b>Inversión:</b> ${totalServicePrice.toFixed(2)}<br/>
                         </>
                       )}
-                      {selectedStaff && (
+                      {selectedStaff ? (
                         <>👤 <b>Atendido por:</b> {selectedStaff.name} {selectedStaff.jobTitle ? `(${selectedStaff.jobTitle})` : ''}<br/></>
-                      )}
+                      ) : selectedServices.length > 1 ? (
+                        <>👥 <b>Atención:</b> Equipo del Local (Coordinación continua)<br/></>
+                      ) : null}
                     </div>
                   </div>
 
