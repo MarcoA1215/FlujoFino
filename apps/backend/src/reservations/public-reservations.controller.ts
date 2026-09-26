@@ -6,7 +6,7 @@ import { Tenant } from '../entities/tenant.entity';
 import { Settings } from '../entities/settings.entity';
 import { Reservation } from '../entities/reservation.entity';
 import { Product } from '../entities/product.entity';
-import { ReservationStatus } from '@nutrideli/shared-types';
+import { ReservationStatus, PaymentStatus } from '@nutrideli/shared-types';
 import { decodeTenantId } from '../utils/tenant-crypto';
 import { Public } from '../auth/public.decorator';
 import { OrderItem } from '../entities/order-item.entity';
@@ -188,9 +188,15 @@ export class PublicReservationsController {
       }
     }
 
+    const totalAmount = Number(reservation.totalAmount || serviceDetails?.price || 0);
+    const abonosTotal = Number(reservation.abonosTotal || 0);
+    const remainingAmount = Math.max(0, totalAmount - abonosTotal);
+    const exchangeRate = Number(settings?.exchangeRateBs || 40.0);
+
     return {
       id: reservation.id,
       customerName: reservation.customerName,
+      customerPhone: reservation.customerPhone,
       date: reservation.date,
       time: reservation.time.substring(0, 5),
       originalTime: reservation.originalTime ? reservation.originalTime.substring(0, 5) : null,
@@ -201,11 +207,92 @@ export class PublicReservationsController {
       status: reservation.status,
       tenantName: reservation.tenant.name,
       tenantId: reservation.tenantId, // Real tenant UUID is OK to return here since they already have the appointment UUID
-      servicePrice: Number(reservation.totalAmount) || serviceDetails?.price || 0,
+      servicePrice: totalAmount,
+      totalAmount: totalAmount,
+      abonosTotal: abonosTotal,
+      remainingAmount: remainingAmount,
+      paymentStatus: reservation.paymentStatus || 'PENDING',
       durationMinutes: serviceDetails?.durationMinutes || 30,
-      bankInfo: settings?.companyBank,
-      companyCedula: settings?.companyCedula,
-      companyPhone: settings?.companyPhone,
+      abonosHistory: reservation.abonosHistory || [],
+      // Financial settings:
+      exchangeRateBs: exchangeRate,
+      totalAmountBs: Math.round(totalAmount * exchangeRate * 100) / 100,
+      remainingAmountBs: Math.round(remainingAmount * exchangeRate * 100) / 100,
+      bankInfo: settings?.companyBank || '',
+      companyCedula: settings?.companyCedula || '',
+      companyPhone: settings?.companyPhone || '',
+      companyAccountNumber: settings?.companyAccountNumber || '',
+      companyAccountHolder: settings?.companyAccountHolder || '',
+      binancePayId: settings?.binancePayId || '',
+      binanceEmail: settings?.binanceEmail || '',
+      acceptCashUsd: settings?.acceptCashUsd ?? true,
+      acceptPagoMovil: settings?.acceptPagoMovil ?? true,
+      acceptBinance: settings?.acceptBinance ?? false,
+      acceptTransfer: settings?.acceptTransfer ?? false,
+      minDepositPercentage: Number(settings?.minDepositPercentage || 0),
+    };
+  }
+
+  @Post('appointment/:id/payment')
+  async reportAppointmentPayment(
+    @Param('id') id: string,
+    @Body() dto: {
+      amount: number;
+      amountBs?: number;
+      method: string;
+      reference: string;
+      notes?: string;
+    }
+  ) {
+    if (!dto.amount || dto.amount <= 0) {
+      throw new BadRequestException('El monto reportado debe ser mayor a 0');
+    }
+    if (!dto.reference || !dto.reference.trim()) {
+      throw new BadRequestException('Por favor, ingresa el número de referencia del comprobante');
+    }
+
+    const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
+    const reservation = await reservationRepo.findOne({ where: { id } });
+    if (!reservation) throw new NotFoundException('Cita no encontrada');
+
+    const paymentEntry = {
+      id: Date.now().toString(),
+      amount: Number(dto.amount),
+      amountBs: dto.amountBs ? Number(dto.amountBs) : undefined,
+      method: dto.method || 'PAGO_MOVIL',
+      reference: dto.reference.trim(),
+      date: new Date().toISOString(),
+      notes: dto.notes ? dto.notes.trim() : undefined,
+      status: 'REPORTED',
+    };
+
+    reservation.abonosHistory = reservation.abonosHistory || [];
+    reservation.abonosHistory.push(paymentEntry);
+    reservation.abonosTotal = Number(reservation.abonosTotal || 0) + Number(dto.amount);
+
+    const total = Number(reservation.totalAmount || 0);
+    const remaining = total - reservation.abonosTotal;
+
+    if (total > 0) {
+      if (remaining <= 0) {
+        reservation.paymentStatus = PaymentStatus.PAID;
+      } else {
+        reservation.paymentStatus = PaymentStatus.PARTIAL;
+      }
+    }
+
+    const methodLabel = dto.method === 'PAGO_MOVIL' ? 'Pago Móvil' : dto.method === 'BINANCE' ? 'Binance' : dto.method === 'TRANSFER' ? 'Transferencia' : 'Pago';
+    const noteTag = `[Pago Reportado: $${Number(dto.amount).toFixed(2)} vía ${methodLabel} Ref: ${dto.reference.trim()}]`;
+    reservation.notes = reservation.notes ? `${reservation.notes} | ${noteTag}` : noteTag;
+
+    await reservationRepo.save(reservation);
+
+    return {
+      success: true,
+      message: 'Pago reportado con éxito. El local verificará tu comprobante.',
+      abonosTotal: reservation.abonosTotal,
+      paymentStatus: reservation.paymentStatus,
+      entry: paymentEntry,
     };
   }
 
