@@ -82,6 +82,12 @@ const Menu: React.FC = () => {
     }
   }, [isAuthenticated, user?.tenantId]);
 
+  useEffect(() => {
+    return () => {
+      document.body.classList.remove('ff-menu-open');
+    };
+  }, []);
+
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
 
   if (!isAuthenticated || (!user?.tenantId && !isSuperAdmin) || location.pathname === '/select-workspace' || location.pathname.startsWith('/book') || location.pathname.startsWith('/appointment') || location.pathname.startsWith('/store')) {
@@ -159,12 +165,6 @@ const Menu: React.FC = () => {
   const displayWorkspaces = acceptedWorkspaces.length > 0 ? acceptedWorkspaces : [
     { tenantId: user?.tenantId || '', name: user?.tenantName || 'Flujo Fino', role: user?.role || '' }
   ];
-
-  useEffect(() => {
-    return () => {
-      document.body.classList.remove('ff-menu-open');
-    };
-  }, []);
 
   return (
     <IonMenu
