@@ -42,6 +42,11 @@ export class OrdersController {
     return this.ordersService.createOrder(req.user.tenantId, dto, req.user?.id);
   }
 
+  @Post('sync-offline')
+  syncOffline(@Request() req: any, @Body('orders') orders: any[]) {
+    return this.ordersService.syncOfflineOrders(req.user.tenantId, orders, req.user?.id);
+  }
+
   @Get()
   getAllOrders(@Request() req: any) {
     return this.ordersService.getAllOrders(req.user.tenantId);}

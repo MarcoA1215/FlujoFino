@@ -268,7 +268,7 @@ const Pos: React.FC = () => {
             setTableNumber(order.tableNumber || '');
             setDeliveryMethod(order.deliveryMethod || DeliveryMethod.IN_STORE);
             setDeliveryZoneId(order.deliveryZoneId || '');
-            setEmployeeId(order.employeeId || '');
+            setEmployeeId(order.employeeId || order.employee?.id || '');
             setPaymentMethod(order.paymentMethod || 'PENDING');
 
             if (order.items && order.items.length > 0) {
@@ -599,8 +599,18 @@ const Pos: React.FC = () => {
       setLinkedReservationId(null);
       fetchProducts();
     } catch (e: any) {
-      console.error(e);
-      // Fallback: If network failed unexpectedly, save offline
+      console.error('Error procesando pedido:', e);
+      if (e.response) {
+        const errorMsg = e.response.data?.message || e.response.data?.error || 'Error al procesar el pedido';
+        presentToast({
+          message: `Error: ${Array.isArray(errorMsg) ? errorMsg.join(', ') : errorMsg}`,
+          duration: 4500,
+          color: 'danger'
+        });
+        return;
+      }
+
+      // Fallback: If network failed unexpectedly (no response), save offline
       try {
         const offlineId = 'off_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
         const offlineOrder: OfflineOrder = {

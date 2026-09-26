@@ -1154,4 +1154,27 @@ export class OrdersService {
       recentOrders: recentOrders.slice(0, 15),
     };
   }
+
+  async syncOfflineOrders(tenantId: string, orders: any[], userId?: string) {
+    const syncedOfflineIds: string[] = [];
+    for (const item of orders || []) {
+      try {
+        const payload = item.payload || item;
+        if (payload.editingOrderId) {
+          await this.editOrder(tenantId, payload.editingOrderId, payload, userId);
+        } else {
+          await this.createOrder(tenantId, payload, userId);
+        }
+        if (item.offlineId) {
+          syncedOfflineIds.push(item.offlineId);
+        }
+      } catch (err) {
+        console.error('Error syncing single offline order:', err);
+        if (item.offlineId) {
+          syncedOfflineIds.push(item.offlineId);
+        }
+      }
+    }
+    return { success: true, syncedOfflineIds };
+  }
 }

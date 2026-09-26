@@ -201,8 +201,8 @@ const Dashboard: React.FC = () => {
                   <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '800', color: '#0F172A' }}>
                     📈 Ventas de los Últimos 7 Días
                   </h3>
-                  <div style={{ height: '240px', width: '100%' }}>
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div style={{ height: '240px', width: '100%', minHeight: '240px' }}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
                       <BarChart data={summary.salesChart || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                         <XAxis dataKey="date" fontSize={11} stroke="#64748B" tickLine={false} />
