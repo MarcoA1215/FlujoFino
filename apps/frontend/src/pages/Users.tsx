@@ -248,8 +248,8 @@ const Users: React.FC = () => {
   return (
     <IonPage>
       <AppHeader title="Gestión de Equipo" />
-      <IonContent className="ion-padding" style={{ '--background': '#F8FAFC' }}>
-        <IonGrid style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <IonContent className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' }}>
+        <IonGrid style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '90px' }}>
           <IonRow>
             <IonCol size="12" sizeMd="4">
               <IonCard>

@@ -216,11 +216,11 @@ const Menu: React.FC = () => {
         </IonList>
       </IonContent>
 
-      <IonFooter className="ion-no-border">
-        <IonToolbar>
-          <IonItem button onClick={confirmLogout} lines="none" detail={false} style={{ '--background': 'transparent' } as any}>
-            <IonIcon aria-hidden="true" slot="start" icon={logOutOutline} color="danger" />
-            <IonLabel color="danger">Cerrar Sesión</IonLabel>
+      <IonFooter className="ion-no-border" style={{ background: '#ffffff', borderTop: '1px solid #e2e8f0', paddingBottom: 'max(8px, env(safe-area-inset-bottom, 8px))' }}>
+        <IonToolbar style={{ '--background': '#ffffff' } as any}>
+          <IonItem button onClick={confirmLogout} lines="none" detail={false} style={{ '--background': 'transparent', cursor: 'pointer' } as any}>
+            <IonIcon aria-hidden="true" slot="start" icon={logOutOutline} color="danger" style={{ fontSize: '22px' }} />
+            <IonLabel color="danger" style={{ fontWeight: 700, fontSize: '15px' }}>Cerrar Sesión</IonLabel>
           </IonItem>
         </IonToolbar>
       </IonFooter>

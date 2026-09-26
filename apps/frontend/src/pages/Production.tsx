@@ -121,8 +121,8 @@ const Production: React.FC = () => {
   return (
     <IonPage>
       <AppHeader title="Producción de Lotes" />
-      <IonContent fullscreen className="ion-padding" style={{ '--background': '#F8FAFC' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <IonContent fullscreen className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '90px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
             <div style={{ display: 'flex', background: '#E2E8F0', padding: '3px', borderRadius: '12px' }}>
               <button

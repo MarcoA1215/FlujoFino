@@ -151,8 +151,8 @@ const RawMaterials: React.FC = () => {
   return (
     <IonPage>
       <AppHeader title="Insumos (Materia Prima)" />
-      <IonContent fullscreen className="ion-padding" style={{ '--background': '#F8FAFC' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <IonContent fullscreen className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '90px' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px' }}>
             <div className="ff-search-pill" style={{ flex: 1 }}>
               <input

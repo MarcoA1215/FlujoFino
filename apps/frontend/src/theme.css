@@ -319,8 +319,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-around;
-  z-index: 999;
-  box-shadow: 0 -2px 10px rgba(15, 23, 42, 0.03);
+  z-index: 100; /* Stays above normal page, but below menus and modals */
+  box-shadow: 0 -2px 10px rgba(15, 23, 42, 0.05);
 }
 
 .ff-nav-item {
@@ -352,6 +352,23 @@ body {
   transform: scale(1.1);
 }
 
+/* Ensure Side Menu (IonMenu) is ALWAYS completely above BottomNav and overlays */
+ion-menu {
+  z-index: 10000 !important;
+}
+
+ion-menu::part(backdrop),
+ion-menu ion-backdrop {
+  z-index: 9999 !important;
+}
+
+ion-menu ion-footer {
+  background: #ffffff !important;
+  border-top: 1px solid var(--ff-slate-200) !important;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px)) !important;
+  z-index: 10001 !important;
+}
+
 /* Hide bottom nav on desktop screens */
 @media (min-width: 769px) {
   .ff-bottom-nav {
@@ -362,10 +379,11 @@ body {
   }
 }
 
-/* Content bottom spacing so bottom nav does not overlap */
+/* Content bottom spacing so bottom nav does not overlap page content or buttons */
 @media (max-width: 768px) {
-  .ff-has-bottom-nav {
-    padding-bottom: 74px !important;
+  .ff-has-bottom-nav,
+  ion-router-outlet > .ion-page > ion-content {
+    --padding-bottom: calc(85px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 

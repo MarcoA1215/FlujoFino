@@ -291,7 +291,7 @@ const SettingsPage: React.FC = () => {
   return (
     <IonPage>
       <AppHeader title="Configuración" />
-      <IonContent className="ion-padding" style={{ '--background': '#F8FAFC' }}>
+      <IonContent className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' }}>
         <IonGrid style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <IonRow>
             {/* Tarjeta Programa de Referidos • Invita y Ahorra */}
@@ -930,8 +930,8 @@ const SettingsPage: React.FC = () => {
 
         </IonGrid>
         
-        <div style={{ padding: '0 10px 20px 10px' }}>
-          <IonButton expand="block" color="primary" onClick={handleSaveSettings} style={{ margin: 0, height: '50px' }}>
+        <div style={{ padding: '0 10px 100px 10px' }}>
+          <IonButton expand="block" color="primary" onClick={handleSaveSettings} style={{ margin: 0, height: '52px', fontWeight: 800, borderRadius: '12px', fontSize: '15px' }}>
             <IonIcon slot="start" icon={saveOutline} />
             Guardar Todos los Ajustes
           </IonButton>

@@ -115,8 +115,8 @@ const FeedbackPage: React.FC = () => {
           </IonToolbar>
         </IonHeader>
 
-        <IonContent className="ion-padding" style={{ backgroundColor: '#f1f5f9' }}>
-          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+        <IonContent className="ion-padding ff-has-bottom-nav" style={{ backgroundColor: '#f1f5f9' }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto', paddingBottom: '90px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div>
                 <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
@@ -197,9 +197,9 @@ const FeedbackPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
 
-      <IonContent className="ion-padding" style={{ backgroundColor: '#f4f5f8' }}>
+      <IonContent className="ion-padding ff-has-bottom-nav" style={{ backgroundColor: '#f4f5f8' }}>
         {tab === 'clientes' && (
-          <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+          <div style={{ maxWidth: '600px', margin: '0 auto', paddingBottom: '90px' }}>
             <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>Comentarios de tus clientes</h2>
             {feedbacks.length === 0 ? (
               <p style={{ color: '#666', textAlign: 'center', marginTop: '40px' }}>Aún no has recibido comentarios de tus clientes.</p>
@@ -228,7 +228,7 @@ const FeedbackPage: React.FC = () => {
         )}
 
         {tab === 'soporte' && (
-          <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+          <div style={{ maxWidth: '600px', margin: '0 auto', paddingBottom: '90px' }}>
             <IonCard style={{ margin: 0, borderRadius: '8px' }}>
               <IonCardHeader>
                 <IonCardTitle style={{ display: 'flex', alignItems: 'center' }}>
