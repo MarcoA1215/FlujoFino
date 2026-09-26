@@ -160,8 +160,19 @@ const Menu: React.FC = () => {
     { tenantId: user?.tenantId || '', name: user?.tenantName || 'Flujo Fino', role: user?.role || '' }
   ];
 
+  useEffect(() => {
+    return () => {
+      document.body.classList.remove('ff-menu-open');
+    };
+  }, []);
+
   return (
-    <IonMenu contentId="main" type="overlay">
+    <IonMenu
+      contentId="main"
+      type="overlay"
+      onIonWillOpen={() => document.body.classList.add('ff-menu-open')}
+      onIonDidClose={() => document.body.classList.remove('ff-menu-open')}
+    >
       <IonContent>
         <div style={{ padding: '20px 16px 16px 16px', textAlign: 'center', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ width: '46px', height: '46px', background: 'var(--ion-color-primary)', color: 'white', borderRadius: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '26px', fontWeight: '900', marginBottom: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.12)' }}>

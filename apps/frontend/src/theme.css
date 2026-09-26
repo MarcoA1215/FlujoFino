@@ -352,21 +352,37 @@ body {
   transform: scale(1.1);
 }
 
-/* Ensure Side Menu (IonMenu) is ALWAYS completely above BottomNav and overlays */
+/* Hide bottom nav when drawer menu is open */
+body.ff-menu-open .ff-bottom-nav,
+body.menu-open .ff-bottom-nav {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Ensure Side Menu (IonMenu) drawer container sits above everything */
 ion-menu {
   z-index: 10000 !important;
 }
 
-ion-menu::part(backdrop),
-ion-menu ion-backdrop {
+/* Drawer container (the white menu itself) must be clean and above the backdrop */
+ion-menu::part(container) {
+  z-index: 10002 !important;
+  background: #ffffff !important;
+  box-shadow: 4px 0 25px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* Backdrop sits BEHIND the drawer container, never over it */
+ion-menu::part(backdrop) {
   z-index: 9999 !important;
+  opacity: 0.4 !important;
+  pointer-events: auto !important;
 }
 
 ion-menu ion-footer {
   background: #ffffff !important;
   border-top: 1px solid var(--ff-slate-200) !important;
   padding-bottom: max(12px, env(safe-area-inset-bottom, 12px)) !important;
-  z-index: 10001 !important;
+  z-index: 10003 !important;
 }
 
 /* Hide bottom nav on desktop screens */
