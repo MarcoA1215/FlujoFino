@@ -42,13 +42,23 @@ export class PublicReservationsController {
       order: { name: 'ASC' }
     });
 
-    const services = products.map(p => ({
+    // Filtramos estrictamente solo los que son de tipo SERVICIO:
+    const onlyServices = products.filter(p => {
+      if (p.product_type === 'SERVICIO') return true;
+      if (p.product_type === 'REVENTA' || p.product_type === 'FORMULA') return false;
+      return p.is_service === true || p.category === 'Servicios';
+    });
+
+    const services = onlyServices.map(p => ({
       id: p.id,
       name: p.name,
       price: p.salePrice,
       durationMinutes: p.durationMinutes || settings?.slotInterval || 30,
       category: p.category,
-      assignedStaffIds: p.assignedStaffIds || []
+      assignedStaffIds: p.assignedStaffIds || [],
+      product_type: 'SERVICIO',
+      is_service: true,
+      image: p.images && p.images.length > 0 ? (Array.isArray(p.images) ? p.images[p.images.length - 1] : String(p.images).split(',').pop()?.trim()) : null
     }));
 
     // Fetch active staff if staff selection is allowed

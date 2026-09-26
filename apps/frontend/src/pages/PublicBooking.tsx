@@ -292,8 +292,16 @@ const PublicBooking: React.FC = () => {
     );
   }
 
+  const availableServices = (tenantInfo?.services || []).filter((s: any) => {
+    if (s.product_type === 'SERVICIO') return true;
+    if (s.product_type === 'REVENTA' || s.product_type === 'FORMULA') return false;
+    return s.is_service === true || s.category === 'Servicios';
+  });
+  const hasServices = availableServices.length > 0;
+  const isServiceRequired = tenantInfo?.bookingRequireService;
+
   const goBack = () => {
-    if (step === 2 && (tenantInfo?.bookingRequireService || selectedService || (tenantInfo?.services && tenantInfo.services.length > 0))) {
+    if (step === 2 && (tenantInfo?.bookingRequireService || selectedService || hasServices)) {
       setStep(1);
     } else if (step === 3) {
       setStep(2);
@@ -301,9 +309,6 @@ const PublicBooking: React.FC = () => {
       setStep(3);
     }
   };
-
-  const hasServices = tenantInfo?.services && tenantInfo.services.length > 0;
-  const isServiceRequired = tenantInfo?.bookingRequireService;
 
   return (
     <IonPage>
@@ -406,7 +411,7 @@ const PublicBooking: React.FC = () => {
                   {/* Services List */}
                   {hasServices ? (
                     <div>
-                      {tenantInfo.services.map((svc: any) => {
+                      {availableServices.map((svc: any) => {
                         const isSelected = selectedService?.id === svc.id;
                         return (
                           <div 

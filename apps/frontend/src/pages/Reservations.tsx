@@ -610,11 +610,17 @@ const Reservations: React.FC = () => {
               <IonLabel position="stacked">Servicio (Opcional)</IonLabel>
               <IonSelect value={serviceId} onIonChange={e => handleServiceChange(e.detail.value)} interface="popover" placeholder="Selecciona un servicio">
                 <IonSelectOption value="">Sin servicio específico</IonSelectOption>
-                {products.map(p => (
-                  <IonSelectOption key={p.id} value={p.id}>
-                    {p.name} ({p.durationMinutes || 30} min) - ${Number(p.salePrice).toFixed(2)}
-                  </IonSelectOption>
-                ))}
+                {products
+                  .filter(p => {
+                    if (p.product_type === 'SERVICIO') return true;
+                    if (p.product_type === 'REVENTA' || p.product_type === 'FORMULA') return false;
+                    return p.is_service === true || p.category === 'Servicios';
+                  })
+                  .map(p => (
+                    <IonSelectOption key={p.id} value={p.id}>
+                      {p.name} ({p.durationMinutes || 30} min) - ${Number(p.salePrice).toFixed(2)}
+                    </IonSelectOption>
+                  ))}
               </IonSelect>
             </IonItem>
             <IonItem>
