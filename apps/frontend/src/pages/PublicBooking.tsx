@@ -330,6 +330,64 @@ const PublicBooking: React.FC = () => {
             </div>
           )}
 
+          {/* Navigation Switcher if Business has both Booking & Store */}
+          {tenantInfo?.featureBuySell && (
+            <div
+              style={{
+                display: 'flex',
+                backgroundColor: '#e2e8f0',
+                borderRadius: '10px',
+                padding: '4px',
+                marginBottom: '16px',
+                gap: '4px',
+              }}
+            >
+              <button
+                onClick={() => (window.location.href = `/store/${tenantId}`)}
+                style={{
+                  flex: 1,
+                  padding: '9px 12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: '#475569',
+                  fontWeight: '600',
+                  fontSize: '0.88rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#cbd5e1')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                <span>🛍️</span> Catálogo / Tienda ↗
+              </button>
+              <button
+                style={{
+                  flex: 1,
+                  padding: '9px 12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#fff',
+                  color: '#0f172a',
+                  fontWeight: 'bold',
+                  fontSize: '0.88rem',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  cursor: 'default',
+                }}
+              >
+                <span>📅</span> Agendar Citas
+              </button>
+            </div>
+          )}
+
           <IonCard style={{ margin: 0, borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
             <IonCardContent style={{ padding: '20px' }}>
               

@@ -10,6 +10,7 @@ import { MovementType } from '@nutrideli/shared-types';
 import { RawMaterial } from '../entities/raw-material.entity';
 
 import { ComboItem } from '../entities/combo-item.entity';
+import { ConvertProductTypeDto, ProductArchetype } from './dto/convert-product-type.dto';
 
 @Injectable()
 export class ProductsService {
@@ -63,7 +64,7 @@ export class ProductsService {
            }
         }
       }
-      if (p.recipe && p.recipe.length > 0) {
+      if (!p.is_service && p.recipe && p.recipe.length > 0) {
         for (const ri of p.recipe) {
            if (ri.rawMaterial) baseCost += ri.quantity * ri.rawMaterial.costPerUnit;
         }
@@ -384,6 +385,55 @@ export class ProductsService {
       await this.productRepo.save(p);
     }
     return { success: true, migratedCount: products.length };
+  }
+
+  async convertProductType(tenantId: string, id: string, dto: ConvertProductTypeDto) {
+    const product = await this.productRepo.findOne({
+      where: { tenantId, id },
+      relations: { recipe: true, comboItems: true }
+    });
+    if (!product) throw new NotFoundException('Producto no encontrado');
+
+    switch (dto.targetType) {
+      case ProductArchetype.SERVICIO:
+        product.is_service = true;
+        product.category = dto.newCategory || (product.category === 'General' ? 'Servicios' : (product.category || 'Servicios'));
+        product.durationMinutes = dto.durationMinutes || product.durationMinutes || 30;
+        // Non-destructive: Preserve recipe items in database without deleting them.
+        // Clean out dead/ghost stock to protect financial valuation & inventory reports:
+        product.stock = 0;
+        product.stockQuantity = 0;
+        product.physicalStock = 0;
+        break;
+
+      case ProductArchetype.REVENTA:
+        product.is_service = false;
+        product.durationMinutes = null;
+        if (product.category === 'Servicios') {
+          product.category = dto.newCategory || 'General';
+        }
+        // If initial stock is provided when converting from service to resale:
+        if (dto.initialStock !== undefined && dto.initialStock !== null && !isNaN(Number(dto.initialStock))) {
+          const initStock = Math.max(0, Number(dto.initialStock));
+          product.stock = initStock;
+          product.stockQuantity = initStock;
+          product.physicalStock = initStock;
+        }
+        break;
+
+      case ProductArchetype.FORMULA:
+        product.is_service = false;
+        product.durationMinutes = null;
+        if (product.category === 'Servicios') {
+          product.category = dto.newCategory || 'General';
+        }
+        break;
+
+      default:
+        throw new BadRequestException('Tipo de producto no reconocido');
+    }
+
+    return this.productRepo.save(product);
   }
 
 }

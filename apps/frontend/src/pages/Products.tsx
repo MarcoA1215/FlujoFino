@@ -106,6 +106,41 @@ const Products: React.FC = () => {
     });
   };
 
+  const handleConvertProductType = async (p: Product, targetType: 'REVENTA' | 'FORMULA' | 'SERVICIO') => {
+    let targetName = 'Reventa Directa';
+    let warningMsg = '';
+    if (targetType === 'SERVICIO') {
+      targetName = 'Servicio / Cita';
+      warningMsg = 'El stock físico se ajustará a 0 para proteger tus reportes financieros de inventario. Si tiene receta, se mantendrá guardada para el futuro.';
+    } else if (targetType === 'FORMULA') {
+      targetName = 'Producto Armable / Con Fórmula';
+      warningMsg = 'Podrás configurar su receta de insumos y fabricarlo o venderlo descontando materia prima.';
+    } else if (targetType === 'REVENTA') {
+      targetName = 'Producto de Reventa Directa';
+      warningMsg = 'Se gestionará con stock directo y costo unitario. Si tenía receta, quedará pausada sin borrarse.';
+    }
+
+    presentAlert({
+      header: `Convertir a ${targetName}`,
+      message: `¿Deseas cambiar "${p.name}" a ${targetName}? ${warningMsg}`,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { 
+          text: 'Sí, Convertir', 
+          handler: async () => {
+            try {
+              await apiClient.patch(`/products/${p.id}/convert-type`, { targetType });
+              fetchData();
+              presentToast({ message: `"${p.name}" convertido a ${targetName} con éxito`, duration: 2500, color: 'success' });
+            } catch(e: any) {
+              presentToast({ message: 'Error: ' + (e.response?.data?.message || e.message), duration: 3500, color: 'danger' });
+            }
+          } 
+        }
+      ]
+    });
+  };
+
   const openAdjustStockAlert = (p: Product) => {
     presentAlert({
       header: 'Stock Inicial de ' + p.name,
@@ -323,6 +358,8 @@ const Products: React.FC = () => {
                       <ProductCard isClientMode={isClientMode}
                         featureRecipes={settings?.featureRecipes}
                         featureProduction={settings?.featureProduction !== false}
+                        featureBuySell={settings?.featureBuySell}
+                        featureCustomerSchedules={settings?.featureCustomerSchedules}
                         key={p.id}
                         product={p}
                         onEdit={openEditModal}
@@ -330,6 +367,7 @@ const Products: React.FC = () => {
                         onConfigure={() => setSelectedProductForRecipe(p)}
                         onAdjustStock={openAdjustStockAlert}
                         onAddStock={openAddStockAlert}
+                        onConvertType={handleConvertProductType}
                         onRegisterLoss={openLossAlert}
                         onToggleKitting={handleToggleKitting}
                         onUnpackKit={handleUnpackKit}

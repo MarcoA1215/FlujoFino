@@ -5,6 +5,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
 import { RegisterLossDto } from '../raw-materials/dto/register-loss.dto';
 import { AddStockDto } from './dto/add-stock.dto';
+import { ConvertProductTypeDto } from './dto/convert-product-type.dto';
 
 import { StorageService } from '../storage/storage.service';
 
@@ -79,6 +80,11 @@ export class ProductsController {
   @Patch(':id/add-stock')
   addStock(@Request() req: any, @Param('id') id: string, @Body() dto: AddStockDto) {
     return this.productsService.addStock(req.user.tenantId, id, dto);
+  }
+
+  @Patch(':id/convert-type')
+  convertType(@Request() req: any, @Param('id') id: string, @Body() dto: ConvertProductTypeDto) {
+    return this.productsService.convertProductType(req.user.tenantId, id, dto);
   }
 
   @Get('migrate-stock')

@@ -555,6 +555,65 @@ const PublicStore: React.FC = () => {
           </IonBadge>
         </div>
 
+        {/* Navigation Switcher if Business has both Store & Booking */}
+        {storeData?.settings?.featureCustomerSchedules && (
+          <div
+            style={{
+              display: 'flex',
+              backgroundColor: '#f1f5f9',
+              borderRadius: '10px',
+              padding: '4px',
+              marginBottom: '16px',
+              gap: '4px',
+              border: '1px solid #e2e8f0',
+            }}
+          >
+            <button
+              style={{
+                flex: 1,
+                padding: '9px 12px',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: '#fff',
+                color: '#0f172a',
+                fontWeight: 'bold',
+                fontSize: '0.88rem',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                cursor: 'default',
+              }}
+            >
+              <span>🛍️</span> Catálogo / Tienda
+            </button>
+            <button
+              onClick={() => (window.location.href = `/book/${tenantId}`)}
+              style={{
+                flex: 1,
+                padding: '9px 12px',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: '#475569',
+                fontWeight: '600',
+                fontSize: '0.88rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e2e8f0')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              <span>📅</span> Agendar Citas Online ↗
+            </button>
+          </div>
+        )}
+
         {/* Search Bar */}
         <IonSearchbar
           value={searchQuery}

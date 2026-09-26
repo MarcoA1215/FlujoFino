@@ -137,18 +137,22 @@ export class PublicStoreController {
       }
 
       const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
-      if (!isService) {
-        const availableStock = Math.max(0, Number(product.stock !== undefined && product.stock !== null ? product.stock : (product.stockQuantity || 0)));
-        if (availableStock <= 0) {
-          throw new BadRequestException(
-            `El producto "${product.name}" se encuentra agotado.`
-          );
-        }
-        if (item.quantity > availableStock) {
-          throw new BadRequestException(
-            `No hay suficiente stock para "${product.name}". Disponible: ${availableStock}, solicitado: ${item.quantity}.`
-          );
-        }
+      if (isService) {
+        throw new BadRequestException(
+          `El producto "${product.name}" ya no está disponible para compra directa en tienda (ha sido configurado como servicio). Por favor retíralo de tu carrito para continuar.`
+        );
+      }
+
+      const availableStock = Math.max(0, Number(product.stock !== undefined && product.stock !== null ? product.stock : (product.stockQuantity || 0)));
+      if (availableStock <= 0) {
+        throw new BadRequestException(
+          `El producto "${product.name}" se encuentra agotado.`
+        );
+      }
+      if (item.quantity > availableStock) {
+        throw new BadRequestException(
+          `No hay suficiente stock para "${product.name}". Disponible: ${availableStock}, solicitado: ${item.quantity}.`
+        );
       }
     }
 

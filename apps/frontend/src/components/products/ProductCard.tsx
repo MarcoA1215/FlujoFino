@@ -14,9 +14,12 @@ interface ProductCardProps {
   onRegisterLoss: (p: Product) => void;
   onToggleKitting?: (p: Product) => void;
   onUnpackKit?: (p: Product) => void;
+  onConvertType?: (p: Product, targetType: 'REVENTA' | 'FORMULA' | 'SERVICIO') => void;
   isClientMode?: boolean;
   featureRecipes?: boolean;
   featureProduction?: boolean;
+  featureBuySell?: boolean;
+  featureCustomerSchedules?: boolean;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -29,16 +32,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onRegisterLoss,
   onToggleKitting,
   onUnpackKit,
+  onConvertType,
   isClientMode,
   featureRecipes,
-  featureProduction
+  featureProduction,
+  featureBuySell,
+  featureCustomerSchedules
 }) => {
   const { openImage } = useImageViewer();
   const [present] = useIonActionSheet();
 
   const openOptions = () => {
     const isService = p.is_service === true || (p.is_service !== false && p.category === 'Servicios');
-    const isResale = !isService && !p.isCombo && (!p.recipe || p.recipe.length === 0);
+    const isFormula = !isService && Boolean((p.recipe && p.recipe.length > 0) || p.isCombo);
+    const isResale = !isService && !isFormula;
 
     const buttons: any[] = [
       { text: 'Editar Info / Precio', icon: pencilOutline, cssClass: 'action-sheet-editar', handler: () => onEdit(p) }
@@ -62,6 +69,33 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
     if (featureProduction !== false && p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) {
       buttons.push({ text: 'Desarmar 1 Und', icon: cutOutline, cssClass: 'action-sheet-desarmar', handler: () => onUnpackKit(p) });
+    }
+
+    if (onConvertType) {
+      if (!isResale && featureBuySell) {
+        buttons.push({
+          text: 'Convertir a Reventa Directa',
+          icon: cubeOutline,
+          cssClass: 'action-sheet-cambiar',
+          handler: () => onConvertType(p, 'REVENTA')
+        });
+      }
+      if (!isFormula && featureRecipes) {
+        buttons.push({
+          text: 'Convertir a Producto Armable / Fórmula',
+          icon: buildOutline,
+          cssClass: 'action-sheet-cambiar',
+          handler: () => onConvertType(p, 'FORMULA')
+        });
+      }
+      if (!isService && featureCustomerSchedules) {
+        buttons.push({
+          text: 'Convertir a Servicio / Cita',
+          icon: cutOutline,
+          cssClass: 'action-sheet-cambiar',
+          handler: () => onConvertType(p, 'SERVICIO')
+        });
+      }
     }
 
     buttons.push({ text: 'Registrar Pérdida', icon: warningOutline, cssClass: 'action-sheet-eliminar', handler: () => onRegisterLoss(p) });

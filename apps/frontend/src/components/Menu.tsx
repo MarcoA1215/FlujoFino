@@ -82,7 +82,7 @@ const Menu: React.FC = () => {
     }
   }, [isAuthenticated, user?.tenantId]);
 
-  if (!isAuthenticated || !user?.tenantId || location.pathname === '/select-workspace' || location.pathname.startsWith('/book') || location.pathname.startsWith('/appointment')) {
+  if (!isAuthenticated || !user?.tenantId || location.pathname === '/select-workspace' || location.pathname.startsWith('/book') || location.pathname.startsWith('/appointment') || location.pathname.startsWith('/store')) {
     return null;
   }
   

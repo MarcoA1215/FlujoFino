@@ -223,7 +223,7 @@ export class OrdersService {
               await manager.save(Product, ci.component);
             }
           }
-        } else if (product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
+        } else if (!product.is_service && product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
           for (const ri of product.recipe) {
             if (ri.rawMaterial) {
               ri.rawMaterial.stockQuantity -= (itemDto.quantity * ri.quantity);
@@ -264,7 +264,7 @@ export class OrdersService {
                 }
             }
         }
-        if (product.recipe && product.recipe.length > 0) {
+        if (!product.is_service && product.recipe && product.recipe.length > 0) {
             for (const ri of product.recipe) {
                 if (ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit;
             }
@@ -419,7 +419,7 @@ export class OrdersService {
                   await manager.save(Product, ci.component);
                 }
               }
-            } else if (product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
+            } else if (!product.is_service && product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
               // Restore raw materials
               for (const ri of product.recipe) {
                 if (ri.rawMaterial) {
