@@ -79,6 +79,8 @@ export class PublicReservationsController {
         }));
     }
 
+    const hasStore = (settings?.featureBuySell || settings?.featureRecipes) ?? false;
+
     return { 
       id: token, 
       name: tenant.name,
@@ -88,6 +90,10 @@ export class PublicReservationsController {
       featureShowCatalog: settings?.featureShowCatalog || false,
       bookingRequireService: settings?.bookingRequireService ?? true,
       bookingAllowStaffSelection: settings?.bookingAllowStaffSelection ?? false,
+      featureBuySell: settings?.featureBuySell ?? false,
+      featureRecipes: settings?.featureRecipes ?? false,
+      featureCustomerSchedules: settings?.featureCustomerSchedules ?? false,
+      hasStore: Boolean(hasStore),
       staff: staff
     };
   }

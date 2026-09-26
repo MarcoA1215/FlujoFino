@@ -92,8 +92,10 @@ export class PublicStoreController {
         companyPhone: settings?.companyPhone || '',
         themePrimaryColor: settings?.themePrimaryColor || '#1e293b',
         themeHeaderColor: settings?.themeHeaderColor || '#334155',
-        featureBuySell: settings?.featureBuySell ?? true,
+        featureBuySell: settings?.featureBuySell ?? false,
+        featureRecipes: settings?.featureRecipes ?? false,
         featureCustomerSchedules: settings?.featureCustomerSchedules ?? false,
+        hasBooking: settings?.featureCustomerSchedules ?? false,
       },
       products: storeProducts,
       deliveryZones: deliveryZones.map((z) => ({

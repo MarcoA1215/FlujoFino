@@ -116,8 +116,8 @@ const PublicBooking: React.FC = () => {
         const res = await axios.get(`${apiBase}/public/reservations/tenant/${tenantId}`);
         setTenantInfo(res.data);
         
-        // If business is pure retail/buy-sell without customer schedules, redirect to online store
-        if (res.data.featureBuySell && !res.data.featureCustomerSchedules) {
+        // If business is pure retail/recipes without customer schedules, redirect to online store
+        if ((res.data.featureBuySell || res.data.featureRecipes) && !res.data.featureCustomerSchedules) {
           window.location.replace(`/store/${tenantId}`);
           return;
         }
@@ -300,6 +300,7 @@ const PublicBooking: React.FC = () => {
   });
   const hasServices = availableServices.length > 0;
   const isServiceRequired = tenantInfo?.bookingRequireService;
+  const hasStore = Boolean(tenantInfo?.hasStore ?? (tenantInfo?.featureBuySell || tenantInfo?.featureRecipes));
 
   const goBack = () => {
     if (step === 2 && (tenantInfo?.bookingRequireService || selectedService || hasServices)) {
@@ -316,36 +317,37 @@ const PublicBooking: React.FC = () => {
       <IonContent className="ion-padding" style={{ 'backgroundColor': '#f4f5f8' }}>
         <div style={{ maxWidth: '500px', margin: '20px auto' }}>
           
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
-            {step > 1 && (step !== 2 || hasServices || isServiceRequired) && (
-              <IonButton fill="clear" onClick={goBack} style={{ margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px', position: 'relative' }}>
+            {step > 1 && (step !== 2 || hasServices || isServiceRequired) ? (
+              <IonButton fill="clear" onClick={goBack} style={{ margin: 0, position: 'absolute', left: 0 }} title="Regresar">
                 <IonIcon slot="icon-only" icon={chevronBackOutline} />
               </IonButton>
-            )}
-            <h2 style={{ fontWeight: 'bold', color: '#333', margin: '0 auto', paddingRight: (step > 1 && (step !== 2 || hasServices || isServiceRequired)) ? '48px' : '0' }}>
+            ) : hasStore ? (
+              <IonButton 
+                fill="clear" 
+                onClick={() => (window.location.href = `/store/${tenantId}`)} 
+                style={{ margin: 0, position: 'absolute', left: 0, color: '#475569' }}
+                title="Volver a la Tienda"
+              >
+                <IonIcon slot="icon-only" icon={chevronBackOutline} />
+              </IonButton>
+            ) : null}
+            <h2 style={{ fontWeight: 'bold', color: '#1e293b', margin: '0 auto', textAlign: 'center', fontSize: '1.4rem' }}>
               {tenantInfo?.name}
             </h2>
           </div>
 
-          {tenantInfo?.featureShowCatalog && (
-            <div style={{ textAlign: 'center', marginBottom: '15px' }}>
-              <IonButton fill="outline" color="primary" onClick={openCatalog}>
-                <IonIcon slot="start" icon={imagesOutline} />
-                Ver Portafolio de Trabajos
-              </IonButton>
-            </div>
-          )}
-
           {/* Navigation Switcher if Business has both Booking & Store */}
-          {tenantInfo?.featureBuySell && (
+          {hasStore && (
             <div
               style={{
                 display: 'flex',
-                backgroundColor: '#e2e8f0',
+                backgroundColor: '#f1f5f9',
                 borderRadius: '10px',
                 padding: '4px',
                 marginBottom: '16px',
                 gap: '4px',
+                border: '1px solid #e2e8f0',
               }}
             >
               <button
@@ -366,7 +368,7 @@ const PublicBooking: React.FC = () => {
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#cbd5e1')}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e2e8f0')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
                 <span>🛍️</span> Catálogo / Tienda ↗
@@ -391,6 +393,15 @@ const PublicBooking: React.FC = () => {
               >
                 <span>📅</span> Agendar Citas
               </button>
+            </div>
+          )}
+
+          {tenantInfo?.featureShowCatalog && (
+            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+              <IonButton fill="outline" color="primary" onClick={openCatalog}>
+                <IonIcon slot="start" icon={imagesOutline} />
+                Ver Portafolio de Trabajos
+              </IonButton>
             </div>
           )}
 
