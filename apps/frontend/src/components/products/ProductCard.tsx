@@ -55,27 +55,31 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       { text: 'Editar Info / Precio', icon: pencilOutline, cssClass: 'action-sheet-editar', handler: () => onEdit(p) }
     ];
 
-    if (isResale && onAddStock) {
-      buttons.push({ text: 'Cargar Stock', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAddStock(p) });
-    }
+    // Opciones según arquetipo del producto
+    if (isResale) {
+      if (onAddStock) {
+        buttons.push({ text: 'Cargar Stock', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAddStock(p) });
+      }
+    } else if (isFormula || p.isCombo) {
+      if (p.isCombo) {
+        buttons.push({ text: 'Configurar Combo', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
+      } else if (featureRecipes) {
+        buttons.push({ text: 'Configurar Fórmula / Receta', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
+      }
 
-    if (p.isCombo) {
-      buttons.push({ text: 'Configurar Combo', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
-    } else if (featureRecipes && (isFormula || !isService)) {
-      buttons.push({ text: 'Configurar Fórmula / Receta', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
-    }
+      if (featureProduction !== false && (p.isCombo || (p.recipe && p.recipe.length > 0)) && onToggleKitting && (p.isCombo || featureRecipes)) {
+        buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Hecho al Instante' : 'Pre-Fabricado'}`, icon: swapHorizontalOutline, cssClass: 'action-sheet-cambiar', handler: () => onToggleKitting(p) });
+      }
 
-    if (!isService) {
-      buttons.push({ text: 'Stock Inicial / Ajuste', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) });
-    }
+      if (featureProduction !== false && p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) {
+        buttons.push({ text: 'Desarmar 1 Und', icon: cutOutline, cssClass: 'action-sheet-desarmar', handler: () => onUnpackKit(p) });
+      }
 
-    if (featureProduction !== false && (p.isCombo || (p.recipe && p.recipe.length > 0)) && onToggleKitting && (p.isCombo || featureRecipes)) {
-      buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Hecho al Instante' : 'Pre-Fabricado'}`, icon: swapHorizontalOutline, cssClass: 'action-sheet-cambiar', handler: () => onToggleKitting(p) });
+      if (p.isPreAssembled && onAdjustStock) {
+        buttons.push({ text: 'Ajustar Stock Ensamblado', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) });
+      }
     }
-
-    if (featureProduction !== false && p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) {
-      buttons.push({ text: 'Desarmar 1 Und', icon: cutOutline, cssClass: 'action-sheet-desarmar', handler: () => onUnpackKit(p) });
-    }
+    // NOTA: Para SERVICIOS no se agrega ninguna opción de stock, fórmulas ni insumos.
 
     if (onConvertType) {
       if (currentType !== 'REVENTA' && featureBuySell) {
@@ -104,9 +108,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       }
     }
 
-    buttons.push({ text: 'Registrar Pérdida', icon: warningOutline, cssClass: 'action-sheet-eliminar', handler: () => onRegisterLoss(p) });
+    if (!isService) {
+      buttons.push({ text: 'Registrar Pérdida', icon: warningOutline, cssClass: 'action-sheet-eliminar', handler: () => onRegisterLoss(p) });
+    }
+
     buttons.push({ text: 'Subir Imagen', icon: 'image-outline', handler: () => document.getElementById(`upload-${p.id}`)?.click() });
-    buttons.push({ text: 'Eliminar Producto', icon: trashOutline, role: 'destructive', handler: () => onDelete(p) });
+    buttons.push({ text: isService ? 'Eliminar Servicio' : 'Eliminar Producto', icon: trashOutline, role: 'destructive', handler: () => onDelete(p) });
     buttons.push({ text: 'Cancelar', icon: closeOutline, role: 'cancel' });
 
     present({
