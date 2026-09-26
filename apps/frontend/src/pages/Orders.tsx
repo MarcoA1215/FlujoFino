@@ -559,6 +559,12 @@ const Orders: React.FC = () => {
                           Sin desglose de items
                         </div>
                       )}
+                      {Number(order.discountAmount || 0) > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#DC2626', fontWeight: '700', padding: '4px 0', borderTop: '1px dashed #E2E8F0', marginTop: '4px' }}>
+                          <span>🏷️ Descuento:</span>
+                          <span>-${Number(order.discountAmount).toFixed(2)}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Price & Payment Status */}
@@ -800,8 +806,14 @@ const Orders: React.FC = () => {
                         </div>
                       );
                     })}
+                    {Number(selectedOrderForDetails.discountAmount || 0) > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #EEF2F6', fontSize: '13px', color: '#DC2626', fontWeight: '700' }}>
+                        <span>🏷️ Descuento Especial:</span>
+                        <span>-${Number(selectedOrderForDetails.discountAmount).toFixed(2)}</span>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', paddingTop: '8px', borderTop: '2px dashed #E2E8F0', fontWeight: '800', fontSize: '16px', color: '#10B981' }}>
-                      <span>Total:</span>
+                      <span>Total Final:</span>
                       <span>${Number(selectedOrderForDetails.totalAmount || 0).toFixed(2)}</span>
                     </div>
                   </div>

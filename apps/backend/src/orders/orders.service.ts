@@ -43,6 +43,8 @@ export class CreateOrderDto {
   items: { productId: string; quantity: number; unitPrice: number }[];
   initialAbono?: number;
   discountAmount?: number;
+  discountType?: string;
+  discountValue?: number;
   bypassMinDeposit?: boolean;
   linkedReservationId?: string;
 }
@@ -349,19 +351,32 @@ export class OrdersService {
         await manager.save(OrderItem, orderItem);
       }
 
+        let effectiveDiscount = 0;
+        if (dto.discountAmount !== undefined && Number(dto.discountAmount) >= 0) {
+          effectiveDiscount = Number(dto.discountAmount);
+        } else if (dto.discountValue && Number(dto.discountValue) > 0) {
+          if (dto.discountType === 'PERCENTAGE') {
+            effectiveDiscount = (totalAmount * Number(dto.discountValue)) / 100;
+          } else {
+            effectiveDiscount = Number(dto.discountValue);
+          }
+        }
+
         const effectiveTotal = totalAmount + deliveryFee;
-        const cappedDiscount = Math.min(discountAmount, effectiveTotal);
+        const cappedDiscount = Math.min(effectiveDiscount, effectiveTotal);
 
         savedOrder.discountAmount = cappedDiscount;
+        savedOrder.discountType = dto.discountType || (cappedDiscount > 0 ? 'FIXED' : undefined);
+        savedOrder.discountValue = dto.discountValue !== undefined ? Number(dto.discountValue) : (cappedDiscount > 0 ? cappedDiscount : undefined);
         savedOrder.totalAmount = effectiveTotal - cappedDiscount;
         savedOrder.totalCost = totalCost;
         savedOrder.netProfit = savedOrder.totalAmount - deliveryFee - totalCost;
-      if (savedOrder.abonosTotal >= savedOrder.totalAmount && savedOrder.totalAmount > 0) {
+        if (savedOrder.abonosTotal >= savedOrder.totalAmount && savedOrder.totalAmount > 0) {
           savedOrder.paymentStatus = PaymentStatus.PAID;
         } else if (savedOrder.abonosTotal > 0 && savedOrder.abonosTotal < savedOrder.totalAmount) {
           savedOrder.paymentStatus = PaymentStatus.PARTIAL;
         }
-      return manager.save(Order, savedOrder);
+        return manager.save(Order, savedOrder);
     });
   }
 
@@ -790,8 +805,21 @@ export class OrdersService {
         }
       }
   
+      let effectiveDiscountEdit = 0;
+      if (dto.discountAmount !== undefined && Number(dto.discountAmount) >= 0) {
+        effectiveDiscountEdit = Number(dto.discountAmount);
+      } else if (dto.discountValue && Number(dto.discountValue) > 0) {
+        if (dto.discountType === 'PERCENTAGE') {
+          effectiveDiscountEdit = (totalAmount * Number(dto.discountValue)) / 100;
+        } else {
+          effectiveDiscountEdit = Number(dto.discountValue);
+        }
+      } else if (dto.discountAmount === undefined && order.discountAmount) {
+        effectiveDiscountEdit = Number(order.discountAmount);
+      }
+
       const effectiveTotalEdit = totalAmount + order.deliveryFee;
-      const cappedDiscountEdit = Math.min(discountAmount, effectiveTotalEdit);
+      const cappedDiscountEdit = Math.min(effectiveDiscountEdit, effectiveTotalEdit);
 
       const targetEmployeeId = dto.employeeId !== undefined ? dto.employeeId : (dto.employee_id !== undefined ? dto.employee_id : undefined);
       if (targetEmployeeId !== undefined) {
@@ -818,9 +846,22 @@ export class OrdersService {
       order.notes = dto.notes || '';
       order.tableNumber = dto.tableNumber || '';
       order.discountAmount = cappedDiscountEdit;
+      order.discountType = dto.discountType || (cappedDiscountEdit > 0 ? (order.discountType || 'FIXED') : null as any);
+      order.discountValue = dto.discountValue !== undefined ? Number(dto.discountValue) : (cappedDiscountEdit > 0 ? (order.discountValue || cappedDiscountEdit) : null as any);
       order.totalCost = totalCost;
       order.totalAmount = effectiveTotalEdit - cappedDiscountEdit;
       order.netProfit = order.totalAmount - order.deliveryFee - totalCost;
+
+      // Update payment status for partial / open tab orders
+      if (order.paymentMethod === 'PENDING' || order.paymentStatus === PaymentStatus.PARTIAL || order.paymentStatus === PaymentStatus.PENDING) {
+        if (order.abonosTotal >= order.totalAmount && order.totalAmount > 0) {
+          order.paymentStatus = PaymentStatus.PAID;
+        } else if (order.abonosTotal > 0 && order.abonosTotal < order.totalAmount) {
+          order.paymentStatus = PaymentStatus.PARTIAL;
+        } else if (order.abonosTotal === 0 && order.paymentStatus !== PaymentStatus.PAID) {
+          order.paymentStatus = PaymentStatus.PENDING;
+        }
+      }
       
       const currentItems = await manager.find(OrderItem, { where: { orderId: order.id } });
       const hasUndelivered = currentItems.some(it => (it.deliveredQuantity || 0) < it.quantity);

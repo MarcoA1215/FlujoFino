@@ -284,6 +284,19 @@ const Pos: React.FC = () => {
               }));
               setCart(loadedCart);
             }
+
+            if (order.discountAmount && Number(order.discountAmount) > 0) {
+              if (order.discountType && order.discountValue) {
+                setDiscountType(order.discountType);
+                setDiscountValue(Number(order.discountValue).toString());
+              } else {
+                setDiscountType('FIXED');
+                setDiscountValue(Number(order.discountAmount).toString());
+              }
+            } else {
+              setDiscountValue('');
+            }
+
             presentToast({
               message: `Modificando Cuenta Abierta #${order.id.slice(0, 8).toUpperCase()}`,
               duration: 3000,
@@ -478,6 +491,7 @@ const Pos: React.FC = () => {
         quantity: item.quantity,
         unitPrice: item.product.salePrice
       })),
+      discountAmount: discountAmount > 0 ? Number(discountAmount.toFixed(2)) : 0,
       discountType: discountAmount > 0 ? discountType : undefined,
       discountValue: discountAmount > 0 ? parseFloat(discountValue) : undefined,
       pagoMovilRef: paymentMethod === 'PAGO_MOVIL' ? pagoMovilRef : undefined,
@@ -646,6 +660,7 @@ const Pos: React.FC = () => {
                   setCustomerName('');
                   setCustomerPhone('');
                   setTableNumber('');
+                  setDiscountValue('');
                   window.history.replaceState({}, '', '/pos');
                 }}
                 style={{

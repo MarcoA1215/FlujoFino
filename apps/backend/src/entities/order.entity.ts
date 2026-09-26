@@ -76,6 +76,12 @@ export class Order {
   @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   discountAmount: number;
 
+  @Column({ nullable: true })
+  discountType: string;
+
+  @Column('decimal', { nullable: true, precision: 12, scale: 4, transformer: new ColumnNumericTransformer() })
+  discountValue: number;
+
   @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   totalCost: number;
 
