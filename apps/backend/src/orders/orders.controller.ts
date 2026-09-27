@@ -68,6 +68,16 @@ export class OrdersController {
   updateOrderStatus(@Request() req: any, @Param('id') id: string, @Body('status') status: OrderStatus) {
     return this.ordersService.updateOrderStatus(req.user.tenantId, id, status);}
 
+  @Patch(':id/close-with-loss')
+  closeWithLoss(@Request() req: any, @Param('id') id: string) {
+    return this.ordersService.closeOrderWithLoss(req.user.tenantId, id);
+  }
+
+  @Post(':id/settle-loss')
+  settleLoss(@Request() req: any, @Param('id') id: string, @Body() dto: UpdatePaymentDto) {
+    return this.ordersService.settleLossOrder(req.user.tenantId, id, dto);
+  }
+
   @Post(':id/clone')
   clone(@Request() req: any, @Param('id') id: string) {
     return this.ordersService.cloneOrder(req.user.tenantId, id);}

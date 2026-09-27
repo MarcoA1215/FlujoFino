@@ -4,6 +4,7 @@ export enum OrderStatus {
   PARTIALLY_DELIVERED = 'PARTIALLY_DELIVERED',
   DELIVERED = 'DELIVERED',
   CANCELED = 'CANCELED',
+  CERRADO_CON_PERDIDA = 'CERRADO_CON_PERDIDA',
 }
 
 export enum PaymentStatus {

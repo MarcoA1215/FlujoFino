@@ -98,9 +98,17 @@ export class DashboardService {
       return acc + (stock * p.salePrice);
     }, 0);
 
+    const lossOrders = await this.orderRepo.find({
+      where: { status: OrderStatus.CERRADO_CON_PERDIDA, tenantId }
+    });
+    const orderLosses = lossOrders.reduce((acc, o) => {
+      const cost = Number(o.totalCost) > 0 ? Number(o.totalCost) : Number(o.totalAmount || 0);
+      return acc + cost;
+    }, 0);
+
     const totalLosses = movements
       .filter(m => m.type === MovementType.LOSS)
-      .reduce((acc, m) => acc + m.totalCost, 0);
+      .reduce((acc, m) => acc + m.totalCost, 0) + orderLosses;
 
     const historicalInvestment = movements
       .filter(m => m.type === MovementType.IN_PURCHASE)

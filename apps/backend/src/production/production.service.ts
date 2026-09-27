@@ -23,6 +23,13 @@ export class ProductionService {
 
       if (!product) throw new BadRequestException('Producto no encontrado');
 
+      if (product.is_service || product.product_type === 'SERVICIO' || product.category?.toLowerCase() === 'servicios') {
+        throw new BadRequestException('Los servicios no pueden ser fabricados en producción.');
+      }
+      if (product.product_type === 'REVENTA') {
+        throw new BadRequestException('Los productos de reventa directa no pueden producirse por lote.');
+      }
+
       let totalBatchCost = 0;
 
       if (product.isCombo) {
