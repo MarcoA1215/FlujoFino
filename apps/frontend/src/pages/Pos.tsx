@@ -91,6 +91,8 @@ const Pos: React.FC = () => {
   // Raw Materials & Customization (Extras / Retiro de Insumos)
   const [availableRawMaterials, setAvailableRawMaterials] = useState<any[]>([]);
   const [customizingProduct, setCustomizingProduct] = useState<Product | null>(null);
+  const [editingCartItemId, setEditingCartItemId] = useState<string | null>(null);
+  const [returnToCheckout, setReturnToCheckout] = useState<boolean>(false);
   const [customRemovedIngredients, setCustomRemovedIngredients] = useState<string[]>([]);
   const [customExtras, setCustomExtras] = useState<Record<string, number>>({});
 
@@ -410,10 +412,36 @@ const Pos: React.FC = () => {
     setCart(prev => prev.filter(item => item.cartItemId !== cartItemId));
   };
 
-  const openCustomizeModal = (p: Product) => {
+  const openCustomizeModal = (p: Product, cartItem?: CartItem) => {
+    if (showCheckoutModal) {
+      setReturnToCheckout(true);
+      setShowCheckoutModal(false);
+    } else {
+      setReturnToCheckout(false);
+    }
     setCustomizingProduct(p);
-    setCustomRemovedIngredients([]);
-    setCustomExtras({});
+    if (cartItem) {
+      setEditingCartItemId(cartItem.cartItemId);
+      setCustomRemovedIngredients(cartItem.removedIngredients ? [...cartItem.removedIngredients] : []);
+      const extrasMap: Record<string, number> = {};
+      (cartItem.addedExtras || []).forEach(ex => {
+        extrasMap[ex.rawMaterialId] = ex.quantity;
+      });
+      setCustomExtras(extrasMap);
+    } else {
+      setEditingCartItemId(null);
+      setCustomRemovedIngredients([]);
+      setCustomExtras({});
+    }
+  };
+
+  const closeCustomizeModal = () => {
+    setCustomizingProduct(null);
+    setEditingCartItemId(null);
+    if (returnToCheckout) {
+      setShowCheckoutModal(true);
+      setReturnToCheckout(false);
+    }
   };
 
   const getExtraPrice = (rm: any) => {
@@ -446,19 +474,41 @@ const Pos: React.FC = () => {
     const finalUnitPrice = Number((customizingProduct.salePrice + extrasTotal).toFixed(2));
     const hasMods = customRemovedIngredients.length > 0 || selectedExtrasList.length > 0;
 
-    const newItem: CartItem = {
-      cartItemId: Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-      product: customizingProduct,
-      quantity: 1,
-      unitPrice: finalUnitPrice,
-      removedIngredients: [...customRemovedIngredients],
-      addedExtras: selectedExtrasList,
-      hasModifications: hasMods
-    };
+    if (editingCartItemId) {
+      setCart(prev =>
+        prev.map(item =>
+          item.cartItemId === editingCartItemId
+            ? {
+                ...item,
+                unitPrice: finalUnitPrice,
+                removedIngredients: [...customRemovedIngredients],
+                addedExtras: selectedExtrasList,
+                hasModifications: hasMods
+              }
+            : item
+        )
+      );
+      presentToast({ message: `Personalización actualizada`, duration: 1500, color: 'success', position: 'top' });
+    } else {
+      const newItem: CartItem = {
+        cartItemId: Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+        product: customizingProduct,
+        quantity: 1,
+        unitPrice: finalUnitPrice,
+        removedIngredients: [...customRemovedIngredients],
+        addedExtras: selectedExtrasList,
+        hasModifications: hasMods
+      };
+      setCart(prev => [...prev, newItem]);
+      presentToast({ message: `Agregado: ${customizingProduct.name} (Personalizado)`, duration: 1500, color: 'success', position: 'top' });
+    }
 
-    setCart(prev => [...prev, newItem]);
     setCustomizingProduct(null);
-    presentToast({ message: `Agregado: ${customizingProduct.name} (Personalizado)`, duration: 1500, color: 'success', position: 'top' });
+    setEditingCartItemId(null);
+    if (returnToCheckout) {
+      setShowCheckoutModal(true);
+      setReturnToCheckout(false);
+    }
   };
 
   // Calculations
@@ -971,7 +1021,7 @@ const Pos: React.FC = () => {
                           </span>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            {((Array.isArray(p.recipe) && p.recipe.length > 0) || p.product_type === 'FORMULA' || (p.isCombo && p.isPreAssembled)) && (
+                            {((Array.isArray(p.recipe) && p.recipe.length > 0) || p.product_type === 'FORMULA' || (p.isCombo && p.isPreAssembled) || availableRawMaterials.some(rm => rm.allowAsExtra)) && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -980,17 +1030,20 @@ const Pos: React.FC = () => {
                                 }}
                                 style={{
                                   background: '#FEF3C7',
-                                  border: '1px solid #FDE68A',
+                                  border: '1px solid #FCD34D',
                                   color: '#92400E',
                                   borderRadius: '6px',
-                                  padding: '4px 7px',
+                                  padding: '4px 8px',
                                   fontSize: '11px',
-                                  fontWeight: '700',
-                                  cursor: 'pointer'
+                                  fontWeight: '800',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '3px'
                                 }}
                                 title="Personalizar (Retirar insumos o agregar extras)"
                               >
-                                ⚙️ Ajustar
+                                ⚙️ Personalizar
                               </button>
                             )}
 
@@ -1139,6 +1192,28 @@ const Pos: React.FC = () => {
                             )}
                           </div>
                         )}
+
+                        <div style={{ marginTop: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => openCustomizeModal(item.product, item)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 9px',
+                              borderRadius: '6px',
+                              background: '#FEF3C7',
+                              color: '#92400E',
+                              border: '1px solid #FCD34D',
+                              fontSize: '11px',
+                              fontWeight: '800',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ⚙️ {item.hasModifications ? 'Editar Personalización' : 'Personalizar (Quitar / Extras)'}
+                          </button>
+                        </div>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1913,7 +1988,7 @@ const Pos: React.FC = () => {
         </IonModal>
 
         {/* Modal Personalizar Producto (Retiro de Insumos y Adicionales Extra) */}
-        <IonModal isOpen={Boolean(customizingProduct)} onDidDismiss={() => setCustomizingProduct(null)}>
+        <IonModal isOpen={Boolean(customizingProduct)} onDidDismiss={closeCustomizeModal}>
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#F8FAFC' }}>
             {/* Modal Header */}
             <div style={{ background: '#ffffff', padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1927,7 +2002,7 @@ const Pos: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setCustomizingProduct(null)}
+                onClick={closeCustomizeModal}
                 style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748B' }}
               >
                 <IonIcon icon={closeOutline} style={{ fontSize: '20px' }} />
@@ -1936,7 +2011,7 @@ const Pos: React.FC = () => {
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
               {/* Sección 1: Quitar Insumos */}
-              {customizingProduct?.recipe && customizingProduct.recipe.length > 0 && (
+              {customizingProduct?.recipe && customizingProduct.recipe.length > 0 ? (
                 <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
                   <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     🥗 Ingredientes de la Receta (Toca para quitar)
@@ -1991,6 +2066,10 @@ const Pos: React.FC = () => {
                     })}
                   </div>
                 </div>
+              ) : (
+                <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '12px 16px', marginBottom: '16px', border: '1px solid #E2E8F0', fontSize: '12px', color: '#64748B' }}>
+                  ℹ️ <em>Este producto no tiene insumos configurados en su receta para retirar. Puedes agregarle Adicionales / Extras a continuación:</em>
+                </div>
               )}
 
               {/* Sección 2: Agregar Extras */}
@@ -2000,8 +2079,13 @@ const Pos: React.FC = () => {
                 </h4>
 
                 {availableRawMaterials.filter(rm => rm.allowAsExtra).length === 0 ? (
-                  <div style={{ fontSize: '12px', color: '#94A3B8', fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>
-                    No hay adicionales configurados. Habilita "Permitir como Extra" en Insumos.
+                  <div style={{ background: '#FFFBEB', borderRadius: '12px', padding: '14px', border: '1px solid #FDE68A', textAlign: 'center' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: '#92400E', marginBottom: '4px' }}>
+                      ⚠️ No hay adicionales habilitados como Extra
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#78350F' }}>
+                      Ve a <strong>Inventario (Insumos)</strong> y activa la opción <strong>"🍔 Vender como Adicional / Extra"</strong> en los insumos que desees ofrecer con recargo (Queso, Tocineta, Salsas, etc.).
+                    </div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -2088,7 +2172,7 @@ const Pos: React.FC = () => {
                 onClick={addCustomizedToCart}
                 style={{ padding: '12px 20px', borderRadius: '12px', fontSize: '14px', fontWeight: '800' }}
               >
-                Agregar al Carrito ✓
+                {editingCartItemId ? 'Guardar Cambios ✓' : 'Agregar al Carrito ✓'}
               </button>
             </div>
           </div>
