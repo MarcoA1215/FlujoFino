@@ -20,6 +20,9 @@ export class PushSubscription {
   @Column({ nullable: true })
   negocioId: string;
 
+  @Column({ default: 'CUSTOMER' })
+  role: string; // 'CUSTOMER' | 'ADMIN' | 'CAJERO'
+
   @CreateDateColumn()
   createdAt: Date;
 }

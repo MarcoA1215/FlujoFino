@@ -14,7 +14,11 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-export async function requestAndSubscribePush(identifier: string, negocioId?: string): Promise<boolean> {
+export async function requestAndSubscribePush(
+  identifier: string,
+  negocioId?: string,
+  role: string = 'CUSTOMER',
+): Promise<boolean> {
   if (!identifier) return false;
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
     console.warn('Web Push not supported in this browser.');
@@ -53,6 +57,7 @@ export async function requestAndSubscribePush(identifier: string, negocioId?: st
         identifier,
         subscription: subscription.toJSON(),
         negocioId,
+        role,
       });
       return true;
     }

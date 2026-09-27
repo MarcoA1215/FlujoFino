@@ -23,6 +23,7 @@ import { UserRole } from '@nutrideli/shared-types';
 import { apiClient } from '../api/client';
 import { offlineDb } from '../services/offline-db';
 import { DailyCashCloseModal } from './DailyCashCloseModal';
+import { useRealtimeAlerts } from '../context/RealtimeContext';
 
 interface AppHeaderProps {
   title?: string;
@@ -44,6 +45,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   children
 }) => {
   const { user } = useContext(AuthContext);
+  const { totalAlertsCount, pendingOrdersCount, pendingReservationsCount } = useRealtimeAlerts();
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
 
@@ -236,6 +238,33 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </IonTitle>
 
           <IonButtons slot="end" style={{ gap: '6px', display: 'flex', alignItems: 'center' }}>
+            {/* Real-time Alerts Pill */}
+            {totalAlertsCount > 0 && (
+              <div
+                className="ff-pill ff-pill-interactive"
+                onClick={() => {
+                  if (pendingOrdersCount > 0) window.location.href = '/orders';
+                  else if (pendingReservationsCount > 0) window.location.href = '/reservations';
+                }}
+                style={{
+                  background: '#FEF2F2',
+                  border: '1px solid #FCA5A5',
+                  color: '#DC2626',
+                  fontWeight: '800',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 10px',
+                  borderRadius: '999px',
+                  cursor: 'pointer'
+                }}
+                title="Nuevos pedidos o citas en tiempo real"
+              >
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#EF4444' }} />
+                <span>🔔 {totalAlertsCount} Nuevo{totalAlertsCount > 1 ? 's' : ''}</span>
+              </div>
+            )}
+
             {/* Status Pill (Interactive toggle for simulation) */}
             {showOfflineToggle && (
               <div

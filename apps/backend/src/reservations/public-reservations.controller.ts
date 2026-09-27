@@ -12,6 +12,7 @@ import { Public } from '../auth/public.decorator';
 import { OrderItem } from '../entities/order-item.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { CustomersService } from '../customers/customers.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Public()
 @Controller('public/reservations')
@@ -19,6 +20,7 @@ export class PublicReservationsController {
   constructor(
     private readonly reservationsService: ReservationsService,
     private readonly customersService: CustomersService,
+    private readonly notificationsService: NotificationsService,
     @InjectRepository(Tenant) private tenantRepo: Repository<Tenant>
   ) {}
 
@@ -208,8 +210,19 @@ export class PublicReservationsController {
         const noteTag = `[Pago Inicial: $${payAmt.toFixed(2)} vía ${methodLabel} Ref: ${dto.paymentReference.trim()}]`;
         resDb.notes = resDb.notes ? `${resDb.notes} | ${noteTag}` : noteTag;
         await reservationRepo.save(resDb);
+        try {
+          await this.notificationsService.notifyNewReservation(id, resDb);
+        } catch (err) {
+          console.error('Failed to notify admins of reservation:', err);
+        }
         return resDb;
       }
+    }
+
+    try {
+      await this.notificationsService.notifyNewReservation(id, res);
+    } catch (err) {
+      console.error('Failed to notify admins of reservation:', err);
     }
 
     return res;

@@ -11,11 +11,14 @@ import { Public } from '../auth/public.decorator';
 import { Throttle } from '@nestjs/throttler';
 import { PaymentStatus } from '@nutrideli/shared-types';
 
+import { NotificationsService } from '../notifications/notifications.service';
+
 @Public()
 @Controller('public/store')
 export class PublicStoreController {
   constructor(
     private readonly ordersService: OrdersService,
+    private readonly notificationsService: NotificationsService,
     @InjectRepository(Tenant) private readonly tenantRepo: Repository<Tenant>,
     @InjectRepository(Settings) private readonly settingsRepo: Repository<Settings>,
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
@@ -171,6 +174,13 @@ export class PublicStoreController {
     };
 
     const createdOrder = await this.ordersService.createOrder(tenantId, orderPayload);
+
+    // Notify admins in real-time and via Web Push
+    try {
+      await this.notificationsService.notifyNewOrder(tenantId, createdOrder);
+    } catch (err) {
+      console.error('Failed to notify admins of new order:', err);
+    }
 
     return {
       success: true,
