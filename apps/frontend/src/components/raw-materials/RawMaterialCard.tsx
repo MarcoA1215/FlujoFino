@@ -59,7 +59,11 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
           </div>
           
           <p style={{ margin: '0 0 8px 0', color: '#64748b', fontSize: '0.85rem' }}>
-            Costo prom: <strong style={{ color: '#0f172a' }}>${m.costPerUnit.toFixed(2)}</strong> / {m.unit}
+            Costo prom: <strong style={{ color: '#0f172a' }}>
+              ${Number(m.costPerUnit) > 0 && Number(m.costPerUnit) < 0.01
+                ? Number(m.costPerUnit).toFixed(4)
+                : Number(m.costPerUnit || 0).toFixed(2)}
+            </strong> / {m.unit}
           </p>
 
           {m.allowAsExtra && (

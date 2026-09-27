@@ -254,11 +254,15 @@ const RawMaterials: React.FC = () => {
 </IonLabel>
                     <IonInput type="number" min="0" step="any" value={inputCost} onIonInput={e => setInputCost(parseFloat(e.detail.value!) || undefined)} placeholder="Ej. 2.00" />
                   </IonItem>
-                  {inputQty && (inputUnit === 'g' || inputUnit === 'ml') && (
-                    <IonNote color="medium" className="ion-margin-top ion-padding-horizontal" style={{display: 'block', fontSize: '12px'}}>
-                      Nota: Se registrarán {inputQty / 1000} {baseUnit} en el inventario. Costo: ${(
-                        (currency === 'VES' ? (Number(inputCost) || 0) / (exchangeRate && exchangeRate > 0 ? exchangeRate : 1) : (Number(inputCost) || 0)) / (inputQty / 1000)
-                      ).toFixed(2)} x {baseUnit}.
+                  {inputQty && inputCost && (
+                    <IonNote color="primary" className="ion-margin-top ion-padding-horizontal" style={{display: 'block', fontSize: '12px', background: '#F0FDF4', color: '#166534', padding: '10px', borderRadius: '8px', border: '1px solid #BBF7D0'}}>
+                      Resumen: Se registrarán <strong>{(inputUnit === 'g' || inputUnit === 'ml') ? inputQty / 1000 : inputQty} {baseUnit}</strong> en inventario. Costo: <strong>${(
+                        (currency === 'VES' ? (Number(inputCost) || 0) / (exchangeRate && exchangeRate > 0 ? exchangeRate : 1) : (Number(inputCost) || 0)) / ((inputUnit === 'g' || inputUnit === 'ml') ? inputQty / 1000 : inputQty)
+                      ) < 0.01 ? (
+                        (currency === 'VES' ? (Number(inputCost) || 0) / (exchangeRate && exchangeRate > 0 ? exchangeRate : 1) : (Number(inputCost) || 0)) / ((inputUnit === 'g' || inputUnit === 'ml') ? inputQty / 1000 : inputQty)
+                      ).toFixed(4) : (
+                        (currency === 'VES' ? (Number(inputCost) || 0) / (exchangeRate && exchangeRate > 0 ? exchangeRate : 1) : (Number(inputCost) || 0)) / ((inputUnit === 'g' || inputUnit === 'ml') ? inputQty / 1000 : inputQty)
+                      ).toFixed(2)} USD/{baseUnit}</strong> (Total compra: ${(currency === 'VES' ? (Number(inputCost) || 0) / (exchangeRate && exchangeRate > 0 ? exchangeRate : 1) : (Number(inputCost) || 0)).toFixed(2)} USD).
                     </IonNote>
                   )}
 

@@ -20,14 +20,27 @@ export class RawMaterialsService {
     private dataSource: DataSource,
   ) {}
 
-  findAll(tenantId: string) {
-    return this.rawMaterialRepo.find({
+  async findAll(tenantId: string) {
+    const materials = await this.rawMaterialRepo.find({
       where: [
         { tenantId, isActive: true },
         { tenantId, isActive: IsNull() }
       ],
+      relations: ['movements'],
       order: { name: 'ASC' }
     });
+
+    for (const m of materials) {
+      if ((!m.costPerUnit || Number(m.costPerUnit) === 0) && m.movements?.length > 0) {
+        const purchaseMov = m.movements.find(mov => mov.type === MovementType.IN_PURCHASE);
+        if (purchaseMov && purchaseMov.quantity > 0 && purchaseMov.totalCost > 0) {
+          m.costPerUnit = Number((purchaseMov.totalCost / purchaseMov.quantity).toFixed(4));
+          await this.rawMaterialRepo.update({ id: m.id }, { costPerUnit: m.costPerUnit });
+        }
+      }
+    }
+
+    return materials;
   }
 
   async create(tenantId: string, dto: CreateRawMaterialDto) {
