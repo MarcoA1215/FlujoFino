@@ -1020,54 +1020,26 @@ const Pos: React.FC = () => {
                               : (p.stockQuantity <= 0 ? 'Agotado' : `Stock: ${p.stockQuantity}`)}
                           </span>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            {((Array.isArray(p.recipe) && p.recipe.length > 0) || p.product_type === 'FORMULA' || (p.isCombo && p.isPreAssembled) || availableRawMaterials.some(rm => rm.allowAsExtra)) && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openCustomizeModal(p);
-                                }}
-                                style={{
-                                  background: '#FEF3C7',
-                                  border: '1px solid #FCD34D',
-                                  color: '#92400E',
-                                  borderRadius: '6px',
-                                  padding: '4px 8px',
-                                  fontSize: '11px',
-                                  fontWeight: '800',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '3px'
-                                }}
-                                title="Personalizar (Retirar insumos o agregar extras)"
-                              >
-                                ⚙️ Personalizar
-                              </button>
-                            )}
-
-                            {/* Circular Add Button */}
-                            <div
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                addToCart(p);
-                              }}
-                              style={{
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '50%',
-                                background: '#10B981',
-                                color: '#ffffff',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              <IonIcon icon={addOutline} style={{ fontSize: '18px', strokeWidth: '32' }} />
-                            </div>
+                          {/* Circular Add Button */}
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addToCart(p);
+                            }}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              background: '#10B981',
+                              color: '#ffffff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <IonIcon icon={addOutline} style={{ fontSize: '18px', strokeWidth: '32' }} />
                           </div>
                         </div>
                       </div>
@@ -1203,11 +1175,11 @@ const Pos: React.FC = () => {
                               gap: '4px',
                               padding: '4px 9px',
                               borderRadius: '6px',
-                              background: '#FEF3C7',
-                              color: '#92400E',
-                              border: '1px solid #FCD34D',
+                              background: '#ECFDF5',
+                              color: '#065F46',
+                              border: '1px solid #A7F3D0',
                               fontSize: '11px',
-                              fontWeight: '800',
+                              fontWeight: '700',
                               cursor: 'pointer'
                             }}
                           >
