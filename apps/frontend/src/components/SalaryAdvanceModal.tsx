@@ -51,7 +51,7 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
     if (isOpen) {
       if (!propEmployees || propEmployees.length === 0) {
         apiClient
-          .get('/users/active-employees')
+          .get('/users/employees')
           .then((res) => {
             setEmployees(res.data || []);
             if (res.data?.length > 0 && !selectedUserId) {

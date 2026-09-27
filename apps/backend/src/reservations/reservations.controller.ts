@@ -54,6 +54,11 @@ export class ReservationsController {
     return this.service.addAbono(req.user.tenantId, id, amount);
   }
 
+  @Post(':id/pay-full')
+  payFull(@Request() req, @Param('id') id: string) {
+    return this.service.payFull(req.user.tenantId, id);
+  }
+
   @Delete(':id/abono/:index')
   revertAbono(@Request() req, @Param('id') id: string, @Param('index') index: string) {
     return this.service.revertAbono(req.user.tenantId, id, parseInt(index, 10));

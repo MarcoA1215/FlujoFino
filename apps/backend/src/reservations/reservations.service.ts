@@ -220,6 +220,17 @@ export class ReservationsService {
     return this.repo.save(res);
   }
 
+  async payFull(tenantId: string, id: string) {
+    const res = await this.repo.findOne({ where: { id, tenantId } });
+    if (!res) throw new NotFoundException('Reserva no encontrada');
+    const total = Number(res.totalAmount || 0);
+    res.abonosTotal = total;
+    res.abonosHistory = res.abonosHistory || [];
+    res.abonosHistory.push({ amount: total, date: new Date().toISOString() });
+    res.paymentStatus = PaymentStatus.PAID;
+    return this.repo.save(res);
+  }
+
   private recalculatePaymentStatus(res: Reservation) {
     const total = Number(res.totalAmount || 0);
     const abonos = Number(res.abonosTotal || 0);

@@ -15,6 +15,11 @@ export class UsersController {
     return this.usersService.findActiveEmployees(req.user.tenantId);
   }
 
+  @Get('active-employees')
+  findActiveEmployeesAlias(@Request() req: any) {
+    return this.usersService.findActiveEmployees(req.user.tenantId);
+  }
+
   @Get('access-requests')
   @Roles(UserRole.ADMIN)
   getAccessRequests(@Request() req: any) {
