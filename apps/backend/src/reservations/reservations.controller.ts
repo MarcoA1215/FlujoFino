@@ -46,5 +46,14 @@ export class ReservationsController {
   revertAbono(@Request() req, @Param('id') id: string, @Param('index') index: string) {
     return this.service.revertAbono(req.user.tenantId, id, parseInt(index, 10));
   }
+
+  @Post(':id/notify-delay')
+  notifyDelay(
+    @Request() req,
+    @Param('id') id: string,
+    @Body('minutes') minutes: number,
+  ) {
+    return this.service.notifyDelay(req.user.tenantId, id, Number(minutes) || 15);
+  }
 }
 

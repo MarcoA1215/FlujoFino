@@ -42,7 +42,9 @@ import { Customer } from './entities/customer.entity';
 import { CustomersModule } from './customers/customers.module';
 import { SaaSPaymentReport } from './entities/saas-payment-report.entity';
 import { PlatformConfig } from './entities/platform-config.entity';
+import { PushSubscription } from './entities/push-subscription.entity';
 import { SuperAdminModule } from './superadmin/superadmin.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -57,7 +59,7 @@ import { SuperAdminModule } from './superadmin/superadmin.module';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
-        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig],
+        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription],
         synchronize: true,
       }),
       inject: [ConfigService],
@@ -73,6 +75,7 @@ import { SuperAdminModule } from './superadmin/superadmin.module';
     FeedbackModule,
     CustomersModule,
     SuperAdminModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: APP_GUARD, useClass: RolesGuard }],

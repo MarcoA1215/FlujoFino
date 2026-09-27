@@ -16,6 +16,7 @@ import {
   logoWhatsapp
 } from 'ionicons/icons';
 import { useImageViewer } from '../context/ImageViewerContext';
+import { requestAndSubscribePush } from '../services/push-notification.service';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -329,6 +330,14 @@ const PublicBooking: React.FC = () => {
       const appointmentId = res.data.id;
       setMagicLink(`${window.location.origin}/appointment/${appointmentId}`);
       setSuccess(true);
+
+      // Web Push notification subscription
+      const identifier = customerPhone || identification;
+      if (identifier) {
+        requestAndSubscribePush(identifier.trim(), tenantId).catch((e) =>
+          console.warn('Web push subscription failed:', e),
+        );
+      }
     } catch (e: any) {
       const msg = e.response?.data?.message || 'Error procesando tu reservación. Intenta de nuevo.';
       presentToast({ message: msg, duration: 3000, color: 'danger' });

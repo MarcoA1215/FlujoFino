@@ -77,6 +77,26 @@ const Reservations: React.FC = () => {
   const [shiftAffected, setShiftAffected] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>({});
   const [isOfflineMode, setIsOfflineMode] = useState<boolean>(!navigator.onLine);
+  const [notifyingDelayId, setNotifyingDelayId] = useState<string | null>(null);
+
+  const handleNotifyDelay = async (id: string, minutes: number = 15, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      setNotifyingDelayId(id);
+      const res = await apiClient.post(`/reservations/${id}/notify-delay`, { minutes });
+      presentToast({
+        message: res.data?.message || `Notificación de retraso (+${minutes}m) enviada al cliente.`,
+        duration: 3500,
+        color: res.data?.sent > 0 ? 'success' : 'warning',
+      });
+    } catch (err: any) {
+      console.error(err);
+      const msg = err.response?.data?.message || 'Error al enviar la notificación de retraso.';
+      presentToast({ message: msg, duration: 3500, color: 'danger' });
+    } finally {
+      setNotifyingDelayId(null);
+    }
+  };
 
   const fetchReservations = async () => {
     try {
@@ -675,6 +695,30 @@ const Reservations: React.FC = () => {
                             </button>
                           )}
 
+                          {/* Avisar Retraso Push */}
+                          <button
+                            type="button"
+                            disabled={notifyingDelayId === res.id}
+                            onClick={(e) => handleNotifyDelay(res.id, 15, e)}
+                            style={{
+                              background: '#FFFBEB',
+                              border: '1px solid #FCD34D',
+                              color: '#B45309',
+                              borderRadius: '8px',
+                              padding: '6px 10px',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              cursor: 'pointer'
+                            }}
+                            title="Avisar retraso (+15 min) vía Web Push"
+                          >
+                            <IonIcon icon={timeOutline} style={{ fontSize: '14px' }} />
+                            {notifyingDelayId === res.id ? 'Avisando...' : 'Avisar retraso (+15 min)'}
+                          </button>
+
                           {/* Enviar a Caja */}
                           <button
                             type="button"
@@ -1026,20 +1070,44 @@ const Reservations: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Actions: Enviar a Caja & Editar */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowDetails(false);
-                        window.location.href = `/pos?reservationId=${selectedEvent.id}`;
-                      }}
-                      className="ff-btn-primary"
-                      style={{ width: '100%', padding: '12px', fontSize: '14px' }}
-                    >
-                      <IonIcon icon={cashOutline} />
-                      Enviar a Caja para Cobrar
-                    </button>
+                    {/* Actions: Enviar a Caja, Avisar Retraso & Editar */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDetails(false);
+                          window.location.href = `/pos?reservationId=${selectedEvent.id}`;
+                        }}
+                        className="ff-btn-primary"
+                        style={{ width: '100%', padding: '12px', fontSize: '14px' }}
+                      >
+                        <IonIcon icon={cashOutline} />
+                        Enviar a Caja para Cobrar
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={notifyingDelayId === selectedEvent.id}
+                        onClick={() => handleNotifyDelay(selectedEvent.id, 15)}
+                        style={{
+                          width: '100%',
+                          padding: '11px',
+                          borderRadius: '10px',
+                          border: '1px solid #FCD34D',
+                          background: '#FFFBEB',
+                          color: '#92400E',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <IonIcon icon={timeOutline} style={{ fontSize: '16px' }} />
+                        {notifyingDelayId === selectedEvent.id ? 'Avisando retraso...' : 'Avisar retraso (+15 min) al Cliente'}
+                      </button>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       <button

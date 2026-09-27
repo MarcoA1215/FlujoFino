@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { Reservation } from '../entities/reservation.entity';
 import { ReservationStatus, PaymentStatus } from '@nutrideli/shared-types';
 import { CustomersService } from '../customers/customers.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotFoundException } from '@nestjs/common';
 
 @Injectable()
 export class ReservationsService {
@@ -11,6 +13,7 @@ export class ReservationsService {
     @InjectRepository(Reservation)
     private repo: Repository<Reservation>,
     private readonly customersService: CustomersService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   findAll(tenantId: string) {
@@ -312,6 +315,45 @@ export class ReservationsService {
     const h = Math.floor(m / 60);
     const min = m % 60;
     return `${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00`;
+  }
+
+  async notifyDelay(tenantId: string, id: string, minutes: number = 15) {
+    const reservation = await this.repo.findOne({ where: { id, tenantId } });
+    if (!reservation) {
+      throw new NotFoundException('Reserva no encontrada');
+    }
+
+    const message = `Tu reserva tiene un retraso aproximado de ${minutes} minutos.`;
+    const payload = {
+      title: 'Aviso de Retraso de Reserva',
+      body: message,
+      data: {
+        url: `/booking`,
+        reservationId: id,
+      },
+    };
+
+    let sent = 0;
+    if (reservation.customerPhone) {
+      sent += await this.notificationsService.sendNotificationToIdentifier(
+        reservation.customerPhone,
+        payload,
+      );
+    }
+    if (reservation.identification && reservation.identification !== reservation.customerPhone) {
+      sent += await this.notificationsService.sendNotificationToIdentifier(
+        reservation.identification,
+        payload,
+      );
+    }
+
+    return {
+      success: true,
+      sent,
+      message: sent > 0 
+        ? `Notificación enviada con éxito (${sent} dispositivo/s notificado/s).` 
+        : `No se encontraron suscripciones push activas para el cliente.`,
+    };
   }
 }
 

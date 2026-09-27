@@ -41,6 +41,7 @@ import {
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useImageViewer } from '../context/ImageViewerContext';
+import { requestAndSubscribePush } from '../services/push-notification.service';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -331,6 +332,13 @@ const PublicStore: React.FC = () => {
       // Clear cart
       setCart([]);
       setIsCartOpen(false);
+
+      // Prompt and subscribe Web Push notifications linked to customer phone
+      if (customerPhone.trim()) {
+        requestAndSubscribePush(customerPhone.trim(), tenantId).catch((e) =>
+          console.warn('Web push subscription failed:', e),
+        );
+      }
     } catch (err: any) {
       console.error(err);
       const msg = err.response?.data?.message || 'Error al procesar el pedido. Intenta de nuevo.';

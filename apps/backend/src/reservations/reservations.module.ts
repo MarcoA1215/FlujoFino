@@ -8,11 +8,13 @@ import { Tenant } from '../entities/tenant.entity';
 
 import { Settings } from '../entities/settings.entity';
 import { CustomersModule } from '../customers/customers.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Reservation, Tenant, Settings]),
     CustomersModule,
+    NotificationsModule,
   ],
   controllers: [ReservationsController, PublicReservationsController],
   providers: [ReservationsService],
