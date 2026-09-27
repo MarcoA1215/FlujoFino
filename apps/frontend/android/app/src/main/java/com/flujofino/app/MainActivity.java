@@ -1,4 +1,4 @@
-package com.nutrideli.app;
+package com.flujofino.app;
 
 import com.getcapacitor.BridgeActivity;
 
