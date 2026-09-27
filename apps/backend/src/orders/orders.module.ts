@@ -12,6 +12,7 @@ import { DeliveryZone } from '../entities/delivery-zone.entity';
 import { OrderItemMedia } from '../entities/order-item-media.entity';
 import { StorageModule } from '../storage/storage.module';
 import { CustomersModule } from '../customers/customers.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { CustomersModule } from '../customers/customers.module';
       Settings,
       DeliveryZone,
     ]),
+    NotificationsModule,
     StorageModule,
     CustomersModule,
   ],

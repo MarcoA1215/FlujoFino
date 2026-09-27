@@ -10,17 +10,17 @@ export class StorageService {
   private s3Client: S3Client;
   private bucket: string = 'img_catalogo'; // We can use the default or configurable bucket
 
-  constructor(private configService: ConfigService) {
-    this.s3Client = new S3Client({
-      forcePathStyle: true,
-      endpoint: 'https://sobczifocynyrcwfhezm.storage.supabase.co/storage/v1/s3',
-      region: 'us-east-1',
-      credentials: {
-        accessKeyId: '1b34b5201d13724da287738a033a9ef3',
-        secretAccessKey: '509e18be1df9548cb4fcf39cc2ca2d89342cec44553420961be0dfff3e3127a2',
-      },
-    });
-  }
+ constructor(private configService: ConfigService) {
+  this.s3Client = new S3Client({
+    forcePathStyle: true,
+    endpoint: this.configService.get<string>('S3_ENDPOINT') || 'https://tu-proyecto.storage.supabase.co/storage/v1/s3',
+    region: this.configService.get<string>('S3_REGION') || 'us-east-1',
+    credentials: {
+      accessKeyId: this.configService.get<string>('S3_ACCESS_KEY_ID', ''),
+      secretAccessKey: this.configService.get<string>('S3_SECRET_ACCESS_KEY', ''),
+    },
+  });
+}
 
   /**
    * Submits a file buffer directly to S3 storage bucket, compressing it if it's an image.
