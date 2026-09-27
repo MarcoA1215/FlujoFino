@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { DataSource, Repository, IsNull } from 'typeorm';
+import { DataSource, Repository, IsNull, EntityManager } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
@@ -31,11 +31,12 @@ export class RawMaterialsService {
     });
 
     for (const m of materials) {
-      if ((!m.costPerUnit || Number(m.costPerUnit) === 0) && m.movements?.length > 0) {
-        const purchaseMov = m.movements.find(mov => mov.type === MovementType.IN_PURCHASE);
-        if (purchaseMov && purchaseMov.quantity > 0 && purchaseMov.totalCost > 0) {
-          m.costPerUnit = Number((purchaseMov.totalCost / purchaseMov.quantity).toFixed(4));
-          await this.rawMaterialRepo.update({ id: m.id }, { costPerUnit: m.costPerUnit });
+      if ((!m.costPerUnit || Number(m.costPerUnit) === 0) && m.movements?.some(mov => Number(mov.totalCost) > 0)) {
+        await this.recalculateStockAndCost(this.dataSource.manager, tenantId, m.id);
+        const refreshed = await this.rawMaterialRepo.findOne({ where: { id: m.id } });
+        if (refreshed) {
+          m.costPerUnit = refreshed.costPerUnit;
+          m.stockQuantity = refreshed.stockQuantity;
         }
       }
     }
@@ -153,6 +154,43 @@ export class RawMaterialsService {
     });
   }
 
+  async recalculateStockAndCost(manager: EntityManager, tenantId: string, rawMaterialId: string) {
+    const material = await manager.findOne(RawMaterial, { where: { tenantId, id: rawMaterialId } });
+    if (!material) return null;
+
+    const movements = await manager.find(StockMovement, {
+      where: { tenantId, rawMaterialId },
+      order: { createdAt: 'ASC' }
+    });
+
+    let currentStock = 0;
+    let currentCostPerUnit = 0;
+
+    for (const mov of movements) {
+      const qty = Number(mov.quantity) || 0;
+      const cost = Number(mov.totalCost) || 0;
+
+      if (mov.type === MovementType.IN_PURCHASE || (mov.type as string).startsWith('IN')) {
+        const prevStock = currentStock;
+        const prevValue = prevStock * currentCostPerUnit;
+        const newStock = prevStock + qty;
+
+        if (newStock > 0) {
+          currentCostPerUnit = (prevValue + cost) / newStock;
+        } else {
+          currentCostPerUnit = qty > 0 ? cost / qty : 0;
+        }
+        currentStock = newStock;
+      } else {
+        currentStock = Math.max(0, currentStock - qty);
+      }
+    }
+
+    material.stockQuantity = Number(currentStock.toFixed(4));
+    material.costPerUnit = Number(currentCostPerUnit.toFixed(4));
+    return manager.save(RawMaterial, material);
+  }
+
   async updateMovement(tenantId: string, id: string, dto: UpdateMovementDto) {
     return this.dataSource.transaction(async (manager) => {
       const movement = await manager.findOne(StockMovement, { where: { tenantId, id }, relations: { rawMaterial: true } });
@@ -161,51 +199,18 @@ export class RawMaterialsService {
       const material = movement.rawMaterial;
       if (!material) throw new NotFoundException('Insumo asociado no encontrado');
 
-      if (movement.type === MovementType.IN_PURCHASE) {
-        // Revertir matemática anterior
-        const oldTotalValue = material.stockQuantity * material.costPerUnit;
-        const revertedValue = oldTotalValue - movement.totalCost;
-        const revertedStock = material.stockQuantity - movement.quantity;
-  
-        // Aplicar nueva matemática
-        const newTotalValue = revertedValue + (dto.totalCost ?? movement.totalCost);
-        const newTotalStock = revertedStock + dto.quantity;
-  
-        if (newTotalStock > 0) {
-          material.costPerUnit = newTotalValue / newTotalStock;
-        } else if (newTotalStock === 0) {
-          material.costPerUnit = 0;
-        }
-        
-        material.stockQuantity = newTotalStock;
-        await manager.save(RawMaterial, material);
-  
-        movement.quantity = dto.quantity;
-        if (dto.totalCost !== undefined) movement.totalCost = dto.totalCost;
-        if (dto.description !== undefined) movement.description = dto.description;
-        
-      } else if (movement.type === MovementType.LOSS) {
-        // Revertir pérdida anterior
-        const revertedStock = material.stockQuantity + movement.quantity;
-        
-        // Aplicar nueva pérdida
-        const newTotalStock = revertedStock - dto.quantity;
-        if (newTotalStock < 0) {
-          throw new BadRequestException('La nueva cantidad resulta en stock negativo');
-        }
-
-        material.stockQuantity = newTotalStock;
-        await manager.save(RawMaterial, material);
-
-        movement.quantity = dto.quantity;
-        movement.totalCost = dto.quantity * material.costPerUnit;
-        if (dto.description !== undefined) movement.description = dto.description;
-        
-      } else {
+      if (movement.type !== MovementType.IN_PURCHASE && movement.type !== MovementType.LOSS) {
         throw new BadRequestException('Solo se pueden editar compras (IN_PURCHASE) o pérdidas (LOSS)');
       }
 
-      return manager.save(StockMovement, movement);
+      movement.quantity = dto.quantity;
+      if (dto.totalCost !== undefined) movement.totalCost = dto.totalCost;
+      if (dto.description !== undefined) movement.description = dto.description;
+      await manager.save(StockMovement, movement);
+
+      await this.recalculateStockAndCost(manager, tenantId, material.id);
+
+      return movement;
     });
   }
 
