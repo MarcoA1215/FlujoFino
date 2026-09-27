@@ -6,6 +6,7 @@ import { Tenant } from '../entities/tenant.entity';
 import { Settings } from '../entities/settings.entity';
 import { Product } from '../entities/product.entity';
 import { DeliveryZone } from '../entities/delivery-zone.entity';
+import { Order } from '../entities/order.entity';
 import { decodeTenantId } from '../utils/tenant-crypto';
 import { Public } from '../auth/public.decorator';
 import { Throttle } from '@nestjs/throttler';
@@ -19,6 +20,7 @@ export class PublicStoreController {
   constructor(
     private readonly ordersService: OrdersService,
     private readonly notificationsService: NotificationsService,
+    @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
     @InjectRepository(Tenant) private readonly tenantRepo: Repository<Tenant>,
     @InjectRepository(Settings) private readonly settingsRepo: Repository<Settings>,
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
@@ -193,6 +195,40 @@ export class PublicStoreController {
       customerName: createdOrder.customerName,
       customerPhone: createdOrder.customerPhone,
       itemsCount: createdOrder.items?.length || dto.items.length,
+    };
+  }
+
+  @Get('order/:orderId')
+  async getPublicOrderStatus(@Param('orderId') orderId: string) {
+    const order = await this.orderRepo.findOne({
+      where: { id: orderId },
+      select: {
+        id: true,
+        status: true,
+        paymentStatus: true,
+        customerName: true,
+        customerPhone: true,
+        totalAmount: true,
+        amountBs: true,
+        deliveryMethod: true,
+        createdAt: true,
+        notes: true,
+      },
+    });
+    if (!order) {
+      throw new NotFoundException('Pedido no encontrado');
+    }
+    return {
+      id: order.id,
+      orderNumber: order.id.slice(0, 8).toUpperCase(),
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      customerName: order.customerName,
+      totalAmount: order.totalAmount,
+      amountBs: order.amountBs,
+      deliveryMethod: order.deliveryMethod,
+      createdAt: order.createdAt,
+      notes: order.notes,
     };
   }
 }

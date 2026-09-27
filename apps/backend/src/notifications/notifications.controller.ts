@@ -1,8 +1,7 @@
-import { Controller, Post, Get, Body, Param, Sse, MessageEvent } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, NotFoundException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { SubscribePushDto } from './dto/subscribe-push.dto';
 import { Public } from '../auth/public.decorator';
-import { Observable } from 'rxjs';
 
 @Controller('notifications')
 export class NotificationsController {
@@ -24,11 +23,5 @@ export class NotificationsController {
       dto.role,
     );
     return { success: true, id: saved?.id };
-  }
-
-  @Public()
-  @Sse('stream/:tenantId')
-  streamEvents(@Param('tenantId') tenantId: string): Observable<MessageEvent> {
-    return this.notificationsService.getTenantEventStream(tenantId);
   }
 }

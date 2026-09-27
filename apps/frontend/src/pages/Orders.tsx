@@ -40,7 +40,6 @@ import { apiClient } from '../api/client';
 import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';
 import type { DeliveryZone } from '../types';
 import { useImageViewer } from '../context/ImageViewerContext';
-import { useRealtimeAlerts } from '../context/RealtimeContext';
 import AppHeader from '../components/AppHeader';
 
 type OrderItem = {
@@ -144,23 +143,11 @@ const Orders: React.FC = () => {
     }
   };
 
-  const { clearOrdersBadge } = useRealtimeAlerts();
-
   useEffect(() => {
     fetchOrders();
     fetchSettings();
     fetchEmployees();
-    clearOrdersBadge();
-
-    const handleRealtimeOrder = () => {
-      fetchOrders();
-    };
-
-    window.addEventListener('flujofino:order_created', handleRealtimeOrder);
-    return () => {
-      window.removeEventListener('flujofino:order_created', handleRealtimeOrder);
-    };
-  }, [clearOrdersBadge]);
+  }, []);
 
   const updateStatus = async (orderId: string, status: OrderStatus) => {
     try {

@@ -23,7 +23,6 @@ import PublicAppointmentManage from './pages/PublicAppointmentManage';
 import FeedbackPage from './pages/Feedback';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import { AuthProvider, AuthContext } from './context/AuthContext';
-import { RealtimeProvider } from './context/RealtimeContext';
 import { ImageViewerProvider } from './context/ImageViewerContext';
 import { UserRole } from '@nutrideli/shared-types';
 import { useContext, useEffect, useState } from 'react';
@@ -111,17 +110,15 @@ const App: React.FC = () => {
 
   return (
     <AuthProvider>
-      <RealtimeProvider>
-        <ImageViewerProvider>
-          <IonApp>
-            <IonReactRouter>
-              <ErrorBoundary>
-                <MainLayout />
-              </ErrorBoundary>
-            </IonReactRouter>
-          </IonApp>
-        </ImageViewerProvider>
-      </RealtimeProvider>
+      <ImageViewerProvider>
+        <IonApp>
+          <IonReactRouter>
+            <ErrorBoundary>
+              <MainLayout />
+            </ErrorBoundary>
+          </IonReactRouter>
+        </IonApp>
+      </ImageViewerProvider>
     </AuthProvider>
   );
 };

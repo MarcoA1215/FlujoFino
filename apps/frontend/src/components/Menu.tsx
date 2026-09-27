@@ -20,7 +20,6 @@ import {
 import { useLocation } from 'react-router-dom';
 import { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import { useRealtimeAlerts } from '../context/RealtimeContext';
 import { UserRole } from '@nutrideli/shared-types';
 import {
   calendarOutline,
@@ -49,7 +48,6 @@ const Menu: React.FC = () => {
   const [presentAlert] = useIonAlert();
   const [presentToast] = useIonToast();
   const { user, logout, switchWorkspace, isAuthenticated } = useContext(AuthContext);
-  const { pendingOrdersCount, pendingReservationsCount } = useRealtimeAlerts();
   const [settings, setSettings] = useState<any>({});
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [workspaces, setWorkspaces] = useState<any[]>(user?.workspaces || []);
@@ -222,16 +220,6 @@ const Menu: React.FC = () => {
                 <IonItem className={location.pathname === appPage.url ? 'selected' : ''} routerLink={appPage.url} routerDirection="none" lines="none" detail={false}>
                   <IonIcon aria-hidden="true" slot="start" ios={appPage.iosIcon} md={appPage.mdIcon} />
                   <IonLabel>{appPage.title}</IonLabel>
-                  {appPage.url === '/orders' && pendingOrdersCount > 0 && (
-                    <IonBadge slot="end" color="danger" style={{ borderRadius: '10px', fontSize: '11px', fontWeight: '800' }}>
-                      {pendingOrdersCount}
-                    </IonBadge>
-                  )}
-                  {appPage.url === '/reservations' && pendingReservationsCount > 0 && (
-                    <IonBadge slot="end" color="danger" style={{ borderRadius: '10px', fontSize: '11px', fontWeight: '800' }}>
-                      {pendingReservationsCount}
-                    </IonBadge>
-                  )}
                 </IonItem>
               </IonMenuToggle>
             );

@@ -37,11 +37,13 @@ import {
   bicycleOutline,
   copyOutline,
   refreshOutline,
+  checkmarkDoneOutline,
 } from 'ionicons/icons';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useImageViewer } from '../context/ImageViewerContext';
 import { requestAndSubscribePush } from '../services/push-notification.service';
+import { playNotificationSound } from '../utils/audio';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -93,6 +95,7 @@ const PublicStore: React.FC = () => {
   // Checkout form
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerCedula, setCustomerCedula] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<'IN_STORE' | 'DELIVERY'>('IN_STORE');
   const [selectedZoneId, setSelectedZoneId] = useState<string>('');
   const [customerAddress, setCustomerAddress] = useState('');
@@ -101,10 +104,13 @@ const PublicStore: React.FC = () => {
   const [pagoMovilRef, setPagoMovilRef] = useState('');
   const [transferRef, setTransferRef] = useState('');
   const [binanceRef, setBinanceRef] = useState('');
+  const [cashReceivedAmount, setCashReceivedAmount] = useState<string>('');
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  // Submission state
+  // Submission & Tracking state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderResult, setOrderResult] = useState<any | null>(null);
+  const [liveOrderStatus, setLiveOrderStatus] = useState<string | null>(null);
 
   const fetchStore = async () => {
     try {
@@ -140,6 +146,86 @@ const PublicStore: React.FC = () => {
       fetchStore();
     }
   }, [tenantId]);
+
+  // Preload customer data from LocalStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('flujofino_customer_data') || localStorage.getItem('lastBookingCustomer');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.name) setCustomerName(parsed.name);
+        if (parsed.phone) setCustomerPhone(parsed.phone);
+        if (parsed.cedula || parsed.identification) setCustomerCedula(parsed.cedula || parsed.identification);
+        if (parsed.address) setCustomerAddress(parsed.address);
+        if (parsed.zoneId) setSelectedZoneId(parsed.zoneId);
+      }
+    } catch (e) {}
+  }, []);
+
+  // Live order status tracking with audible chime
+  useEffect(() => {
+    if (!orderResult?.orderId) return;
+
+    let currentStatus = orderResult.status || 'PENDING';
+    setLiveOrderStatus(currentStatus);
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await axios.get(`${apiBase}/public/store/order/${orderResult.orderId}`);
+        const newStatus = res.data?.status;
+        if (newStatus && newStatus !== currentStatus) {
+          currentStatus = newStatus;
+          setLiveOrderStatus(newStatus);
+          playNotificationSound();
+          presentToast({
+            message: `🔔 ¡Estado actualizado: ${getStatusLabel(newStatus)}!`,
+            duration: 4000,
+            color: 'success',
+            position: 'top',
+          });
+        }
+      } catch (err) {}
+    }, 6000);
+
+    return () => clearInterval(interval);
+  }, [orderResult?.orderId]);
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'PENDING':
+        return '🕒 Esperando confirmación';
+      case 'PREPARING':
+      case 'IN_PROGRESS':
+        return '👨‍🍳 En preparación';
+      case 'READY':
+        return '✅ ¡Listo para retirar en tienda!';
+      case 'DELIVERING':
+      case 'ON_THE_WAY':
+        return '🛵 ¡Tu pedido va en camino!';
+      case 'COMPLETED':
+        return '🎉 ¡Pedido entregado con éxito!';
+      case 'CANCELED':
+        return '❌ Pedido cancelado';
+      default:
+        return status;
+    }
+  };
+
+  const handleCedulaInput = (val: string) => {
+    setCustomerCedula(val);
+    try {
+      const saved = localStorage.getItem('flujofino_customer_data');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.cedula && parsed.cedula.replace(/\D/g, '') === val.replace(/\D/g, '')) {
+          if (parsed.name && !customerName) setCustomerName(parsed.name);
+          if (parsed.phone && !customerPhone) setCustomerPhone(parsed.phone);
+          if (parsed.address && !customerAddress) setCustomerAddress(parsed.address);
+          if (parsed.zoneId && !selectedZoneId) setSelectedZoneId(parsed.zoneId);
+        }
+      }
+    } catch (e) {}
+  };
 
   // Calculations
   const exchangeRate = Number(storeData?.settings?.exchangeRateBs || 40.0);
@@ -292,12 +378,22 @@ const PublicStore: React.FC = () => {
 
     try {
       setIsSubmitting(true);
+      let usdNote = 'MÉTODO: Divisas Efectivo (USD)';
+      if (paymentOption === 'USD' && cashReceivedAmount) {
+        const cashNum = parseFloat(cashReceivedAmount);
+        if (!isNaN(cashNum) && cashNum >= grandTotalUSD) {
+          const change = cashNum - grandTotalUSD;
+          usdNote = `MÉTODO: Divisas Efectivo (USD) | Paga con: $${cashNum.toFixed(2)} | Vuelto a recibir: $${change.toFixed(2)}`;
+        }
+      }
+
       const paymentNote = paymentOption === 'TRANSFER' ? `MÉTODO: Transferencia Bancaria | Ref: ${transferRef.trim()}` :
                           paymentOption === 'BINANCE' ? `MÉTODO: Binance Pay | ID: ${binanceRef.trim()}` :
-                          paymentOption === 'USD' ? 'MÉTODO: Divisas Efectivo (USD)' :
+                          paymentOption === 'USD' ? usdNote :
                           paymentOption === 'WHATSAPP' ? 'MÉTODO: A convenir por WhatsApp' : '';
 
-      const finalNotes = [notes.trim(), paymentNote].filter(Boolean).join(' | ');
+      const cedulaNote = customerCedula.trim() ? `Cédula: ${customerCedula.trim()}` : '';
+      const finalNotes = [notes.trim(), cedulaNote, paymentNote].filter(Boolean).join(' | ');
 
       const payload = {
         customerName: customerName.trim(),
@@ -329,13 +425,28 @@ const PublicStore: React.FC = () => {
         notes: finalNotes,
       });
 
+      // Save customer info in LocalStorage for next time
+      try {
+        localStorage.setItem(
+          'flujofino_customer_data',
+          JSON.stringify({
+            name: customerName.trim(),
+            phone: customerPhone.trim(),
+            cedula: customerCedula.trim(),
+            address: customerAddress.trim(),
+            zoneId: selectedZoneId,
+          }),
+        );
+      } catch (e) {}
+
       // Clear cart
       setCart([]);
       setIsCartOpen(false);
 
-      // Prompt and subscribe Web Push notifications linked to customer phone
-      if (customerPhone.trim()) {
-        requestAndSubscribePush(customerPhone.trim(), tenantId).catch((e) =>
+      // Prompt and subscribe Web Push notifications linked to customer phone or cédula
+      const pushIdentifier = customerPhone.trim() || customerCedula.trim();
+      if (pushIdentifier) {
+        requestAndSubscribePush(pushIdentifier, tenantId).catch((e) =>
           console.warn('Web push subscription failed:', e),
         );
       }
@@ -353,11 +464,12 @@ const PublicStore: React.FC = () => {
     if (!orderResult || !storeData) return;
     const phone = storeData.settings?.companyPhone?.replace(/\D/g, '') || '';
     const lines = [
-      `🛍️ *NUEVO PEDIDO #${orderResult.orderNumber}*`,
+      `🛍️ *COMPROBANTE DE PEDIDO #${orderResult.orderNumber}*`,
       `👤 *Cliente:* ${orderResult.customerName}`,
+      customerCedula.trim() ? `🪪 *Cédula:* ${customerCedula.trim()}` : '',
       `📞 *Teléfono:* ${orderResult.customerPhone}`,
       `📦 *Entrega:* ${orderResult.deliveryMethod === 'DELIVERY' ? '🛵 Delivery a Domicilio' : '🏪 Retiro en Tienda'}`,
-    ];
+    ].filter(Boolean);
 
     if (orderResult.deliveryMethod === 'DELIVERY' && customerAddress) {
       lines.push(`📍 *Dirección:* ${customerAddress}`);
@@ -400,7 +512,21 @@ const PublicStore: React.FC = () => {
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    presentToast({ message: `${label} copiado`, duration: 1800, color: 'success' });
+    setCopiedField(label);
+    setTimeout(() => setCopiedField(null), 2500);
+    presentToast({ message: `¡${label} copiado!`, duration: 1800, color: 'success' });
+  };
+
+  const copyAllPagoMovil = () => {
+    if (!storeData?.settings) return;
+    const s = storeData.settings;
+    const lines = [
+      s.companyBank ? `Banco: ${s.companyBank}` : '',
+      s.companyCedula ? `Cédula: ${s.companyCedula}` : '',
+      s.companyPhone ? `Teléfono: ${s.companyPhone}` : '',
+      `Monto: Bs. ${grandTotalBs.toFixed(2)}`,
+    ].filter(Boolean).join('\n');
+    copyToClipboard(lines, 'Datos de Pago Móvil');
   };
 
   const headerColor = storeData?.settings?.themeHeaderColor || '#0f172a';
@@ -435,6 +561,25 @@ const PublicStore: React.FC = () => {
 
   // Confirmation view after success
   if (orderResult) {
+    const currentStatus = liveOrderStatus || 'PENDING';
+    const statusBg =
+      currentStatus === 'COMPLETED'
+        ? '#dcfce7'
+        : currentStatus === 'READY' || currentStatus === 'DELIVERING' || currentStatus === 'ON_THE_WAY'
+        ? '#dbeafe'
+        : currentStatus === 'PREPARING' || currentStatus === 'IN_PROGRESS'
+        ? '#fef3c7'
+        : '#f1f5f9';
+
+    const statusTextColor =
+      currentStatus === 'COMPLETED'
+        ? '#15803d'
+        : currentStatus === 'READY' || currentStatus === 'DELIVERING' || currentStatus === 'ON_THE_WAY'
+        ? '#1d4ed8'
+        : currentStatus === 'PREPARING' || currentStatus === 'IN_PROGRESS'
+        ? '#b45309'
+        : '#475569';
+
     return (
       <IonPage>
         <IonHeader>
@@ -450,10 +595,44 @@ const PublicStore: React.FC = () => {
               Tu orden <b>#{orderResult.orderNumber}</b> ha sido registrada con éxito.
             </p>
 
+            {/* Live Order Status Tracking Banner */}
+            <div
+              style={{
+                background: statusBg,
+                color: statusTextColor,
+                border: `1.5px solid ${statusTextColor}40`,
+                borderRadius: '12px',
+                padding: '14px 16px',
+                margin: '18px 0',
+                textAlign: 'center',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              }}
+            >
+              <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, marginBottom: '4px', opacity: 0.85 }}>
+                📡 Seguimiento en Tiempo Real
+              </div>
+              <div style={{ fontSize: '1.15rem', fontWeight: 800 }}>
+                {getStatusLabel(currentStatus)}
+              </div>
+              <div style={{ fontSize: '12px', marginTop: '6px', opacity: 0.9 }}>
+                Esta pantalla se actualiza automáticamente cuando tu pedido cambie de estado.
+              </div>
+            </div>
+
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', margin: '20px 0', textAlign: 'left' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <span style={{ color: '#64748b' }}>Cliente:</span>
                 <span style={{ fontWeight: '600' }}>{orderResult.customerName}</span>
+              </div>
+              {customerCedula.trim() && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ color: '#64748b' }}>Cédula:</span>
+                  <span style={{ fontWeight: '600' }}>{customerCedula.trim()}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ color: '#64748b' }}>Teléfono:</span>
+                <span style={{ fontWeight: '600' }}>{orderResult.customerPhone}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <span style={{ color: '#64748b' }}>Modalidad:</span>
@@ -461,7 +640,15 @@ const PublicStore: React.FC = () => {
                   {orderResult.deliveryMethod === 'DELIVERY' ? '🛵 Delivery a Domicilio' : '🏪 Retiro en Tienda'}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
+              {orderResult.notes && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
+                  <span style={{ color: '#64748b' }}>Detalle:</span>
+                  <span style={{ fontWeight: '500', color: '#334155', textAlign: 'right', maxWidth: '65%' }}>
+                    {orderResult.notes}
+                  </span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: '4px' }}>
                 <span style={{ fontWeight: 'bold' }}>Total a pagar:</span>
                 <span style={{ fontWeight: 'bold', color: '#16a34a', fontSize: '1.1rem' }}>
                   ${orderResult.grandTotalUSD.toFixed(2)} (Bs. {orderResult.grandTotalBs.toFixed(2)})
@@ -476,7 +663,7 @@ const PublicStore: React.FC = () => {
               style={{ height: '52px', fontWeight: 'bold', fontSize: '1rem', marginBottom: '12px' }}
             >
               <IonIcon slot="start" icon={logoWhatsapp} style={{ fontSize: '1.3rem' }} />
-              Enviar Pedido por WhatsApp
+              Enviar Comprobante por WhatsApp
             </IonButton>
 
             <IonButton
@@ -485,6 +672,7 @@ const PublicStore: React.FC = () => {
               color="medium"
               onClick={() => {
                 setOrderResult(null);
+                setLiveOrderStatus(null);
                 fetchStore();
               }}
             >
@@ -1096,6 +1284,14 @@ const PublicStore: React.FC = () => {
                 <h4 style={{ fontWeight: 'bold', margin: '0 0 10px 0' }}>Tus Datos de Contacto</h4>
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '8px 12px', marginBottom: '16px', background: '#fff' }}>
                   <IonItem lines="none">
+                    <IonLabel position="stacked">Cédula / RIF (Opcional - Autocompleta tus datos)</IonLabel>
+                    <IonInput
+                      value={customerCedula}
+                      onIonInput={(e) => handleCedulaInput(e.detail.value!)}
+                      placeholder="Ej. V-12345678"
+                    />
+                  </IonItem>
+                  <IonItem lines="none">
                     <IonLabel position="stacked">Nombre y Apellido *</IonLabel>
                     <IonInput
                       value={customerName}
@@ -1146,9 +1342,44 @@ const PublicStore: React.FC = () => {
 
                   {paymentOption === 'PAGO_MOVIL' && storeData?.settings && (
                     <div style={{ background: '#f1f5f9', padding: '12px', borderRadius: '8px', marginTop: '10px' }}>
-                      <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 'bold' }}>Datos para Pago Móvil (Total: Bs. {grandTotalBs.toFixed(2)}):</p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#0f172a' }}>
+                          Datos para Pago Móvil
+                        </span>
+                        <button
+                          type="button"
+                          onClick={copyAllPagoMovil}
+                          style={{
+                            background: copiedField === 'Datos de Pago Móvil' ? '#DCFCE7' : '#EFF6FF',
+                            color: copiedField === 'Datos de Pago Móvil' ? '#15803D' : '#1D4ED8',
+                            border: '1px solid #BFDBFE',
+                            borderRadius: '8px',
+                            padding: '4px 8px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <IonIcon icon={copiedField === 'Datos de Pago Móvil' ? checkmarkDoneOutline : copyOutline} />
+                          {copiedField === 'Datos de Pago Móvil' ? '¡Copiado!' : 'Copiar todo'}
+                        </button>
+                      </div>
+
+                      {/* Monto exacto a transferir */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0', background: '#F8FAFC', padding: '6px 10px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                        <span style={{ fontSize: '13px' }}>
+                          <b>Monto en Bs:</b> <span style={{ color: '#059669', fontWeight: '800' }}>Bs. {grandTotalBs.toFixed(2)}</span>
+                        </span>
+                        <IonButton fill="clear" size="small" onClick={() => copyToClipboard(grandTotalBs.toFixed(2), 'Monto en Bs')}>
+                          <IonIcon icon={copiedField === 'Monto en Bs' ? checkmarkDoneOutline : copyOutline} slot="icon-only" color={copiedField === 'Monto en Bs' ? 'success' : undefined} />
+                        </IonButton>
+                      </div>
+
                       {storeData.settings.companyBank && (
-                        <p style={{ margin: '2px 0', fontSize: '13px' }}>
+                        <p style={{ margin: '4px 0', fontSize: '13px' }}>
                           <b>Banco:</b> {storeData.settings.companyBank}
                         </p>
                       )}
@@ -1156,7 +1387,7 @@ const PublicStore: React.FC = () => {
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '2px 0' }}>
                           <span style={{ fontSize: '13px' }}><b>Cédula/RIF:</b> {storeData.settings.companyCedula}</span>
                           <IonButton fill="clear" size="small" onClick={() => copyToClipboard(storeData.settings.companyCedula, 'Cédula')}>
-                            <IonIcon icon={copyOutline} slot="icon-only" />
+                            <IonIcon icon={copiedField === 'Cédula' ? checkmarkDoneOutline : copyOutline} slot="icon-only" color={copiedField === 'Cédula' ? 'success' : undefined} />
                           </IonButton>
                         </div>
                       )}
@@ -1164,7 +1395,7 @@ const PublicStore: React.FC = () => {
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '2px 0' }}>
                           <span style={{ fontSize: '13px' }}><b>Teléfono:</b> {storeData.settings.companyPhone}</span>
                           <IonButton fill="clear" size="small" onClick={() => copyToClipboard(storeData.settings.companyPhone, 'Teléfono')}>
-                            <IonIcon icon={copyOutline} slot="icon-only" />
+                            <IonIcon icon={copiedField === 'Teléfono' ? checkmarkDoneOutline : copyOutline} slot="icon-only" color={copiedField === 'Teléfono' ? 'success' : undefined} />
                           </IonButton>
                         </div>
                       )}
@@ -1176,6 +1407,72 @@ const PublicStore: React.FC = () => {
                           placeholder="Ej. 9482"
                         />
                       </IonItem>
+                    </div>
+                  )}
+
+                  {paymentOption === 'USD' && (
+                    <div style={{ background: '#ecfdf5', padding: '14px', borderRadius: '10px', marginTop: '10px', border: '1px solid #a7f3d0' }}>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 'bold', color: '#065f46' }}>
+                        💵 Pago en Efectivo (Total: ${grandTotalUSD.toFixed(2)} USD)
+                      </p>
+                      <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#047857' }}>
+                        Indica con qué billete pagarás para preparar tu vuelto:
+                      </p>
+
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setCashReceivedAmount(grandTotalUSD.toFixed(2))}
+                          style={{
+                            background: cashReceivedAmount === grandTotalUSD.toFixed(2) ? '#059669' : '#ffffff',
+                            color: cashReceivedAmount === grandTotalUSD.toFixed(2) ? '#ffffff' : '#065F46',
+                            border: '1px solid #A7F3D0',
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Monto Exacto
+                        </button>
+                        {[5, 10, 20, 50, 100].filter(d => d >= grandTotalUSD).map(denom => (
+                          <button
+                            key={denom}
+                            type="button"
+                            onClick={() => setCashReceivedAmount(denom.toString())}
+                            style={{
+                              background: cashReceivedAmount === denom.toString() ? '#059669' : '#ffffff',
+                              color: cashReceivedAmount === denom.toString() ? '#ffffff' : '#065F46',
+                              border: '1px solid #A7F3D0',
+                              borderRadius: '6px',
+                              padding: '4px 8px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Billete ${denom}
+                          </button>
+                        ))}
+                      </div>
+
+                      <IonItem lines="none" style={{ '--background': '#fff', borderRadius: '6px' }}>
+                        <IonLabel position="stacked">¿Con cuánto pagarás? (USD)</IonLabel>
+                        <IonInput
+                          type="number"
+                          value={cashReceivedAmount}
+                          onIonInput={(e) => setCashReceivedAmount(e.detail.value!)}
+                          placeholder={`Ej. ${(Math.ceil(grandTotalUSD / 5) * 5 || grandTotalUSD).toFixed(0)}`}
+                        />
+                      </IonItem>
+
+                      {parseFloat(cashReceivedAmount) >= grandTotalUSD && (
+                        <div style={{ marginTop: '8px', padding: '8px 10px', background: '#d1fae5', borderRadius: '6px', fontSize: '13px', color: '#065f46', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Vuelto requerido:</span>
+                          <span>${(parseFloat(cashReceivedAmount) - grandTotalUSD).toFixed(2)} USD</span>
+                        </div>
+                      )}
                     </div>
                   )}
 

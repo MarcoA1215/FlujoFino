@@ -38,7 +38,6 @@ import { apiClient } from '../api/client';
 import { ReservationStatus } from '@nutrideli/shared-types';
 import { offlineDb } from '../services/offline-db';
 import { AuthContext } from '../context/AuthContext';
-import { useRealtimeAlerts } from '../context/RealtimeContext';
 import AppHeader from '../components/AppHeader';
 
 const Reservations: React.FC = () => {
@@ -166,34 +165,26 @@ const Reservations: React.FC = () => {
     } catch (e) {}
   };
 
-  const { clearReservationsBadge } = useRealtimeAlerts();
-
   useEffect(() => {
     fetchReservations();
     fetchProducts();
     fetchSettings();
     fetchEmployees();
-    clearReservationsBadge();
 
     const handleOnline = () => {
       setIsOfflineMode(false);
       fetchReservations();
     };
     const handleOffline = () => setIsOfflineMode(true);
-    const handleRealtimeReservation = () => {
-      fetchReservations();
-    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    window.addEventListener('flujofino:reservation_created', handleRealtimeReservation);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('flujofino:reservation_created', handleRealtimeReservation);
     };
-  }, [clearReservationsBadge]);
+  }, []);
 
   const handleMassShift = async () => {
     if (!shiftTimeFrom || !shiftMinutes) return;
