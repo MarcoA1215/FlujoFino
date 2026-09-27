@@ -66,10 +66,12 @@ export const MovementHistoryModal: React.FC<MovementHistoryModalProps> = ({ mate
             if (!data.qty) return false;
             if (!isLoss && !data.cost) return false;
             try {
-              await apiClient.put('/stock-movements/' + mov.id, {
+              const payload = {
                 quantity: parseFloat(data.qty),
-                totalCost: isLoss ? 0 : parseFloat(data.cost)
-              });
+                totalCost: isLoss ? 0 : parseFloat(data.cost),
+                description: mov.description || ''
+              };
+              await apiClient.put('/stock-movements/' + mov.id, payload);
               fetchMovements(material.id);
               onCorrected(); 
               presentToast({ message: 'Movimiento corregido', duration: 2000, color: 'success' });

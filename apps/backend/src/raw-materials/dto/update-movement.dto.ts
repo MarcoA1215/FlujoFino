@@ -1,8 +1,15 @@
-import { IsNumber, IsString } from 'class-validator';
+import { IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class UpdateMovementDto {
-  @IsNumber() quantity: number;
-  @IsNumber() totalCost: number;
-  @IsString() description: string;
+  @IsNumber()
+  quantity: number;
+
+  @IsOptional()
+  @IsNumber()
+  totalCost?: number;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
 }
 
