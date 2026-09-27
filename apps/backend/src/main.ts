@@ -41,7 +41,13 @@ async function bootstrap() {
   app.enableCors({
     origin: (origin, callback) => {
       // Allow non-browser requests (mobile, server-to-server, curl) or matching origins
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.onrender.com')) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.onrender.com') ||
+        origin.endsWith('.vercel.app') ||
+        (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL)
+      ) {
         callback(null, true);
       } else {
         callback(null, false);
