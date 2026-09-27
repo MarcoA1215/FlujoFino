@@ -46,9 +46,10 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       }
 
       try {
-        const rateRes = await apiClient.get<{ rate?: number }>('/exchange-rate');
-        if (rateRes.data?.rate) {
-          setExchangeRate(Number(rateRes.data.rate));
+        const rateRes = await apiClient.get<{ exchangeRateBs?: number; rate?: number }>('/settings/exchange-rate');
+        const r = rateRes.data?.exchangeRateBs || rateRes.data?.rate;
+        if (r) {
+          setExchangeRate(Number(r));
         }
       } catch {
         // Fallback default exchange rate
