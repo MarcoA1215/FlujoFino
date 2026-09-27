@@ -50,9 +50,23 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
             </IonBadge>
           </div>
           
-          <p style={{ margin: '0 0 12px 0', color: '#64748b', fontSize: '0.85rem' }}>
+          <p style={{ margin: '0 0 8px 0', color: '#64748b', fontSize: '0.85rem' }}>
             Costo prom: <strong style={{ color: '#0f172a' }}>${m.costPerUnit.toFixed(2)}</strong> / {m.unit}
           </p>
+
+          {m.allowAsExtra && (
+            <div style={{ marginBottom: '8px' }}>
+              <IonBadge color="tertiary" style={{ borderRadius: '8px', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600 }}>
+                ✨ Extra: +${(
+                  m.extraPriceType === 'FIXED_PRICE'
+                    ? Number(m.extraPriceValue || 0)
+                    : m.extraPriceType === 'MARGIN_PERCENT'
+                    ? m.costPerUnit * (1 + Number(m.extraPriceValue || 0) / 100)
+                    : m.costPerUnit
+                ).toFixed(2)} USD
+              </IonBadge>
+            </div>
+          )}
         </div>
         
         <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>

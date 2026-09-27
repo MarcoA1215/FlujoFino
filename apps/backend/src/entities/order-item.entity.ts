@@ -35,6 +35,15 @@ export class OrderItem {
   @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
   subtotal: number;
 
+  @Column('simple-json', { nullable: true })
+  removedIngredients?: string[];
+
+  @Column('simple-json', { nullable: true })
+  addedExtras?: Array<{ rawMaterialId: string; name: string; priceUSD: number; quantity: number }>;
+
+  @Column({ default: false })
+  hasModifications: boolean;
+
   @ManyToOne(() => Order, order => order.items, { onDelete: 'CASCADE' })
   order: Order;
 

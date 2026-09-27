@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsBoolean } from 'class-validator';
 
 export class CreateRawMaterialDto {
   @IsString()
@@ -17,5 +17,17 @@ export class CreateRawMaterialDto {
   @IsOptional()
   @IsNumber()
   initialStock?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  allowAsExtra?: boolean;
+
+  @IsOptional()
+  @IsString()
+  extraPriceType?: 'COST' | 'MARGIN_PERCENT' | 'FIXED_PRICE';
+
+  @IsOptional()
+  @IsNumber()
+  extraPriceValue?: number;
 }
 

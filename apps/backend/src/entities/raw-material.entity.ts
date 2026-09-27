@@ -26,6 +26,15 @@ export class RawMaterial {
   @Column('decimal', { default: 5 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   minStockAlert: number;
 
+  @Column({ default: false })
+  allowAsExtra: boolean;
+
+  @Column({ type: 'varchar', default: 'COST', nullable: true })
+  extraPriceType: 'COST' | 'MARGIN_PERCENT' | 'FIXED_PRICE';
+
+  @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  extraPriceValue: number;
+
   @OneToMany(() => StockMovement, movement => movement.rawMaterial)
   movements: StockMovement[];
 

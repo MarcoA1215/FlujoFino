@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton, IonLabel, useIonAlert, useIonToast, IonNote, IonIcon, IonModal } from '@ionic/react';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton, IonLabel, useIonAlert, useIonToast, IonNote, IonIcon, IonModal, IonToggle } from '@ionic/react';
 import { addOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import type { RawMaterial } from '../types';
@@ -19,6 +19,19 @@ const RawMaterials: React.FC = () => {
   const [currency, setCurrency] = useState<'USD' | 'VES'>('USD');
   const [exchangeRate, setExchangeRate] = useState<number>(36.5);
   
+  // Extra customization (Create)
+  const [allowAsExtra, setAllowAsExtra] = useState(false);
+  const [extraPriceType, setExtraPriceType] = useState<'COST' | 'MARGIN_PERCENT' | 'FIXED_PRICE'>('COST');
+  const [extraPriceValue, setExtraPriceValue] = useState<number>(0);
+
+  // Edit Modal State
+  const [editingMaterial, setEditingMaterial] = useState<RawMaterial | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editMinStock, setEditMinStock] = useState<number>(5);
+  const [editAllowAsExtra, setEditAllowAsExtra] = useState(false);
+  const [editExtraPriceType, setEditExtraPriceType] = useState<'COST' | 'MARGIN_PERCENT' | 'FIXED_PRICE'>('COST');
+  const [editExtraPriceValue, setEditExtraPriceValue] = useState<number>(0);
+
   const [presentAlert] = useIonAlert();
   const [searchText, setSearchText] = useState('');
   const [presentToast] = useIonToast();
@@ -91,11 +104,17 @@ const RawMaterials: React.FC = () => {
         unit: baseUnit, 
         costPerUnit: costPerBaseUnit, 
         initialStock: finalStock, 
-        minStockAlert: 5 
+        minStockAlert: 5,
+        allowAsExtra,
+        extraPriceType,
+        extraPriceValue: Number(extraPriceValue) || 0
       });
       setName(''); 
       setInputQty(undefined); 
       setInputCost(undefined);
+      setAllowAsExtra(false);
+      setExtraPriceType('COST');
+      setExtraPriceValue(0);
       fetchMaterials();
       presentToast({ message: 'Insumo creado', duration: 2000, color: 'success' });
       setShowCreateModal(false);
@@ -114,33 +133,34 @@ const RawMaterials: React.FC = () => {
     setOperationType('loss');
   };
 
-  const openEditNameAlert = (m: RawMaterial) => {
-    presentAlert({
-      header: 'Editar Insumo',
-      inputs: [
-        { name: 'newName', type: 'text', value: m.name, placeholder: 'Nuevo nombre' },
-        { name: 'newMinStock', type: 'number', value: m.minStockAlert?.toString() || '5', placeholder: 'Alerta minima de stock' }
-      ],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Guardar',
-          handler: async (data) => {
-            if (!data.newName) return;
-            try {
-              await apiClient.put('/raw-materials/' + m.id, { 
-                name: data.newName, 
-                minStockAlert: parseFloat(data.newMinStock) || 0
-              });
-              presentToast({ message: 'Insumo actualizado', duration: 2000, color: 'success' });
-              fetchMaterials();
-            } catch (e) {
-              presentToast({ message: 'Error al actualizar', duration: 2000, color: 'danger' });
-            }
-          }
-        }
-      ]
-    });
+  const openEditModal = (m: RawMaterial) => {
+    setEditingMaterial(m);
+    setEditName(m.name || '');
+    setEditMinStock(m.minStockAlert !== undefined ? m.minStockAlert : 5);
+    setEditAllowAsExtra(Boolean(m.allowAsExtra));
+    setEditExtraPriceType(m.extraPriceType || 'COST');
+    setEditExtraPriceValue(Number(m.extraPriceValue) || 0);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingMaterial || !editName.trim()) {
+      presentToast({ message: 'El nombre es obligatorio', duration: 2000, color: 'warning' });
+      return;
+    }
+    try {
+      await apiClient.put('/raw-materials/' + editingMaterial.id, { 
+        name: editName.trim(), 
+        minStockAlert: parseFloat(editMinStock) || 0,
+        allowAsExtra: editAllowAsExtra,
+        extraPriceType: editExtraPriceType,
+        extraPriceValue: parseFloat(editExtraPriceValue) || 0
+      });
+      presentToast({ message: 'Insumo actualizado exitosamente', duration: 2000, color: 'success' });
+      setEditingMaterial(null);
+      fetchMaterials();
+    } catch (e) {
+      presentToast({ message: 'Error al actualizar', duration: 2000, color: 'danger' });
+    }
   };
 
   const filteredData = materials.filter(item => {
@@ -175,7 +195,7 @@ const RawMaterials: React.FC = () => {
           <IonGrid className="ion-no-padding">
             <IonRow>
               {filteredData.map(m => (
-                <RawMaterialCard key={m.id} material={m} onEditName={openEditNameAlert} onRestock={openRestockAlert} onRegisterLoss={openLossAlert} onViewHistory={() => setSelectedMaterialForHistory(m)} onArchive={archiveRawMaterial} />
+                <RawMaterialCard key={m.id} material={m} onEditName={openEditModal} onRestock={openRestockAlert} onRegisterLoss={openLossAlert} onViewHistory={() => setSelectedMaterialForHistory(m)} onArchive={archiveRawMaterial} />
               ))}
             </IonRow>
           </IonGrid>
@@ -234,10 +254,103 @@ const RawMaterials: React.FC = () => {
                       Nota: Se registrarán {inputQty / 1000} {baseUnit} en el inventario. Costo: ${(inputCost || 0) / (inputQty / 1000)} x {baseUnit}.
                     </IonNote>
                   )}
+
+                  <IonItem lines="none" style={{ marginTop: '12px', borderTop: '1px solid #E2E8F0', paddingTop: '8px' }}>
+                    <IonLabel>Permitir como Adicional / Extra</IonLabel>
+                    <IonToggle checked={allowAsExtra} onIonChange={e => setAllowAsExtra(e.detail.checked)} />
+                  </IonItem>
+                  {allowAsExtra && (
+                    <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '10px', border: '1px solid #E2E8F0', marginTop: '6px' }}>
+                      <IonItem lines="none" style={{ background: 'transparent' }}>
+                        <IonLabel position="stacked">Cálculo de Precio de Venta</IonLabel>
+                        <IonSelect value={extraPriceType} onIonChange={e => setExtraPriceType(e.detail.value)}>
+                          <IonSelectOption value="COST">Al Costo Directo</IonSelectOption>
+                          <IonSelectOption value="MARGIN_PERCENT">Margen de Ganancia (%)</IonSelectOption>
+                          <IonSelectOption value="FIXED_PRICE">Precio Fijo en USD ($)</IonSelectOption>
+                        </IonSelect>
+                      </IonItem>
+                      {extraPriceType !== 'COST' && (
+                        <IonItem lines="none" style={{ background: 'transparent' }}>
+                          <IonLabel position="stacked">
+                            {extraPriceType === 'MARGIN_PERCENT' ? 'Porcentaje de Margen (% ej. 50)' : 'Precio Fijo en USD ($)'}
+                          </IonLabel>
+                          <IonInput
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={extraPriceValue}
+                            onIonInput={e => setExtraPriceValue(parseFloat(e.detail.value!) || 0)}
+                          />
+                        </IonItem>
+                      )}
+                    </div>
+                  )}
+
                   <IonButton expand="block" color="success" className="ion-margin-top" onClick={handleCreate}>Guardar</IonButton>
                 </IonCardContent>
               </IonCard>
             
+      </IonContent>
+    </IonModal>
+
+    {/* Modal Editar Insumo & Extras */}
+    <IonModal isOpen={Boolean(editingMaterial)} onDidDismiss={() => setEditingMaterial(null)}>
+      <IonHeader>
+        <IonToolbar color="primary">
+          <IonTitle>Editar Insumo</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={() => setEditingMaterial(null)}>Cerrar</IonButton>
+          </IonButtons>
+        </IonToolbar>
+      </IonHeader>
+      <IonContent className="ion-padding">
+        <IonCard>
+          <IonCardContent>
+            <IonItem>
+              <IonLabel position="stacked">Nombre del Insumo</IonLabel>
+              <IonInput value={editName} onIonInput={e => setEditName(e.detail.value!)} placeholder="Nombre del insumo" />
+            </IonItem>
+            <IonItem>
+              <IonLabel position="stacked">Alerta Mínima de Stock</IonLabel>
+              <IonInput type="number" min="0" step="any" value={editMinStock} onIonInput={e => setEditMinStock(parseFloat(e.detail.value!) || 0)} />
+            </IonItem>
+
+            <IonItem lines="none" style={{ marginTop: '12px', borderTop: '1px solid #E2E8F0', paddingTop: '8px' }}>
+              <IonLabel>Permitir como Adicional / Extra</IonLabel>
+              <IonToggle checked={editAllowAsExtra} onIonChange={e => setEditAllowAsExtra(e.detail.checked)} />
+            </IonItem>
+            {editAllowAsExtra && (
+              <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '10px', border: '1px solid #E2E8F0', marginTop: '6px' }}>
+                <IonItem lines="none" style={{ background: 'transparent' }}>
+                  <IonLabel position="stacked">Cálculo de Precio de Venta</IonLabel>
+                  <IonSelect value={editExtraPriceType} onIonChange={e => setEditExtraPriceType(e.detail.value)}>
+                    <IonSelectOption value="COST">Al Costo Directo</IonSelectOption>
+                    <IonSelectOption value="MARGIN_PERCENT">Margen de Ganancia (%)</IonSelectOption>
+                    <IonSelectOption value="FIXED_PRICE">Precio Fijo en USD ($)</IonSelectOption>
+                  </IonSelect>
+                </IonItem>
+                {editExtraPriceType !== 'COST' && (
+                  <IonItem lines="none" style={{ background: 'transparent' }}>
+                    <IonLabel position="stacked">
+                      {editExtraPriceType === 'MARGIN_PERCENT' ? 'Porcentaje de Margen (% ej. 50)' : 'Precio Fijo en USD ($)'}
+                    </IonLabel>
+                    <IonInput
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={editExtraPriceValue}
+                      onIonInput={e => setEditExtraPriceValue(parseFloat(e.detail.value!) || 0)}
+                    />
+                  </IonItem>
+                )}
+              </div>
+            )}
+
+            <IonButton expand="block" color="primary" className="ion-margin-top" onClick={handleSaveEdit}>
+              Guardar Cambios
+            </IonButton>
+          </IonCardContent>
+        </IonCard>
       </IonContent>
     </IonModal>
   

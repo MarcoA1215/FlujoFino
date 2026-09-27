@@ -31,6 +31,31 @@ export type RawMaterial = {
   stockQuantity: number;
   minStockAlert: number;
   isActive?: boolean;
+  allowAsExtra?: boolean;
+  extraPriceType?: 'COST' | 'MARGIN_PERCENT' | 'FIXED_PRICE';
+  extraPriceValue?: number;
+};
+
+export type OrderItemExtra = {
+  rawMaterialId: string;
+  name: string;
+  priceUSD: number;
+  quantity: number;
+};
+
+export type OrderItem = {
+  id?: string;
+  productId: string;
+  productName?: string;
+  product?: Product;
+  quantity: number;
+  deliveredQuantity?: number;
+  unitPrice: number;
+  unitCost?: number;
+  subtotal: number;
+  removedIngredients?: string[];
+  addedExtras?: OrderItemExtra[];
+  hasModifications?: boolean;
 };
 
 export type RecipeItem = {

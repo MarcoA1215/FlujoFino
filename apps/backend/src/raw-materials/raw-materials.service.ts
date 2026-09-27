@@ -32,6 +32,9 @@ export class RawMaterialsService {
         costPerUnit: dto.costPerUnit,
         minStockAlert: dto.minStockAlert,
         stockQuantity: dto.initialStock || 0,
+        allowAsExtra: dto.allowAsExtra || false,
+        extraPriceType: dto.extraPriceType || 'COST',
+        extraPriceValue: dto.extraPriceValue || 0,
       });
       const savedMaterial = await manager.save(RawMaterial, material);
 

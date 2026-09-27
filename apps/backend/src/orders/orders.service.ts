@@ -40,8 +40,14 @@ export class CreateOrderDto {
   changeRef?: string;
   amountBs?: number;
   exchangeRate?: number;
-  exchangeRateBs?: number;
-  items: { productId: string; quantity: number; unitPrice: number }[];
+  items: {
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    removedIngredients?: string[];
+    addedExtras?: Array<{ rawMaterialId: string; name: string; priceUSD: number; quantity: number }>;
+    hasModifications?: boolean;
+  }[];
   initialAbono?: number;
   discountAmount?: number;
   discountType?: string;
@@ -308,6 +314,11 @@ export class OrdersService {
           } else if (!product.is_service && product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
             for (const ri of product.recipe) {
               if (ri.rawMaterial) {
+                const isRemoved = itemDto.removedIngredients?.some(rem => 
+                  rem === ri.rawMaterial.id || rem.toLowerCase() === ri.rawMaterial.name.toLowerCase()
+                );
+                if (isRemoved) continue;
+
                 ri.rawMaterial.stockQuantity -= (itemDto.quantity * ri.quantity);
                 await manager.save(RawMaterial, ri.rawMaterial);
                 const mov = manager.create(StockMovement, { tenantId,
@@ -333,6 +344,27 @@ export class OrdersService {
               await manager.save(Product, product);
             }
           }
+
+          // Descontar adicionales extra
+          if (itemDto.addedExtras && itemDto.addedExtras.length > 0) {
+            for (const extra of itemDto.addedExtras) {
+              if (!extra.rawMaterialId) continue;
+              const extraRm = await manager.findOne(RawMaterial, { where: { tenantId, id: extra.rawMaterialId } });
+              if (extraRm) {
+                const extraQty = (Number(extra.quantity) || 1) * itemDto.quantity;
+                extraRm.stockQuantity -= extraQty;
+                await manager.save(RawMaterial, extraRm);
+                const mov = manager.create(StockMovement, { tenantId,
+                  rawMaterialId: extraRm.id,
+                  type: MovementType.OUT_SALE,
+                  quantity: extraQty,
+                  totalCost: extraQty * extraRm.costPerUnit,
+                  description: `Extra (${extra.name}) para: ${product.name}`
+                });
+                await manager.save(StockMovement, mov);
+              }
+            }
+          }
         }
 
         let unitCost = 0;
@@ -347,15 +379,35 @@ export class OrdersService {
         }
         if (!product.is_service && product.recipe && product.recipe.length > 0) {
             for (const ri of product.recipe) {
-                if (ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit;
+                const isRemoved = itemDto.removedIngredients?.some(rem => 
+                  rem === ri.rawMaterial?.id || rem.toLowerCase() === ri.rawMaterial?.name?.toLowerCase()
+                );
+                if (!isRemoved && ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit;
             }
         } else if (product.cost !== undefined && product.cost !== null && Number(product.cost) > 0) {
             unitCost = Number(product.cost);
         } else if (product.estimatedCost) {
             unitCost = Number(product.estimatedCost);
         }
+
+        // Sumar costo de insumos extra
+        if (itemDto.addedExtras && itemDto.addedExtras.length > 0) {
+          for (const extra of itemDto.addedExtras) {
+            if (!extra.rawMaterialId) continue;
+            const extraRm = await manager.findOne(RawMaterial, { where: { tenantId, id: extra.rawMaterialId } });
+            if (extraRm) {
+              unitCost += (Number(extra.quantity) || 1) * extraRm.costPerUnit;
+            }
+          }
+        }
         
         totalCost += unitCost * itemDto.quantity;
+
+        const hasModifications = Boolean(
+          (itemDto.removedIngredients && itemDto.removedIngredients.length > 0) ||
+          (itemDto.addedExtras && itemDto.addedExtras.length > 0) ||
+          itemDto.hasModifications
+        );
 
         const orderItem = manager.create(OrderItem, { tenantId,
           orderId: savedOrder.id,
@@ -365,7 +417,10 @@ export class OrdersService {
           unitPrice: itemDto.unitPrice,
           unitCost: unitCost,
           subtotal: subtotal,
-          deliveredQuantity: 0
+          deliveredQuantity: 0,
+          removedIngredients: itemDto.removedIngredients || [],
+          addedExtras: itemDto.addedExtras || [],
+          hasModifications
         });
         await manager.save(OrderItem, orderItem);
       }
@@ -534,9 +589,14 @@ export class OrdersService {
                 }
               }
             } else if (!product.is_service && product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
-              // Restore raw materials
+              // Restore raw materials (except removed)
               for (const ri of product.recipe) {
                 if (ri.rawMaterial) {
+                  const isRemoved = item.removedIngredients?.some(rem => 
+                    rem === ri.rawMaterial.id || rem.toLowerCase() === ri.rawMaterial.name.toLowerCase()
+                  );
+                  if (isRemoved) continue;
+
                   ri.rawMaterial.stockQuantity += (item.quantity * ri.quantity);
                   await manager.save(RawMaterial, ri.rawMaterial);
                   const mov = manager.create(StockMovement, { tenantId,
@@ -560,6 +620,27 @@ export class OrdersService {
                   }
                   await manager.save(Product, product);
                 }
+            }
+
+            // Restore added extras
+            if (item.addedExtras && item.addedExtras.length > 0) {
+              for (const extra of item.addedExtras) {
+                if (!extra.rawMaterialId) continue;
+                const extraRm = await manager.findOne(RawMaterial, { where: { tenantId, id: extra.rawMaterialId } });
+                if (extraRm) {
+                  const extraQty = (Number(extra.quantity) || 1) * item.quantity;
+                  extraRm.stockQuantity += extraQty;
+                  await manager.save(RawMaterial, extraRm);
+                  const mov = manager.create(StockMovement, { tenantId,
+                    rawMaterialId: extraRm.id,
+                    type: MovementType.IN,
+                    quantity: extraQty,
+                    totalCost: extraQty * extraRm.costPerUnit,
+                    description: `Reverso Extra (${extra.name}) por Cancelación: ${order.id}`
+                  });
+                  await manager.save(StockMovement, mov);
+                }
+              }
             }
           }
         }

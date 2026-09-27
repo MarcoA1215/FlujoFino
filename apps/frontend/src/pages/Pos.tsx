@@ -56,11 +56,21 @@ type Product = {
   baseCost: number;
   durationMinutes?: number;
   images?: string[] | string;
+  recipe?: any[];
+  isCombo?: boolean;
+  isPreAssembled?: boolean;
+  comboItems?: any[];
+  product_type?: string;
 };
 
 type CartItem = {
+  cartItemId: string;
   product: Product;
   quantity: number;
+  unitPrice: number;
+  removedIngredients?: string[];
+  addedExtras?: Array<{ rawMaterialId: string; name: string; priceUSD: number; quantity: number }>;
+  hasModifications?: boolean;
 };
 
 type PaymentMethod = 'PENDING' | 'PAGO_MOVIL' | 'USD' | 'PUNTO' | 'BINANCE' | 'TRANSFER';
@@ -77,6 +87,12 @@ const Pos: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
+
+  // Raw Materials & Customization (Extras / Retiro de Insumos)
+  const [availableRawMaterials, setAvailableRawMaterials] = useState<any[]>([]);
+  const [customizingProduct, setCustomizingProduct] = useState<Product | null>(null);
+  const [customRemovedIngredients, setCustomRemovedIngredients] = useState<string[]>([]);
+  const [customExtras, setCustomExtras] = useState<Record<string, number>>({});
 
   // Cart & Order
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -208,8 +224,16 @@ const Pos: React.FC = () => {
     } catch (e) {}
   };
 
+  const fetchRawMaterials = async () => {
+    try {
+      const res = await apiClient.get<any[]>('/raw-materials');
+      setAvailableRawMaterials(res.data || []);
+    } catch (e) {}
+  };
+
   useEffect(() => {
     fetchProducts();
+    fetchRawMaterials();
     fetchRate();
     fetchDeliveryZones();
     fetchEmployees();
@@ -231,6 +255,7 @@ const Pos: React.FC = () => {
 
       if (order.items && order.items.length > 0) {
         const loadedCart: CartItem[] = order.items.map((it: any) => ({
+          cartItemId: it.id || (Date.now() + '_' + Math.random().toString(36).substring(2, 7)),
           product: {
             id: it.productId || it.product?.id || it.id,
             name: it.productName || it.product?.name || 'Producto',
@@ -238,7 +263,11 @@ const Pos: React.FC = () => {
             baseCost: Number(it.product?.baseCost || 0),
             stockQuantity: 999
           },
-          quantity: it.quantity
+          quantity: it.quantity,
+          unitPrice: Number(it.unitPrice || it.product?.salePrice || 0),
+          removedIngredients: it.removedIngredients || [],
+          addedExtras: it.addedExtras || [],
+          hasModifications: Boolean(it.hasModifications)
         }));
         setCart(loadedCart);
       }
@@ -253,7 +282,7 @@ const Pos: React.FC = () => {
         apiClient.get<Product[]>('/products').then(res => {
           const found = res.data.find(p => p.id === resData.serviceId);
           if (found) {
-            setCart([{ product: found, quantity: 1 }]);
+            setCart([{ cartItemId: Date.now().toString(), product: found, quantity: 1, unitPrice: found.salePrice, hasModifications: false }]);
           }
         }).catch(() => {});
       }
@@ -276,6 +305,7 @@ const Pos: React.FC = () => {
 
             if (order.items && order.items.length > 0) {
               const loadedCart: CartItem[] = order.items.map((it: any) => ({
+                cartItemId: it.id || (Date.now() + '_' + Math.random().toString(36).substring(2, 7)),
                 product: {
                   id: it.productId || it.product?.id || it.id,
                   name: it.productName || it.product?.name || 'Producto',
@@ -283,7 +313,11 @@ const Pos: React.FC = () => {
                   baseCost: Number(it.product?.baseCost || 0),
                   stockQuantity: 999
                 },
-                quantity: it.quantity
+                quantity: it.quantity,
+                unitPrice: Number(it.unitPrice || it.product?.salePrice || 0),
+                removedIngredients: it.removedIngredients || [],
+                addedExtras: it.addedExtras || [],
+                hasModifications: Boolean(it.hasModifications)
               }));
               setCart(loadedCart);
             }
@@ -336,33 +370,95 @@ const Pos: React.FC = () => {
   // Cart operations
   const addToCart = (product: Product) => {
     setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id);
+      const existing = prev.find(item => item.product.id === product.id && !item.hasModifications);
       if (existing) {
         return prev.map(item =>
-          item.product.id === product.id
+          item.cartItemId === existing.cartItemId
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
-      return [...prev, { product, quantity: 1 }];
+      return [
+        ...prev,
+        {
+          cartItemId: Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          product,
+          quantity: 1,
+          unitPrice: product.salePrice,
+          hasModifications: false,
+          removedIngredients: [],
+          addedExtras: []
+        }
+      ];
     });
     presentToast({ message: `+1 ${product.name}`, duration: 1000, color: 'success', position: 'top' });
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateQuantity = (cartItemId: string, quantity: number) => {
     if (quantity <= 0) {
-      removeFromCart(productId);
+      removeFromCart(cartItemId);
       return;
     }
     setCart(prev =>
       prev.map(item =>
-        item.product.id === productId ? { ...item, quantity } : item
+        item.cartItemId === cartItemId ? { ...item, quantity } : item
       )
     );
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.product.id !== productId));
+  const removeFromCart = (cartItemId: string) => {
+    setCart(prev => prev.filter(item => item.cartItemId !== cartItemId));
+  };
+
+  const openCustomizeModal = (p: Product) => {
+    setCustomizingProduct(p);
+    setCustomRemovedIngredients([]);
+    setCustomExtras({});
+  };
+
+  const getExtraPrice = (rm: any) => {
+    if (rm.extraPriceType === 'FIXED_PRICE') return Number(rm.extraPriceValue || 0);
+    if (rm.extraPriceType === 'MARGIN_PERCENT') return Number((rm.costPerUnit * (1 + (Number(rm.extraPriceValue) || 0) / 100)).toFixed(2));
+    return Number(rm.costPerUnit || 0);
+  };
+
+  const addCustomizedToCart = () => {
+    if (!customizingProduct) return;
+    const selectedExtrasList: Array<{ rawMaterialId: string; name: string; priceUSD: number; quantity: number }> = [];
+    let extrasTotal = 0;
+
+    Object.entries(customExtras).forEach(([rmId, qty]) => {
+      if (qty > 0) {
+        const rm = availableRawMaterials.find(m => m.id === rmId);
+        if (rm) {
+          const priceUSD = getExtraPrice(rm);
+          extrasTotal += priceUSD * qty;
+          selectedExtrasList.push({
+            rawMaterialId: rm.id,
+            name: rm.name,
+            priceUSD,
+            quantity: qty
+          });
+        }
+      }
+    });
+
+    const finalUnitPrice = Number((customizingProduct.salePrice + extrasTotal).toFixed(2));
+    const hasMods = customRemovedIngredients.length > 0 || selectedExtrasList.length > 0;
+
+    const newItem: CartItem = {
+      cartItemId: Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      product: customizingProduct,
+      quantity: 1,
+      unitPrice: finalUnitPrice,
+      removedIngredients: [...customRemovedIngredients],
+      addedExtras: selectedExtrasList,
+      hasModifications: hasMods
+    };
+
+    setCart(prev => [...prev, newItem]);
+    setCustomizingProduct(null);
+    presentToast({ message: `Agregado: ${customizingProduct.name} (Personalizado)`, duration: 1500, color: 'success', position: 'top' });
   };
 
   // Calculations
@@ -371,7 +467,7 @@ const Pos: React.FC = () => {
   }, [cart]);
 
   const cartSubtotal = useMemo(() => {
-    return cart.reduce((acc, item) => acc + item.product.salePrice * item.quantity, 0);
+    return cart.reduce((acc, item) => acc + (item.unitPrice || item.product.salePrice) * item.quantity, 0);
   }, [cart]);
 
   const deliveryFee = useMemo(() => {
@@ -493,7 +589,10 @@ const Pos: React.FC = () => {
       items: cart.map(item => ({
         productId: item.product.id,
         quantity: item.quantity,
-        unitPrice: item.product.salePrice
+        unitPrice: item.unitPrice || item.product.salePrice,
+        removedIngredients: item.removedIngredients || [],
+        addedExtras: item.addedExtras || [],
+        hasModifications: Boolean(item.hasModifications)
       })),
       discountAmount: discountAmount > 0 ? Number(discountAmount.toFixed(2)) : 0,
       discountType: discountAmount > 0 ? discountType : undefined,
@@ -871,26 +970,51 @@ const Pos: React.FC = () => {
                               : (p.stockQuantity <= 0 ? 'Agotado' : `Stock: ${p.stockQuantity}`)}
                           </span>
 
-                          {/* Circular Add Button */}
-                          <div
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              addToCart(p);
-                            }}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '50%',
-                              background: '#10B981',
-                              color: '#ffffff',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <IonIcon icon={addOutline} style={{ fontSize: '18px', strokeWidth: '32' }} />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {((Array.isArray(p.recipe) && p.recipe.length > 0) || p.product_type === 'FORMULA' || (p.isCombo && p.isPreAssembled)) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openCustomizeModal(p);
+                                }}
+                                style={{
+                                  background: '#FEF3C7',
+                                  border: '1px solid #FDE68A',
+                                  color: '#92400E',
+                                  borderRadius: '6px',
+                                  padding: '4px 7px',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer'
+                                }}
+                                title="Personalizar (Retirar insumos o agregar extras)"
+                              >
+                                ⚙️ Ajustar
+                              </button>
+                            )}
+
+                            {/* Circular Add Button */}
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                addToCart(p);
+                              }}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                background: '#10B981',
+                                color: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <IonIcon icon={addOutline} style={{ fontSize: '18px', strokeWidth: '32' }} />
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -975,7 +1099,7 @@ const Pos: React.FC = () => {
                 <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '12px', marginBottom: '16px' }}>
                   {cart.map(item => (
                     <div
-                      key={item.product.id}
+                      key={item.cartItemId}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -985,18 +1109,42 @@ const Pos: React.FC = () => {
                       }}
                     >
                       <div style={{ flex: 1, paddingRight: '8px' }}>
-                        <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>
-                          {item.quantity}x {item.product.name}
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span>{item.quantity}x {item.product.name}</span>
+                          {item.hasModifications && (
+                            <span style={{ fontSize: '10px', fontWeight: '800', background: '#FEF3C7', color: '#92400E', padding: '1px 5px', borderRadius: '4px' }}>
+                              ⚠️ Modificado
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: '12px', color: '#64748B' }}>
-                          ${(item.product.salePrice * item.quantity).toFixed(2)}
+                          ${((item.unitPrice || item.product.salePrice) * item.quantity).toFixed(2)}
                         </div>
+
+                        {item.hasModifications && (
+                          <div style={{ marginTop: '3px', fontSize: '11px', lineHeight: '1.3' }}>
+                            {item.removedIngredients && item.removedIngredients.length > 0 && (
+                              <div style={{ color: '#DC2626', fontWeight: '700' }}>
+                                SIN: {item.removedIngredients.join(', ')}
+                              </div>
+                            )}
+                            {item.addedExtras && item.addedExtras.length > 0 && (
+                              <div style={{ color: '#16A34A', fontWeight: '700' }}>
+                                {item.addedExtras.map((e, idx) => (
+                                  <span key={idx} style={{ marginRight: '6px' }}>
+                                    EXTRA: {e.quantity > 1 ? `${e.quantity}x ` : ''}{e.name} (+${(e.priceUSD * e.quantity).toFixed(2)})
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <button
                           type="button"
-                          onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                          onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)}
                           style={{ width: '26px', height: '26px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#ffffff', fontWeight: '700' }}
                         >
                           -
@@ -1006,14 +1154,14 @@ const Pos: React.FC = () => {
                         </span>
                         <button
                           type="button"
-                          onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                          onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)}
                           style={{ width: '26px', height: '26px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#ffffff', fontWeight: '700' }}
                         >
                           +
                         </button>
                         <button
                           type="button"
-                          onClick={() => removeFromCart(item.product.id)}
+                          onClick={() => removeFromCart(item.cartItemId)}
                           style={{ background: 'none', border: 'none', color: '#EF4444', padding: '4px', cursor: 'pointer' }}
                         >
                           <IonIcon icon={trashOutline} style={{ fontSize: '16px' }} />
@@ -1760,6 +1908,188 @@ const Pos: React.FC = () => {
                   <IonIcon icon={checkmarkCircle} style={{ fontSize: '20px' }} />
                   {editingOrderId ? 'Guardar Cambios del Pedido' : 'Confirmar Pedido ✓'}
                 </button>
+            </div>
+          </div>
+        </IonModal>
+
+        {/* Modal Personalizar Producto (Retiro de Insumos y Adicionales Extra) */}
+        <IonModal isOpen={Boolean(customizingProduct)} onDidDismiss={() => setCustomizingProduct(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#F8FAFC' }}>
+            {/* Modal Header */}
+            <div style={{ background: '#ffffff', padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
+                  Personalizar: {customizingProduct?.name}
+                </h3>
+                <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                  Base: ${Number(customizingProduct?.salePrice || 0).toFixed(2)} USD
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCustomizingProduct(null)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748B' }}
+              >
+                <IonIcon icon={closeOutline} style={{ fontSize: '20px' }} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+              {/* Sección 1: Quitar Insumos */}
+              {customizingProduct?.recipe && customizingProduct.recipe.length > 0 && (
+                <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    🥗 Ingredientes de la Receta (Toca para quitar)
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {customizingProduct.recipe.map((ri: any) => {
+                      const rm = ri.rawMaterial || availableRawMaterials.find(m => m.id === ri.rawMaterialId);
+                      const rmName = rm?.name || ri.rawMaterialName || 'Insumo';
+                      const isRemoved = customRemovedIngredients.includes(rmName);
+
+                      return (
+                        <div
+                          key={ri.id || ri.rawMaterialId}
+                          onClick={() => {
+                            if (isRemoved) {
+                              setCustomRemovedIngredients(prev => prev.filter(n => n !== rmName));
+                            } else {
+                              setCustomRemovedIngredients(prev => [...prev, rmName]);
+                            }
+                          }}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: `1px solid ${isRemoved ? '#FCA5A5' : '#E2E8F0'}`,
+                            background: isRemoved ? '#FEF2F2' : '#F8FAFC',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: '13px', fontWeight: '700', color: isRemoved ? '#991B1B' : '#0F172A', textDecoration: isRemoved ? 'line-through' : 'none' }}>
+                              {rmName}
+                            </div>
+                            <div style={{ fontSize: '11px', color: isRemoved ? '#DC2626' : '#64748B', fontWeight: isRemoved ? '700' : '500' }}>
+                              {isRemoved ? '❌ Se quitará de la preparación' : '✓ Incluido'}
+                            </div>
+                          </div>
+                          <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            background: isRemoved ? '#DC2626' : '#E2E8F0',
+                            color: isRemoved ? '#FFFFFF' : '#475569'
+                          }}>
+                            {isRemoved ? 'QUITADO' : 'INCLUIDO'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Sección 2: Agregar Extras */}
+              <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  ✨ Adicionales / Extras Disponibles
+                </h4>
+
+                {availableRawMaterials.filter(rm => rm.allowAsExtra).length === 0 ? (
+                  <div style={{ fontSize: '12px', color: '#94A3B8', fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>
+                    No hay adicionales configurados. Habilita "Permitir como Extra" en Insumos.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {availableRawMaterials.filter(rm => rm.allowAsExtra).map(rm => {
+                      const price = getExtraPrice(rm);
+                      const qty = customExtras[rm.id] || 0;
+
+                      return (
+                        <div
+                          key={rm.id}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: `1px solid ${qty > 0 ? '#86EFAC' : '#E2E8F0'}`,
+                            background: qty > 0 ? '#F0FDF4' : '#F8FAFC'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>
+                              {rm.name}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#16A34A', fontWeight: '700' }}>
+                              +${price.toFixed(2)} USD (Bs. {(price * exchangeRate).toFixed(2)})
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              type="button"
+                              disabled={qty <= 0}
+                              onClick={() => setCustomExtras(prev => ({ ...prev, [rm.id]: Math.max(0, (prev[rm.id] || 0) - 1) }))}
+                              style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#ffffff', fontWeight: '700', cursor: qty > 0 ? 'pointer' : 'default', opacity: qty > 0 ? 1 : 0.4 }}
+                            >
+                              -
+                            </button>
+                            <span style={{ fontSize: '14px', fontWeight: '800', minWidth: '20px', textAlign: 'center' }}>
+                              {qty}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setCustomExtras(prev => ({ ...prev, [rm.id]: (prev[rm.id] || 0) + 1 }))}
+                              style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #10B981', background: '#ECFDF5', color: '#047857', fontWeight: '700', cursor: 'pointer' }}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer: Total & Add button */}
+            <div style={{ background: '#ffffff', padding: '16px 20px', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                {(() => {
+                  let extrasSum = 0;
+                  Object.entries(customExtras).forEach(([rmId, qty]) => {
+                    if (qty > 0) {
+                      const rm = availableRawMaterials.find(m => m.id === rmId);
+                      if (rm) extrasSum += getExtraPrice(rm) * qty;
+                    }
+                  });
+                  const total = (customizingProduct?.salePrice || 0) + extrasSum;
+                  return (
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#64748B' }}>Total Ítem:</div>
+                      <div style={{ fontSize: '18px', fontWeight: '900', color: '#10B981' }}>
+                        ${total.toFixed(2)} USD
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <button
+                type="button"
+                className="ff-btn-primary"
+                onClick={addCustomizedToCart}
+                style={{ padding: '12px 20px', borderRadius: '12px', fontSize: '14px', fontWeight: '800' }}
+              >
+                Agregar al Carrito ✓
+              </button>
             </div>
           </div>
         </IonModal>

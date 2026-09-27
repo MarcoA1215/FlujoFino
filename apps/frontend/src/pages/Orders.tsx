@@ -630,11 +630,35 @@ const Orders: React.FC = () => {
                         const qty = Number(it.quantity) || 1;
                         const uPrice = Number(it.unitPrice) || 0;
                         return (
-                          <div key={it.id || idx} style={{ fontSize: '13px', color: '#334155', padding: '2px 0', display: 'flex', justifyContent: 'space-between' }}>
-                            <span>{qty}x {pName}</span>
-                            <span style={{ fontWeight: '600', color: '#0F172A' }}>
-                              ${(uPrice * qty).toFixed(2)}
-                            </span>
+                          <div key={it.id || idx} style={{ fontSize: '13px', color: '#334155', padding: '4px 0', borderBottom: idx < orderItems.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: '600' }}>{qty}x {pName}</span>
+                              <span style={{ fontWeight: '700', color: '#0F172A' }}>
+                                ${(uPrice * qty).toFixed(2)}
+                              </span>
+                            </div>
+
+                            {it.hasModifications && (
+                              <div style={{ marginTop: '2px', paddingLeft: '8px', borderLeft: '2px solid #F59E0B' }}>
+                                <span style={{ fontSize: '10px', fontWeight: '800', background: '#FEF3C7', color: '#92400E', padding: '1px 5px', borderRadius: '4px' }}>
+                                  ⚠️ Modificado
+                                </span>
+                                {Array.isArray(it.removedIngredients) && it.removedIngredients.length > 0 && (
+                                  <div style={{ fontSize: '11px', color: '#DC2626', fontWeight: '700', marginTop: '1px' }}>
+                                    SIN: {it.removedIngredients.join(', ')}
+                                  </div>
+                                )}
+                                {Array.isArray(it.addedExtras) && it.addedExtras.length > 0 && (
+                                  <div style={{ fontSize: '11px', color: '#16A34A', fontWeight: '700', marginTop: '1px' }}>
+                                    {it.addedExtras.map((ex: any, eIdx: number) => (
+                                      <div key={eIdx}>
+                                        EXTRA: {ex.quantity > 1 ? `${ex.quantity}x ` : ''}{ex.name} (+${(Number(ex.priceUSD) * Number(ex.quantity || 1)).toFixed(2)})
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -938,11 +962,42 @@ const Orders: React.FC = () => {
                       const qty = Number(it.quantity) || 1;
                       const uPrice = Number(it.unitPrice) || 0;
                       return (
-                        <div key={it.id || idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #EEF2F6', fontSize: '13px' }}>
-                          <span>{qty}x {pName}</span>
-                          <span style={{ fontWeight: '700', color: '#0F172A' }}>
-                            ${(uPrice * qty).toFixed(2)}
-                          </span>
+                        <div key={it.id || idx} style={{ padding: '8px 0', borderBottom: '1px solid #EEF2F6', fontSize: '13px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {qty}x {pName}
+                              {it.hasModifications && (
+                                <span style={{ fontSize: '10px', fontWeight: '800', background: '#FEF3C7', color: '#92400E', padding: '1px 5px', borderRadius: '4px' }}>
+                                  ⚠️ Modificado
+                                </span>
+                              )}
+                            </span>
+                            <span style={{ fontWeight: '800', color: '#0F172A' }}>
+                              ${(uPrice * qty).toFixed(2)}
+                            </span>
+                          </div>
+
+                          {it.hasModifications && (
+                            <div style={{ marginTop: '4px', padding: '6px 10px', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #FCD34D' }}>
+                              <div style={{ fontSize: '11px', fontWeight: '800', color: '#B45309', marginBottom: '2px' }}>
+                                📝 COMANDA DE COCINA:
+                              </div>
+                              {Array.isArray(it.removedIngredients) && it.removedIngredients.length > 0 && (
+                                <div style={{ fontSize: '12px', color: '#DC2626', fontWeight: '800' }}>
+                                  SIN: {it.removedIngredients.join(', ')}
+                                </div>
+                              )}
+                              {Array.isArray(it.addedExtras) && it.addedExtras.length > 0 && (
+                                <div style={{ fontSize: '12px', color: '#16A34A', fontWeight: '800', marginTop: '2px' }}>
+                                  {it.addedExtras.map((ex: any, eIdx: number) => (
+                                    <div key={eIdx}>
+                                      EXTRA: {ex.quantity > 1 ? `${ex.quantity}x ` : ''}{ex.name} (+${(Number(ex.priceUSD) * Number(ex.quantity || 1)).toFixed(2)})
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}

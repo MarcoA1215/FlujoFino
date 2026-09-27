@@ -46,6 +46,15 @@ export interface DeliveryZoneDTO {
   feePrice: number;
 }
 
+export type ExtraPriceType = 'COST' | 'MARGIN_PERCENT' | 'FIXED_PRICE';
+
+export interface OrderItemExtra {
+  rawMaterialId: string;
+  name: string;
+  priceUSD: number;
+  quantity: number;
+}
+
 export interface RawMaterialDTO {
   id?: string;
   name: string;
@@ -53,12 +62,16 @@ export interface RawMaterialDTO {
   costPerUnit: number;
   stockQuantity: number;
   minStockAlert: number;
+  allowAsExtra?: boolean;
+  extraPriceType?: ExtraPriceType;
+  extraPriceValue?: number;
 }
 
 export interface RecipeItemDTO {
   id?: string;
   rawMaterialId: string;
   quantity: number;
+  rawMaterial?: RawMaterialDTO;
 }
 
 export interface ComboItemDTO {
@@ -95,10 +108,15 @@ export interface ProductDTO {
 export interface OrderItemDTO {
   id?: string;
   productId: string;
+  productName?: string;
   quantity: number;
   deliveredQuantity?: number;
   unitPrice: number;
+  unitCost?: number;
   subtotal: number;
+  removedIngredients?: string[];
+  addedExtras?: OrderItemExtra[];
+  hasModifications?: boolean;
 }
 
 export interface OrderDTO {
