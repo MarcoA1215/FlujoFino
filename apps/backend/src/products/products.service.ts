@@ -72,14 +72,16 @@ export class ProductsService {
         baseCost = Number(p.estimatedCost);
       }
 
-      const computedType = p.product_type || (p.is_service === true || p.category === 'Servicios' ? 'SERVICIO' : ((p.recipe && p.recipe.length > 0) || p.isCombo ? 'FORMULA' : 'REVENTA'));
+      const isService = p.is_service === true || p.category === 'Servicios' || Boolean(p.durationMinutes);
+      const isFormula = (p.recipe && p.recipe.length > 0) || (p.isCombo && p.isPreAssembled);
+      const computedType = isService ? 'SERVICIO' : (p.product_type === 'FORMULA' || isFormula ? 'FORMULA' : (p.product_type || 'REVENTA'));
 
       return {
         ...p,
         product_type: computedType,
         cost: p.cost !== undefined && p.cost !== null ? Number(p.cost) : (p.estimatedCost ? Number(p.estimatedCost) : 0),
         stock: finalStock,
-        is_service: computedType === 'SERVICIO',
+        is_service: isService,
         baseCost,
         stockQuantity: finalStock,
         physicalStock: finalPhysical,

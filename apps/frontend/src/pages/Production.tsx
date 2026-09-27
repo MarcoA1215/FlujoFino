@@ -109,7 +109,18 @@ const Production: React.FC = () => {
   };
 
   const filteredProducts = products.filter(p => {
+    // 1. Excluir estrictamente servicios
+    const isService = p.is_service === true || p.product_type === 'SERVICIO' || p.category === 'Servicios' || Boolean(p.durationMinutes);
+    if (isService) return false;
+
+    // 2. Excluir productos de reventa directa (deben tener receta con insumos vinculados o ser combo pre-ensamblado)
+    const hasRecipe = Array.isArray(p.recipe) && p.recipe.length > 0;
+    const isPreAssembledCombo = Boolean(p.isCombo && p.isPreAssembled && p.comboItems && p.comboItems.length > 0);
+
+    if (!hasRecipe && !isPreAssembledCombo) return false;
+
     if (p.isCombo && (!p.isPreAssembled || !p.comboItems || p.comboItems.length === 0)) return false;
+
     if (searchText.trim() === '') return true;
     return p.name?.toLowerCase().includes(searchText.toLowerCase());
   });
@@ -183,28 +194,41 @@ const Production: React.FC = () => {
                     
                     <IonGrid className="ion-no-padding ion-margin-top">
                       <IonRow>
-                        {filteredProducts.map(p => (
-                          <IonCol size="12" sizeSm="6" sizeMd="4" key={p.id}>
-                            <IonCard style={{ margin: '5px' }}>
-                              <IonCardContent>
-                                <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                                    <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 10px 0', whiteSpace: 'normal', lineHeight: '1.4' }}>{p.name}</h2>
-                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                      <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '8px', fontSize: '0.95rem' }}>
-                                        Físico: {p.physicalStock}
-                                      </IonBadge>
-                                      <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} style={{ padding: '8px', fontSize: '0.95rem' }}>
-                                        Disp: {p.stockQuantity}
-                                      </IonBadge>
-                                    </div>
-                                  </div>
-                                <IonButton size="small" fill="solid" color="primary" onClick={() => openProduceAlert(p)} expand="block">
-                                  Producir Lote
-                                </IonButton>
-                              </IonCardContent>
-                            </IonCard>
+                        {filteredProducts.length === 0 ? (
+                          <IonCol size="12">
+                            <div style={{ textAlign: 'center', padding: '30px 10px', color: '#64748B' }}>
+                              <p style={{ fontWeight: 600, fontSize: '1rem', margin: '0 0 6px 0' }}>
+                                No hay productos con fórmula o receta para fabricar
+                              </p>
+                              <p style={{ fontSize: '0.85rem', margin: 0 }}>
+                                Los productos de reventa directa y servicios están excluidos. Vincula insumos/receta a tus productos en Servicios / Productos para habilitar la producción.
+                              </p>
+                            </div>
                           </IonCol>
-                        ))}
+                        ) : (
+                          filteredProducts.map(p => (
+                            <IonCol size="12" sizeSm="6" sizeMd="4" key={p.id}>
+                              <IonCard style={{ margin: '5px' }}>
+                                <IonCardContent>
+                                  <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                                      <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 10px 0', whiteSpace: 'normal', lineHeight: '1.4' }}>{p.name}</h2>
+                                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                        <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '8px', fontSize: '0.95rem' }}>
+                                          Físico: {p.physicalStock}
+                                        </IonBadge>
+                                        <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} style={{ padding: '8px', fontSize: '0.95rem' }}>
+                                          Disp: {p.stockQuantity}
+                                        </IonBadge>
+                                      </div>
+                                    </div>
+                                  <IonButton size="small" fill="solid" color="primary" onClick={() => openProduceAlert(p)} expand="block">
+                                    Producir Lote
+                                  </IonButton>
+                                </IonCardContent>
+                              </IonCard>
+                            </IonCol>
+                          ))
+                        )}
                       </IonRow>
                     </IonGrid>
                   </IonCardContent>

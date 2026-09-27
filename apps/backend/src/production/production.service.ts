@@ -23,6 +23,11 @@ export class ProductionService {
 
       if (!product) throw new BadRequestException('Producto no encontrado');
 
+      const isService = product.is_service === true || product.category === 'Servicios' || Boolean(product.durationMinutes);
+      if (isService) {
+        throw new BadRequestException('No se puede producir un servicio');
+      }
+
       let totalBatchCost = 0;
 
       if (product.isCombo) {
