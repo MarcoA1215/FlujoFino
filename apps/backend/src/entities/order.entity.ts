@@ -8,6 +8,8 @@ import { DeliveryZone } from './delivery-zone.entity';
 import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';
 
 @Entity()
+@Index(['tenantId', 'createdAt'])
+@Index(['tenantId', 'status'])
 export class Order {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -153,6 +155,7 @@ export class Order {
   @JoinColumn({ name: 'tenantId' })
   tenant: Tenant;
 
+  @Index()
   @Column({ nullable: true }) // Temporarily nullable for safe migration
   tenantId: string;
 

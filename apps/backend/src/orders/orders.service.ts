@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { DataSource, Between } from 'typeorm';
+import { DataSource, Between, In } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Product } from '../entities/product.entity';
@@ -165,12 +165,16 @@ export class OrdersService {
       }
 
       // Check if we have enough available stock (Disponible) for everything
+      const productIds = Array.from(new Set((dto.items || []).map(i => i.productId).filter(Boolean)));
+      const products = productIds.length > 0 ? await manager.find(Product, {
+        where: { tenantId, id: In(productIds) },
+        relations: { comboItems: { component: { recipe: { rawMaterial: true } } }, recipe: { rawMaterial: true } }
+      }) : [];
+      const productMap = new Map(products.map(p => [p.id, p]));
+
       let requiresPreparation = false;
       for (const itemDto of dto.items) {
-        const product = await manager.findOne(Product, { 
-          where: { tenantId, id: itemDto.productId },
-          relations: { comboItems: { component: true } }
-        });
+        const product = productMap.get(itemDto.productId);
         if (product) {
           if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
             for (const ci of product.comboItems) {
@@ -284,10 +288,7 @@ export class OrdersService {
       const savedOrder = await manager.save(Order, order);
 
       for (const itemDto of dto.items) {
-        const product = await manager.findOne(Product, { 
-          where: { tenantId, id: itemDto.productId },
-          relations: { comboItems: { component: true }, recipe: { rawMaterial: true } }
-        });
+        const product = productMap.get(itemDto.productId);
         
         if (!product) throw new BadRequestException('Producto no encontrado');
 
@@ -337,12 +338,9 @@ export class OrdersService {
         let unitCost = 0;
         if (product.isCombo && !product.isPreAssembled && product.comboItems) {
             for (const ci of product.comboItems) {
-                if (ci.component) {
-                    const comp = await manager.findOne(Product, { where: { tenantId, id: ci.component.id }, relations: { recipe: { rawMaterial: true } } });
-                    if (comp && comp.recipe) {
-                        for (const ri of comp.recipe) {
-                            if (ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit * ci.quantity;
-                        }
+                if (ci.component && ci.component.recipe) {
+                    for (const ri of ci.component.recipe) {
+                        if (ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit * ci.quantity;
                     }
                 }
             }
@@ -418,11 +416,13 @@ export class OrdersService {
     return order;
   }
 
-  async getAllOrders(tenantId: string) {
+  async getAllOrders(tenantId: string, limit = 150, offset = 0) {
     const orders = await this.dataSource.getRepository(Order).find({
       where: { tenantId },
       relations: { items: { product: true, media: true }, deliveryZone: true, employee: { tenantAccess: true }, deliveryUser: true },
       order: { createdAt: 'DESC' },
+      take: Math.min(Number(limit) || 150, 300),
+      skip: Number(offset) || 0,
     });
     return orders.map(order => this.mapOrderEmployee(order, tenantId));
   }
@@ -475,11 +475,15 @@ export class OrdersService {
       if (order.status === OrderStatus.CANCELED) throw new BadRequestException('El pedido ya está cancelado');
 
       if (status === OrderStatus.DELIVERED) {
+        const itemProductIds = Array.from(new Set((order.items || []).map(i => i.productId).filter(Boolean)));
+        const products = itemProductIds.length > 0 ? await manager.find(Product, {
+          where: { tenantId, id: In(itemProductIds) },
+          relations: { comboItems: { component: true } }
+        }) : [];
+        const productMap = new Map(products.map(p => [p.id, p]));
+
         for (const item of order.items) {
-          const product = await manager.findOne(Product, { 
-            where: { tenantId, id: item.productId },
-            relations: { comboItems: { component: true } }
-          });
+          const product = productMap.get(item.productId);
           if (product) {
             if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
               for (const ci of product.comboItems) {
@@ -507,11 +511,15 @@ export class OrdersService {
 
       if (status === OrderStatus.CANCELED) {
         // Reverse inventory
+        const itemProductIds = Array.from(new Set((order.items || []).map(i => i.productId).filter(Boolean)));
+        const products = itemProductIds.length > 0 ? await manager.find(Product, {
+          where: { tenantId, id: In(itemProductIds) },
+          relations: { comboItems: { component: true }, recipe: { rawMaterial: true } }
+        }) : [];
+        const productMap = new Map(products.map(p => [p.id, p]));
+
         for (const item of order.items) {
-          const product = await manager.findOne(Product, { 
-            where: { tenantId, id: item.productId },
-            relations: { comboItems: { component: true }, recipe: { rawMaterial: true } }
-          });
+          const product = productMap.get(item.productId);
           
           if (product) {
             if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {

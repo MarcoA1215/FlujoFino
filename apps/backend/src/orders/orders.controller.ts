@@ -48,8 +48,15 @@ export class OrdersController {
   }
 
   @Get()
-  getAllOrders(@Request() req: any) {
-    return this.ordersService.getAllOrders(req.user.tenantId);}
+  getAllOrders(
+    @Request() req: any,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const l = limit ? parseInt(limit, 10) : 150;
+    const o = offset ? parseInt(offset, 10) : 0;
+    return this.ordersService.getAllOrders(req.user.tenantId, l, o);
+  }
 
   @Get('daily-cash-summary')
   getDailyCashSummary(@Request() req: any, @Query('date') date?: string) {

@@ -1,8 +1,10 @@
 import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { Tenant } from './tenant.entity';
 
 @Entity('operating_expenses')
+@Index(['tenantId', 'createdAt'])
+@Index(['tenantId', 'category'])
 export class OperatingExpense {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -19,6 +21,7 @@ export class OperatingExpense {
   @Column({ type: 'varchar', default: 'GENERAL' })
   category: string; // e.g. 'PAYROLL', 'UTILITIES'
 
+  @Index()
   @CreateDateColumn()
   createdAt: Date;
 
@@ -26,7 +29,7 @@ export class OperatingExpense {
   @JoinColumn({ name: 'tenantId' })
   tenant: Tenant;
 
+  @Index()
   @Column({ nullable: true })
   tenantId: string;
 }
-

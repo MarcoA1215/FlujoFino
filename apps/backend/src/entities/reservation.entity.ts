@@ -1,11 +1,13 @@
 import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { ReservationStatus, PaymentStatus } from '@nutrideli/shared-types';
 import { Tenant } from './tenant.entity';
 import { User } from './user.entity';
 import { Customer } from './customer.entity';
 
 @Entity()
+@Index(['tenantId', 'date'])
+@Index(['tenantId', 'status'])
 export class Reservation {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -13,6 +15,7 @@ export class Reservation {
   @Column()
   customerName: string;
 
+  @Index()
   @Column({ nullable: true })
   customerPhone: string;
 
@@ -26,6 +29,7 @@ export class Reservation {
   @JoinColumn({ name: 'customerId' })
   customer: Customer;
 
+  @Index()
   @Column({ type: 'date' })
   date: string;
 
@@ -54,6 +58,7 @@ export class Reservation {
   @JoinColumn({ name: 'employeeId' })
   employee: User;
 
+  @Index()
   @Column({ type: 'enum', enum: ReservationStatus, default: ReservationStatus.PENDING })
   status: ReservationStatus;
 
@@ -88,6 +93,7 @@ export class Reservation {
   @JoinColumn({ name: 'tenantId' })
   tenant: Tenant;
 
+  @Index()
   @Column()
   tenantId: string;
 

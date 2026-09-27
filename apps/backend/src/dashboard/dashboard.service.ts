@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThanOrEqual } from 'typeorm';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { Product } from '../entities/product.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
@@ -27,21 +27,6 @@ export class DashboardService {
     const products = await this.productRepo.find({
       where: { tenantId },
       relations: { recipe: { rawMaterial: true } }
-    });
-    const movements = await this.movementRepo.find({
-      relations: { rawMaterial: true },
-      where: { tenantId }
-    });
-    
-    // Solo tomamos en cuenta pedidos que no están cancelados
-    const orders = await this.orderRepo.find({
-      where: [
-        { status: OrderStatus.PENDING, tenantId },
-        { status: OrderStatus.PREPARING, tenantId },
-        { status: OrderStatus.DELIVERED, tenantId }
-      ],
-      relations: { items: { product: true } },
-      withDeleted: true
     });
 
     const rawMaterialDebt: Record<string, number> = {};
@@ -100,28 +85,44 @@ export class DashboardService {
       return acc + (stock * p.salePrice);
     }, 0);
 
-    const lossOrders = await this.orderRepo.find({
-      where: { status: OrderStatus.CERRADO_CON_PERDIDA, tenantId }
-    });
-    const orderLosses = lossOrders.reduce((acc, o) => {
-      const cost = Number(o.totalCost) > 0 ? Number(o.totalCost) : Number(o.totalAmount || 0);
-      return acc + cost;
-    }, 0);
+    // Agregaciones eficientes en base de datos para pérdidas
+    const lossRes = await this.orderRepo.createQueryBuilder('o')
+      .select('COALESCE(SUM(CASE WHEN o.totalCost > 0 THEN o.totalCost ELSE o.totalAmount END), 0)', 'total')
+      .where('o.tenantId = :tenantId', { tenantId })
+      .andWhere('o.status = :status', { status: OrderStatus.CERRADO_CON_PERDIDA })
+      .getRawOne();
+    const orderLosses = Number(lossRes?.total || 0);
 
-    const totalLosses = movements
-      .filter(m => m.type === MovementType.LOSS)
-      .reduce((acc, m) => acc + m.totalCost, 0) + orderLosses;
+    const moveLossRes = await this.movementRepo.createQueryBuilder('m')
+      .select('COALESCE(SUM(m.totalCost), 0)', 'total')
+      .where('m.tenantId = :tenantId', { tenantId })
+      .andWhere('m.type = :type', { type: MovementType.LOSS })
+      .getRawOne();
+    const totalLosses = Number(moveLossRes?.total || 0) + orderLosses;
 
-    const historicalInvestment = movements
-      .filter(m => m.type === MovementType.IN_PURCHASE)
-      .reduce((acc, m) => acc + m.totalCost, 0);
+    // Inversión histórica en compras
+    const invRes = await this.movementRepo.createQueryBuilder('m')
+      .select('COALESCE(SUM(m.totalCost), 0)', 'total')
+      .where('m.tenantId = :tenantId', { tenantId })
+      .andWhere('m.type = :type', { type: MovementType.IN_PURCHASE })
+      .getRawOne();
+    const historicalInvestment = Number(invRes?.total || 0);
 
-    const historicalRevenue = orders.reduce((acc, o) => acc + o.totalAmount, 0);
+    // Ingreso histórico de pedidos no cancelados
+    const revRes = await this.orderRepo.createQueryBuilder('o')
+      .select('COALESCE(SUM(o.totalAmount), 0)', 'total')
+      .where('o.tenantId = :tenantId', { tenantId })
+      .andWhere('o.status IN (:...statuses)', { statuses: [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.DELIVERED] })
+      .getRawOne();
+    const historicalRevenue = Number(revRes?.total || 0);
     
-    const expenses = await this.expenseRepo.find({ where: { tenantId } });
-    const payrollExpenses = expenses
-      .filter(e => e.category === 'PAYROLL')
-      .reduce((acc, e) => acc + e.amount, 0);
+    // Gastos de nómina
+    const payRes = await this.expenseRepo.createQueryBuilder('e')
+      .select('COALESCE(SUM(e.amount), 0)', 'total')
+      .where('e.tenantId = :tenantId', { tenantId })
+      .andWhere('e.category = :category', { category: 'PAYROLL' })
+      .getRawOne();
+    const payrollExpenses = Number(payRes?.total || 0);
     
     const reinvestmentExpense = historicalInvestment - totalInventoryCapital;
 
@@ -143,43 +144,61 @@ export class DashboardService {
     const totalConsolidatedInvestment = totalExternalInvestment + totalConsolidatedReinvestment;
     const historicalProfit = historicalRevenue - totalConsolidatedReinvestment - payrollExpenses;
 
-    // Calcular ventas de los ultimos 7 dias
+    // Calcular ventas de los últimos 7 días únicamente
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
     const last7Days = Array.from({length: 7}, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - i);
       return d.toISOString().split('T')[0];
     }).reverse();
 
+    const recentOrders = await this.orderRepo.find({
+      where: [
+        { status: OrderStatus.PENDING, tenantId, createdAt: MoreThanOrEqual(sevenDaysAgo) },
+        { status: OrderStatus.PREPARING, tenantId, createdAt: MoreThanOrEqual(sevenDaysAgo) },
+        { status: OrderStatus.DELIVERED, tenantId, createdAt: MoreThanOrEqual(sevenDaysAgo) }
+      ],
+      select: { createdAt: true, totalAmount: true }
+    });
+
     const salesByDay: Record<string, number> = {};
     last7Days.forEach(d => salesByDay[d] = 0);
 
-    orders.forEach(o => {
+    recentOrders.forEach(o => {
       const dateStr = new Date(o.createdAt).toISOString().split('T')[0];
       if (salesByDay[dateStr] !== undefined) {
-        salesByDay[dateStr] += o.totalAmount;
+        salesByDay[dateStr] += Number(o.totalAmount || 0);
       }
     });
 
     const salesChart = last7Days.map(date => ({
       date,
-      total: salesByDay[date]
+      total: Number(salesByDay[date].toFixed(2))
     }));
 
-    // Productos mas vendidos
-    const productSalesCount: Record<string, {name: string, quantity: number, revenue: number}> = {};
-    orders.forEach(o => {
-      o.items.forEach(item => {
-        if (!productSalesCount[item.productId]) {
-          productSalesCount[item.productId] = { name: item.productName || (item.product ? item.product.name : 'Producto Eliminado'), quantity: 0, revenue: 0 };
-        }
-        productSalesCount[item.productId].quantity += item.quantity;
-        productSalesCount[item.productId].revenue += item.subtotal;
-      });
-    });
+    // Productos más vendidos mediante consulta agregada
+    const topItemsRaw = await this.orderItemRepo.createQueryBuilder('item')
+      .innerJoin('item.order', 'order')
+      .select('item.productId', 'productId')
+      .addSelect('item.productName', 'productName')
+      .addSelect('SUM(item.quantity)', 'totalQuantity')
+      .addSelect('SUM(item.subtotal)', 'totalRevenue')
+      .where('order.tenantId = :tenantId', { tenantId })
+      .andWhere('order.status IN (:...statuses)', { statuses: [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.DELIVERED] })
+      .groupBy('item.productId')
+      .addGroupBy('item.productName')
+      .orderBy('"totalQuantity"', 'DESC')
+      .limit(5)
+      .getRawMany();
 
-    const topProducts = Object.values(productSalesCount)
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 5);
+    const topProducts = topItemsRaw.map(r => ({
+      name: r.productName || 'Producto',
+      quantity: Number(r.totalQuantity || 0),
+      revenue: Number(Number(r.totalRevenue || 0).toFixed(2))
+    }));
 
     return {
       totalRawMaterialCapital,

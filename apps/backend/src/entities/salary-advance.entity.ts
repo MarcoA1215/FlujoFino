@@ -1,5 +1,5 @@
 import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { User } from './user.entity';
 import { Tenant } from './tenant.entity';
 
@@ -9,10 +9,13 @@ export enum SalaryAdvanceStatus {
 }
 
 @Entity('salary_advances')
+@Index(['negocioId', 'status'])
+@Index(['negocioId', 'userId'])
 export class SalaryAdvance {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index()
   @Column()
   userId: string;
 
@@ -20,6 +23,7 @@ export class SalaryAdvance {
   @JoinColumn({ name: 'userId' })
   user: User;
 
+  @Index()
   @Column({ nullable: true })
   negocioId: string;
 
@@ -42,6 +46,7 @@ export class SalaryAdvance {
   @Column({ type: 'date', default: () => 'CURRENT_DATE' })
   date: string;
 
+  @Index()
   @Column({
     type: 'enum',
     enum: SalaryAdvanceStatus,

@@ -5,10 +5,13 @@ import { RawMaterial } from './raw-material.entity';
 import { MovementType } from '@nutrideli/shared-types';
 
 @Entity()
+@Index(['tenantId', 'createdAt'])
+@Index(['tenantId', 'rawMaterialId'])
 export class StockMovement {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index()
   @Column()
   rawMaterialId: string;
 
@@ -45,7 +48,7 @@ export class StockMovement {
   @JoinColumn({ name: 'tenantId' })
   tenant: Tenant;
 
+  @Index()
   @Column({ nullable: true }) // Temporarily nullable for safe migration
   tenantId: string;
-
 }

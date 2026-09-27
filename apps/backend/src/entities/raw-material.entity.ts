@@ -5,6 +5,7 @@ import { StockMovement } from './stock-movement.entity';
 import { RecipeItem } from './recipe-item.entity';
 
 @Entity()
+@Index(['tenantId', 'name'])
 export class RawMaterial {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -48,7 +49,7 @@ export class RawMaterial {
   @JoinColumn({ name: 'tenantId' })
   tenant: Tenant;
 
+  @Index()
   @Column({ nullable: true }) // Temporarily nullable for safe migration
   tenantId: string;
-
 }

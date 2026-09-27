@@ -1,10 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
 
 @Entity('push_subscriptions')
+@Index(['negocioId', 'role'])
+@Index(['negocioId', 'identifier'])
 export class PushSubscription {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index()
   @Column()
   identifier: string; // Cédula o teléfono normalizado
 
@@ -17,6 +20,7 @@ export class PushSubscription {
   @Column('text')
   auth: string;
 
+  @Index()
   @Column({ nullable: true })
   negocioId: string;
 

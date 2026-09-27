@@ -7,6 +7,7 @@ import { ProductionBatch } from './production-batch.entity';
 import { ComboItem } from './combo-item.entity';
 
 @Entity()
+@Index(['tenantId', 'category'])
 export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -98,6 +99,7 @@ export class Product {
   @JoinColumn({ name: 'tenantId' })
   tenant: Tenant;
 
+  @Index()
   @Column({ nullable: true }) // Temporarily nullable for safe migration
   tenantId: string;
 

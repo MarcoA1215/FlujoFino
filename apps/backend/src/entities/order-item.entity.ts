@@ -1,5 +1,5 @@
 import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, Index } from 'typeorm';
 import { Order } from './order.entity';
 import { Product } from './product.entity';
 import { OrderItemMedia } from './order-item-media.entity';
@@ -9,9 +9,11 @@ export class OrderItem {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index()
   @Column()
   orderId: string;
 
+  @Index()
   @Column()
   productId: string;
 
@@ -42,4 +44,3 @@ export class OrderItem {
   @OneToMany(() => OrderItemMedia, media => media.orderItem)
   media: OrderItemMedia[];
 }
-

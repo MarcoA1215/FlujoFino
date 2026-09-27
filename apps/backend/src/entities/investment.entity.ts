@@ -1,13 +1,16 @@
 import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { Tenant } from './tenant.entity';
 import { InvestmentType } from '@nutrideli/shared-types';
 
 @Entity('investments')
+@Index(['negocioId', 'date'])
+@Index(['negocioId', 'type'])
 export class Investment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index()
   @Column({ nullable: true })
   negocioId: string;
 
