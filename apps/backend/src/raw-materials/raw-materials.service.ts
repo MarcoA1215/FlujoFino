@@ -26,7 +26,7 @@ export class RawMaterialsService {
         { tenantId, isActive: true },
         { tenantId, isActive: IsNull() }
       ],
-      relations: ['movements'],
+      relations: { movements: true },
       order: { name: 'ASC' }
     });
 

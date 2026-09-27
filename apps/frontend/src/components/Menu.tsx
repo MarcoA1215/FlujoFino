@@ -124,41 +124,54 @@ const Menu: React.FC = () => {
     }
   };
   
-  const rawPages = [
-    { title: 'Tablero Principal', url: '/dashboard', iosIcon: pieChartOutline, mdIcon: pieChartOutline },
-    { title: 'Inventario (Insumos)', url: '/raw-materials', iosIcon: cubeOutline, mdIcon: cubeOutline, conditional: 'featureRecipes' },
-    { title: 'Servicios / Productos', url: '/products', iosIcon: listOutline, mdIcon: listOutline },
-    { title: 'Fórmulas / Ensamblaje', url: '/production', iosIcon: constructOutline, mdIcon: constructOutline, conditional: 'featureProduction' },
-    { title: 'Calculadora de Costos', url: '/calculator', iosIcon: calculatorOutline, mdIcon: calculatorOutline, conditional: 'featureRecipes' },
-    { title: 'Caja', url: '/pos', iosIcon: cashOutline, mdIcon: cashOutline },
-    { title: 'Pedidos / Tickets', url: '/orders', iosIcon: cartOutline, mdIcon: cartOutline },
-    { title: 'Panel Repartidor', url: '/delivery-panel', iosIcon: mapOutline, mdIcon: mapOutline },
-    { title: 'Reservaciones', url: '/reservations', iosIcon: calendarOutline, mdIcon: calendarOutline, conditional: 'featureCustomerSchedules' },
-    { title: 'Clientes', url: '/customers', iosIcon: personCircleOutline, mdIcon: personCircleOutline },
-    { title: 'Zonas Delivery', url: '/delivery-zones', iosIcon: mapOutline, mdIcon: mapOutline, conditional: 'featureBuySell' },
-    { title: 'Usuarios', url: '/users', iosIcon: peopleOutline, mdIcon: peopleOutline },
-    { title: 'Ayuda y Comentarios', url: '/feedback', iosIcon: chatbubbleOutline, mdIcon: chatbubbleOutline },
-    { title: 'Configuración', url: '/settings', iosIcon: settingsOutline, mdIcon: settingsOutline }
+  interface NavItem {
+    id: string;
+    label: string;
+    path: string;
+    icon: string;
+    isVisible: boolean;
+  }
+
+  const isProductionEnabled = settings.enableProduction !== undefined ? Boolean(settings.enableProduction) : (settings.featureProduction !== false);
+  const isReservationsEnabled = settings.enableReservations !== undefined ? Boolean(settings.enableReservations) : Boolean(settings.featureCustomerSchedules);
+  const isDeliveryEnabled = settings.enableDelivery !== undefined ? Boolean(settings.enableDelivery) : Boolean(settings.featureBuySell);
+  const isRecipesEnabled = settings.enableFormulas !== undefined ? Boolean(settings.enableFormulas) : Boolean(settings.featureRecipes);
+
+  const navItems: NavItem[] = [
+    { id: 'dashboard', label: 'Tablero Principal', path: '/dashboard', icon: pieChartOutline, isVisible: true },
+    { id: 'raw-materials', label: 'Inventario (Insumos)', path: '/raw-materials', icon: cubeOutline, isVisible: isRecipesEnabled },
+    { id: 'products', label: 'Servicios / Productos', path: '/products', icon: listOutline, isVisible: true },
+    { id: 'production', label: 'Fórmulas / Ensamblaje', path: '/production', icon: constructOutline, isVisible: isProductionEnabled },
+    { id: 'calculator', label: 'Calculadora de Costos', path: '/calculator', icon: calculatorOutline, isVisible: isRecipesEnabled },
+    { id: 'pos', label: 'Caja', path: '/pos', icon: cashOutline, isVisible: true },
+    { id: 'orders', label: 'Pedidos / Tickets', path: '/orders', icon: cartOutline, isVisible: true },
+    { id: 'delivery-panel', label: 'Panel Repartidor', path: '/delivery-panel', icon: mapOutline, isVisible: isDeliveryEnabled },
+    { id: 'reservations', label: 'Reservaciones', path: '/reservations', icon: calendarOutline, isVisible: isReservationsEnabled },
+    { id: 'customers', label: 'Clientes', path: '/customers', icon: personCircleOutline, isVisible: true },
+    { id: 'delivery-zones', label: 'Zonas Delivery', path: '/delivery-zones', icon: mapOutline, isVisible: isDeliveryEnabled },
+    { id: 'users', label: 'Usuarios', path: '/users', icon: peopleOutline, isVisible: user?.role === UserRole.ADMIN },
+    { id: 'feedback', label: 'Ayuda y Comentarios', path: '/feedback', icon: chatbubbleOutline, isVisible: true },
+    { id: 'settings', label: 'Configuración', path: '/settings', icon: settingsOutline, isVisible: user?.role === UserRole.ADMIN }
   ];
 
-  let appPages = rawPages.filter(p => !p.conditional || (p.conditional === 'featureProduction' ? settings.featureProduction !== false : settings[p.conditional]));
+  let visibleItems: NavItem[] = navItems.filter(i => i.isVisible);
 
   if (!user?.tenantId) {
-    appPages = [];
+    visibleItems = [];
   } else if (user?.role === UserRole.POS) {
-    appPages = appPages.filter(p => ['/pos', '/orders', '/calculator', '/reservations', '/customers'].includes(p.url));
+    visibleItems = visibleItems.filter(i => ['/pos', '/orders', '/calculator', '/reservations', '/customers'].includes(i.path));
   } else if (user?.role === UserRole.KITCHEN) {
-    appPages = appPages.filter(p => settings?.featureProduction === false ? ['/orders'].includes(p.url) : ['/orders', '/production'].includes(p.url));
+    visibleItems = visibleItems.filter(i => isProductionEnabled ? ['/orders', '/production'].includes(i.path) : ['/orders'].includes(i.path));
   } else if (user?.role === UserRole.DELIVERY) {
-    appPages = appPages.filter(p => ['/delivery-panel', '/orders'].includes(p.url));
+    visibleItems = visibleItems.filter(i => ['/delivery-panel', '/orders'].includes(i.path));
   } else if (user?.role === UserRole.INVENTORY) {
-    appPages = appPages.filter(p => ['/raw-materials', '/products'].includes(p.url));
+    visibleItems = visibleItems.filter(i => ['/raw-materials', '/products'].includes(i.path));
   }
 
   if (isSuperAdmin) {
-    appPages = [
-      { title: 'Plataforma SaaS', url: '/platform-admin', iosIcon: shieldCheckmarkOutline, mdIcon: shieldCheckmarkOutline },
-      { title: 'Mensajes de Soporte', url: '/feedback', iosIcon: chatbubbleOutline, mdIcon: chatbubbleOutline },
+    visibleItems = [
+      { id: 'platform-admin', label: 'Plataforma SaaS', path: '/platform-admin', icon: shieldCheckmarkOutline, isVisible: true },
+      { id: 'feedback-admin', label: 'Mensajes de Soporte', path: '/feedback', icon: chatbubbleOutline, isVisible: true },
     ];
   }
 
@@ -215,16 +228,20 @@ const Menu: React.FC = () => {
         </div>
 
         <IonList id="inbox-list" style={{ paddingTop: 0 }}>
-          {appPages.map((appPage, index) => {
-            return (
-              <IonMenuToggle key={index} autoHide={false}>
-                <IonItem className={location.pathname === appPage.url ? 'selected' : ''} routerLink={appPage.url} routerDirection="none" lines="none" detail={false}>
-                  <IonIcon aria-hidden="true" slot="start" ios={appPage.iosIcon} md={appPage.mdIcon} />
-                  <IonLabel>{appPage.title}</IonLabel>
-                </IonItem>
-              </IonMenuToggle>
-            );
-          })}
+          {visibleItems.map((item) => (
+            <IonMenuToggle key={item.id} autoHide={false}>
+              <IonItem
+                className={location.pathname === item.path ? 'selected' : ''}
+                routerLink={item.path}
+                routerDirection="none"
+                lines="none"
+                detail={false}
+              >
+                <IonIcon aria-hidden="true" slot="start" icon={item.icon} />
+                <IonLabel>{item.label}</IonLabel>
+              </IonItem>
+            </IonMenuToggle>
+          ))}
         </IonList>
       </IonContent>
 

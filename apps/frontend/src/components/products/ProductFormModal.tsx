@@ -52,6 +52,29 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [availabilityType, setAvailabilityType] = useState<'INMEDIATO' | 'BAJO_ENCARGO'>('INMEDIATO');
   const [isSupplierPreorder, setIsSupplierPreorder] = useState(false);
 
+  const [settings, setSettings] = useState<any>(() => {
+    try {
+      const cached = localStorage.getItem('flujofino_cached_settings');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return {};
+  });
+
+  useEffect(() => {
+    apiClient.get('/settings').then(res => {
+      if (res.data) setSettings(res.data);
+    }).catch(() => {});
+  }, []);
+
+  const isProductionEnabled = settings.enableProduction !== undefined ? Boolean(settings.enableProduction) : (settings.featureProduction !== false);
+  const isRetailEnabled = settings.enableRetail !== undefined ? Boolean(settings.enableRetail) : (settings.featureBuySell !== false);
+  const isReservationsEnabled = settings.enableReservations !== undefined ? Boolean(settings.enableReservations) : Boolean(settings.featureCustomerSchedules);
+
+  const availableTypes: ('REVENTA' | 'FORMULA' | 'SERVICIO')[] = [];
+  if (isRetailEnabled) availableTypes.push('REVENTA');
+  if (isProductionEnabled) availableTypes.push('FORMULA');
+  availableTypes.push('SERVICIO');
+
   const isResale = selectedType === 'REVENTA';
   const isFormula = selectedType === 'FORMULA';
   const isService = selectedType === 'SERVICIO';
@@ -81,10 +104,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       }
       setSelectedStaffIds(staffIds);
     } else {
-      const initType = archetype || (isResaleOnly ? 'REVENTA' : 'REVENTA');
-      setSelectedType(initType);
+      let defaultType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = archetype || (isResaleOnly ? 'REVENTA' : 'REVENTA');
+      if (!availableTypes.includes(defaultType)) {
+        defaultType = availableTypes[0] || 'SERVICIO';
+      }
+      setSelectedType(defaultType);
       setName('');
-      setCategory(isCombo ? 'Combos' : initType === 'SERVICIO' ? 'Servicios' : 'General');
+      setCategory(isCombo ? 'Combos' : defaultType === 'SERVICIO' ? 'Servicios' : 'General');
       setSalePrice('');
       setEstimatedCost('');
       setStock('0');
@@ -93,7 +119,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setIsSupplierPreorder(false);
       setSelectedStaffIds([]);
     }
-  }, [product, isCombo, archetype, isResaleOnly, isOpen]);
+  }, [product, isCombo, archetype, isResaleOnly, isOpen, isProductionEnabled, isRetailEnabled]);
+
+  useEffect(() => {
+    if (!product && !availableTypes.includes(selectedType) && availableTypes.length > 0) {
+      setSelectedType(availableTypes[0]);
+    }
+  }, [availableTypes, product, selectedType]);
 
   const toggleStaff = (userId: string) => {
     setSelectedStaffIds(prev => 
@@ -195,50 +227,54 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               borderRadius: '10px',
               marginBottom: '16px'
             }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedType('REVENTA');
-                  if (category === 'Servicios') setCategory('General');
-                }}
-                style={{
-                  flex: 1,
-                  padding: '9px 6px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  fontWeight: selectedType === 'REVENTA' ? '700' : '500',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  backgroundColor: selectedType === 'REVENTA' ? '#ffffff' : 'transparent',
-                  color: selectedType === 'REVENTA' ? '#166534' : '#475569',
-                  boxShadow: selectedType === 'REVENTA' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                📦 Reventa Directa
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedType('FORMULA');
-                  if (category === 'Servicios') setCategory('General');
-                }}
-                style={{
-                  flex: 1,
-                  padding: '9px 6px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  fontWeight: selectedType === 'FORMULA' ? '700' : '500',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  backgroundColor: selectedType === 'FORMULA' ? '#ffffff' : 'transparent',
-                  color: selectedType === 'FORMULA' ? '#92400e' : '#475569',
-                  boxShadow: selectedType === 'FORMULA' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                🧪 Con Fórmula
-              </button>
+              {isRetailEnabled && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedType('REVENTA');
+                    if (category === 'Servicios') setCategory('General');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '9px 6px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: selectedType === 'REVENTA' ? '700' : '500',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    backgroundColor: selectedType === 'REVENTA' ? '#ffffff' : 'transparent',
+                    color: selectedType === 'REVENTA' ? '#166534' : '#475569',
+                    boxShadow: selectedType === 'REVENTA' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  📦 Reventa Directa
+                </button>
+              )}
+              {isProductionEnabled && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedType('FORMULA');
+                    if (category === 'Servicios') setCategory('General');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '9px 6px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: selectedType === 'FORMULA' ? '700' : '500',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    backgroundColor: selectedType === 'FORMULA' ? '#ffffff' : 'transparent',
+                    color: selectedType === 'FORMULA' ? '#92400e' : '#475569',
+                    boxShadow: selectedType === 'FORMULA' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  🧪 Con Fórmula
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -259,7 +295,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   transition: 'all 0.15s ease'
                 }}
               >
-                💆 Servicio / Cita
+                {isReservationsEnabled ? '💆 Servicio / Cita' : '💆 Servicio'}
               </button>
             </div>
           )}
@@ -341,21 +377,27 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
             {isService && (
               <>
-                <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', '--background': '#ffffff' } as any}>
-                  <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <IonIcon icon={timeOutline} /> Duración Estimada (Minutos)
-                  </IonLabel>
-                  <IonInput 
-                    type="number" 
-                    value={durationMinutes} 
-                    onIonInput={e => setDurationMinutes(e.detail.value!)} 
-                    placeholder="Ej. 30, 45, 60..." 
-                    min="5"
-                    step="5"
-                  />
-                </IonItem>
+                {isReservationsEnabled ? (
+                  <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', '--background': '#ffffff' } as any}>
+                    <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <IonIcon icon={timeOutline} /> Duración Estimada (Minutos)
+                    </IonLabel>
+                    <IonInput 
+                      type="number" 
+                      value={durationMinutes} 
+                      onIonInput={e => setDurationMinutes(e.detail.value!)} 
+                      placeholder="Ej. 30, 45, 60..." 
+                      min="5"
+                      step="5"
+                    />
+                  </IonItem>
+                ) : null}
                 <div style={{ padding: '10px 12px', backgroundColor: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe', color: '#1e40af', fontSize: '13px', marginTop: '10px' }}>
-                  💆 <b>Servicio / Cita:</b> No maneja stock físico. Si para realizar este servicio consumes insumos o materiales de trabajo (ej. tintes, desinfectante, etc.), podrás vincularlos en "Configurar Insumos del Servicio" desde la tarjeta.
+                  {isReservationsEnabled ? (
+                    <>💆 <b>Servicio / Cita:</b> No maneja stock físico. Si para realizar este servicio consumes insumos o materiales de trabajo (ej. tintes, desinfectante, etc.), podrás vincularlos en "Configurar Insumos del Servicio" desde la tarjeta.</>
+                  ) : (
+                    <>💆 <b>Servicio Directo:</b> No maneja stock físico. Diseñado para facturar mano de obra, trabajos o atenciones directamente en Caja (POS).</>
+                  )}
                 </div>
               </>
             )}
@@ -439,8 +481,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             </div>
           )}
 
-          {/* Assigned Staff Card - Solo para Servicios */}
-          {isService && (
+          {/* Assigned Staff Card - Solo para Servicios con módulo de citas activo */}
+          {isService && isReservationsEnabled && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>

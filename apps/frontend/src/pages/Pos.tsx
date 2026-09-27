@@ -61,6 +61,9 @@ type Product = {
   isPreAssembled?: boolean;
   comboItems?: any[];
   product_type?: string;
+  physicalStock?: number;
+  stock?: number;
+  is_service?: boolean;
 };
 
 type CartItem = {
@@ -903,7 +906,12 @@ const Pos: React.FC = () => {
           <IonGrid style={{ padding: 0, marginTop: '8px' }}>
             <IonRow>
               {filteredProducts.map(p => {
-                const isService = settings?.featureProduction === false || p.category === 'Servicios' || !!p.durationMinutes;
+                const isService = p.is_service === true || p.product_type === 'SERVICIO' || p.category === 'Servicios' || Boolean(p.durationMinutes);
+                const isFormula = Boolean((p.recipe && p.recipe.length > 0) || p.product_type === 'FORMULA' || (p.isCombo && p.isPreAssembled));
+                const physicalStockVal = Number(p.physicalStock ?? 0);
+                const regularStockVal = Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.physicalStock ?? p.stockQuantity ?? 0));
+                const currentPhysicalStock = isFormula ? physicalStockVal : regularStockVal;
+
                 const img = Array.isArray(p.images) && p.images.length > 0
                   ? p.images[p.images.length - 1]
                   : (typeof p.images === 'string' && p.images ? (p.images as string).split(',').pop()?.trim() : null);
@@ -1012,13 +1020,13 @@ const Pos: React.FC = () => {
                               fontWeight: '600',
                               padding: '3px 8px',
                               borderRadius: '6px',
-                              background: isService ? '#ECFDF5' : (p.stockQuantity <= 0 ? '#FEF2F2' : '#F1F5F9'),
-                              color: isService ? '#047857' : (p.stockQuantity <= 0 ? '#991B1B' : '#475569')
+                              background: isService ? '#ECFDF5' : (currentPhysicalStock <= 0 ? '#FEF2F2' : '#F1F5F9'),
+                              color: isService ? '#047857' : (currentPhysicalStock <= 0 ? '#991B1B' : '#475569')
                             }}
                           >
                             {isService
                               ? (p.durationMinutes ? `⏱️ ${p.durationMinutes}m` : 'Servicio')
-                              : (p.stockQuantity <= 0 ? 'Agotado' : `Stock: ${p.stockQuantity}`)}
+                              : (currentPhysicalStock <= 0 ? 'Agotado' : `${currentPhysicalStock} en stock`)}
                           </span>
 
                           {/* Circular Add Button */}
