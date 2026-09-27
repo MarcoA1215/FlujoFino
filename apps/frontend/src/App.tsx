@@ -25,6 +25,8 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import DeliveryPanel from './pages/DeliveryPanel';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { ImageViewerProvider } from './context/ImageViewerContext';
+import { LoadingProvider } from './context/LoadingContext';
+import { LoadingOverlay } from './components/common/LoadingOverlay';
 import { UserRole } from '@nutrideli/shared-types';
 import { useContext, useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -112,13 +114,16 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <ImageViewerProvider>
-        <IonApp>
-          <IonReactRouter>
-            <ErrorBoundary>
-              <MainLayout />
-            </ErrorBoundary>
-          </IonReactRouter>
-        </IonApp>
+        <LoadingProvider>
+          <IonApp>
+            <LoadingOverlay />
+            <IonReactRouter>
+              <ErrorBoundary>
+                <MainLayout />
+              </ErrorBoundary>
+            </IonReactRouter>
+          </IonApp>
+        </LoadingProvider>
       </ImageViewerProvider>
     </AuthProvider>
   );
