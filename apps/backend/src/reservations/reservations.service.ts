@@ -5,6 +5,7 @@ import { Reservation } from '../entities/reservation.entity';
 import { ReservationStatus, PaymentStatus } from '@nutrideli/shared-types';
 import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { StorageService } from '../storage/storage.service';
 import { NotFoundException } from '@nestjs/common';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class ReservationsService {
     private repo: Repository<Reservation>,
     private readonly customersService: CustomersService,
     private readonly notificationsService: NotificationsService,
+    private readonly storageService: StorageService,
   ) {}
 
   findAll(tenantId: string) {
@@ -354,6 +356,25 @@ export class ReservationsService {
         ? `Notificación enviada con éxito (${sent} dispositivo/s notificado/s).` 
         : `No se encontraron suscripciones push activas para el cliente.`,
     };
+  }
+
+  async uploadMedia(tenantId: string, id: string, file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('Archivo requerido');
+    const reservation = await this.repo.findOne({ where: { id, tenantId } });
+    if (!reservation) throw new NotFoundException('Reservación no encontrada');
+
+    const url = await this.storageService.uploadFile(file, `tenant-${tenantId}/reservations`);
+    reservation.imageUrl = url;
+    await this.repo.save(reservation);
+    return { url, reservation };
+  }
+
+  async removeMedia(tenantId: string, id: string) {
+    const reservation = await this.repo.findOne({ where: { id, tenantId } });
+    if (!reservation) throw new NotFoundException('Reservación no encontrada');
+    reservation.imageUrl = null;
+    await this.repo.save(reservation);
+    return { success: true, reservation };
   }
 }
 

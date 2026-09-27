@@ -41,7 +41,6 @@ export class RawMaterial {
   @OneToMany(() => RecipeItem, recipeItem => recipeItem.rawMaterial)
   recipeItems: RecipeItem[];
 
-  @CreateDateColumn()
   @Column({ default: true })
   isActive: boolean;
 

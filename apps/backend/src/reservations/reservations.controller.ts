@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ReservationsService } from './reservations.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -35,6 +36,17 @@ export class ReservationsController {
   @Delete(':id')
   delete(@Request() req, @Param('id') id: string) {
     return this.service.delete(req.user.tenantId, id);
+  }
+
+  @Post(':id/media')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadMedia(@Request() req, @Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+    return this.service.uploadMedia(req.user.tenantId, id, file);
+  }
+
+  @Delete(':id/media')
+  removeMedia(@Request() req, @Param('id') id: string) {
+    return this.service.removeMedia(req.user.tenantId, id);
   }
 
   @Post(':id/abono')

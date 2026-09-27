@@ -413,6 +413,7 @@ const Pos: React.FC = () => {
   };
 
   const openCustomizeModal = (p: Product, cartItem?: CartItem) => {
+    if (!p.recipe || p.recipe.length === 0) return;
     if (showCheckoutModal) {
       setReturnToCheckout(true);
       setShowCheckoutModal(false);
@@ -1165,27 +1166,29 @@ const Pos: React.FC = () => {
                           </div>
                         )}
 
-                        <div style={{ marginTop: '6px' }}>
-                          <button
-                            type="button"
-                            onClick={() => openCustomizeModal(item.product, item)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '4px 9px',
-                              borderRadius: '6px',
-                              background: '#ECFDF5',
-                              color: '#065F46',
-                              border: '1px solid #A7F3D0',
-                              fontSize: '11px',
-                              fontWeight: '700',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            ⚙️ {item.hasModifications ? 'Editar Personalización' : 'Personalizar (Quitar / Extras)'}
-                          </button>
-                        </div>
+                        {Boolean(Array.isArray(item.product?.recipe) && item.product.recipe.length > 0) && (
+                          <div style={{ marginTop: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={() => openCustomizeModal(item.product, item)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 9px',
+                                borderRadius: '6px',
+                                background: '#ECFDF5',
+                                color: '#065F46',
+                                border: '1px solid #A7F3D0',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              ⚙️ {item.hasModifications ? 'Editar Personalización' : 'Personalizar (Quitar / Extras)'}
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1982,137 +1985,139 @@ const Pos: React.FC = () => {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
-              {/* Sección 1: Quitar Insumos */}
               {customizingProduct?.recipe && customizingProduct.recipe.length > 0 ? (
-                <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
-                  <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    🥗 Ingredientes de la Receta (Toca para quitar)
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {customizingProduct.recipe.map((ri: any) => {
-                      const rm = ri.rawMaterial || availableRawMaterials.find(m => m.id === ri.rawMaterialId);
-                      const rmName = rm?.name || ri.rawMaterialName || 'Insumo';
-                      const isRemoved = customRemovedIngredients.includes(rmName);
+                <>
+                  {/* Sección 1: Quitar Insumos */}
+                  <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
+                    <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🥗 Ingredientes de la Receta (Toca para quitar)
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {customizingProduct.recipe.map((ri: any) => {
+                        const rm = ri.rawMaterial || availableRawMaterials.find(m => m.id === ri.rawMaterialId);
+                        const rmName = rm?.name || ri.rawMaterialName || 'Insumo';
+                        const isRemoved = customRemovedIngredients.includes(rmName);
 
-                      return (
-                        <div
-                          key={ri.id || ri.rawMaterialId}
-                          onClick={() => {
-                            if (isRemoved) {
-                              setCustomRemovedIngredients(prev => prev.filter(n => n !== rmName));
-                            } else {
-                              setCustomRemovedIngredients(prev => [...prev, rmName]);
-                            }
-                          }}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '10px 12px',
-                            borderRadius: '10px',
-                            border: `1px solid ${isRemoved ? '#FCA5A5' : '#E2E8F0'}`,
-                            background: isRemoved ? '#FEF2F2' : '#F8FAFC',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontSize: '13px', fontWeight: '700', color: isRemoved ? '#991B1B' : '#0F172A', textDecoration: isRemoved ? 'line-through' : 'none' }}>
-                              {rmName}
+                        return (
+                          <div
+                            key={ri.id || ri.rawMaterialId}
+                            onClick={() => {
+                              if (isRemoved) {
+                                setCustomRemovedIngredients(prev => prev.filter(n => n !== rmName));
+                              } else {
+                                setCustomRemovedIngredients(prev => [...prev, rmName]);
+                              }
+                            }}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '10px 12px',
+                              borderRadius: '10px',
+                              border: `1px solid ${isRemoved ? '#FCA5A5' : '#E2E8F0'}`,
+                              background: isRemoved ? '#FEF2F2' : '#F8FAFC',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: '700', color: isRemoved ? '#991B1B' : '#0F172A', textDecoration: isRemoved ? 'line-through' : 'none' }}>
+                                {rmName}
+                              </div>
+                              <div style={{ fontSize: '11px', color: isRemoved ? '#DC2626' : '#64748B', fontWeight: isRemoved ? '700' : '500' }}>
+                                {isRemoved ? '❌ Se quitará de la preparación' : '✓ Incluido'}
+                              </div>
                             </div>
-                            <div style={{ fontSize: '11px', color: isRemoved ? '#DC2626' : '#64748B', fontWeight: isRemoved ? '700' : '500' }}>
-                              {isRemoved ? '❌ Se quitará de la preparación' : '✓ Incluido'}
-                            </div>
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              background: isRemoved ? '#DC2626' : '#E2E8F0',
+                              color: isRemoved ? '#FFFFFF' : '#475569'
+                            }}>
+                              {isRemoved ? 'QUITADO' : 'INCLUIDO'}
+                            </span>
                           </div>
-                          <span style={{
-                            padding: '4px 10px',
-                            borderRadius: '6px',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            background: isRemoved ? '#DC2626' : '#E2E8F0',
-                            color: isRemoved ? '#FFFFFF' : '#475569'
-                          }}>
-                            {isRemoved ? 'QUITADO' : 'INCLUIDO'}
-                          </span>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+
+                  {/* Sección 2: Agregar Extras */}
+                  <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
+                    <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      ✨ Adicionales / Extras Disponibles
+                    </h4>
+
+                    {availableRawMaterials.filter(rm => rm.allowAsExtra).length === 0 ? (
+                      <div style={{ background: '#FFFBEB', borderRadius: '12px', padding: '14px', border: '1px solid #FDE68A', textAlign: 'center' }}>
+                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#92400E', marginBottom: '4px' }}>
+                          ⚠️ No hay adicionales habilitados como Extra
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#78350F' }}>
+                          Ve a <strong>Inventario (Insumos)</strong> y activa la opción <strong>"🍔 Vender como Adicional / Extra"</strong> en los insumos que desees ofrecer con recargo (Queso, Tocineta, Salsas, etc.).
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {availableRawMaterials.filter(rm => rm.allowAsExtra).map(rm => {
+                          const price = getExtraPrice(rm);
+                          const qty = customExtras[rm.id] || 0;
+
+                          return (
+                            <div
+                              key={rm.id}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: '10px 12px',
+                                borderRadius: '10px',
+                                border: `1px solid ${qty > 0 ? '#86EFAC' : '#E2E8F0'}`,
+                                background: qty > 0 ? '#F0FDF4' : '#F8FAFC'
+                              }}
+                            >
+                              <div>
+                                <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>
+                                  {rm.name}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#16A34A', fontWeight: '700' }}>
+                                  +${price.toFixed(2)} USD (Bs. {(price * exchangeRate).toFixed(2)})
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <button
+                                  type="button"
+                                  disabled={qty <= 0}
+                                  onClick={() => setCustomExtras(prev => ({ ...prev, [rm.id]: Math.max(0, (prev[rm.id] || 0) - 1) }))}
+                                  style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#ffffff', fontWeight: '700', cursor: qty > 0 ? 'pointer' : 'default', opacity: qty > 0 ? 1 : 0.4 }}
+                                >
+                                  -
+                                </button>
+                                <span style={{ fontSize: '14px', fontWeight: '800', minWidth: '20px', textAlign: 'center' }}>
+                                  {qty}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setCustomExtras(prev => ({ ...prev, [rm.id]: (prev[rm.id] || 0) + 1 }))}
+                                  style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #10B981', background: '#ECFDF5', color: '#047857', fontWeight: '700', cursor: 'pointer' }}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
               ) : (
-                <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '12px 16px', marginBottom: '16px', border: '1px solid #E2E8F0', fontSize: '12px', color: '#64748B' }}>
-                  ℹ️ <em>Este producto no tiene insumos configurados en su receta para retirar. Puedes agregarle Adicionales / Extras a continuación:</em>
+                <div style={{ background: '#FFFBEB', borderRadius: '14px', padding: '16px', border: '1px solid #FDE68A', textAlign: 'center', color: '#92400E', fontSize: '13px' }}>
+                  ℹ️ Este producto no cuenta con receta ni insumos para personalizar o añadir extras.
                 </div>
               )}
-
-              {/* Sección 2: Agregar Extras */}
-              <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
-                <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  ✨ Adicionales / Extras Disponibles
-                </h4>
-
-                {availableRawMaterials.filter(rm => rm.allowAsExtra).length === 0 ? (
-                  <div style={{ background: '#FFFBEB', borderRadius: '12px', padding: '14px', border: '1px solid #FDE68A', textAlign: 'center' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '800', color: '#92400E', marginBottom: '4px' }}>
-                      ⚠️ No hay adicionales habilitados como Extra
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#78350F' }}>
-                      Ve a <strong>Inventario (Insumos)</strong> y activa la opción <strong>"🍔 Vender como Adicional / Extra"</strong> en los insumos que desees ofrecer con recargo (Queso, Tocineta, Salsas, etc.).
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {availableRawMaterials.filter(rm => rm.allowAsExtra).map(rm => {
-                      const price = getExtraPrice(rm);
-                      const qty = customExtras[rm.id] || 0;
-
-                      return (
-                        <div
-                          key={rm.id}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '10px 12px',
-                            borderRadius: '10px',
-                            border: `1px solid ${qty > 0 ? '#86EFAC' : '#E2E8F0'}`,
-                            background: qty > 0 ? '#F0FDF4' : '#F8FAFC'
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>
-                              {rm.name}
-                            </div>
-                            <div style={{ fontSize: '11px', color: '#16A34A', fontWeight: '700' }}>
-                              +${price.toFixed(2)} USD (Bs. {(price * exchangeRate).toFixed(2)})
-                            </div>
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button
-                              type="button"
-                              disabled={qty <= 0}
-                              onClick={() => setCustomExtras(prev => ({ ...prev, [rm.id]: Math.max(0, (prev[rm.id] || 0) - 1) }))}
-                              style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#ffffff', fontWeight: '700', cursor: qty > 0 ? 'pointer' : 'default', opacity: qty > 0 ? 1 : 0.4 }}
-                            >
-                              -
-                            </button>
-                            <span style={{ fontSize: '14px', fontWeight: '800', minWidth: '20px', textAlign: 'center' }}>
-                              {qty}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setCustomExtras(prev => ({ ...prev, [rm.id]: (prev[rm.id] || 0) + 1 }))}
-                              style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #10B981', background: '#ECFDF5', color: '#047857', fontWeight: '700', cursor: 'pointer' }}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Modal Footer: Total & Add button */}

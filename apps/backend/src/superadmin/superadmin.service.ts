@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Tenant } from '../entities/tenant.entity';
 import { SaaSPaymentReport } from '../entities/saas-payment-report.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { PlatformConfig } from '../entities/platform-config.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { UpdatePlatformConfigDto } from './dto/update-platform-config.dto';
 import {
   TenantPlanType,
@@ -19,6 +20,8 @@ import {
 
 @Injectable()
 export class SuperAdminService {
+  private readonly logger = new Logger(SuperAdminService.name);
+
   constructor(
     @InjectRepository(Tenant)
     private readonly tenantRepo: Repository<Tenant>,
@@ -28,6 +31,7 @@ export class SuperAdminService {
     private readonly userAccessRepo: Repository<UserTenantAccess>,
     @InjectRepository(PlatformConfig)
     private readonly platformConfigRepo: Repository<PlatformConfig>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -122,6 +126,25 @@ export class SuperAdminService {
       trialDaysLeft = Math.max(0, diff);
     }
 
+    let daysLeft = trialDaysLeft;
+    if (tenant.status === TenantStatus.ACTIVE) {
+      if (tenant.current_period_ends_at) {
+        const periodEnd = new Date(tenant.current_period_ends_at).getTime();
+        daysLeft = Math.max(0, Math.ceil((periodEnd - now) / 86400000));
+      } else {
+        daysLeft = 30;
+      }
+    } else if (tenant.status === TenantStatus.SUSPENDED || tenant.status === TenantStatus.PAST_DUE) {
+      daysLeft = 0;
+    }
+
+    const isExpired =
+      !tenant.isActive ||
+      tenant.status === TenantStatus.SUSPENDED ||
+      tenant.status === TenantStatus.PAST_DUE ||
+      (tenant.status === TenantStatus.TRIAL && trialDaysLeft <= 0) ||
+      (tenant.status === TenantStatus.ACTIVE && daysLeft <= 0 && !!tenant.current_period_ends_at);
+
     return {
       tenantId: tenant.id,
       tenantName: tenant.name,
@@ -134,6 +157,8 @@ export class SuperAdminService {
       discountPercentage: feeCalc.discountPercentage,
       finalFee: feeCalc.finalFee,
       trialDaysLeft,
+      daysLeft,
+      isExpired,
       trialEndsAt: tenant.trial_ends_at ? new Date(tenant.trial_ends_at).toISOString() : undefined,
       currentPeriodEndsAt: tenant.current_period_ends_at
         ? new Date(tenant.current_period_ends_at).toISOString()
@@ -376,7 +401,29 @@ export class SuperAdminService {
       status: SaaSPaymentStatus.PENDING,
     });
 
-    return await this.paymentReportRepo.save(report);
+    const saved = await this.paymentReportRepo.save(report);
+
+    try {
+      const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+      const storeName = tenant?.name || 'Un negocio';
+      const formattedAmount = Number(data.amount).toFixed(2);
+      const ref = data.reference.trim();
+
+      await this.notificationsService.notifySuperAdmin({
+        title: '¡Nuevo Pago de Suscripción Reportado!',
+        body: `${storeName} reportó $${formattedAmount} USD (Ref: ${ref}). Toca para revisar y aprobar.`,
+        data: {
+          url: '/superadmin/payments',
+          reportId: saved.id,
+          tenantId,
+          type: 'SAAS_PAYMENT_REPORT',
+        },
+      });
+    } catch (err: any) {
+      this.logger.error(`Error notifying superadmin of payment report: ${err.message}`);
+    }
+
+    return saved;
   }
 
   /**

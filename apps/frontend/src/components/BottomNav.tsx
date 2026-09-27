@@ -21,6 +21,7 @@ const BottomNav: React.FC = () => {
     location.pathname === '/login' ||
     location.pathname === '/register' ||
     location.pathname === '/select-workspace' ||
+    location.pathname === '/subscription-expired' ||
     location.pathname === '/platform-admin';
 
   if (isPublicRoute) return null;

@@ -20,6 +20,7 @@ export class NotificationsController {
       dto.identifier,
       dto.subscription,
       dto.negocioId,
+      dto.role,
     );
     return { success: true, id: saved?.id };
   }

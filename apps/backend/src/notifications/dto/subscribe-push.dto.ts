@@ -17,4 +17,9 @@ export class SubscribePushDto {
   @IsOptional()
   @IsString()
   negocioId?: string;
+
+  @IsOptional()
+  @IsString()
+  role?: string;
 }
+

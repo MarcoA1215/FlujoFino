@@ -24,6 +24,7 @@ const PublicBooking: React.FC = () => {
   const { openImage } = useImageViewer();
   const { tenantId } = useParams<{ tenantId: string }>();
   const [tenantInfo, setTenantInfo] = useState<any>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [presentToast] = useIonToast();
 
@@ -186,23 +187,34 @@ const PublicBooking: React.FC = () => {
   useEffect(() => {
     const fetchTenant = async () => {
       try {
+        setErrorMsg(null);
         const res = await axios.get(`${apiBase}/public/reservations/tenant/${tenantId}`);
+        if (res.data?.isSuspended) {
+          setTenantInfo(res.data);
+          setLoading(false);
+          return;
+        }
+        if (res.data.featureCustomerSchedules === false) {
+          setErrorMsg('El sistema de citas y reservaciones se encuentra temporalmente desactivado');
+          setLoading(false);
+          return;
+        }
         setTenantInfo(res.data);
         
-        // If business is pure retail/recipes without customer schedules, redirect to online store
-        if ((res.data.featureBuySell || res.data.featureRecipes) && !res.data.featureCustomerSchedules) {
+        // If business is pure retail/recipes without customer schedules, redirect to online store (if catalog is active)
+        if ((res.data.featureBuySell || res.data.featureRecipes) && res.data.featureShowCatalog !== false && !res.data.featureCustomerSchedules) {
           window.location.replace(`/store/${tenantId}`);
           return;
         }
 
-        // If require service is NOT enabled and no services are defined, skip step 1
-        if (!res.data.bookingRequireService && (!res.data.services || res.data.services.length === 0)) {
+        // If require service is NOT enabled, skip step 1 directly to date/time selection (step 2)
+        if (res.data.bookingRequireService === false) {
           setStep(2);
         } else {
           setStep(1);
         }
-      } catch (e) {
-        presentToast({ message: 'Error cargando información', duration: 3000, color: 'danger' });
+      } catch (e: any) {
+        setErrorMsg(e.response?.data?.message || 'Error cargando información');
       } finally {
         setLoading(false);
       }
@@ -390,6 +402,95 @@ const PublicBooking: React.FC = () => {
 
   if (loading) return <IonPage><IonContent className="ion-padding ion-text-center"><IonSpinner /></IonContent></IonPage>;
 
+  if (tenantInfo?.isSuspended) {
+    const rawPhone = tenantInfo?.companyPhone || '';
+    const cleanPhone = rawPhone.replace(/\D/g, '');
+    const waPhone = cleanPhone.startsWith('58')
+      ? cleanPhone
+      : cleanPhone.startsWith('0')
+      ? `58${cleanPhone.slice(1)}`
+      : cleanPhone;
+
+    const waMsg = encodeURIComponent(
+      `Hola, me gustaría consultar información directamente con ${tenantInfo?.name || 'su negocio'}.`
+    );
+    const waUrl = waPhone ? `https://wa.me/${waPhone}?text=${waMsg}` : undefined;
+
+    return (
+      <IonPage>
+        <IonContent className="ion-padding" style={{ backgroundColor: '#f8fafc' }}>
+          <div
+            style={{
+              maxWidth: '480px',
+              margin: '18vh auto 0 auto',
+              textAlign: 'center',
+              background: '#ffffff',
+              padding: '36px 24px',
+              borderRadius: '20px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+              border: '1px solid #e2e8f0',
+            }}
+          >
+            <div
+              style={{
+                width: '72px',
+                height: '72px',
+                borderRadius: '50%',
+                backgroundColor: '#f1f5f9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px auto',
+                fontSize: '32px',
+                color: '#64748b',
+              }}
+            >
+              🏪
+            </div>
+
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0' }}>
+              {tenantInfo?.name || 'Negocio'}
+            </h2>
+
+            <h1 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#475569', margin: '0 0 14px 0' }}>
+              Tienda temporalmente en pausa
+            </h1>
+
+            <p style={{ color: '#64748b', fontSize: '0.92rem', lineHeight: 1.5, margin: '0 0 24px 0' }}>
+              En este momento {tenantInfo?.name || 'este negocio'} no está recibiendo pedidos en línea. Estaremos de vuelta muy pronto.
+            </p>
+
+            {waUrl ? (
+              <IonButton
+                expand="block"
+                color="success"
+                href={waUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontWeight: 700, '--border-radius': '12px' }}
+              >
+                <IonIcon slot="start" icon={logoWhatsapp} style={{ fontSize: '1.25rem' }} />
+                Consultar directamente por WhatsApp
+              </IonButton>
+            ) : null}
+          </div>
+        </IonContent>
+      </IonPage>
+    );
+  }
+
+  if (errorMsg) {
+    return (
+      <IonPage>
+        <IonContent className="ion-padding ion-text-center">
+          <div style={{ marginTop: '25vh' }}>
+            <h2>⚠️ {errorMsg}</h2>
+          </div>
+        </IonContent>
+      </IonPage>
+    );
+  }
+
   if (success) {
     return (
       <IonPage>
@@ -447,13 +548,20 @@ const PublicBooking: React.FC = () => {
     return s.is_service === true || s.category === 'Servicios';
   });
   const hasServices = availableServices.length > 0;
-  const isServiceRequired = tenantInfo?.bookingRequireService;
-  const hasStore = Boolean(tenantInfo?.hasStore ?? (tenantInfo?.featureBuySell || tenantInfo?.featureRecipes));
+  const isServiceRequired = tenantInfo?.bookingRequireService !== false;
+  const hasStore = Boolean(tenantInfo?.hasStore ?? ((tenantInfo?.featureBuySell || tenantInfo?.featureRecipes) && tenantInfo?.featureShowCatalog !== false));
   const companyPhone = tenantInfo?.companyPhone || tenantInfo?.settings?.companyPhone || '';
   const headerColor = tenantInfo?.settings?.themeHeaderColor || '#0f172a';
 
+  // Ensure step 1 is never active if bookingRequireService is disabled
+  useEffect(() => {
+    if (tenantInfo && !isServiceRequired && step === 1) {
+      setStep(2);
+    }
+  }, [tenantInfo, isServiceRequired, step]);
+
   const goBack = () => {
-    if (step === 2 && (tenantInfo?.bookingRequireService || selectedServices.length > 0 || hasServices)) {
+    if (step === 2 && isServiceRequired) {
       setStep(1);
     } else if (step === 3) {
       setStep(2);
@@ -467,7 +575,7 @@ const PublicBooking: React.FC = () => {
       {/* Header matching PublicStore */}
       <IonHeader>
         <IonToolbar style={{ ['--background' as any]: headerColor, color: '#fff' }}>
-          {step > 1 ? (
+          {step > (isServiceRequired ? 1 : 2) ? (
             <IonButtons slot="start">
               <IonButton fill="clear" onClick={goBack} style={{ color: '#fff' }} title="Regresar">
                 <IonIcon slot="icon-only" icon={chevronBackOutline} />
@@ -633,15 +741,13 @@ const PublicBooking: React.FC = () => {
           <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 14px rgba(0,0,0,0.04)', padding: '24px' }}>
               
               {/* STEP 1: SERVICES & SPECIALIST */}
-              {step === 1 && (
+              {step === 1 && isServiceRequired && (
                 <div>
                   <h3 style={{ fontWeight: '800', marginBottom: '4px', textAlign: 'center', fontSize: '18px', color: '#0F172A' }}>
-                    {isServiceRequired ? 'Elige tu(s) Servicio(s)' : 'Selecciona tu(s) Servicio(s) (Opcional)'}
+                    Selecciona tu(s) Servicio(s)
                   </h3>
                   <p style={{ textAlign: 'center', color: '#64748b', fontSize: '13px', margin: '0 0 20px 0' }}>
-                    {isServiceRequired 
-                      ? 'Puedes seleccionar uno o varios servicios para agendarlos en una sola cita' 
-                      : 'Elige uno o más servicios o avanza directamente para reservar'}
+                    Puedes seleccionar uno o varios servicios para agendarlos en una sola cita
                   </p>
 
                   {/* Services List */}
@@ -1533,7 +1639,7 @@ const PublicBooking: React.FC = () => {
                 whiteSpace: 'nowrap'
               }}
             >
-              💅 Servicios ({catalogItems.filter(i => i.type === 'service').length})
+              💅 Servicios ({catalogItems.filter(i => i.type === 'service' || i.productId).length})
             </button>
             <button
               onClick={() => setPortfolioTab('WORK')}
@@ -1557,7 +1663,7 @@ const PublicBooking: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', padding: '12px' }}>
             {catalogItems
               .filter(item => {
-                if (portfolioTab === 'SERVICE') return item.type === 'service';
+                if (portfolioTab === 'SERVICE') return item.type === 'service' || item.productId || item.type === 'work';
                 if (portfolioTab === 'WORK') return item.type === 'work';
                 return true;
               })
@@ -1585,7 +1691,7 @@ const PublicBooking: React.FC = () => {
                       boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
                       zIndex: 2,
                     }}>
-                      {item.type === 'service' ? '💅 Servicio' : '✨ Trabajo'}
+                      {item.type === 'service' ? '💅 Servicio Disponible' : '✨ Trabajo Realizado'}
                     </div>
                   </div>
                   <IonCardContent style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -1593,7 +1699,7 @@ const PublicBooking: React.FC = () => {
                       <h3 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#1e293b', lineHeight: '1.3' }}>{item.title}</h3>
                       <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>{item.subtitle}</p>
                     </div>
-                    {item.type === 'service' && item.productId && (
+                    {item.productId && isServiceRequired && (
                       <IonButton 
                         size="small" 
                         expand="block" 

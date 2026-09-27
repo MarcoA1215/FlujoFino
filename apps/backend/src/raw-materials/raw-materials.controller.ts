@@ -22,6 +22,10 @@ export class RawMaterialsController {
   update(@Request() req: any, @Param('id') id: string, @Body() dto: UpdateRawMaterialDto) {
     return this.rawMaterialsService.update(req.user.tenantId, id, dto);}
 
+  @Patch(':id/archive')
+  archive(@Request() req: any, @Param('id') id: string) {
+    return this.rawMaterialsService.archive(req.user.tenantId, id);}
+
   @Post(':id/restock')
   restock(@Request() req: any, @Param('id') id: string, @Body() dto: RestockRawMaterialDto) {
     return this.rawMaterialsService.restock(req.user.tenantId, id, dto);}

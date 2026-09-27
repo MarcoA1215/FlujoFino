@@ -6,10 +6,12 @@ import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { PlatformConfig } from '../entities/platform-config.entity';
 import { SuperAdminService } from './superadmin.service';
 import { SuperAdminController } from './superadmin.controller';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Tenant, SaaSPaymentReport, UserTenantAccess, PlatformConfig]),
+    NotificationsModule,
   ],
   controllers: [SuperAdminController],
   providers: [SuperAdminService],

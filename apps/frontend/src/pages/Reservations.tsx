@@ -27,7 +27,9 @@ import {
   closeCircleOutline,
   alertCircleOutline,
   closeOutline,
-  arrowForwardOutline
+  arrowForwardOutline,
+  cameraOutline,
+  imageOutline
 } from 'ionicons/icons';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -38,13 +40,16 @@ import { apiClient } from '../api/client';
 import { ReservationStatus } from '@nutrideli/shared-types';
 import { offlineDb } from '../services/offline-db';
 import { AuthContext } from '../context/AuthContext';
+import { useImageViewer } from '../context/ImageViewerContext';
 import AppHeader from '../components/AppHeader';
 
 const Reservations: React.FC = () => {
   const { user } = useContext(AuthContext);
+  const { openImage } = useImageViewer();
   const router = useIonRouter();
   const [reservations, setReservations] = useState<any[]>([]);
   const [presentToast] = useIonToast();
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
 
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -329,6 +334,38 @@ const Reservations: React.FC = () => {
     }
   };
 
+  const handleUploadPhoto = async (reservationId: string, file: File) => {
+    try {
+      setUploadingPhotoId(reservationId);
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await apiClient.post(`/reservations/${reservationId}/media`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const updatedUrl = res.data.url;
+      setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, imageUrl: updatedUrl } : r));
+      setSelectedEvent(prev => (prev && prev.id === reservationId ? { ...prev, imageUrl: updatedUrl } : prev));
+      presentToast({ message: 'Foto del servicio guardada con éxito', duration: 2500, color: 'success' });
+    } catch (err: any) {
+      console.error(err);
+      presentToast({ message: 'Error al subir la foto', duration: 3000, color: 'danger' });
+    } finally {
+      setUploadingPhotoId(null);
+    }
+  };
+
+  const handleRemovePhoto = async (reservationId: string) => {
+    try {
+      await apiClient.delete(`/reservations/${reservationId}/media`);
+      setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, imageUrl: null } : r));
+      setSelectedEvent(prev => (prev && prev.id === reservationId ? { ...prev, imageUrl: null } : prev));
+      presentToast({ message: 'Foto eliminada del servicio', duration: 2000, color: 'warning' });
+    } catch (err: any) {
+      console.error(err);
+      presentToast({ message: 'Error al eliminar foto', duration: 3000, color: 'danger' });
+    }
+  };
+
   const openEdit = (res: any) => {
     setEditingId(res.id);
     setCustomerName(res.customerName);
@@ -572,7 +609,7 @@ const Reservations: React.FC = () => {
               </div>
 
               {/* Timeline Cards (Figma Modern Timeline) */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '90px' }}>
                 {dayReservations.map(res => {
                   const duration = res.serviceDuration || 45;
                   const isConfirmed = res.status === ReservationStatus.CONFIRMED;
@@ -591,17 +628,18 @@ const Reservations: React.FC = () => {
                       {/* Left: Time Pill */}
                       <div
                         style={{
-                          minWidth: '92px',
+                          width: '68px',
+                          flexShrink: 0,
                           background: '#ffffff',
                           border: '1px solid #E2E8F0',
                           borderRadius: '12px',
-                          padding: '8px 10px',
+                          padding: '8px 4px',
                           textAlign: 'center',
                           boxShadow: 'var(--ff-shadow-sm)'
                         }}
                       >
                         <div style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A' }}>
-                          {res.time}
+                          {res.time ? res.time.substring(0, 5) : ''}
                         </div>
                         <div style={{ fontSize: '11px', fontWeight: '600', color: '#64748B' }}>
                           {duration} min
@@ -647,15 +685,39 @@ const Reservations: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Service Name */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
-                          <span>✂️</span>
-                          <span>{res.serviceName || 'Servicio Agendado'}</span>
-                          {res.totalAmount > 0 && (
-                            <span style={{ color: '#10B981', fontWeight: '800', marginLeft: 'auto' }}>
-                              ${Number(res.totalAmount).toFixed(2)}
-                            </span>
-                          )}
+                        {/* Service Name & Optional Photo */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', color: '#334155' }}>
+                            <span>✂️</span>
+                            <span>{res.serviceName || 'Servicio Agendado'}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+                            {res.imageUrl && (
+                              <img
+                                src={res.imageUrl}
+                                alt="Foto servicio"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openImage(res.imageUrl, res.serviceName || 'Servicio Realizado');
+                                }}
+                                title="Ver foto del servicio realizado"
+                                style={{
+                                  width: '36px',
+                                  height: '36px',
+                                  borderRadius: '8px',
+                                  objectFit: 'cover',
+                                  border: '1px solid #E2E8F0',
+                                  cursor: 'zoom-in',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                }}
+                              />
+                            )}
+                            {res.totalAmount > 0 && (
+                              <span style={{ color: '#10B981', fontWeight: '800', fontSize: '13px' }}>
+                                ${Number(res.totalAmount).toFixed(2)}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {/* Specialist & Station */}
@@ -665,7 +727,7 @@ const Reservations: React.FC = () => {
                         </div>
 
                         {/* Action buttons footer */}
-                        <div style={{ display: 'flex', gap: '8px', paddingTop: '8px', borderTop: '1px solid #F1F5F9' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', paddingTop: '8px', borderTop: '1px solid #F1F5F9', alignItems: 'center' }}>
                           {/* WhatsApp */}
                           {res.customerPhone && (
                             <button
@@ -681,16 +743,17 @@ const Reservations: React.FC = () => {
                                 border: '1px solid #A7F3D0',
                                 color: '#065F46',
                                 borderRadius: '8px',
-                                padding: '6px 12px',
-                                fontSize: '12px',
+                                padding: '5px 8px',
+                                fontSize: '11px',
                                 fontWeight: '700',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap'
                               }}
                             >
-                              <IonIcon icon={logoWhatsapp} style={{ fontSize: '14px' }} />
+                              <IonIcon icon={logoWhatsapp} style={{ fontSize: '13px' }} />
                               WhatsApp
                             </button>
                           )}
@@ -705,18 +768,58 @@ const Reservations: React.FC = () => {
                               border: '1px solid #FCD34D',
                               color: '#B45309',
                               borderRadius: '8px',
-                              padding: '6px 10px',
-                              fontSize: '12px',
+                              padding: '5px 8px',
+                              fontSize: '11px',
                               fontWeight: '700',
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '4px',
-                              cursor: 'pointer'
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap'
                             }}
                             title="Avisar retraso (+15 min) vía Web Push"
                           >
-                            <IonIcon icon={timeOutline} style={{ fontSize: '14px' }} />
-                            {notifyingDelayId === res.id ? 'Avisando...' : 'Avisar retraso (+15 min)'}
+                            <IonIcon icon={timeOutline} style={{ fontSize: '13px' }} />
+                            {notifyingDelayId === res.id ? 'Avisando...' : 'Retraso (+15m)'}
+                          </button>
+
+                          {/* Subir / Cambiar Foto */}
+                          <input
+                            type="file"
+                            id={`card-upload-${res.id}`}
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) handleUploadPhoto(res.id, f);
+                              e.target.value = '';
+                            }}
+                          />
+                          <button
+                            type="button"
+                            disabled={uploadingPhotoId === res.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              document.getElementById(`card-upload-${res.id}`)?.click();
+                            }}
+                            style={{
+                              background: res.imageUrl ? '#F0FDF4' : '#F8FAFC',
+                              border: res.imageUrl ? '1px solid #86EFAC' : '1px solid #CBD5E1',
+                              color: res.imageUrl ? '#15803D' : '#475569',
+                              borderRadius: '8px',
+                              padding: '5px 8px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap'
+                            }}
+                            title={res.imageUrl ? 'Cambiar foto del servicio realizado' : 'Subir foto del servicio realizado'}
+                          >
+                            <IonIcon icon={res.imageUrl ? imageOutline : cameraOutline} style={{ fontSize: '13px' }} />
+                            {uploadingPhotoId === res.id ? 'Subiendo...' : (res.imageUrl ? 'Cambiar foto' : '+ Foto')}
                           </button>
 
                           {/* Enviar a Caja */}
@@ -725,19 +828,20 @@ const Reservations: React.FC = () => {
                             onClick={(e) => {
                               e.stopPropagation();
                               router.push('/pos', 'root', 'replace');
-                              // Also write to session storage so POS loads it
                               sessionStorage.setItem('reservation_to_bill', JSON.stringify(res));
                               window.location.href = `/pos?reservationId=${res.id}`;
                             }}
                             className="ff-btn-primary"
                             style={{
-                              padding: '6px 14px',
-                              fontSize: '12px',
+                              padding: '5px 10px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              borderRadius: '8px',
                               marginLeft: 'auto',
-                              borderRadius: '8px'
+                              whiteSpace: 'nowrap'
                             }}
                           >
-                            <IonIcon icon={cashOutline} style={{ fontSize: '14px' }} />
+                            <IonIcon icon={cashOutline} style={{ fontSize: '13px' }} />
                             Enviar a Caja
                           </button>
                         </div>
@@ -1070,8 +1174,132 @@ const Reservations: React.FC = () => {
                     </div>
                   </div>
 
-                    {/* Actions: Enviar a Caja, Avisar Retraso & Editar */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                  {/* Foto del Servicio Realizado */}
+                  <div style={{ marginBottom: '16px', padding: '14px', background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <IonIcon icon={cameraOutline} style={{ color: '#10B981', fontSize: '16px' }} />
+                        Foto del Servicio Realizado
+                      </span>
+                      {selectedEvent.imageUrl && (
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#059669', background: '#ECFDF5', padding: '2px 8px', borderRadius: '6px' }}>
+                          ✓ En Catálogo Público
+                        </span>
+                      )}
+                    </div>
+
+                    {selectedEvent.imageUrl ? (
+                      <div>
+                        <img
+                          src={selectedEvent.imageUrl}
+                          alt="Servicio realizado"
+                          onClick={() => openImage(selectedEvent.imageUrl, selectedEvent.serviceName || 'Servicio Realizado')}
+                          title="Toca para ver en grande"
+                          style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '10px', cursor: 'zoom-in', border: '1px solid #CBD5E1', marginBottom: '8px' }}
+                        />
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input
+                            type="file"
+                            id={`detail-upload-${selectedEvent.id}`}
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) handleUploadPhoto(selectedEvent.id, f);
+                              e.target.value = '';
+                            }}
+                          />
+                          <button
+                            type="button"
+                            disabled={uploadingPhotoId === selectedEvent.id}
+                            onClick={() => document.getElementById(`detail-upload-${selectedEvent.id}`)?.click()}
+                            style={{
+                              flex: 1,
+                              padding: '8px',
+                              borderRadius: '8px',
+                              border: '1px solid #CBD5E1',
+                              background: '#ffffff',
+                              color: '#334155',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            <IonIcon icon={cameraOutline} />
+                            {uploadingPhotoId === selectedEvent.id ? 'Subiendo...' : 'Cambiar Foto'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePhoto(selectedEvent.id)}
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid #FCA5A5',
+                              background: '#FEF2F2',
+                              color: '#DC2626',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px'
+                            }}
+                            title="Eliminar foto"
+                          >
+                            <IonIcon icon={trashOutline} />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#64748B', lineHeight: '1.4' }}>
+                          Sube una foto del trabajo completado para exhibirla en el catálogo y portafolio público de reservas.
+                        </p>
+                        <input
+                          type="file"
+                          id={`detail-upload-${selectedEvent.id}`}
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleUploadPhoto(selectedEvent.id, f);
+                            e.target.value = '';
+                          }}
+                        />
+                        <button
+                          type="button"
+                          disabled={uploadingPhotoId === selectedEvent.id}
+                          onClick={() => document.getElementById(`detail-upload-${selectedEvent.id}`)?.click()}
+                          style={{
+                            width: '100%',
+                            padding: '10px',
+                            borderRadius: '8px',
+                            border: '1px dashed #10B981',
+                            background: '#ECFDF5',
+                            color: '#065F46',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <IonIcon icon={cameraOutline} style={{ fontSize: '16px' }} />
+                          {uploadingPhotoId === selectedEvent.id ? 'Subiendo foto...' : '+ Cargar Foto del Servicio'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions: Enviar a Caja, Avisar Retraso & Editar */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
                       <button
                         type="button"
                         onClick={() => {

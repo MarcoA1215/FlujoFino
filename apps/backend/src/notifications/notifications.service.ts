@@ -192,5 +192,42 @@ export class NotificationsService {
     }
     return sent;
   }
+
+  async notifySuperAdmin(payload: { title: string; body: string; data?: any }): Promise<number> {
+    const subs = await this.pushRepo.find({
+      where: { role: 'SUPERADMIN' },
+    });
+
+    if (!subs.length) {
+      this.logger.warn('No push subscriptions found for SUPERADMIN');
+      return 0;
+    }
+
+    let sent = 0;
+    for (const sub of subs) {
+      try {
+        if (sub.endpoint.startsWith('http://') || sub.endpoint.startsWith('https://')) {
+          await webpush.sendNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: { p256dh: sub.p256dh, auth: sub.auth },
+            } as any,
+            JSON.stringify(payload),
+          );
+          sent++;
+        } else {
+          this.logger.log(`SuperAdmin native push endpoint registered for ${sub.identifier}`);
+        }
+      } catch (err: any) {
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          this.logger.log(`Subscription expired (${err.statusCode}), deleting subscription ${sub.id}`);
+          await this.pushRepo.delete(sub.id).catch(() => {});
+        } else {
+          this.logger.error(`Error sending push notification to superadmin ${sub.id}: ${err.message}`);
+        }
+      }
+    }
+    return sent;
+  }
 }
 

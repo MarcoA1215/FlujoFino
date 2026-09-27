@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Repository, IsNull } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
@@ -21,7 +21,13 @@ export class RawMaterialsService {
   ) {}
 
   findAll(tenantId: string) {
-    return this.rawMaterialRepo.find({ where: { tenantId }, order: { name: 'ASC' } });
+    return this.rawMaterialRepo.find({
+      where: [
+        { tenantId, isActive: true },
+        { tenantId, isActive: IsNull() }
+      ],
+      order: { name: 'ASC' }
+    });
   }
 
   async create(tenantId: string, dto: CreateRawMaterialDto) {

@@ -231,40 +231,59 @@ const SettingsPage: React.FC = () => {
     }
 
     try {
-      await apiClient.put('/settings', { 
-          companyBank: settings.companyBank, 
-          companyCedula: settings.companyCedula, 
-          companyPhone: settings.companyPhone,
-          companyAccountNumber: settings.companyAccountNumber,
-          companyAccountHolder: settings.companyAccountHolder,
-          binancePayId: settings.binancePayId,
-          binanceEmail: settings.binanceEmail,
-          binancePhone: settings.binancePhone,
-          allowPartialPayments: settings.allowPartialPayments,
-          minDepositPercentage: Number(settings.minDepositPercentage) || 0,
-          allowCashierBypassDeposit: settings.allowCashierBypassDeposit !== false,
-          acceptCashUsd: settings.acceptCashUsd !== false,
-          acceptPagoMovil: settings.acceptPagoMovil !== false,
-          acceptCardPos: settings.acceptCardPos === true,
-          acceptBinance: settings.acceptBinance === true,
-          acceptTransfer: settings.acceptTransfer === true,
-          requireApprovalAlways: settings.requireApprovalAlways,
-          featureCustomerSchedules: settings.featureCustomerSchedules,
-          featureRecipes: settings.featureRecipes,
-          featureBuySell: settings.featureBuySell,
-          featureProduction: settings.featureProduction !== false,
-          featureShowCatalog: settings.featureShowCatalog,
-          bookingRequireService: settings.bookingRequireService,
-          bookingAllowStaffSelection: settings.bookingAllowStaffSelection,
-          businessHours: settings.businessHours,
-          services: settings.services,
-          slotInterval: settings.slotInterval,
-          themePrimaryColor: settings.themePrimaryColor,
-          themeHeaderColor: settings.themeHeaderColor
-        });
-        presentToast({
-          message: 'Configuración guardada', duration: 2000, color: 'success' });
-      fetchSettings();
+      const payload: Partial<Settings> = { 
+        companyBank: settings.companyBank, 
+        companyCedula: settings.companyCedula, 
+        companyPhone: settings.companyPhone,
+        companyAccountNumber: settings.companyAccountNumber,
+        companyAccountHolder: settings.companyAccountHolder,
+        binancePayId: settings.binancePayId,
+        binanceEmail: settings.binanceEmail,
+        binancePhone: settings.binancePhone,
+        allowPartialPayments: settings.allowPartialPayments,
+        minDepositPercentage: Number(settings.minDepositPercentage) || 0,
+        allowCashierBypassDeposit: settings.allowCashierBypassDeposit !== false,
+        acceptCashUsd: settings.acceptCashUsd !== false,
+        acceptPagoMovil: settings.acceptPagoMovil !== false,
+        acceptCardPos: settings.acceptCardPos === true,
+        acceptBinance: settings.acceptBinance === true,
+        acceptTransfer: settings.acceptTransfer === true,
+        requireApprovalAlways: settings.requireApprovalAlways,
+        featureCustomerSchedules: settings.featureCustomerSchedules,
+        featureRecipes: settings.featureRecipes,
+        featureBuySell: settings.featureBuySell,
+        featureProduction: settings.featureProduction !== false,
+        featureShowCatalog: settings.featureShowCatalog,
+        bookingRequireService: settings.bookingRequireService,
+        bookingAllowStaffSelection: settings.bookingAllowStaffSelection,
+        businessHours: settings.businessHours,
+        services: settings.services,
+        slotInterval: settings.slotInterval,
+        themePrimaryColor: settings.themePrimaryColor,
+        themeHeaderColor: settings.themeHeaderColor
+      };
+
+      const res = await apiClient.put<Settings>('/settings', payload);
+      const updatedSettings: Settings = res.data || { ...settings, ...payload };
+
+      setSettings(updatedSettings);
+      localStorage.setItem('flujofino_cached_settings', JSON.stringify(updatedSettings));
+
+      if (updatedSettings.themePrimaryColor) {
+        document.documentElement.style.setProperty('--ion-color-primary', updatedSettings.themePrimaryColor);
+      }
+      if (updatedSettings.themeHeaderColor) {
+        document.documentElement.style.setProperty('--ion-color-success', updatedSettings.themeHeaderColor);
+        document.documentElement.style.setProperty('--ion-color-tertiary', updatedSettings.themeHeaderColor);
+      }
+
+      presentToast({
+        message: 'Configuración guardada',
+        duration: 1500,
+        color: 'success'
+      });
+
+      window.location.reload();
     } catch(e: any) {
       const msg = e.response?.data?.message || 'Error guardando ajustes';
       presentToast({ message: msg, duration: 4000, color: 'danger' });
@@ -788,8 +807,13 @@ const SettingsPage: React.FC = () => {
                     <IonToggle checked={settings.featureProduction !== false} onIonChange={e => setSettings({...settings, featureProduction: e.detail.checked})} />
                   </IonItem>
                   <IonItem>
-                    <IonLabel className="ion-text-wrap">Portafolio / Catálogo Público de Trabajos</IonLabel>
-                    <IonToggle checked={settings.featureShowCatalog || false} onIonChange={e => setSettings({...settings, featureShowCatalog: e.detail.checked})} />
+                    <IonLabel className="ion-text-wrap">
+                      <h2>Catálogo Digital / Tienda Online y Portafolio</h2>
+                      <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
+                        Permite a tus clientes consultar productos y comprar por la tienda online. Si lo desactivas, los enlaces públicos quedarán deshabilitados.
+                      </p>
+                    </IonLabel>
+                    <IonToggle checked={settings.featureShowCatalog !== false} onIonChange={e => setSettings({...settings, featureShowCatalog: e.detail.checked})} />
                   </IonItem>
                 </IonCardContent>
               </IonCard>
@@ -810,25 +834,43 @@ const SettingsPage: React.FC = () => {
 
                   {/* Enlace Tienda Online (Compra-Venta) */}
                   {settings.featureBuySell && (
-                    <div style={{ padding: '16px', backgroundColor: '#f0fdf4', borderRadius: '10px', border: '1px solid #86efac', marginBottom: '16px' }}>
+                    <div style={{ 
+                      padding: '16px', 
+                      backgroundColor: settings.featureShowCatalog === false ? '#f8fafc' : '#f0fdf4', 
+                      borderRadius: '10px', 
+                      border: `1px solid ${settings.featureShowCatalog === false ? '#cbd5e1' : '#86efac'}`, 
+                      marginBottom: '16px',
+                      opacity: settings.featureShowCatalog === false ? 0.7 : 1
+                    }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-                        <h3 style={{ margin: 0, color: '#166534', fontWeight: 'bold' }}>🛍️ Enlace de tu Tienda Online / Catálogo Digital</h3>
-                        <span style={{ fontSize: '11px', background: '#bbf7d0', color: '#14532d', padding: '3px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
-                          Módulo Compra-Venta Activo
-                        </span>
+                        <h3 style={{ margin: 0, color: settings.featureShowCatalog === false ? '#64748b' : '#166534', fontWeight: 'bold' }}>🛍️ Enlace de tu Tienda Online / Catálogo Digital</h3>
+                        {settings.featureShowCatalog === false ? (
+                          <span style={{ fontSize: '11px', background: '#fee2e2', color: '#991b1b', padding: '3px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
+                            🚫 Enlace Deshabilitado
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '11px', background: '#bbf7d0', color: '#14532d', padding: '3px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
+                            Módulo Activo
+                          </span>
+                        )}
                       </div>
-                      <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#15803d' }}>
-                        Tus clientes verán tus productos con fotos, precios en $ y Bs., control de stock, carrito de compras, opciones de delivery y podrán enviarte sus pedidos directo a Caja y WhatsApp.
+                      <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: settings.featureShowCatalog === false ? '#64748b' : '#15803d' }}>
+                        {settings.featureShowCatalog === false 
+                          ? 'El catálogo se encuentra desactivado en "Módulos Activos". Tus clientes no podrán acceder ni realizar compras hasta que lo actives nuevamente.'
+                          : 'Tus clientes verán tus productos con fotos, precios en $ y Bs., control de stock, carrito de compras, opciones de delivery y podrán enviarte sus pedidos directo a Caja y WhatsApp.'
+                        }
                       </p>
                       <IonInput 
                         readonly 
+                        disabled={settings.featureShowCatalog === false}
                         value={`${window.location.origin}/store/${settings.publicToken || user?.tenantId}`} 
-                        style={{ backgroundColor: 'white', padding: '10px', borderRadius: '6px', marginBottom: '10px', border: '1px solid #cbd5e1' }} 
+                        style={{ backgroundColor: settings.featureShowCatalog === false ? '#f1f5f9' : 'white', padding: '10px', borderRadius: '6px', marginBottom: '10px', border: '1px solid #cbd5e1' }} 
                       />
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         <IonButton 
                           size="small" 
                           color="success" 
+                          disabled={settings.featureShowCatalog === false}
                           onClick={() => {
                             navigator.clipboard.writeText(`${window.location.origin}/store/${settings.publicToken || user?.tenantId}`);
                             presentToast({ message: '¡Enlace de tienda copiado!', duration: 2000, color: 'success' });
@@ -840,6 +882,7 @@ const SettingsPage: React.FC = () => {
                           size="small" 
                           fill="outline" 
                           color="success" 
+                          disabled={settings.featureShowCatalog === false}
                           onClick={() => {
                             window.open(`${window.location.origin}/store/${settings.publicToken || user?.tenantId}`, '_blank');
                           }}

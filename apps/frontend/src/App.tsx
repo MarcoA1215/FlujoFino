@@ -23,13 +23,18 @@ import PublicAppointmentManage from './pages/PublicAppointmentManage';
 import FeedbackPage from './pages/Feedback';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import DeliveryPanel from './pages/DeliveryPanel';
+import SubscriptionExpired from './pages/SubscriptionExpired';
 import { AuthProvider, AuthContext } from './context/AuthContext';
+import { SubscriptionProvider, SubscriptionContext } from './context/SubscriptionContext';
 import { ImageViewerProvider } from './context/ImageViewerContext';
 import { LoadingProvider } from './context/LoadingContext';
 import { LoadingOverlay } from './components/common/LoadingOverlay';
+import { SubscriptionWarningBanner } from './components/SubscriptionWarningBanner';
+import { ReportPaymentModal } from './components/ReportPaymentModal';
 import { UserRole } from '@nutrideli/shared-types';
 import { useContext, useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
+import { usePushNotifications } from './hooks/usePushNotifications';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -50,7 +55,9 @@ setupIonicReact();
 
 const HomeRedirector: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useContext(AuthContext);
-  if (isLoading) return null;
+  const { isExpired, isLoading: isSubLoading } = useContext(SubscriptionContext);
+
+  if (isLoading || isSubLoading) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
@@ -59,6 +66,10 @@ const HomeRedirector: React.FC = () => {
   }
   
   if (!user?.tenantId) return <Navigate to="/select-workspace" replace />;
+
+  if (isExpired) {
+    return <Navigate to="/subscription-expired" replace />;
+  }
   
   if (user?.role === UserRole.POS) return <Navigate to="/pos" replace />;
   if (user?.role === UserRole.KITCHEN) return <Navigate to="/orders" replace />;
@@ -83,9 +94,41 @@ const RegisterRoute: React.FC = () => {
 };
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useContext(AuthContext);
-  if (isLoading) return null;
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+  const { isAuthenticated, isLoading, user } = useContext(AuthContext);
+  const { isExpired, isLoading: isSubLoading } = useContext(SubscriptionContext);
+
+  if (isLoading || isSubLoading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  const isSuperAdmin =
+    user?.role === UserRole.SUPERADMIN ||
+    (user?.role as string) === 'SUPERADMIN' ||
+    user?.email === 'superadmin@flujofino.com';
+
+  if (!isSuperAdmin && user?.tenantId && isExpired) {
+    return <Navigate to="/subscription-expired" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const ExpiredPaywallRoute: React.FC = () => {
+  const { isAuthenticated, isLoading, user } = useContext(AuthContext);
+  const { isExpired, isLoading: isSubLoading } = useContext(SubscriptionContext);
+
+  if (isLoading || isSubLoading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  const isSuperAdmin =
+    user?.role === UserRole.SUPERADMIN ||
+    (user?.role as string) === 'SUPERADMIN' ||
+    user?.email === 'superadmin@flujofino.com';
+
+  if (isSuperAdmin || !isExpired) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <SubscriptionExpired />;
 };
 
 const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -113,24 +156,28 @@ const App: React.FC = () => {
 
   return (
     <AuthProvider>
-      <ImageViewerProvider>
-        <LoadingProvider>
-          <IonApp>
-            <LoadingOverlay />
-            <IonReactRouter>
-              <ErrorBoundary>
-                <MainLayout />
-              </ErrorBoundary>
-            </IonReactRouter>
-          </IonApp>
-        </LoadingProvider>
-      </ImageViewerProvider>
+      <SubscriptionProvider>
+        <ImageViewerProvider>
+          <LoadingProvider>
+            <IonApp>
+              <LoadingOverlay />
+              <IonReactRouter>
+                <ErrorBoundary>
+                  <MainLayout />
+                </ErrorBoundary>
+              </IonReactRouter>
+            </IonApp>
+          </LoadingProvider>
+        </ImageViewerProvider>
+      </SubscriptionProvider>
     </AuthProvider>
   );
 };
 
 const MainLayout: React.FC = () => {
   const { user } = useContext(AuthContext);
+  usePushNotifications(user);
+  const { isReportModalOpen, setIsReportModalOpen } = useContext(SubscriptionContext);
   const location = useLocation();
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
 
@@ -151,6 +198,7 @@ const MainLayout: React.FC = () => {
                         location.pathname.startsWith('/store') || 
                         location.pathname.startsWith('/tienda') || 
                         location.pathname.startsWith('/appointment');
+  const isExpiredRoute = location.pathname === '/subscription-expired';
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
 
   return (
@@ -173,13 +221,15 @@ const MainLayout: React.FC = () => {
           ⚡ Modo Sin Conexión: Visualizando agenda, clientes y catálogo guardados localmente.
         </div>
       )}
-      <IonSplitPane contentId="main" when={!isPublicRoute && (user?.tenantId || isSuperAdmin) ? 'md' : false}>
-        {!isPublicRoute && <Menu />}
+      {!isPublicRoute && !isExpiredRoute && <SubscriptionWarningBanner />}
+      <IonSplitPane contentId="main" when={!isPublicRoute && !isExpiredRoute && (user?.tenantId || isSuperAdmin) ? 'md' : false}>
+        {!isPublicRoute && !isExpiredRoute && <Menu />}
         <IonRouterOutlet id="main">
         <Route path="/book/:tenantId" element={<PublicBooking />} />
         <Route path="/store/:tenantId" element={<PublicStore />} />
         <Route path="/tienda/:tenantId" element={<PublicStore />} />
         <Route path="/appointment/:id" element={<PublicAppointmentManage />} />
+        <Route path="/subscription-expired" element={<ExpiredPaywallRoute />} />
         <Route path="/" element={<HomeRedirector />} />
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/register" element={<RegisterRoute />} />
@@ -203,6 +253,10 @@ const MainLayout: React.FC = () => {
       </IonRouterOutlet>
       </IonSplitPane>
       <BottomNav />
+      <ReportPaymentModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+      />
     </>
   );
 };

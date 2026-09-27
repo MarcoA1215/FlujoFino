@@ -210,6 +210,7 @@ export interface ReservationDTO {
   totalAmount?: number;
   abonosTotal?: number;
   notes?: string;
+  imageUrl?: string;
 }
 
 export interface BusinessHourDay {
@@ -387,6 +388,8 @@ export interface MySubscriptionDTO {
   discountPercentage: number;
   finalFee: number;
   trialDaysLeft: number;
+  daysLeft?: number;
+  isExpired?: boolean;
   trialEndsAt?: string;
   currentPeriodEndsAt?: string;
 }

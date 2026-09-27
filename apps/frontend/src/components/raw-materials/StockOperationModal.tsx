@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
   IonContent, IonItem, IonLabel, IonInput, IonSelect, IonSelectOption,
@@ -48,13 +48,12 @@ export const StockOperationModal: React.FC<Props> = ({ material, operationType, 
           presentToast({ message: 'Ingresa el costo', duration: 2000, color: 'warning' });
           return;
         }
-        let totalUSD = cost;
-        if (currency === 'VES') {
-          totalUSD = cost / exchangeRate;
-        }
+        const costUSD: number = currency === 'VES'
+          ? Number(cost) / (exchangeRate && exchangeRate > 0 ? exchangeRate : 1)
+          : Number(cost);
         await apiClient.post(`/raw-materials/${material.id}/restock`, {
           quantity: finalQuantity,
-          totalCost: totalUSD
+          totalCost: costUSD
         });
         presentToast({ message: 'Compra registrada', duration: 2000, color: 'success' });
       } else if (operationType === 'loss') {

@@ -91,12 +91,16 @@ const RawMaterials: React.FC = () => {
       return;
     }
 
-    let finalStock = inputQty;
+    let finalStock: number = inputQty;
     if (inputUnit === 'g' || inputUnit === 'ml') {
       finalStock = inputQty / 1000;
     }
 
-    const costPerBaseUnit = inputCost / finalStock;
+    const costUSD: number = currency === 'VES'
+      ? Number(inputCost) / (exchangeRate && exchangeRate > 0 ? exchangeRate : 1)
+      : Number(inputCost);
+
+    const costPerBaseUnit: number = costUSD / finalStock;
 
     try {
       await apiClient.post('/raw-materials', { 
@@ -112,6 +116,7 @@ const RawMaterials: React.FC = () => {
       setName(''); 
       setInputQty(undefined); 
       setInputCost(undefined);
+      setCurrency('USD');
       setAllowAsExtra(false);
       setExtraPriceType('COST');
       setExtraPriceValue(0);
@@ -251,7 +256,9 @@ const RawMaterials: React.FC = () => {
                   </IonItem>
                   {inputQty && (inputUnit === 'g' || inputUnit === 'ml') && (
                     <IonNote color="medium" className="ion-margin-top ion-padding-horizontal" style={{display: 'block', fontSize: '12px'}}>
-                      Nota: Se registrarán {inputQty / 1000} {baseUnit} en el inventario. Costo: ${(inputCost || 0) / (inputQty / 1000)} x {baseUnit}.
+                      Nota: Se registrarán {inputQty / 1000} {baseUnit} en el inventario. Costo: ${(
+                        (currency === 'VES' ? (Number(inputCost) || 0) / (exchangeRate && exchangeRate > 0 ? exchangeRate : 1) : (Number(inputCost) || 0)) / (inputQty / 1000)
+                      ).toFixed(2)} x {baseUnit}.
                     </IonNote>
                   )}
 

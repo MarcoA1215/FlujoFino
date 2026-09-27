@@ -79,7 +79,7 @@ export class PublicReservationsController {
         }));
     }
 
-    const hasStore = (settings?.featureBuySell || settings?.featureRecipes) ?? false;
+    const hasStore = ((settings?.featureBuySell || settings?.featureRecipes) && settings?.featureShowCatalog !== false) ?? false;
 
     return { 
       id: token, 
@@ -453,7 +453,28 @@ export class PublicReservationsController {
         date: m.createdAt
       })));
 
-    const combined = [...productImages, ...orderImages];
+    const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
+    const completedReservations = await reservationRepo.find({
+      where: {
+        tenantId: id,
+        status: ReservationStatus.COMPLETED,
+      },
+    });
+
+    const reservationImages = completedReservations
+      .filter(r => Boolean(r.imageUrl))
+      .map(r => ({
+        id: `res-${r.id}`,
+        type: 'work',
+        productId: r.serviceId,
+        badge: 'Trabajo Realizado',
+        url: r.imageUrl,
+        title: r.serviceName || 'Servicio Realizado',
+        subtitle: r.customerName ? `Cliente: ${r.customerName}` : 'Servicio finalizado',
+        date: r.updatedAt || r.date || r.createdAt,
+      }));
+
+    const combined = [...productImages, ...reservationImages, ...orderImages];
     // Sort descending by date
     combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 

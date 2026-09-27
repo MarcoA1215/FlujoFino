@@ -118,8 +118,17 @@ const PublicStore: React.FC = () => {
   const fetchStore = async () => {
     try {
       setLoading(true);
-      setErrorMsg(null);
       const res = await axios.get(`${apiBase}/public/store/tenant/${tenantId}`);
+      if (res.data?.isSuspended) {
+        setStoreData(res.data);
+        setLoading(false);
+        return;
+      }
+      if (res.data?.settings?.featureShowCatalog === false) {
+        setErrorMsg('El catálogo online se encuentra temporalmente desactivado');
+        setLoading(false);
+        return;
+      }
       setStoreData(res.data);
       setProducts(res.data.products || []);
       setDeliveryZones(res.data.deliveryZones || []);
@@ -571,6 +580,83 @@ const PublicStore: React.FC = () => {
           <div style={{ marginTop: '30vh' }}>
             <IonSpinner name="crescent" color="primary" style={{ width: '48px', height: '48px' }} />
             <p style={{ marginTop: '12px', color: '#64748b' }}>Cargando catálogo de productos...</p>
+          </div>
+        </IonContent>
+      </IonPage>
+    );
+  }
+
+  if (storeData?.isSuspended) {
+    const rawPhone = storeData?.settings?.companyPhone || '';
+    const cleanPhone = rawPhone.replace(/\D/g, '');
+    const waPhone = cleanPhone.startsWith('58')
+      ? cleanPhone
+      : cleanPhone.startsWith('0')
+      ? `58${cleanPhone.slice(1)}`
+      : cleanPhone;
+
+    const waMsg = encodeURIComponent(
+      `Hola, me gustaría consultar información sobre sus productos en ${storeData?.tenant?.name || 'su tienda'}.`
+    );
+    const waUrl = waPhone ? `https://wa.me/${waPhone}?text=${waMsg}` : undefined;
+
+    return (
+      <IonPage>
+        <IonContent className="ion-padding" style={{ backgroundColor: '#f8fafc' }}>
+          <div
+            style={{
+              maxWidth: '480px',
+              margin: '18vh auto 0 auto',
+              textAlign: 'center',
+              background: '#ffffff',
+              padding: '36px 24px',
+              borderRadius: '20px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+              border: '1px solid #e2e8f0',
+            }}
+          >
+            <div
+              style={{
+                width: '72px',
+                height: '72px',
+                borderRadius: '50%',
+                backgroundColor: '#f1f5f9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px auto',
+                fontSize: '32px',
+                color: '#64748b',
+              }}
+            >
+              🏪
+            </div>
+
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0' }}>
+              {storeData?.tenant?.name || 'Tienda'}
+            </h2>
+
+            <h1 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#475569', margin: '0 0 14px 0' }}>
+              Tienda temporalmente en pausa
+            </h1>
+
+            <p style={{ color: '#64748b', fontSize: '0.92rem', lineHeight: 1.5, margin: '0 0 24px 0' }}>
+              En este momento {storeData?.tenant?.name || 'este negocio'} no está recibiendo pedidos en línea. Estaremos de vuelta muy pronto.
+            </p>
+
+            {waUrl ? (
+              <IonButton
+                expand="block"
+                color="success"
+                href={waUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontWeight: 700, '--border-radius': '12px' }}
+              >
+                <IonIcon slot="start" icon={logoWhatsapp} style={{ fontSize: '1.25rem' }} />
+                Consultar directamente por WhatsApp
+              </IonButton>
+            ) : null}
           </div>
         </IonContent>
       </IonPage>

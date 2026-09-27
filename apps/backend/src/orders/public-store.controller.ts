@@ -8,6 +8,7 @@ import { Product } from '../entities/product.entity';
 import { DeliveryZone } from '../entities/delivery-zone.entity';
 import { Order } from '../entities/order.entity';
 import { decodeTenantId } from '../utils/tenant-crypto';
+import { isTenantSuspendedOrExpired } from '../utils/tenant-status';
 import { Public } from '../auth/public.decorator';
 import { Throttle } from '@nestjs/throttler';
 import { PaymentStatus, OrderStatus } from '@nutrideli/shared-types';
@@ -41,7 +42,30 @@ export class PublicStoreController {
       throw new NotFoundException('Tienda no encontrada');
     }
 
+    const isSuspended = isTenantSuspendedOrExpired(tenant);
     const settings = await this.settingsRepo.findOne({ where: { tenantId } });
+
+    if (isSuspended) {
+      return {
+        tenant: {
+          id: token,
+          name: tenant.name,
+        },
+        settings: {
+          companyPhone: settings?.companyPhone || '',
+          themePrimaryColor: settings?.themePrimaryColor || '#1e293b',
+          themeHeaderColor: settings?.themeHeaderColor || '#334155',
+        },
+        isSuspended: true,
+        products: [],
+        deliveryZones: [],
+        categories: [],
+      };
+    }
+
+    if (settings && settings.featureShowCatalog === false) {
+      throw new BadRequestException('El catálogo online se encuentra desactivado');
+    }
     const deliveryZones = await this.deliveryZoneRepo.find({
       where: { tenantId },
       order: { name: 'ASC' },
@@ -103,6 +127,7 @@ export class PublicStoreController {
         featureBuySell: settings?.featureBuySell ?? false,
         featureRecipes: settings?.featureRecipes ?? false,
         featureCustomerSchedules: settings?.featureCustomerSchedules ?? false,
+        featureShowCatalog: settings?.featureShowCatalog !== false,
         hasBooking: settings?.featureCustomerSchedules ?? false,
       },
       products: storeProducts,
@@ -126,6 +151,19 @@ export class PublicStoreController {
       tenantId = decodeTenantId(token);
     } catch {
       throw new NotFoundException('Tienda no encontrada');
+    }
+
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) {
+      throw new NotFoundException('Tienda no encontrada');
+    }
+    if (isTenantSuspendedOrExpired(tenant)) {
+      throw new BadRequestException('Esta tienda se encuentra temporalmente en pausa y no está recibiendo pedidos.');
+    }
+
+    const settings = await this.settingsRepo.findOne({ where: { tenantId } });
+    if (settings && settings.featureShowCatalog === false) {
+      throw new BadRequestException('El catálogo online se encuentra desactivado');
     }
 
     if (!dto.customerName || !dto.customerName.trim()) {

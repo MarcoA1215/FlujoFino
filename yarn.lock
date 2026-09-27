@@ -845,6 +845,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@capacitor/push-notifications@npm:^8.1.2":
+  version: 8.1.2
+  resolution: "@capacitor/push-notifications@npm:8.1.2"
+  peerDependencies:
+    "@capacitor/core": ">=8.0.0"
+  checksum: 10c0/064e9c5780e266d715c88c96c3489c0e0dcf40e58155826d6a5beb448a1796d7561f4df0d61a11cf8440e54206fc17a84239eb40556d21e57c67be247db9adb1
+  languageName: node
+  linkType: hard
+
 "@capacitor/splash-screen@npm:^8.0.2":
   version: 8.0.2
   resolution: "@capacitor/splash-screen@npm:8.0.2"
@@ -6428,6 +6437,7 @@ __metadata:
     "@capacitor/cli": "npm:^8.5.2"
     "@capacitor/core": "npm:^8.5.2"
     "@capacitor/preferences": "npm:^8.0.1"
+    "@capacitor/push-notifications": "npm:^8.1.2"
     "@capacitor/splash-screen": "npm:^8.0.2"
     "@capacitor/status-bar": "npm:^8.0.3"
     "@fullcalendar/core": "npm:6.1.15"
