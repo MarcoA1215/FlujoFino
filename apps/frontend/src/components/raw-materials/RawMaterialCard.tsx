@@ -27,7 +27,7 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
     present({
       header: 'Opciones de Insumo',
       buttons: [
-        { text: 'Editar Nombre/Alerta', icon: pencilOutline, cssClass: 'action-sheet-editar', handler: () => onEditName(m) },
+        { text: 'Editar Insumo y Extras', icon: pencilOutline, cssClass: 'action-sheet-editar', handler: () => onEditName(m) },
         { text: 'Comprar', icon: cartOutline, cssClass: 'action-sheet-comprar', handler: () => onRestock(m) },
         { text: 'Registrar Pérdida', icon: warningOutline, cssClass: 'action-sheet-eliminar', handler: () => onRegisterLoss(m) },
         { text: 'Historial', icon: timeOutline, cssClass: 'action-sheet-editar', handler: () => onViewHistory(m) },
@@ -37,6 +37,14 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
     });
   };
   
+  const extraPriceCalculated = (
+    m.extraPriceType === 'FIXED_PRICE'
+      ? Number(m.extraPriceValue || 0)
+      : m.extraPriceType === 'MARGIN_PERCENT'
+      ? m.costPerUnit * (1 + Number(m.extraPriceValue || 0) / 100)
+      : m.costPerUnit
+  ).toFixed(2);
+
   return (
     <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3" style={{ display: 'flex' }}>
       <div className="ff-card" style={{ margin: '6px', width: '100%', display: 'flex', flexDirection: 'column', padding: '16px', justifyContent: 'space-between' }}>
@@ -54,22 +62,35 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
             Costo prom: <strong style={{ color: '#0f172a' }}>${m.costPerUnit.toFixed(2)}</strong> / {m.unit}
           </p>
 
-          {m.allowAsExtra && (
-            <div style={{ marginBottom: '8px' }}>
-              <IonBadge color="tertiary" style={{ borderRadius: '8px', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600 }}>
-                ✨ Extra: +${(
-                  m.extraPriceType === 'FIXED_PRICE'
-                    ? Number(m.extraPriceValue || 0)
-                    : m.extraPriceType === 'MARGIN_PERCENT'
-                    ? m.costPerUnit * (1 + Number(m.extraPriceValue || 0) / 100)
-                    : m.costPerUnit
-                ).toFixed(2)} USD
-              </IonBadge>
-            </div>
-          )}
+          <div style={{ marginBottom: '8px' }}>
+            {m.allowAsExtra ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#ECFDF5', color: '#065F46', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, border: '1px solid #A7F3D0' }}>
+                ✨ Extra en POS: +${extraPriceCalculated} USD
+              </span>
+            ) : (
+              <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: '500' }}>
+                Extra no habilitado
+              </span>
+            )}
+          </div>
         </div>
         
-        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
+          <button
+            onClick={() => onEditName(m)}
+            style={{
+              background: '#F1F5F9',
+              border: '1px solid #CBD5E1',
+              borderRadius: '6px',
+              color: '#0F172A',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              padding: '4px 8px'
+            }}
+          >
+            ⚙️ Editar / Extras
+          </button>
           <IonButton size="small" fill="outline" color="dark" onClick={openOptions} style={{ margin: 0, borderRadius: '8px', fontWeight: 600, fontSize: '0.75rem' }}>
             Gestionar
           </IonButton>

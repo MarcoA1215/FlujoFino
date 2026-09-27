@@ -296,58 +296,84 @@ const RawMaterials: React.FC = () => {
     {/* Modal Editar Insumo & Extras */}
     <IonModal isOpen={Boolean(editingMaterial)} onDidDismiss={() => setEditingMaterial(null)}>
       <IonHeader>
-        <IonToolbar color="primary">
-          <IonTitle>Editar Insumo</IonTitle>
+        <IonToolbar color="success">
+          <IonTitle>Editar Insumo y Configurar Extras</IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={() => setEditingMaterial(null)}>Cerrar</IonButton>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
-      <IonContent className="ion-padding">
-        <IonCard>
+      <IonContent className="ion-padding" style={{ '--background': '#F8FAFC' }}>
+        <IonCard style={{ borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
           <IonCardContent>
-            <IonItem>
-              <IonLabel position="stacked">Nombre del Insumo</IonLabel>
+            <IonItem lines="full">
+              <IonLabel position="stacked" style={{ fontWeight: '700', color: '#0F172A' }}>Nombre del Insumo</IonLabel>
               <IonInput value={editName} onIonInput={e => setEditName(e.detail.value!)} placeholder="Nombre del insumo" />
             </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Alerta Mínima de Stock</IonLabel>
+            <IonItem lines="full">
+              <IonLabel position="stacked" style={{ fontWeight: '700', color: '#0F172A' }}>Alerta Mínima de Stock</IonLabel>
               <IonInput type="number" min="0" step="any" value={editMinStock} onIonInput={e => setEditMinStock(parseFloat(e.detail.value!) || 0)} />
             </IonItem>
 
-            <IonItem lines="none" style={{ marginTop: '12px', borderTop: '1px solid #E2E8F0', paddingTop: '8px' }}>
-              <IonLabel>Permitir como Adicional / Extra</IonLabel>
-              <IonToggle checked={editAllowAsExtra} onIonChange={e => setEditAllowAsExtra(e.detail.checked)} />
-            </IonItem>
-            {editAllowAsExtra && (
-              <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '10px', border: '1px solid #E2E8F0', marginTop: '6px' }}>
-                <IonItem lines="none" style={{ background: 'transparent' }}>
-                  <IonLabel position="stacked">Cálculo de Precio de Venta</IonLabel>
-                  <IonSelect value={editExtraPriceType} onIonChange={e => setEditExtraPriceType(e.detail.value)}>
-                    <IonSelectOption value="COST">Al Costo Directo</IonSelectOption>
-                    <IonSelectOption value="MARGIN_PERCENT">Margen de Ganancia (%)</IonSelectOption>
-                    <IonSelectOption value="FIXED_PRICE">Precio Fijo en USD ($)</IonSelectOption>
-                  </IonSelect>
-                </IonItem>
-                {editExtraPriceType !== 'COST' && (
-                  <IonItem lines="none" style={{ background: 'transparent' }}>
-                    <IonLabel position="stacked">
-                      {editExtraPriceType === 'MARGIN_PERCENT' ? 'Porcentaje de Margen (% ej. 50)' : 'Precio Fijo en USD ($)'}
-                    </IonLabel>
-                    <IonInput
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={editExtraPriceValue}
-                      onIonInput={e => setEditExtraPriceValue(parseFloat(e.detail.value!) || 0)}
-                    />
-                  </IonItem>
-                )}
+            <div style={{ marginTop: '16px', padding: '14px', background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: '800', fontSize: '14px', color: '#0F172A' }}>
+                    🍔 Vender como Adicional / Extra
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                    Permite a los cajeros añadir este insumo con costo extra en pedidos y personalizar recetas
+                  </div>
+                </div>
+                <IonToggle checked={editAllowAsExtra} onIonChange={e => setEditAllowAsExtra(e.detail.checked)} color="success" />
               </div>
-            )}
 
-            <IonButton expand="block" color="primary" className="ion-margin-top" onClick={handleSaveEdit}>
-              Guardar Cambios
+              {editAllowAsExtra && editingMaterial && (
+                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed #CBD5E1' }}>
+                  <IonItem lines="none" style={{ background: '#FFFFFF', borderRadius: '8px', border: '1px solid #E2E8F0', marginBottom: '8px' }}>
+                    <IonLabel position="stacked" style={{ fontWeight: '700', color: '#0F172A' }}>Cálculo de Precio al Cliente</IonLabel>
+                    <IonSelect value={editExtraPriceType} onIonChange={e => setEditExtraPriceType(e.detail.value)}>
+                      <IonSelectOption value="COST">Al Costo Directo del Insumo (${editingMaterial.costPerUnit.toFixed(2)})</IonSelectOption>
+                      <IonSelectOption value="MARGIN_PERCENT">Margen de Ganancia sobre Costo (%)</IonSelectOption>
+                      <IonSelectOption value="FIXED_PRICE">Precio Fijo en USD ($)</IonSelectOption>
+                    </IonSelect>
+                  </IonItem>
+
+                  {editExtraPriceType !== 'COST' && (
+                    <IonItem lines="none" style={{ background: '#FFFFFF', borderRadius: '8px', border: '1px solid #E2E8F0', marginBottom: '8px' }}>
+                      <IonLabel position="stacked" style={{ fontWeight: '700', color: '#0F172A' }}>
+                        {editExtraPriceType === 'MARGIN_PERCENT' ? 'Porcentaje de Margen (% ej. 50)' : 'Precio Fijo en USD ($ ej. 1.50)'}
+                      </IonLabel>
+                      <IonInput
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={editExtraPriceValue}
+                        onIonInput={e => setEditExtraPriceValue(parseFloat(e.detail.value!) || 0)}
+                      />
+                    </IonItem>
+                  )}
+
+                  <div style={{ marginTop: '10px', padding: '10px 14px', background: '#ECFDF5', borderRadius: '10px', border: '1px solid #A7F3D0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#065F46' }}>
+                      Precio extra cobrado en POS:
+                    </span>
+                    <span style={{ fontSize: '15px', fontWeight: '900', color: '#047857' }}>
+                      +${(
+                        editExtraPriceType === 'FIXED_PRICE'
+                          ? Number(editExtraPriceValue || 0)
+                          : editExtraPriceType === 'MARGIN_PERCENT'
+                          ? (editingMaterial.costPerUnit || 0) * (1 + Number(editExtraPriceValue || 0) / 100)
+                          : (editingMaterial.costPerUnit || 0)
+                      ).toFixed(2)} USD
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <IonButton expand="block" color="success" className="ion-margin-top" onClick={handleSaveEdit} style={{ fontWeight: '700', borderRadius: '10px' }}>
+              Guardar Insumo y Extras
             </IonButton>
           </IonCardContent>
         </IonCard>
