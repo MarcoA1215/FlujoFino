@@ -62,35 +62,16 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
             Costo prom: <strong style={{ color: '#0f172a' }}>${m.costPerUnit.toFixed(2)}</strong> / {m.unit}
           </p>
 
-          <div style={{ marginBottom: '8px' }}>
-            {m.allowAsExtra ? (
+          {m.allowAsExtra && (
+            <div style={{ marginBottom: '8px' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#ECFDF5', color: '#065F46', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, border: '1px solid #A7F3D0' }}>
                 ✨ Extra en POS: +${extraPriceCalculated} USD
               </span>
-            ) : (
-              <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: '500' }}>
-                Extra no habilitado
-              </span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
-          <button
-            onClick={() => onEditName(m)}
-            style={{
-              background: '#F1F5F9',
-              border: '1px solid #CBD5E1',
-              borderRadius: '6px',
-              color: '#0F172A',
-              fontSize: '11px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              padding: '4px 8px'
-            }}
-          >
-            ⚙️ Editar / Extras
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
           <IonButton size="small" fill="outline" color="dark" onClick={openOptions} style={{ margin: 0, borderRadius: '8px', fontWeight: 600, fontSize: '0.75rem' }}>
             Gestionar
           </IonButton>

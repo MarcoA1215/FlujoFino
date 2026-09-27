@@ -24,7 +24,7 @@ async function bootstrap() {
   // Global Validation & Sanitization Pipe
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,
+      whitelist: false,
       transform: true,
       forbidUnknownValues: false,
     }),

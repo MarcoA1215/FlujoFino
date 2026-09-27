@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { DataSource, Between, In } from 'typeorm';
+import { IsOptional, IsArray, IsString, IsNumber, IsBoolean } from 'class-validator';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Product } from '../entities/product.entity';
@@ -12,34 +13,117 @@ import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Settings } from '../entities/settings.entity';
 
 export class CreateOrderDto {
+  @IsString()
   customerName: string;
+
+  @IsOptional()
+  @IsString()
   customerPhone?: string;
+
+  @IsOptional()
+  @IsString()
   customerAddress?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
   tableNumber?: string;
-  paymentStatus: PaymentStatus;
+
+  @IsOptional()
+  paymentStatus?: PaymentStatus;
+
+  @IsOptional()
   deliveryMethod?: DeliveryMethod;
+
+  @IsOptional()
+  @IsString()
   deliveryZoneId?: string;
+
+  @IsOptional()
+  @IsString()
   deliveryUserId?: string;
+
+  @IsOptional()
+  @IsString()
   employeeId?: string;
+
+  @IsOptional()
+  @IsString()
   employee_id?: string;
+
+  @IsOptional()
+  @IsString()
   paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
   pagoMovilRef?: string;
+
+  @IsOptional()
+  @IsString()
   pagoMovilPhone?: string;
+
+  @IsOptional()
+  @IsString()
   pagoMovilCedula?: string;
+
+  @IsOptional()
+  @IsString()
   pagoMovilBank?: string;
+
+  @IsOptional()
+  @IsString()
   puntoRef?: string;
+
+  @IsOptional()
+  @IsString()
   puntoBank?: string;
+
+  @IsOptional()
+  @IsString()
   binanceRef?: string;
+
+  @IsOptional()
+  @IsString()
   transferRef?: string;
+
+  @IsOptional()
+  @IsString()
   transferBank?: string;
+
+  @IsOptional()
+  @IsNumber()
   usdReceived?: number;
+
+  @IsOptional()
+  @IsNumber()
   changeAmount?: number;
+
+  @IsOptional()
+  @IsNumber()
   changeAmountBs?: number;
+
+  @IsOptional()
+  @IsString()
   changeMethod?: string;
+
+  @IsOptional()
+  @IsString()
   changeRef?: string;
+
+  @IsOptional()
+  @IsNumber()
   amountBs?: number;
+
+  @IsOptional()
+  @IsNumber()
   exchangeRate?: number;
+
+  @IsOptional()
+  @IsArray()
   items: {
     productId: string;
     quantity: number;
@@ -48,13 +132,35 @@ export class CreateOrderDto {
     addedExtras?: Array<{ rawMaterialId: string; name: string; priceUSD: number; quantity: number }>;
     hasModifications?: boolean;
   }[];
+
+  @IsOptional()
+  @IsNumber()
   initialAbono?: number;
+
+  @IsOptional()
+  @IsNumber()
   discountAmount?: number;
+
+  @IsOptional()
+  @IsString()
   discountType?: string;
+
+  @IsOptional()
+  @IsNumber()
   discountValue?: number;
+
+  @IsOptional()
+  @IsBoolean()
   bypassMinDeposit?: boolean;
+
+  @IsOptional()
+  @IsString()
   linkedReservationId?: string;
+
+  @IsOptional()
   status?: OrderStatus;
+
+  @IsOptional()
   requestedDeliveryDate?: string | Date;
 }
 

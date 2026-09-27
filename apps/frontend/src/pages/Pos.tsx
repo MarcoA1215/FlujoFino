@@ -637,9 +637,9 @@ const Pos: React.FC = () => {
         ? (abonoAmount >= totalCart ? PaymentStatus.PAID : (abonoAmount > 0 ? PaymentStatus.PARTIAL : PaymentStatus.PENDING))
         : PaymentStatus.PAID,
       items: cart.map(item => ({
-        productId: item.product.id,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice || item.product.salePrice,
+        productId: item.product?.id || (item as any).productId,
+        quantity: Number(item.quantity) || 1,
+        unitPrice: Number(item.unitPrice || item.product?.salePrice || 0),
         removedIngredients: item.removedIngredients || [],
         addedExtras: item.addedExtras || [],
         hasModifications: Boolean(item.hasModifications)
