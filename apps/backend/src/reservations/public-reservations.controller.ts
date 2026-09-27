@@ -183,7 +183,8 @@ export class PublicReservationsController {
       const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
       const resDb = await reservationRepo.findOne({ where: { id: res.id } });
       if (resDb) {
-        const payAmt = Number(dto.paymentAmount || totalAmount);
+        const rawPayAmt = Number(dto.paymentAmount || totalAmount);
+        const payAmt = totalAmount > 0 ? Math.min(rawPayAmt, totalAmount) : rawPayAmt;
         const rate = Number(settings?.exchangeRateBs || 40.0);
         const payAmtBs = dto.paymentAmountBs ? Number(dto.paymentAmountBs) : Math.round(payAmt * rate * 100) / 100;
 

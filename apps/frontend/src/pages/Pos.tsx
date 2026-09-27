@@ -1676,13 +1676,27 @@ const Pos: React.FC = () => {
                           </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '11px', color: '#64748B' }}>Saldo por Cobrar:</div>
-                          <div style={{ fontSize: '16px', fontWeight: '900', color: '#D97706' }}>
-                            ${saldoPendiente.toFixed(2)} USD
-                          </div>
-                          <div style={{ fontSize: '11px', fontWeight: '700', color: '#92400E' }}>
-                            Bs. {saldoPendienteBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </div>
+                          {abonoNum > totalCart ? (
+                            <>
+                              <div style={{ fontSize: '11px', color: '#047857', fontWeight: '700' }}>Saldo a Favor del Cliente:</div>
+                              <div style={{ fontSize: '16px', fontWeight: '900', color: '#059669' }}>
+                                +${(abonoNum - totalCart).toFixed(2)} USD
+                              </div>
+                              <div style={{ fontSize: '11px', fontWeight: '700', color: '#065F46' }}>
+                                Bs. {((abonoNum - totalCart) * exchangeRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div style={{ fontSize: '11px', color: '#64748B' }}>Saldo por Cobrar:</div>
+                              <div style={{ fontSize: '16px', fontWeight: '900', color: '#D97706' }}>
+                                ${saldoPendiente.toFixed(2)} USD
+                              </div>
+                              <div style={{ fontSize: '11px', fontWeight: '700', color: '#92400E' }}>
+                                Bs. {saldoPendienteBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

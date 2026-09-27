@@ -112,20 +112,9 @@ const PublicBooking: React.FC = () => {
 
   const copyToClipboard = (text: string, label: string) => {
     if (!text) return;
-    try {
-      if (navigator?.clipboard?.writeText) {
-        navigator.clipboard.writeText(text);
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-      }
-      presentToast({ message: `${label} copiado: ${text}`, duration: 2000, color: 'success' });
-    } catch {
-      presentToast({ message: `Copiado: ${text}`, duration: 2000, color: 'success' });
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(text);
+      presentToast({ message: `${label} copiado al portapapeles`, duration: 2000, color: 'success' });
     }
   };
 
@@ -268,6 +257,14 @@ const PublicBooking: React.FC = () => {
           presentToast({ 
             message: 'El monto de abono o pago debe ser mayor a 0.', 
             duration: 3000, 
+            color: 'warning' 
+          });
+          return;
+        }
+        if (payNum > totalServicePrice) {
+          presentToast({ 
+            message: `El monto a pagar no puede superar el total del servicio ($${totalServicePrice.toFixed(2)})`, 
+            duration: 3500, 
             color: 'warning' 
           });
           return;
@@ -1191,14 +1188,25 @@ const PublicBooking: React.FC = () => {
                           {/* Amount to report */}
                           <div>
                             <IonLabel style={{ fontWeight: 'bold', fontSize: '12px', color: '#334155', display: 'block', marginBottom: '4px' }}>
-                              Monto a pagar (USD):
+                              Monto a pagar (USD): <span style={{ color: '#64748b', fontWeight: 'normal' }}>(Máx: ${totalServicePrice.toFixed(2)})</span>
                             </IonLabel>
                             <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', backgroundColor: '#ffffff' }}>
                               <IonInput 
                                 type="number"
+                                max={totalServicePrice}
+                                min={0}
                                 value={bookingPaymentAmount}
                                 disabled={bookingPaymentOption === 'FULL'}
-                                onIonInput={e => setBookingPaymentAmount(e.detail.value!)}
+                                onIonInput={e => {
+                                  const val = e.detail.value || '';
+                                  const num = parseFloat(val);
+                                  if (!isNaN(num) && num > totalServicePrice) {
+                                    setBookingPaymentAmount(totalServicePrice.toString());
+                                    presentToast({ message: `El monto no puede superar el total ($${totalServicePrice.toFixed(2)})`, duration: 2500, color: 'warning' });
+                                  } else {
+                                    setBookingPaymentAmount(val);
+                                  }
+                                }}
                                 placeholder="0.00"
                               />
                             </IonItem>

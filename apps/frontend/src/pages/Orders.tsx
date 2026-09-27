@@ -593,19 +593,29 @@ const Orders: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Desglose de Abonos / Saldo Pendiente */}
-                      {!isPaid && !isCanceled && (
-                        <div style={{ marginTop: '8px', padding: '8px 10px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', fontSize: '11px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: abonosTotal > 0 ? '4px' : '0' }}>
-                            <span style={{ color: '#64748B' }}>Abonado: <b style={{ color: '#059669' }}>${abonosTotal.toFixed(2)}</b></span>
-                            <span style={{ color: '#64748B' }}>Resta: <b style={{ color: '#D97706' }}>${remaining.toFixed(2)}</b> (Bs. {remainingBs})</span>
-                          </div>
-                          {abonosTotal > 0 && (
-                            <div style={{ width: '100%', height: '6px', background: '#E2E8F0', borderRadius: '999px', overflow: 'hidden' }}>
-                              <div style={{ width: `${Math.min(100, (abonosTotal / (totalUsd || 1)) * 100)}%`, height: '100%', background: '#10B981' }} />
+                      {/* Desglose de Abonos / Saldo Pendiente o Saldo a Favor */}
+                      {!isCanceled && (
+                        <>
+                          {!isPaid && (
+                            <div style={{ marginTop: '8px', padding: '8px 10px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', fontSize: '11px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: abonosTotal > 0 ? '4px' : '0' }}>
+                                <span style={{ color: '#64748B' }}>Abonado: <b style={{ color: '#059669' }}>${abonosTotal.toFixed(2)}</b></span>
+                                <span style={{ color: '#64748B' }}>Resta: <b style={{ color: '#D97706' }}>${remaining.toFixed(2)}</b> (Bs. {remainingBs})</span>
+                              </div>
+                              {abonosTotal > 0 && (
+                                <div style={{ width: '100%', height: '6px', background: '#E2E8F0', borderRadius: '999px', overflow: 'hidden' }}>
+                                  <div style={{ width: `${Math.min(100, (abonosTotal / (totalUsd || 1)) * 100)}%`, height: '100%', background: '#10B981' }} />
+                                </div>
+                              )}
                             </div>
                           )}
-                        </div>
+                          {abonosTotal > totalUsd && (
+                            <div style={{ marginTop: '8px', padding: '8px 10px', background: '#ECFDF5', borderRadius: '10px', border: '1px solid #A7F3D0', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ color: '#065F46' }}>Abonado: <b>${abonosTotal.toFixed(2)}</b></span>
+                              <span style={{ color: '#047857', fontWeight: '800' }}>Saldo a favor: +${(abonosTotal - totalUsd).toFixed(2)}</span>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -977,9 +987,14 @@ const Orders: React.FC = () => {
                           <span style={{ fontWeight: '800', color: '#10B981' }}>${Number(selectedOrderForDetails.abonosTotal || 0).toFixed(2)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingTop: '4px', borderTop: '1px dashed #FCD34D' }}>
-                          <span style={{ color: '#92400E', fontWeight: '700' }}>Saldo Pendiente:</span>
-                          <span style={{ fontWeight: '900', color: '#D97706' }}>
-                            ${Math.max(0, Number(selectedOrderForDetails.totalAmount) - Number(selectedOrderForDetails.abonosTotal || 0)).toFixed(2)}
+                          <span style={{ color: '#92400E', fontWeight: '700' }}>
+                            {Number(selectedOrderForDetails.abonosTotal || 0) > Number(selectedOrderForDetails.totalAmount) ? 'Saldo a Favor del Cliente:' : 'Saldo Pendiente:'}
+                          </span>
+                          <span style={{ fontWeight: '900', color: Number(selectedOrderForDetails.abonosTotal || 0) > Number(selectedOrderForDetails.totalAmount) ? '#059669' : '#D97706' }}>
+                            {Number(selectedOrderForDetails.abonosTotal || 0) > Number(selectedOrderForDetails.totalAmount)
+                              ? `+$${(Number(selectedOrderForDetails.abonosTotal) - Number(selectedOrderForDetails.totalAmount)).toFixed(2)} USD`
+                              : `$${Math.max(0, Number(selectedOrderForDetails.totalAmount) - Number(selectedOrderForDetails.abonosTotal || 0)).toFixed(2)} USD`
+                            }
                           </span>
                         </div>
                         {Array.isArray(selectedOrderForDetails.abonosHistory) && selectedOrderForDetails.abonosHistory.length > 0 && (
@@ -1143,7 +1158,8 @@ const Orders: React.FC = () => {
                 presentToast({ message: 'Ingresa un monto válido para el abono', duration: 2500, color: 'warning' });
                 return;
               }
-              if (effectiveUsd > restante + 0.01) {
+              const isOpenTab = selectedOrderForAbono.paymentMethod === 'PENDING' || Boolean(selectedOrderForAbono.tableNumber);
+              if (effectiveUsd > restante + 0.01 && !isOpenTab) {
                 presentToast({ message: `El abono no puede superar el saldo restante ($${restante.toFixed(2)})`, duration: 3000, color: 'warning' });
                 return;
               }
