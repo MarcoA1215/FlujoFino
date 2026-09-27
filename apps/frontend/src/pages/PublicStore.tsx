@@ -58,6 +58,8 @@ interface StoreProduct {
   stock?: number;
   isService: boolean;
   isOutOfStock: boolean;
+  availabilityType?: 'INMEDIATO' | 'BAJO_ENCARGO';
+  isSupplierPreorder?: boolean;
 }
 
 const getAvailableStock = (p: StoreProduct) =>
@@ -99,6 +101,7 @@ const PublicStore: React.FC = () => {
   const [deliveryMethod, setDeliveryMethod] = useState<'IN_STORE' | 'DELIVERY'>('IN_STORE');
   const [selectedZoneId, setSelectedZoneId] = useState<string>('');
   const [customerAddress, setCustomerAddress] = useState('');
+  const [requestedDeliveryDate, setRequestedDeliveryDate] = useState('');
   const [notes, setNotes] = useState('');
   const [paymentOption, setPaymentOption] = useState<'PAGO_MOVIL' | 'USD' | 'TRANSFER' | 'BINANCE' | 'WHATSAPP'>('PAGO_MOVIL');
   const [pagoMovilRef, setPagoMovilRef] = useState('');
@@ -192,6 +195,12 @@ const PublicStore: React.FC = () => {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
+      case 'SOLICITUD_ENCARGO':
+        return '📋 Solicitud de encargo recibida (Verificando con proveedor)';
+      case 'PENDIENTE_PAGO':
+        return '💳 Disponibilidad confirmada (Pendiente de pago)';
+      case 'CANCELADO_PROVEEDOR':
+        return '❌ Agotado en distribuidor / proveedor';
       case 'PENDING':
         return '🕒 Esperando confirmación';
       case 'PREPARING':
@@ -263,8 +272,12 @@ const PublicStore: React.FC = () => {
   const grandTotalUSD = cartSubtotalUSD + deliveryFeeUSD;
   const grandTotalBs = grandTotalUSD * exchangeRate;
 
+  const hasBajoEncargo = useMemo(() => cart.some((i) => i.product.availabilityType === 'BAJO_ENCARGO'), [cart]);
+  const hasSupplierPreorder = useMemo(() => cart.some((i) => i.product.isSupplierPreorder), [cart]);
+
   const handleAddToCart = (product: StoreProduct) => {
-    if (product.isOutOfStock) {
+    const isExempt = product.availabilityType === 'BAJO_ENCARGO' || product.isSupplierPreorder;
+    if (product.isOutOfStock && !isExempt) {
       presentToast({
         message: 'Este producto está agotado por el momento.',
         duration: 2500,
@@ -278,7 +291,7 @@ const PublicStore: React.FC = () => {
     const availableStock = getAvailableStock(product);
 
     // Check inventory availability
-    if (!product.isService && currentQtyInCart + 1 > availableStock) {
+    if (!isExempt && !product.isService && currentQtyInCart + 1 > availableStock) {
       presentToast({
         message: `Solo quedan ${availableStock} unidades disponibles de "${product.name}".`,
         duration: 3000,
@@ -315,10 +328,11 @@ const PublicStore: React.FC = () => {
       return;
     }
 
+    const isExempt = item.product.availabilityType === 'BAJO_ENCARGO' || item.product.isSupplierPreorder;
     const availableStock = getAvailableStock(item.product);
 
     // Check inventory cap on increase
-    if (delta > 0 && !item.product.isService && newQty > availableStock) {
+    if (delta > 0 && !isExempt && !item.product.isService && newQty > availableStock) {
       presentToast({
         message: `Límite alcanzado: solo hay ${availableStock} unidades disponibles de "${item.product.name}".`,
         duration: 2500,
@@ -354,10 +368,15 @@ const PublicStore: React.FC = () => {
       presentToast({ message: 'El carrito está vacío', duration: 2000, color: 'warning' });
       return;
     }
+    if (hasBajoEncargo && !requestedDeliveryDate.trim()) {
+      presentToast({ message: 'Por favor indica la fecha y hora para cuándo necesitas tu encargo', duration: 3000, color: 'warning' });
+      return;
+    }
 
     for (const item of cart) {
+      const isExempt = item.product.availabilityType === 'BAJO_ENCARGO' || item.product.isSupplierPreorder;
       const avail = getAvailableStock(item.product);
-      if (!item.product.isService && item.quantity > avail) {
+      if (!isExempt && !item.product.isService && item.quantity > avail) {
         presentToast({
           message: `El producto "${item.product.name}" solo tiene ${avail} unidades disponibles. Por favor ajusta la cantidad.`,
           duration: 3500,
@@ -367,13 +386,15 @@ const PublicStore: React.FC = () => {
       }
     }
 
-    if (paymentOption === 'TRANSFER' && !transferRef.trim()) {
-      presentToast({ message: 'Por favor ingresa la referencia de transferencia bancaria', duration: 2500, color: 'warning' });
-      return;
-    }
-    if (paymentOption === 'BINANCE' && !binanceRef.trim()) {
-      presentToast({ message: 'Por favor ingresa el ID de transacción / Binance Pay', duration: 2500, color: 'warning' });
-      return;
+    if (!hasSupplierPreorder) {
+      if (paymentOption === 'TRANSFER' && !transferRef.trim()) {
+        presentToast({ message: 'Por favor ingresa la referencia de transferencia bancaria', duration: 2500, color: 'warning' });
+        return;
+      }
+      if (paymentOption === 'BINANCE' && !binanceRef.trim()) {
+        presentToast({ message: 'Por favor ingresa el ID de transacción / Binance Pay', duration: 2500, color: 'warning' });
+        return;
+      }
     }
 
     try {
@@ -387,13 +408,15 @@ const PublicStore: React.FC = () => {
         }
       }
 
-      const paymentNote = paymentOption === 'TRANSFER' ? `MÉTODO: Transferencia Bancaria | Ref: ${transferRef.trim()}` :
+      const paymentNote = hasSupplierPreorder ? 'MÉTODO: Solicitud de Encargo (Pago tras confirmación de proveedor)' :
+                          paymentOption === 'TRANSFER' ? `MÉTODO: Transferencia Bancaria | Ref: ${transferRef.trim()}` :
                           paymentOption === 'BINANCE' ? `MÉTODO: Binance Pay | ID: ${binanceRef.trim()}` :
                           paymentOption === 'USD' ? usdNote :
                           paymentOption === 'WHATSAPP' ? 'MÉTODO: A convenir por WhatsApp' : '';
 
+      const deliveryDateNote = requestedDeliveryDate.trim() ? `Fecha requerida: ${requestedDeliveryDate.replace('T', ' ')}` : '';
       const cedulaNote = customerCedula.trim() ? `Cédula: ${customerCedula.trim()}` : '';
-      const finalNotes = [notes.trim(), cedulaNote, paymentNote].filter(Boolean).join(' | ');
+      const finalNotes = [notes.trim(), deliveryDateNote, cedulaNote, paymentNote].filter(Boolean).join(' | ');
 
       const payload = {
         customerName: customerName.trim(),
@@ -401,10 +424,13 @@ const PublicStore: React.FC = () => {
         deliveryMethod,
         deliveryZoneId: deliveryMethod === 'DELIVERY' ? selectedZoneId : undefined,
         customerAddress: deliveryMethod === 'DELIVERY' ? customerAddress.trim() : undefined,
+        requestedDeliveryDate: requestedDeliveryDate.trim() ? new Date(requestedDeliveryDate).toISOString() : undefined,
+        status: hasSupplierPreorder ? 'SOLICITUD_ENCARGO' : undefined,
         notes: finalNotes,
-        pagoMovilRef: paymentOption === 'PAGO_MOVIL' ? pagoMovilRef.trim() : 
+        pagoMovilRef: hasSupplierPreorder ? undefined : (
+                      paymentOption === 'PAGO_MOVIL' ? pagoMovilRef.trim() : 
                       paymentOption === 'TRANSFER' ? transferRef.trim() : 
-                      paymentOption === 'BINANCE' ? binanceRef.trim() : undefined,
+                      paymentOption === 'BINANCE' ? binanceRef.trim() : undefined),
         exchangeRate,
         amountBs: grandTotalBs,
         items: cart.map((i) => ({
@@ -462,14 +488,21 @@ const PublicStore: React.FC = () => {
   // WhatsApp Order message builder
   const openWhatsAppOrder = () => {
     if (!orderResult || !storeData) return;
+    const isPreorder = orderResult.status === 'SOLICITUD_ENCARGO';
     const phone = storeData.settings?.companyPhone?.replace(/\D/g, '') || '';
     const lines = [
-      `🛍️ *COMPROBANTE DE PEDIDO #${orderResult.orderNumber}*`,
+      isPreorder ? `📋 *SOLICITUD DE ENCARGO #${orderResult.orderNumber}*` : `🛍️ *COMPROBANTE DE PEDIDO #${orderResult.orderNumber}*`,
       `👤 *Cliente:* ${orderResult.customerName}`,
       customerCedula.trim() ? `🪪 *Cédula:* ${customerCedula.trim()}` : '',
       `📞 *Teléfono:* ${orderResult.customerPhone}`,
       `📦 *Entrega:* ${orderResult.deliveryMethod === 'DELIVERY' ? '🛵 Delivery a Domicilio' : '🏪 Retiro en Tienda'}`,
     ].filter(Boolean);
+
+    if (orderResult.requestedDeliveryDate) {
+      try {
+        lines.push(`📅 *Fecha requerida:* ${new Date(orderResult.requestedDeliveryDate).toLocaleString('es-ES')}`);
+      } catch (e) {}
+    }
 
     if (orderResult.deliveryMethod === 'DELIVERY' && customerAddress) {
       lines.push(`📍 *Dirección:* ${customerAddress}`);
@@ -561,7 +594,8 @@ const PublicStore: React.FC = () => {
 
   // Confirmation view after success
   if (orderResult) {
-    const currentStatus = liveOrderStatus || 'PENDING';
+    const currentStatus = liveOrderStatus || orderResult.status || 'PENDING';
+    const isPreorder = orderResult.status === 'SOLICITUD_ENCARGO' || currentStatus === 'SOLICITUD_ENCARGO';
     const statusBg =
       currentStatus === 'COMPLETED'
         ? '#dcfce7'
@@ -569,6 +603,10 @@ const PublicStore: React.FC = () => {
         ? '#dbeafe'
         : currentStatus === 'PREPARING' || currentStatus === 'IN_PROGRESS'
         ? '#fef3c7'
+        : currentStatus === 'SOLICITUD_ENCARGO'
+        ? '#f3e8ff'
+        : currentStatus === 'PENDIENTE_PAGO'
+        ? '#fef9c3'
         : '#f1f5f9';
 
     const statusTextColor =
@@ -578,6 +616,10 @@ const PublicStore: React.FC = () => {
         ? '#1d4ed8'
         : currentStatus === 'PREPARING' || currentStatus === 'IN_PROGRESS'
         ? '#b45309'
+        : currentStatus === 'SOLICITUD_ENCARGO'
+        ? '#7e22ce'
+        : currentStatus === 'PENDIENTE_PAGO'
+        ? '#854d0e'
         : '#475569';
 
     return (
@@ -589,10 +631,14 @@ const PublicStore: React.FC = () => {
         </IonHeader>
         <IonContent className="ion-padding" style={{ maxWidth: '600px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', padding: '20px 10px' }}>
-            <IonIcon icon={checkmarkCircleOutline} color="success" style={{ fontSize: '72px' }} />
-            <h1 style={{ fontWeight: 'bold', margin: '10px 0 5px 0' }}>¡Pedido Recibido!</h1>
+            <IonIcon icon={checkmarkCircleOutline} color={isPreorder ? 'tertiary' : 'success'} style={{ fontSize: '72px' }} />
+            <h1 style={{ fontWeight: 'bold', margin: '10px 0 5px 0' }}>
+              {isPreorder ? '¡Solicitud de Encargo Enviada!' : '¡Pedido Recibido!'}
+            </h1>
             <p style={{ color: '#64748b', fontSize: '15px' }}>
-              Tu orden <b>#{orderResult.orderNumber}</b> ha sido registrada con éxito.
+              {isPreorder 
+                ? <>Tu solicitud <b>#{orderResult.orderNumber}</b> fue registrada. Verificaremos stock con el proveedor y te contactaremos.</>
+                : <>Tu orden <b>#{orderResult.orderNumber}</b> ha sido registrada con éxito.</>}
             </p>
 
             {/* Live Order Status Tracking Banner */}
@@ -658,12 +704,12 @@ const PublicStore: React.FC = () => {
 
             <IonButton
               expand="block"
-              color="success"
+              color={isPreorder ? 'tertiary' : 'success'}
               onClick={openWhatsAppOrder}
               style={{ height: '52px', fontWeight: 'bold', fontSize: '1rem', marginBottom: '12px' }}
             >
               <IonIcon slot="start" icon={logoWhatsapp} style={{ fontSize: '1.3rem' }} />
-              Enviar Comprobante por WhatsApp
+              {isPreorder ? 'Enviar Solicitud por WhatsApp' : 'Enviar Comprobante por WhatsApp'}
             </IonButton>
 
             <IonButton
@@ -897,7 +943,39 @@ const PublicStore: React.FC = () => {
                               cursor: 'zoom-in',
                             }}
                           />
-                          {product.isOutOfStock && (
+                          {product.isSupplierPreorder ? (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: '8px',
+                                right: '8px',
+                                backgroundColor: '#7e22ce',
+                                color: '#fff',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                              }}
+                            >
+                              📦 Por Catálogo (Proveedor)
+                            </div>
+                          ) : product.availabilityType === 'BAJO_ENCARGO' ? (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: '8px',
+                                right: '8px',
+                                backgroundColor: '#d97706',
+                                color: '#fff',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                              }}
+                            >
+                              🎂 Bajo Encargo (Preparación)
+                            </div>
+                          ) : product.isOutOfStock ? (
                             <div
                               style={{
                                 position: 'absolute',
@@ -913,8 +991,7 @@ const PublicStore: React.FC = () => {
                             >
                               Agotado
                             </div>
-                          )}
-                          {!product.isOutOfStock && !product.isService && (
+                          ) : !product.isService ? (
                             <div
                               style={{
                                 position: 'absolute',
@@ -930,7 +1007,7 @@ const PublicStore: React.FC = () => {
                             >
                               Disp: {getAvailableStock(product)}
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       ) : (
                         <div
@@ -1028,7 +1105,7 @@ const PublicStore: React.FC = () => {
                                 size="small"
                                 color="primary"
                                 onClick={() => handleUpdateQuantity(product.id, 1)}
-                                disabled={!product.isService && inCart.quantity >= getAvailableStock(product)}
+                                disabled={!product.isService && product.availabilityType !== 'BAJO_ENCARGO' && !product.isSupplierPreorder && inCart.quantity >= getAvailableStock(product)}
                                 style={{ margin: 0, height: '32px', width: '32px' }}
                               >
                                 <IonIcon slot="icon-only" icon={addOutline} />
@@ -1037,12 +1114,18 @@ const PublicStore: React.FC = () => {
                           ) : (
                             <IonButton
                               size="small"
-                              color="primary"
-                              disabled={product.isOutOfStock}
+                              color={product.isSupplierPreorder ? 'tertiary' : product.availabilityType === 'BAJO_ENCARGO' ? 'warning' : 'primary'}
+                              disabled={product.isOutOfStock && !product.isSupplierPreorder && product.availabilityType !== 'BAJO_ENCARGO'}
                               onClick={() => handleAddToCart(product)}
-                              style={{ margin: 0, borderRadius: '8px' }}
+                              style={{ margin: 0, borderRadius: '8px', fontWeight: 'bold' }}
                             >
-                              {product.isOutOfStock ? 'Agotado' : 'Agregar'}
+                              {product.isSupplierPreorder
+                                ? 'Solicitar Encargo'
+                                : product.availabilityType === 'BAJO_ENCARGO'
+                                ? 'Encargar'
+                                : product.isOutOfStock
+                                ? 'Agotado'
+                                : 'Agregar'}
                             </IonButton>
                           )}
                         </div>
@@ -1318,12 +1401,51 @@ const PublicStore: React.FC = () => {
                   </IonItem>
                 </div>
 
-                {/* Payment Option */}
-                <h4 style={{ fontWeight: 'bold', margin: '0 0 10px 0' }}>Forma de Pago</h4>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#fff', marginBottom: '20px' }}>
-                  <IonItem lines="none">
-                    <IonLabel>Método</IonLabel>
-                    <IonSelect value={paymentOption} onIonChange={(e) => setPaymentOption(e.detail.value)}>
+                {/* Bajo Encargo - Fecha requerida */}
+                {hasBajoEncargo && (
+                  <div style={{ background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#92400e', marginBottom: '4px' }}>
+                      🎂 Productos Bajo Encargo (Preparación)
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#b45309', marginBottom: '10px' }}>
+                      Este pedido incluye platos o postres preparados a solicitud. Se requiere un abono previo para procesar la orden.
+                    </div>
+                    <IonItem lines="none" style={{ '--background': '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                      <IonLabel position="stacked" style={{ color: '#92400e', fontWeight: 'bold' }}>
+                        ¿Para cuándo lo necesitas? * (Fecha y Hora)
+                      </IonLabel>
+                      <IonInput
+                        type="datetime-local"
+                        value={requestedDeliveryDate}
+                        onIonInput={(e) => setRequestedDeliveryDate(e.detail.value!)}
+                      />
+                    </IonItem>
+                  </div>
+                )}
+
+                {/* Payment Option / Preorder Notice */}
+                {hasSupplierPreorder ? (
+                  <div style={{ background: '#faf5ff', border: '1.5px solid #d8b4fe', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '20px' }}>📦</span>
+                      <h4 style={{ fontWeight: 'bold', margin: 0, color: '#6b21a8', fontSize: '15px' }}>
+                        Preorden por Catálogo (Sujeto a Proveedor)
+                      </h4>
+                    </div>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#7e22ce', lineHeight: '1.4' }}>
+                      Hemos recibido tu solicitud. Verificaremos existencia con el distribuidor y te avisaremos para realizar el pago de apartado.
+                    </p>
+                    <div style={{ fontSize: '12px', color: '#9333ea', fontWeight: '600' }}>
+                      ✓ No requieres transferir ni registrar pago en este momento.
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <h4 style={{ fontWeight: 'bold', margin: '0 0 10px 0' }}>Forma de Pago</h4>
+                    <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#fff', marginBottom: '20px' }}>
+                      <IonItem lines="none">
+                        <IonLabel>Método</IonLabel>
+                        <IonSelect value={paymentOption} onIonChange={(e) => setPaymentOption(e.detail.value)}>
                       {storeData?.settings?.acceptPagoMovil !== false && (
                         <IonSelectOption value="PAGO_MOVIL">📱 Pago Móvil (Bolívares)</IonSelectOption>
                       )}
@@ -1562,6 +1684,8 @@ const PublicStore: React.FC = () => {
                     </div>
                   )}
                 </div>
+              </>
+            )}
 
                 {/* Totals Summary */}
                 <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
@@ -1594,7 +1718,7 @@ const PublicStore: React.FC = () => {
                 {/* Confirm Button */}
                 <IonButton
                   expand="block"
-                  color="success"
+                  color={hasSupplierPreorder ? 'tertiary' : 'success'}
                   disabled={isSubmitting}
                   onClick={handleCheckout}
                   style={{ height: '52px', fontWeight: 'bold', fontSize: '1rem', borderRadius: '10px' }}
@@ -1604,7 +1728,9 @@ const PublicStore: React.FC = () => {
                   ) : (
                     <>
                       <IonIcon slot="start" icon={checkmarkCircleOutline} />
-                      Confirmar Pedido (${grandTotalUSD.toFixed(2)})
+                      {hasSupplierPreorder
+                        ? `Enviar Solicitud de Encargo ($${grandTotalUSD.toFixed(2)})`
+                        : `Confirmar Pedido ($${grandTotalUSD.toFixed(2)})`}
                     </>
                   )}
                 </IonButton>

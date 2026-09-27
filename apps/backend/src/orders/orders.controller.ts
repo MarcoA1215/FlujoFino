@@ -85,4 +85,13 @@ export class OrdersController {
   autoAllocate(@Request() req: any) {
     return this.ordersService.autoAllocatePhysicalStock(req.user.tenantId);}
 
+  @Patch(':id/confirm-supplier')
+  confirmSupplier(@Request() req: any, @Param('id') id: string) {
+    return this.ordersService.confirmSupplier(req.user.tenantId, id);
+  }
+
+  @Patch(':id/reject-supplier')
+  rejectSupplier(@Request() req: any, @Param('id') id: string) {
+    return this.ordersService.rejectSupplier(req.user.tenantId, id);
+  }
 }

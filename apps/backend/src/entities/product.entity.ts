@@ -61,6 +61,15 @@ export class Product {
   @Column({ default: false })
   isPreAssembled: boolean;
 
+  @Column({
+    type: 'varchar',
+    default: 'INMEDIATO',
+  })
+  availabilityType: 'INMEDIATO' | 'BAJO_ENCARGO';
+
+  @Column({ default: false })
+  isSupplierPreorder: boolean;
+
   @OneToMany(() => RecipeItem, recipeItem => recipeItem.product)
   recipe: RecipeItem[];
 

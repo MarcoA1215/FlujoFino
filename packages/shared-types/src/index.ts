@@ -7,6 +7,14 @@ export enum OrderStatus {
   DELIVERED = 'DELIVERED',
   CANCELED = 'CANCELED',
   CERRADO_CON_PERDIDA = 'CERRADO_CON_PERDIDA',
+  SOLICITUD_ENCARGO = 'SOLICITUD_ENCARGO',
+  PENDIENTE_PAGO = 'PENDIENTE_PAGO',
+  CANCELADO_PROVEEDOR = 'CANCELADO_PROVEEDOR',
+}
+
+export enum ProductAvailabilityType {
+  INMEDIATO = 'INMEDIATO',
+  BAJO_ENCARGO = 'BAJO_ENCARGO',
 }
 
 export enum PaymentStatus {
@@ -80,6 +88,8 @@ export interface ProductDTO {
   cost?: number;
   stock?: number;
   is_service?: boolean;
+  availabilityType?: ProductAvailabilityType;
+  isSupplierPreorder?: boolean;
 }
 
 export interface OrderItemDTO {
@@ -106,6 +116,7 @@ export interface OrderDTO {
   totalAmount: number;
   customerId?: string;
   identification?: string;
+  requestedDeliveryDate?: string | Date;
   employeeId?: string;
   employee?: {
     id: string;

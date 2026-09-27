@@ -49,6 +49,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [selectedType, setSelectedType] = useState<'REVENTA' | 'FORMULA' | 'SERVICIO'>(archetype || 'REVENTA');
+  const [availabilityType, setAvailabilityType] = useState<'INMEDIATO' | 'BAJO_ENCARGO'>('INMEDIATO');
+  const [isSupplierPreorder, setIsSupplierPreorder] = useState(false);
 
   const isResale = selectedType === 'REVENTA';
   const isFormula = selectedType === 'FORMULA';
@@ -68,6 +70,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setEstimatedCost(existingCost !== undefined && existingCost !== null ? String(existingCost) : '');
       setStock(product.stock !== undefined && product.stock !== null ? String(product.stock) : String(product.stockQuantity || '0'));
       setDurationMinutes(product.durationMinutes ? String(product.durationMinutes) : '30');
+      setAvailabilityType(product.availabilityType || 'INMEDIATO');
+      setIsSupplierPreorder(!!product.isSupplierPreorder);
       
       let staffIds: string[] = [];
       if (Array.isArray(product.assignedStaffIds)) {
@@ -85,6 +89,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setEstimatedCost('');
       setStock('0');
       setDurationMinutes('30');
+      setAvailabilityType('INMEDIATO');
+      setIsSupplierPreorder(false);
       setSelectedStaffIds([]);
     }
   }, [product, isCombo, archetype, isResaleOnly, isOpen]);
@@ -132,7 +138,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         durationMinutes: isService ? (durationMinutes ? parseInt(durationMinutes, 10) : 30) : null,
         assignedStaffIds: isService ? selectedStaffIds : [],
         is_service: isService,
-        product_type: selectedType
+        product_type: selectedType,
+        availabilityType: isService ? 'INMEDIATO' : availabilityType,
+        isSupplierPreorder: isService ? false : isSupplierPreorder
       };
 
       if (product) {
@@ -352,6 +360,84 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </>
             )}
           </div>
+
+          {/* Modalidad y Disponibilidad (Productos y Fórmulas) */}
+          {!isService && (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: '700', color: '#1e293b' }}>
+                Disponibilidad y Tipo de Entrega
+              </h4>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setAvailabilityType('INMEDIATO')}
+                  style={{
+                    padding: '10px 8px',
+                    borderRadius: '8px',
+                    border: `2px solid ${availabilityType === 'INMEDIATO' ? '#2563eb' : '#e2e8f0'}`,
+                    backgroundColor: availabilityType === 'INMEDIATO' ? '#eff6ff' : '#ffffff',
+                    color: availabilityType === 'INMEDIATO' ? '#1d4ed8' : '#475569',
+                    fontWeight: availabilityType === 'INMEDIATO' ? '700' : '500',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    textAlign: 'center'
+                  }}
+                >
+                  ⚡ Entrega Inmediata
+                  <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>Stock físico o salida rápida</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAvailabilityType('BAJO_ENCARGO')}
+                  style={{
+                    padding: '10px 8px',
+                    borderRadius: '8px',
+                    border: `2px solid ${availabilityType === 'BAJO_ENCARGO' ? '#d97706' : '#e2e8f0'}`,
+                    backgroundColor: availabilityType === 'BAJO_ENCARGO' ? '#fffbeb' : '#ffffff',
+                    color: availabilityType === 'BAJO_ENCARGO' ? '#b45309' : '#475569',
+                    fontWeight: availabilityType === 'BAJO_ENCARGO' ? '700' : '500',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    textAlign: 'center'
+                  }}
+                >
+                  🎂 Bajo Encargo
+                  <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>Cocina / Repostería / A pedido</div>
+                </button>
+              </div>
+
+              {/* Preorden por Proveedor (Catálogo) */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: isSupplierPreorder ? '1.5px solid #a855f7' : '1px solid #e2e8f0',
+                  background: isSupplierPreorder ? '#faf5ff' : '#f8fafc',
+                  cursor: 'pointer'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isSupplierPreorder}
+                  onChange={e => setIsSupplierPreorder(e.target.checked)}
+                  style={{ marginTop: '2px', accentColor: '#9333ea', width: '16px', height: '16px' }}
+                />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: isSupplierPreorder ? '#7e22ce' : '#1e293b' }}>
+                    📦 Preorden por Catálogo (Sujeto a Proveedor)
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                    Ideal para ropa, calzado o mercancía por encargo. En la tienda pública el cliente enviará una solicitud sin pagar de inmediato hasta que verifiques disponibilidad.
+                  </div>
+                </div>
+              </label>
+            </div>
+          )}
 
           {/* Assigned Staff Card - Solo para Servicios */}
           {isService && (

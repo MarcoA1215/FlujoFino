@@ -37,6 +37,9 @@ export class Order {
   @Column({ nullable: true })
   tableNumber: string;
 
+  @Column({ type: 'timestamp', nullable: true })
+  requestedDeliveryDate: Date;
+
   @Index()
   @Column({
     type: 'enum',

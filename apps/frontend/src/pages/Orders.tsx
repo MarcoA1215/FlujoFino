@@ -82,6 +82,7 @@ type Order = {
   deliveryFee?: number;
   abonosTotal?: number;
   abonosHistory?: any[];
+  requestedDeliveryDate?: string | Date;
   employeeId?: string;
   employee?: {
     id: string;
@@ -96,7 +97,7 @@ const Orders: React.FC = () => {
   const router = useIonRouter();
   const { openImage } = useImageViewer();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [tab, setTab] = useState<'activos' | 'por_cobrar' | 'historial'>('activos');
+  const [tab, setTab] = useState<'activos' | 'por_cobrar' | 'por_confirmar' | 'historial'>('activos');
   const [searchText, setSearchText] = useState('');
   const [exchangeRate, setExchangeRate] = useState<number>(40.0);
   const [presentToast] = useIonToast();
@@ -165,6 +166,53 @@ const Orders: React.FC = () => {
     if (!target) return;
     router.push('/pos', 'root', 'replace');
     window.location.href = `/pos?cloneId=${orderId}`;
+  };
+
+  const confirmSupplierOrder = async (order: Order) => {
+    try {
+      await apiClient.patch(`/orders/${order.id}/confirm-supplier`, {});
+      presentToast({ message: 'Disponibilidad confirmada con éxito', duration: 2500, color: 'success' });
+      const cleanPhone = String(order.customerPhone || '').replace(/\D/g, '');
+      const shortId = String(order.id || '').slice(0, 8).toUpperCase();
+      if (cleanPhone) {
+        const msg = encodeURIComponent(`Hola ${order.customerName || 'Cliente'}, ¡confirmamos disponibilidad de tu encargo #${shortId} con el distribuidor! Ya puedes proceder a realizar el pago o abono para apartar tus prendas/artículos.`);
+        window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
+      }
+      fetchOrders();
+    } catch (e: any) {
+      console.error(e);
+      presentToast({ message: 'Error confirmando pedido con proveedor', duration: 3000, color: 'danger' });
+    }
+  };
+
+  const rejectSupplierOrder = (order: Order) => {
+    const shortId = String(order.id || '').slice(0, 8).toUpperCase();
+    presentAlert({
+      header: 'Agotado en Proveedor',
+      message: `¿Confirmas que el encargo #${shortId} de "${order.customerName || 'Cliente'}" está agotado? Se cancelará la orden sin cobro.`,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Sí, Marcar Agotado',
+          role: 'destructive',
+          handler: async () => {
+            try {
+              await apiClient.patch(`/orders/${order.id}/reject-supplier`, {});
+              presentToast({ message: 'Encargo cancelado por falta de stock en proveedor', duration: 2500, color: 'medium' });
+              const cleanPhone = String(order.customerPhone || '').replace(/\D/g, '');
+              if (cleanPhone) {
+                const msg = encodeURIComponent(`Hola ${order.customerName || 'Cliente'}, lamentamos informarte que los artículos de tu encargo #${shortId} están temporalmente agotados con el distribuidor.`);
+                window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
+              }
+              fetchOrders();
+            } catch (e) {
+              console.error(e);
+              presentToast({ message: 'Error al cancelar encargo', duration: 3000, color: 'danger' });
+            }
+          }
+        }
+      ]
+    });
   };
 
   const openPaymentAlert = (order: Order) => {
@@ -318,11 +366,12 @@ const Orders: React.FC = () => {
   };
 
   const counts = useMemo(() => {
-    if (!Array.isArray(orders)) return { activos: 0, porCobrar: 0, historial: 0 };
+    if (!Array.isArray(orders)) return { activos: 0, porCobrar: 0, porConfirmar: 0, historial: 0 };
     const activos = orders.filter(o => o && (o.status === OrderStatus.PENDING || o.status === OrderStatus.PREPARING)).length;
-    const porCobrar = orders.filter(o => o && [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED).length;
-    const historial = orders.filter(o => o && (o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED)).length;
-    return { activos, porCobrar, historial };
+    const porCobrar = orders.filter(o => o && [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED && o.status !== OrderStatus.CANCELADO_PROVEEDOR && o.status !== OrderStatus.SOLICITUD_ENCARGO).length;
+    const porConfirmar = orders.filter(o => o && o.status === OrderStatus.SOLICITUD_ENCARGO).length;
+    const historial = orders.filter(o => o && (o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED || o.status === OrderStatus.CANCELADO_PROVEEDOR)).length;
+    return { activos, porCobrar, porConfirmar, historial };
   }, [orders]);
 
   const filteredOrders = useMemo(() => {
@@ -330,11 +379,13 @@ const Orders: React.FC = () => {
     return orders.filter(o => {
       if (!o) return false;
       const isActivo = o.status === OrderStatus.PENDING || o.status === OrderStatus.PREPARING;
-      const isHistorial = o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED;
-      const isPorCobrar = [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED;
+      const isHistorial = o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED || o.status === OrderStatus.CANCELADO_PROVEEDOR;
+      const isPorCobrar = [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED && o.status !== OrderStatus.CANCELADO_PROVEEDOR && o.status !== OrderStatus.SOLICITUD_ENCARGO;
+      const isPorConfirmar = o.status === OrderStatus.SOLICITUD_ENCARGO;
 
       if (tab === 'activos' && !isActivo) return false;
       if (tab === 'por_cobrar' && !isPorCobrar) return false;
+      if (tab === 'por_confirmar' && !isPorConfirmar) return false;
       if (tab === 'historial' && !isHistorial) return false;
 
       if (selectedEmployeeFilter && o.employeeId !== selectedEmployeeFilter && o.employee?.id !== selectedEmployeeFilter) {
@@ -402,6 +453,14 @@ const Orders: React.FC = () => {
               </button>
               <button
                 type="button"
+                className={`ff-chip ${tab === 'por_confirmar' ? 'active' : ''}`}
+                onClick={() => setTab('por_confirmar')}
+                style={counts.porConfirmar > 0 ? { borderColor: '#A855F7', color: '#7E22CE', fontWeight: '800' } : {}}
+              >
+                Por Confirmar (Proveedor) ({counts.porConfirmar})
+              </button>
+              <button
+                type="button"
                 className={`ff-chip ${tab === 'historial' ? 'active' : ''}`}
                 onClick={() => setTab('historial')}
               >
@@ -444,6 +503,8 @@ const Orders: React.FC = () => {
               const isCanceled = order.status === OrderStatus.CANCELED;
               const isPreparing = order.status === OrderStatus.PREPARING;
               const isPending = order.status === OrderStatus.PENDING;
+              const isPreorderSolicitud = order.status === OrderStatus.SOLICITUD_ENCARGO;
+              const isProveedorCancel = order.status === OrderStatus.CANCELADO_PROVEEDOR;
 
               const isPaid = order.paymentStatus === PaymentStatus.PAID;
               const isPartial = order.paymentStatus === PaymentStatus.PARTIAL;
@@ -505,20 +566,43 @@ const Orders: React.FC = () => {
                       </div>
 
                       {/* Status Badge */}
-                      <div
-                        className={`ff-pill ${isDelivered ? 'ff-pill-online' : (isPreparing ? 'ff-pill-rate' : (isCanceled ? 'ff-pill-danger' : 'ff-pill-sync'))}`}
-                        style={{ fontSize: '11px', padding: '3px 10px' }}
-                      >
-                        <span
-                          className="ff-pill-dot"
-                          style={{ background: isDelivered ? '#10B981' : (isPreparing ? '#3B82F6' : (isCanceled ? '#EF4444' : '#F59E0B')) }}
-                        />
-                        <span>{order.status || 'PENDING'}</span>
-                      </div>
+                      {isPreorderSolicitud ? (
+                        <div
+                          className="ff-pill"
+                          style={{ fontSize: '11px', padding: '3px 10px', background: '#FAF5FF', color: '#7E22CE', border: '1px solid #D8B4FE' }}
+                        >
+                          <span className="ff-pill-dot" style={{ background: '#9333EA' }} />
+                          <span>POR CONFIRMAR (PROVEEDOR)</span>
+                        </div>
+                      ) : isProveedorCancel ? (
+                        <div
+                          className="ff-pill ff-pill-danger"
+                          style={{ fontSize: '11px', padding: '3px 10px' }}
+                        >
+                          <span className="ff-pill-dot" style={{ background: '#EF4444' }} />
+                          <span>AGOTADO EN PROVEEDOR</span>
+                        </div>
+                      ) : (
+                        <div
+                          className={`ff-pill ${isDelivered ? 'ff-pill-online' : (isPreparing ? 'ff-pill-rate' : (isCanceled ? 'ff-pill-danger' : 'ff-pill-sync'))}`}
+                          style={{ fontSize: '11px', padding: '3px 10px' }}
+                        >
+                          <span
+                            className="ff-pill-dot"
+                            style={{ background: isDelivered ? '#10B981' : (isPreparing ? '#3B82F6' : (isCanceled ? '#EF4444' : '#F59E0B')) }}
+                          />
+                          <span>{order.status || 'PENDING'}</span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Meta Pills (Table / Delivery / Employee) */}
+                    {/* Meta Pills (Table / Delivery / Employee / Requested Date) */}
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                      {order.requestedDeliveryDate && (
+                        <span style={{ fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: '#FEF3C7', color: '#92400E', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          📅 Requerido: {new Date(order.requestedDeliveryDate).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
+                        </span>
+                      )}
                       {order.tableNumber && (
                         <span style={{ fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: '#F1F5F9', color: '#0F172A' }}>
                           Mesa {order.tableNumber}
@@ -622,7 +706,53 @@ const Orders: React.FC = () => {
 
                   {/* Actions Footer */}
                   <div style={{ display: 'flex', gap: '8px', paddingTop: '10px', borderTop: '1px solid #F1F5F9', flexWrap: 'wrap' }}>
-                    {!isPaid && !isCanceled && (
+                    {isPreorderSolicitud && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => confirmSupplierOrder(order)}
+                          style={{
+                            flex: 1,
+                            padding: '8px 10px',
+                            borderRadius: '10px',
+                            border: '1px solid #C084FC',
+                            background: '#FAF5FF',
+                            color: '#7E22CE',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ✅ Confirmar Disponibilidad
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => rejectSupplierOrder(order)}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: '10px',
+                            border: '1px solid #FCA5A5',
+                            background: '#FEF2F2',
+                            color: '#DC2626',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ❌ Agotado
+                        </button>
+                      </>
+                    )}
+
+                    {!isPaid && !isCanceled && !isProveedorCancel && !isPreorderSolicitud && (
                       <>
                         <button
                           type="button"

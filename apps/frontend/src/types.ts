@@ -19,6 +19,8 @@ export type Product = {
   stock?: number;
   is_service?: boolean;
   product_type?: 'REVENTA' | 'FORMULA' | 'SERVICIO';
+  availabilityType?: 'INMEDIATO' | 'BAJO_ENCARGO';
+  isSupplierPreorder?: boolean;
 };
 
 export type RawMaterial = {

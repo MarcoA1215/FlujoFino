@@ -10,7 +10,7 @@ import { Order } from '../entities/order.entity';
 import { decodeTenantId } from '../utils/tenant-crypto';
 import { Public } from '../auth/public.decorator';
 import { Throttle } from '@nestjs/throttler';
-import { PaymentStatus } from '@nutrideli/shared-types';
+import { PaymentStatus, OrderStatus } from '@nutrideli/shared-types';
 
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -62,6 +62,7 @@ export class PublicStoreController {
 
     const storeProducts = nonServiceProducts.map((p) => {
       const availableStock = Math.max(0, Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.stockQuantity || 0)));
+      const isUnderDemand = p.availabilityType === 'BAJO_ENCARGO' || Boolean(p.isSupplierPreorder);
 
       return {
         id: p.id,
@@ -76,8 +77,10 @@ export class PublicStoreController {
           : [],
         stockQuantity: availableStock,
         stock: availableStock,
+        availabilityType: p.availabilityType || 'INMEDIATO',
+        isSupplierPreorder: Boolean(p.isSupplierPreorder),
         isService: false,
-        isOutOfStock: availableStock <= 0,
+        isOutOfStock: isUnderDemand ? false : availableStock <= 0,
       };
     });
 
@@ -135,6 +138,9 @@ export class PublicStoreController {
       throw new BadRequestException('El carrito está vacío');
     }
 
+    let hasPreorder = false;
+    let hasUnderDemand = false;
+
     // 1. Control de stock estricto en backend
     for (const item of dto.items) {
       if (!item.productId || item.quantity <= 0) {
@@ -156,23 +162,35 @@ export class PublicStoreController {
         );
       }
 
-      const availableStock = Math.max(0, Number(product.stock !== undefined && product.stock !== null ? product.stock : (product.stockQuantity || 0)));
-      if (availableStock <= 0) {
-        throw new BadRequestException(
-          `El producto "${product.name}" se encuentra agotado.`
-        );
+      if (product.isSupplierPreorder) {
+        hasPreorder = true;
       }
-      if (item.quantity > availableStock) {
-        throw new BadRequestException(
-          `No hay suficiente stock para "${product.name}". Disponible: ${availableStock}, solicitado: ${item.quantity}.`
-        );
+      if (product.availabilityType === 'BAJO_ENCARGO') {
+        hasUnderDemand = true;
+      }
+
+      const isExemptFromStock = product.isSupplierPreorder || product.availabilityType === 'BAJO_ENCARGO';
+      if (!isExemptFromStock) {
+        const availableStock = Math.max(0, Number(product.stock !== undefined && product.stock !== null ? product.stock : (product.stockQuantity || 0)));
+        if (availableStock <= 0) {
+          throw new BadRequestException(
+            `El producto "${product.name}" se encuentra agotado.`
+          );
+        }
+        if (item.quantity > availableStock) {
+          throw new BadRequestException(
+            `No hay suficiente stock para "${product.name}". Disponible: ${availableStock}, solicitado: ${item.quantity}.`
+          );
+        }
       }
     }
 
     // 2. Crear orden mediante OrdersService
     const orderPayload: CreateOrderDto = {
       ...dto,
-      paymentStatus: dto.paymentStatus || PaymentStatus.PENDING,
+      status: hasPreorder ? OrderStatus.SOLICITUD_ENCARGO : dto.status,
+      paymentStatus: hasPreorder ? PaymentStatus.PENDING : (dto.paymentStatus || PaymentStatus.PENDING),
+      requestedDeliveryDate: dto.requestedDeliveryDate,
     };
 
     const createdOrder = await this.ordersService.createOrder(tenantId, orderPayload);

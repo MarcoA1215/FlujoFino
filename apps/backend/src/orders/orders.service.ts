@@ -48,6 +48,8 @@ export class CreateOrderDto {
   discountValue?: number;
   bypassMinDeposit?: boolean;
   linkedReservationId?: string;
+  status?: OrderStatus;
+  requestedDeliveryDate?: string | Date;
 }
 
 export class UpdatePaymentDto {
@@ -186,7 +188,7 @@ export class OrdersService {
         }
       }
 
-      const initialStatus = requiresPreparation ? OrderStatus.PREPARING : OrderStatus.PENDING;
+      const initialStatus = dto.status || (requiresPreparation ? OrderStatus.PREPARING : OrderStatus.PENDING);
 
       let customerId: string | undefined = undefined;
       let identification: string | undefined = dto.pagoMovilCedula;
@@ -248,6 +250,7 @@ export class OrdersService {
         tableNumber: dto.tableNumber || '',
         paymentStatus: dto.paymentStatus,
         status: initialStatus,
+        requestedDeliveryDate: dto.requestedDeliveryDate ? new Date(dto.requestedDeliveryDate) : undefined,
         deliveryMethod: dto.deliveryMethod || DeliveryMethod.IN_STORE,
         deliveryZoneId: (dto.deliveryMethod === DeliveryMethod.DELIVERY && dto.deliveryZoneId && dto.deliveryZoneId.trim() !== '') ? dto.deliveryZoneId : undefined,
         deliveryFee: deliveryFee,
@@ -291,38 +294,43 @@ export class OrdersService {
         const subtotal = itemDto.quantity * itemDto.unitPrice;
         totalAmount += subtotal;
 
-        if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
-          for (const ci of product.comboItems) {
-            if (ci.component) {
-              ci.component.stockQuantity -= (itemDto.quantity * ci.quantity);
-              await manager.save(Product, ci.component);
+        const isSupplierPreorderOrder = initialStatus === OrderStatus.SOLICITUD_ENCARGO;
+
+        if (!isSupplierPreorderOrder) {
+          if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
+            for (const ci of product.comboItems) {
+              if (ci.component) {
+                ci.component.stockQuantity -= (itemDto.quantity * ci.quantity);
+                await manager.save(Product, ci.component);
+              }
             }
-          }
-        } else if (!product.is_service && product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
-          for (const ri of product.recipe) {
-            if (ri.rawMaterial) {
-              ri.rawMaterial.stockQuantity -= (itemDto.quantity * ri.quantity);
-              await manager.save(RawMaterial, ri.rawMaterial);
-              const mov = manager.create(StockMovement, { tenantId,
-                rawMaterialId: ri.rawMaterial.id,
-                type: MovementType.OUT_SALE,
-                quantity: itemDto.quantity * ri.quantity,
-                totalCost: (itemDto.quantity * ri.quantity) * ri.rawMaterial.costPerUnit,
-                description: 'Venta de Producto: ' + product.name
-              });
-              await manager.save(StockMovement, mov);
+          } else if (!product.is_service && product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
+            for (const ri of product.recipe) {
+              if (ri.rawMaterial) {
+                ri.rawMaterial.stockQuantity -= (itemDto.quantity * ri.quantity);
+                await manager.save(RawMaterial, ri.rawMaterial);
+                const mov = manager.create(StockMovement, { tenantId,
+                  rawMaterialId: ri.rawMaterial.id,
+                  type: MovementType.OUT_SALE,
+                  quantity: itemDto.quantity * ri.quantity,
+                  totalCost: (itemDto.quantity * ri.quantity) * ri.rawMaterial.costPerUnit,
+                  description: 'Venta de Producto: ' + product.name
+                });
+                await manager.save(StockMovement, mov);
+              }
             }
-          }
-        } else if (!product.isCombo || product.isPreAssembled) {
-          const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
-          if (!isService) {
-            const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
-            if (currentStock < itemDto.quantity) {
-              throw new BadRequestException(`Stock insuficiente para "${product.name}". Disponible: ${currentStock}, solicitado: ${itemDto.quantity}`);
+          } else if (!product.isCombo || product.isPreAssembled) {
+            const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
+            if (!isService) {
+              const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
+              const isBajoEncargo = product.availabilityType === 'BAJO_ENCARGO';
+              if (currentStock < itemDto.quantity && !isBajoEncargo) {
+                throw new BadRequestException(`Stock insuficiente para "${product.name}". Disponible: ${currentStock}, solicitado: ${itemDto.quantity}`);
+              }
+              product.stock = Math.max(0, currentStock - itemDto.quantity);
+              product.stockQuantity = product.stock;
+              await manager.save(Product, product);
             }
-            product.stock = Math.max(0, currentStock - itemDto.quantity);
-            product.stockQuantity = product.stock;
-            await manager.save(Product, product);
           }
         }
 
@@ -1204,4 +1212,35 @@ export class OrdersService {
     }
     return { success: true, syncedOfflineIds };
   }
+
+  async confirmSupplier(tenantId: string, orderId: string): Promise<Order> {
+    const repo = this.dataSource.getRepository(Order);
+    const order = await repo.findOne({
+      where: { tenantId, id: orderId },
+      relations: { items: { product: true } },
+    });
+    if (!order) {
+      throw new BadRequestException('Orden no encontrada');
+    }
+
+    order.status = OrderStatus.PENDIENTE_PAGO;
+    order.paymentStatus = PaymentStatus.PENDING;
+
+    return repo.save(order);
+  }
+
+  async rejectSupplier(tenantId: string, orderId: string): Promise<Order> {
+    const repo = this.dataSource.getRepository(Order);
+    const order = await repo.findOne({
+      where: { tenantId, id: orderId },
+    });
+    if (!order) {
+      throw new BadRequestException('Orden no encontrada');
+    }
+
+    order.status = OrderStatus.CANCELADO_PROVEEDOR;
+
+    return repo.save(order);
+  }
 }
+
