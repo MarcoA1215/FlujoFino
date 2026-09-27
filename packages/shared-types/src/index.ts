@@ -1,9 +1,12 @@
 export enum OrderStatus {
   PENDING = 'PENDING',
   PREPARING = 'PREPARING',
+  READY = 'READY',
+  IN_TRANSIT = 'IN_TRANSIT',
   PARTIALLY_DELIVERED = 'PARTIALLY_DELIVERED',
   DELIVERED = 'DELIVERED',
   CANCELED = 'CANCELED',
+  CERRADO_CON_PERDIDA = 'CERRADO_CON_PERDIDA',
 }
 
 export enum PaymentStatus {
@@ -369,6 +372,23 @@ export interface PlatformConfigDTO {
   binanceEmail?: string;
   defaultMonthlyPrice?: number;
   defaultTrialDays?: number;
+}
+
+export enum InvestmentType {
+  INVERSION_EXTERNA = 'INVERSION_EXTERNA',
+  REINVERSION_GANANCIA = 'REINVERSION_GANANCIA',
+}
+
+export interface InvestmentDTO {
+  id?: string;
+  negocioId?: string;
+  type: InvestmentType;
+  amountUSD: number;
+  amountBS: number;
+  exchangeRate: number;
+  description: string;
+  date: string;
+  createdAt?: string;
 }
 
 

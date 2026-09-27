@@ -7,7 +7,8 @@ import { StockMovement } from '../entities/stock-movement.entity';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
-import { MovementType, OrderStatus } from '@nutrideli/shared-types';
+import { Investment } from '../entities/investment.entity';
+import { MovementType, OrderStatus, InvestmentType } from '@nutrideli/shared-types';
 
 @Injectable()
 export class DashboardService {
@@ -17,7 +18,8 @@ export class DashboardService {
     @InjectRepository(StockMovement) private movementRepo: Repository<StockMovement>,
     @InjectRepository(Order) private orderRepo: Repository<Order>,
     @InjectRepository(OrderItem) private orderItemRepo: Repository<OrderItem>,
-    @InjectRepository(OperatingExpense) private expenseRepo: Repository<OperatingExpense>
+    @InjectRepository(OperatingExpense) private expenseRepo: Repository<OperatingExpense>,
+    @InjectRepository(Investment) private investmentRepo: Repository<Investment>,
   ) {}
 
   async getSummary(tenantId: string) {
@@ -122,7 +124,24 @@ export class DashboardService {
       .reduce((acc, e) => acc + e.amount, 0);
     
     const reinvestmentExpense = historicalInvestment - totalInventoryCapital;
-    const historicalProfit = historicalRevenue - reinvestmentExpense - payrollExpenses;
+
+    // Inversión y Reinversión manual consolidada
+    const investments = await this.investmentRepo.find({ where: { negocioId: tenantId } });
+    let totalExternalInvestment = 0;
+    let totalRegisteredReinvestment = 0;
+
+    for (const inv of investments) {
+      const usd = Number(inv.amountUSD || 0);
+      if (inv.type === InvestmentType.INVERSION_EXTERNA) {
+        totalExternalInvestment += usd;
+      } else if (inv.type === InvestmentType.REINVERSION_GANANCIA) {
+        totalRegisteredReinvestment += usd;
+      }
+    }
+
+    const totalConsolidatedReinvestment = reinvestmentExpense + totalRegisteredReinvestment;
+    const totalConsolidatedInvestment = totalExternalInvestment + totalConsolidatedReinvestment;
+    const historicalProfit = historicalRevenue - totalConsolidatedReinvestment - payrollExpenses;
 
     // Calcular ventas de los ultimos 7 dias
     const last7Days = Array.from({length: 7}, (_, i) => {
@@ -167,6 +186,10 @@ export class DashboardService {
       totalFinishedProductCapital,
       totalInventoryCapital,
       reinvestmentExpense,
+      totalExternalInvestment: Number(totalExternalInvestment.toFixed(2)),
+      totalRegisteredReinvestment: Number(totalRegisteredReinvestment.toFixed(2)),
+      totalConsolidatedReinvestment: Number(totalConsolidatedReinvestment.toFixed(2)),
+      totalConsolidatedInvestment: Number(totalConsolidatedInvestment.toFixed(2)),
       expectedRevenue,
       lowStockMaterials: lowStockMaterials.map(m => ({
         id: m.id,

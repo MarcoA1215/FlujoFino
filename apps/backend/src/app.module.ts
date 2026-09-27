@@ -44,10 +44,12 @@ import { SaaSPaymentReport } from './entities/saas-payment-report.entity';
 import { PlatformConfig } from './entities/platform-config.entity';
 import { PushSubscription } from './entities/push-subscription.entity';
 import { SalaryAdvance } from './entities/salary-advance.entity';
+import { Investment } from './entities/investment.entity';
 import { SuperAdminModule } from './superadmin/superadmin.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SalaryAdvancesModule } from './salary-advances/salary-advances.module';
 import { DeliveriesModule } from './deliveries/deliveries.module';
+import { InvestmentsModule } from './investments/investments.module';
 
 @Module({
   imports: [
@@ -62,7 +64,7 @@ import { DeliveriesModule } from './deliveries/deliveries.module';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
-        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription, SalaryAdvance],
+        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription, SalaryAdvance, Investment],
         synchronize: true,
       }),
       inject: [ConfigService],
@@ -81,6 +83,7 @@ import { DeliveriesModule } from './deliveries/deliveries.module';
     NotificationsModule,
     SalaryAdvancesModule,
     DeliveriesModule,
+    InvestmentsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: APP_GUARD, useClass: RolesGuard }],

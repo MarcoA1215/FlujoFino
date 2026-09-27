@@ -29,12 +29,14 @@ import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
 import type { DashboardSummary } from '../types';
 import AppHeader from '../components/AppHeader';
+import InvestmentModal from '../components/InvestmentModal';
 
 const Dashboard: React.FC = () => {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [settings, setSettings] = useState<any>({});
+  const [showInvestmentModal, setShowInvestmentModal] = useState(false);
   const [presentToast] = useIonToast();
 
   const fetchSummary = async () => {
@@ -160,19 +162,34 @@ const Dashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Gastos de Reinversión */}
-                <div className="ff-card" style={{ padding: '16px', background: '#ffffff' }}>
+                {/* Inversión / Reinversión */}
+                <div
+                  className="ff-card"
+                  onClick={() => setShowInvestmentModal(true)}
+                  style={{
+                    padding: '16px',
+                    background: '#ffffff',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    border: '1px solid #E2E8F0',
+                  }}
+                  title="Click para ver desglose y registrar inversión/reinversión"
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#64748B' }}>Reinversión / Stock</span>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#64748B' }}>Inversión / Reinversión</span>
                     <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FFFBEB', color: '#B45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <IonIcon icon={cartOutline} style={{ fontSize: '20px' }} />
                     </div>
                   </div>
                   <div style={{ fontSize: '24px', fontWeight: '900', color: '#0F172A' }}>
-                    ${(summary.reinvestmentExpense || 0).toFixed(2)}
+                    ${((summary.totalConsolidatedInvestment !== undefined ? summary.totalConsolidatedInvestment : (summary.reinvestmentExpense || 0) + (summary.totalExternalInvestment || 0))).toFixed(2)}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
-                    Cap. Insumos: ${(summary.totalInventoryCapital || 0).toFixed(2)}
+                  <div style={{ fontSize: '11px', color: '#64748B', marginTop: '4px', display: 'flex', justifyContent: 'space-between', gap: '4px' }}>
+                    <span>Ext: ${(summary.totalExternalInvestment || 0).toFixed(2)}</span>
+                    <span>Reinv: ${(summary.totalConsolidatedReinvestment !== undefined ? summary.totalConsolidatedReinvestment : summary.reinvestmentExpense || 0).toFixed(2)}</span>
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#0284C7', fontWeight: 700, marginTop: '6px' }}>
+                    👆 Clic para ver / registrar
                   </div>
                 </div>
 
@@ -345,6 +362,13 @@ const Dashboard: React.FC = () => {
 
         </div>
       </IonContent>
+
+      <InvestmentModal
+        isOpen={showInvestmentModal}
+        onClose={() => setShowInvestmentModal(false)}
+        onSuccess={() => fetchSummary()}
+        defaultExchangeRate={settings?.exchangeRateBs}
+      />
     </IonPage>
   );
 };
