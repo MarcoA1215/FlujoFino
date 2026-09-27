@@ -132,6 +132,7 @@ const Menu: React.FC = () => {
     { title: 'Calculadora de Costos', url: '/calculator', iosIcon: calculatorOutline, mdIcon: calculatorOutline, conditional: 'featureRecipes' },
     { title: 'Caja', url: '/pos', iosIcon: cashOutline, mdIcon: cashOutline },
     { title: 'Pedidos / Tickets', url: '/orders', iosIcon: cartOutline, mdIcon: cartOutline },
+    { title: 'Panel Repartidor', url: '/delivery-panel', iosIcon: mapOutline, mdIcon: mapOutline },
     { title: 'Reservaciones', url: '/reservations', iosIcon: calendarOutline, mdIcon: calendarOutline, conditional: 'featureCustomerSchedules' },
     { title: 'Clientes', url: '/customers', iosIcon: personCircleOutline, mdIcon: personCircleOutline },
     { title: 'Zonas Delivery', url: '/delivery-zones', iosIcon: mapOutline, mdIcon: mapOutline, conditional: 'featureBuySell' },
@@ -149,7 +150,7 @@ const Menu: React.FC = () => {
   } else if (user?.role === UserRole.KITCHEN) {
     appPages = appPages.filter(p => settings?.featureProduction === false ? ['/orders'].includes(p.url) : ['/orders', '/production'].includes(p.url));
   } else if (user?.role === UserRole.DELIVERY) {
-    appPages = appPages.filter(p => ['/orders'].includes(p.url));
+    appPages = appPages.filter(p => ['/delivery-panel', '/orders'].includes(p.url));
   } else if (user?.role === UserRole.INVENTORY) {
     appPages = appPages.filter(p => ['/raw-materials', '/products'].includes(p.url));
   }

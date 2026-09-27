@@ -45,6 +45,7 @@ import { offlineDb, type OfflineOrder } from '../services/offline-db';
 import { DeliveryMethod, PaymentStatus, UserRole } from '@nutrideli/shared-types';
 import type { DeliveryZone } from '../types';
 import AppHeader from '../components/AppHeader';
+import { SalaryAdvanceModal } from '../components/SalaryAdvanceModal';
 
 type Product = {
   id: string;
@@ -133,7 +134,9 @@ const Pos: React.FC = () => {
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(DeliveryMethod.IN_STORE);
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
   const [deliveryZoneId, setDeliveryZoneId] = useState<string>('');
+  const [deliveryUserId, setDeliveryUserId] = useState<string>('');
   const [customerAddress, setCustomerAddress] = useState<string>('');
+  const [showSalaryAdvanceModal, setShowSalaryAdvanceModal] = useState<boolean>(false);
 
   // Editing & Linked
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
@@ -481,6 +484,7 @@ const Pos: React.FC = () => {
       tableNumber: tableNumber.trim() || undefined,
       deliveryMethod,
       deliveryZoneId: deliveryMethod === DeliveryMethod.DELIVERY ? deliveryZoneId || undefined : undefined,
+      deliveryUserId: deliveryMethod === DeliveryMethod.DELIVERY && deliveryUserId ? deliveryUserId : undefined,
       employeeId: employeeId || undefined,
       paymentMethod,
       paymentStatus: paymentMethod === 'PENDING'
@@ -689,22 +693,46 @@ const Pos: React.FC = () => {
             </div>
           )}
 
-          {/* 1. Search Bar (Figma Pill) */}
-          <div className="ff-search-pill" style={{ marginBottom: '12px' }}>
-            <IonIcon icon={searchOutline} style={{ fontSize: '18px', color: '#64748B' }} />
-            <input
-              type="text"
-              placeholder="Buscar producto o servicio..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <IonIcon
-                icon={closeOutline}
-                style={{ fontSize: '18px', color: '#64748B', cursor: 'pointer' }}
-                onClick={() => setSearchTerm('')}
+          {/* 1. Search Bar & Vale Button */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <div className="ff-search-pill" style={{ flex: 1, marginBottom: 0 }}>
+              <IonIcon icon={searchOutline} style={{ fontSize: '18px', color: '#64748B' }} />
+              <input
+                type="text"
+                placeholder="Buscar producto o servicio..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
               />
-            )}
+              {searchTerm && (
+                <IonIcon
+                  icon={closeOutline}
+                  style={{ fontSize: '18px', color: '#64748B', cursor: 'pointer' }}
+                  onClick={() => setSearchTerm('')}
+                />
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSalaryAdvanceModal(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '0 14px',
+                borderRadius: '12px',
+                border: '1px solid #FECACA',
+                background: '#FEF2F2',
+                color: '#DC2626',
+                fontWeight: '700',
+                fontSize: '12px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+              title="Registrar salida de dinero por vale de empleado"
+            >
+              <IonIcon icon={cashOutline} style={{ fontSize: '16px' }} />
+              <span>Vale</span>
+            </button>
           </div>
 
           {/* 2. Category Chips Horizontal Carousel */}
@@ -1059,22 +1087,41 @@ const Pos: React.FC = () => {
                 {/* Delivery Zone & Shipping Info */}
                 {deliveryMethod === DeliveryMethod.DELIVERY && (
                   <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '12px', marginBottom: '14px' }}>
-                    <div style={{ marginBottom: '10px' }}>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                        Zona de Envío *
-                      </label>
-                      <select
-                        value={deliveryZoneId}
-                        onChange={e => setDeliveryZoneId(e.target.value)}
-                        style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#ffffff', fontSize: '13px', color: '#0F172A' }}
-                      >
-                        <option value="">Selecciona zona de envío...</option>
-                        {deliveryZones.map(z => (
-                          <option key={z.id} value={z.id}>
-                            {z.name} (+${Number(z.feePrice).toFixed(2)})
-                          </option>
-                        ))}
-                      </select>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                          Zona de Envío *
+                        </label>
+                        <select
+                          value={deliveryZoneId}
+                          onChange={e => setDeliveryZoneId(e.target.value)}
+                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#ffffff', fontSize: '13px', color: '#0F172A' }}
+                        >
+                          <option value="">Selecciona zona de envío...</option>
+                          {deliveryZones.map(z => (
+                            <option key={z.id} value={z.id}>
+                              {z.name} (+${Number(z.feePrice).toFixed(2)})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                          🛵 Repartidor Asignado
+                        </label>
+                        <select
+                          value={deliveryUserId}
+                          onChange={e => setDeliveryUserId(e.target.value)}
+                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#ffffff', fontSize: '13px', color: '#0F172A' }}
+                        >
+                          <option value="">Sin asignar / A convenir</option>
+                          {employees.filter(e => e.role === UserRole.DELIVERY).map(d => (
+                            <option key={d.id} value={d.id}>
+                              🛵 {d.username || d.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       <div>
@@ -1716,6 +1763,13 @@ const Pos: React.FC = () => {
             </div>
           </div>
         </IonModal>
+
+        <SalaryAdvanceModal
+          isOpen={showSalaryAdvanceModal}
+          onClose={() => setShowSalaryAdvanceModal(false)}
+          employees={employees}
+          defaultExchangeRate={exchangeRate}
+        />
       </IonContent>
     </IonPage>
   );

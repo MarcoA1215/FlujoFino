@@ -5,7 +5,6 @@ export enum OrderStatus {
   IN_TRANSIT = 'IN_TRANSIT',
   DELIVERED = 'DELIVERED',
   CANCELED = 'CANCELED',
-  CERRADO_CON_PERDIDA = 'CERRADO_CON_PERDIDA',
 }
 
 export interface Order {

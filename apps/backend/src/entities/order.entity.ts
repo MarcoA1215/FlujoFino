@@ -165,4 +165,11 @@ export class Order {
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'employeeId' })
   employee: User;
+
+  @Column({ nullable: true })
+  deliveryUserId: string;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'deliveryUserId' })
+  deliveryUser: User;
 }

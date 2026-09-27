@@ -20,6 +20,7 @@ export class CreateOrderDto {
   paymentStatus: PaymentStatus;
   deliveryMethod?: DeliveryMethod;
   deliveryZoneId?: string;
+  deliveryUserId?: string;
   employeeId?: string;
   employee_id?: string;
   paymentMethod?: string;
@@ -226,6 +227,17 @@ export class OrdersService {
         }
       }
 
+      let deliveryUserIdToSave: string | undefined = undefined;
+      if (dto.deliveryUserId && dto.deliveryUserId.trim() !== '') {
+        const dAccess = await manager.findOne(UserTenantAccess, {
+          where: { userId: dto.deliveryUserId, tenantId, isActive: true }
+        });
+        if (!dAccess || dAccess.role !== UserRole.DELIVERY) {
+          throw new BadRequestException('El repartidor asignado debe ser un usuario activo con rol DELIVERY');
+        }
+        deliveryUserIdToSave = dto.deliveryUserId;
+      }
+
       const order = manager.create(Order, { tenantId,
         customerId,
         identification,
@@ -239,6 +251,7 @@ export class OrdersService {
         deliveryMethod: dto.deliveryMethod || DeliveryMethod.IN_STORE,
         deliveryZoneId: (dto.deliveryMethod === DeliveryMethod.DELIVERY && dto.deliveryZoneId && dto.deliveryZoneId.trim() !== '') ? dto.deliveryZoneId : undefined,
         deliveryFee: deliveryFee,
+        deliveryUserId: deliveryUserIdToSave,
         discountAmount: discountAmount,
         totalCost: 0,
         netProfit: 0,
@@ -400,7 +413,7 @@ export class OrdersService {
   async getAllOrders(tenantId: string) {
     const orders = await this.dataSource.getRepository(Order).find({
       where: { tenantId },
-      relations: { items: { product: true, media: true }, deliveryZone: true, employee: { tenantAccess: true } },
+      relations: { items: { product: true, media: true }, deliveryZone: true, employee: { tenantAccess: true }, deliveryUser: true },
       order: { createdAt: 'DESC' },
     });
     return orders.map(order => this.mapOrderEmployee(order, tenantId));
@@ -409,7 +422,7 @@ export class OrdersService {
   async getOrderById(tenantId: string, id: string) {
     const order = await this.dataSource.getRepository(Order).findOne({
       where: { tenantId, id },
-      relations: { items: { product: true, media: true }, deliveryZone: true, employee: { tenantAccess: true } }
+      relations: { items: { product: true, media: true }, deliveryZone: true, employee: { tenantAccess: true }, deliveryUser: true }
     });
     return order ? this.mapOrderEmployee(order, tenantId) : null;
   }
@@ -423,58 +436,6 @@ export class OrdersService {
     order.paymentStatus = dto.status;
     if (dto.paymentMethod) order.paymentMethod = dto.paymentMethod;
     if (dto.notes) order.notes = dto.notes;
-    if (dto.pagoMovilRef !== undefined) order.pagoMovilRef = dto.pagoMovilRef;
-    if (dto.pagoMovilPhone !== undefined) order.pagoMovilPhone = dto.pagoMovilPhone;
-    if (dto.pagoMovilCedula !== undefined) order.pagoMovilCedula = dto.pagoMovilCedula;
-    if (dto.pagoMovilBank !== undefined) order.pagoMovilBank = dto.pagoMovilBank;
-    if (dto.puntoRef !== undefined) order.puntoRef = dto.puntoRef;
-    if (dto.puntoBank !== undefined) order.puntoBank = dto.puntoBank;
-    if (dto.binanceRef !== undefined) order.binanceRef = dto.binanceRef;
-    if (dto.transferRef !== undefined) order.transferRef = dto.transferRef;
-    if (dto.transferBank !== undefined) order.transferBank = dto.transferBank;
-    if (dto.usdReceived !== undefined) order.usdReceived = dto.usdReceived;
-    if (dto.changeAmount !== undefined) order.changeAmount = dto.changeAmount;
-    if (dto.changeAmountBs !== undefined) order.changeAmountBs = dto.changeAmountBs;
-    if (dto.changeMethod !== undefined) order.changeMethod = dto.changeMethod;
-    if (dto.changeRef !== undefined) order.changeRef = dto.changeRef;
-    if (dto.amountBs !== undefined) order.amountBs = dto.amountBs;
-    if (dto.exchangeRate !== undefined) order.exchangeRate = dto.exchangeRate;
-
-    return orderRepo.save(order);
-  }
-
-  async closeOrderWithLoss(tenantId: string, id: string) {
-    const orderRepo = this.dataSource.getRepository(Order);
-    const order = await orderRepo.findOne({ where: { tenantId, id } });
-    if (!order) throw new BadRequestException('Pedido no encontrado');
-    if (order.status === OrderStatus.CANCELED) throw new BadRequestException('El pedido ya está cancelado');
-    if (order.paymentStatus === PaymentStatus.PAID) throw new BadRequestException('El pedido ya está pagado completamente');
-
-    // Libera la mesa
-    if (order.tableNumber) {
-      order.notes = [order.notes, `(Mesa ${order.tableNumber} liberada por cierre con pérdida)`].filter(Boolean).join(' | ');
-      order.tableNumber = '';
-    }
-
-    order.status = OrderStatus.CERRADO_CON_PERDIDA;
-    return orderRepo.save(order);
-  }
-
-  async settleLossOrder(tenantId: string, id: string, dto: UpdatePaymentDto) {
-    const orderRepo = this.dataSource.getRepository(Order);
-    const order = await orderRepo.findOne({ where: { tenantId, id } });
-    if (!order) throw new BadRequestException('Pedido no encontrado');
-    if (order.status !== OrderStatus.CERRADO_CON_PERDIDA) {
-      throw new BadRequestException('Solo pedidos cerrados con pérdida pueden saldarse con esta acción');
-    }
-
-    order.status = OrderStatus.DELIVERED;
-    order.paymentStatus = dto.status || PaymentStatus.PAID;
-    if (dto.paymentMethod) order.paymentMethod = dto.paymentMethod;
-
-    const recoveryNote = '(Pérdida saldada y recuperada)';
-    order.notes = [order.notes, dto.notes, recoveryNote].filter(Boolean).join(' | ');
-
     if (dto.pagoMovilRef !== undefined) order.pagoMovilRef = dto.pagoMovilRef;
     if (dto.pagoMovilPhone !== undefined) order.pagoMovilPhone = dto.pagoMovilPhone;
     if (dto.pagoMovilCedula !== undefined) order.pagoMovilCedula = dto.pagoMovilCedula;
@@ -889,6 +850,20 @@ export class OrdersService {
           order.employeeId = user.id;
         } else {
           order.employeeId = null as any;
+        }
+      }
+
+      if (dto.deliveryUserId !== undefined) {
+        if (dto.deliveryUserId && dto.deliveryUserId.trim() !== '') {
+          const dAccess = await manager.findOne(UserTenantAccess, {
+            where: { userId: dto.deliveryUserId, tenantId, isActive: true }
+          });
+          if (!dAccess || dAccess.role !== UserRole.DELIVERY) {
+            throw new BadRequestException('El repartidor asignado debe ser un usuario activo con rol DELIVERY');
+          }
+          order.deliveryUserId = dto.deliveryUserId;
+        } else {
+          order.deliveryUserId = null as any;
         }
       }
 

@@ -222,26 +222,16 @@ const Orders: React.FC = () => {
               return false;
             }
             try {
-              const isLoss = order.status === OrderStatus.CERRADO_CON_PERDIDA;
-              const payload = {
+              await apiClient.patch(`/orders/${order.id}/payment`, {
                 status: PaymentStatus.PAID,
                 paymentMethod: 'PAGO_MOVIL',
                 pagoMovilRef: data.pmRef,
                 pagoMovilBank: data.pmBank || 'Pago Móvil',
                 amountBs: parseFloat(totalBs),
                 exchangeRate
-              };
-              if (isLoss) {
-                await apiClient.post(`/orders/${order.id}/settle-loss`, payload);
-              } else {
-                await apiClient.patch(`/orders/${order.id}/payment`, payload);
-              }
-              fetchOrders();
-              presentToast({
-                message: isLoss ? '¡Pérdida recuperada y pago registrado con éxito!' : 'Pago registrado con éxito',
-                duration: 2500,
-                color: 'success'
               });
+              fetchOrders();
+              presentToast({ message: 'Pago registrado con éxito', duration: 2000, color: 'success' });
             } catch (e) {
               presentToast({ message: 'Error registrando pago', duration: 3000, color: 'danger' });
             }
@@ -271,26 +261,16 @@ const Orders: React.FC = () => {
               return false;
             }
             try {
-              const isLoss = order.status === OrderStatus.CERRADO_CON_PERDIDA;
-              const payload = {
+              await apiClient.patch(`/orders/${order.id}/payment`, {
                 status: PaymentStatus.PAID,
                 paymentMethod: 'PUNTO',
                 pagoMovilRef: data.puntoRef,
                 pagoMovilBank: data.puntoBank || 'Punto de Venta',
                 amountBs: parseFloat(totalBs),
                 exchangeRate
-              };
-              if (isLoss) {
-                await apiClient.post(`/orders/${order.id}/settle-loss`, payload);
-              } else {
-                await apiClient.patch(`/orders/${order.id}/payment`, payload);
-              }
-              fetchOrders();
-              presentToast({
-                message: isLoss ? '¡Pérdida recuperada y pago registrado con éxito!' : 'Pago registrado con éxito',
-                duration: 2500,
-                color: 'success'
               });
+              fetchOrders();
+              presentToast({ message: 'Pago registrado con éxito', duration: 2000, color: 'success' });
             } catch (e) {
               presentToast({ message: 'Error registrando pago', duration: 3000, color: 'danger' });
             }
@@ -321,50 +301,15 @@ const Orders: React.FC = () => {
             const changeUsd = received - remaining;
             const changeBs = changeUsd * exchangeRate;
             try {
-              const isLoss = order.status === OrderStatus.CERRADO_CON_PERDIDA;
-              const payload = {
+              await apiClient.patch(`/orders/${order.id}/payment`, {
                 status: PaymentStatus.PAID,
                 paymentMethod: 'USD',
                 notes: (order.notes ? order.notes + '\n' : '') + `Pago USD: $${remaining.toFixed(2)} | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
-              };
-              if (isLoss) {
-                await apiClient.post(`/orders/${order.id}/settle-loss`, payload);
-              } else {
-                await apiClient.patch(`/orders/${order.id}/payment`, payload);
-              }
-              fetchOrders();
-              presentToast({
-                message: isLoss ? '¡Pérdida recuperada y pago en USD registrado!' : 'Pago en USD registrado',
-                duration: 2500,
-                color: 'success'
               });
+              fetchOrders();
+              presentToast({ message: 'Pago en USD registrado', duration: 2000, color: 'success' });
             } catch (e) {
               presentToast({ message: 'Error registrando pago', duration: 3000, color: 'danger' });
-            }
-          }
-        }
-      ]
-    });
-  };
-
-  const handleCloseWithLoss = (order: Order) => {
-    const shortId = String(order.id || '').slice(0, 8).toUpperCase();
-    presentAlert({
-      header: 'Cerrar con Pérdida / Incobrable',
-      message: `¿Estás seguro de cerrar el pedido #${shortId} con pérdida? La mesa se liberará y el monto se registrará en Mermas & Pérdidas.`,
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Sí, Cerrar con Pérdida',
-          role: 'destructive',
-          handler: async () => {
-            try {
-              await apiClient.patch(`/orders/${order.id}/close-with-loss`);
-              fetchOrders();
-              presentToast({ message: 'Pedido cerrado con pérdida y mesa liberada', duration: 2500, color: 'warning' });
-              setSelectedOrderForDetails(null);
-            } catch (e: any) {
-              presentToast({ message: e.response?.data?.message || 'Error al cerrar con pérdida', duration: 3000, color: 'danger' });
             }
           }
         }
@@ -375,8 +320,8 @@ const Orders: React.FC = () => {
   const counts = useMemo(() => {
     if (!Array.isArray(orders)) return { activos: 0, porCobrar: 0, historial: 0 };
     const activos = orders.filter(o => o && (o.status === OrderStatus.PENDING || o.status === OrderStatus.PREPARING)).length;
-    const porCobrar = orders.filter(o => o && [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED && o.status !== OrderStatus.CERRADO_CON_PERDIDA).length;
-    const historial = orders.filter(o => o && (o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED || o.status === OrderStatus.CERRADO_CON_PERDIDA)).length;
+    const porCobrar = orders.filter(o => o && [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED).length;
+    const historial = orders.filter(o => o && (o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED)).length;
     return { activos, porCobrar, historial };
   }, [orders]);
 
@@ -385,8 +330,8 @@ const Orders: React.FC = () => {
     return orders.filter(o => {
       if (!o) return false;
       const isActivo = o.status === OrderStatus.PENDING || o.status === OrderStatus.PREPARING;
-      const isHistorial = o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED || o.status === OrderStatus.CERRADO_CON_PERDIDA;
-      const isPorCobrar = [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED && o.status !== OrderStatus.CERRADO_CON_PERDIDA;
+      const isHistorial = o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED;
+      const isPorCobrar = [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED;
 
       if (tab === 'activos' && !isActivo) return false;
       if (tab === 'por_cobrar' && !isPorCobrar) return false;
@@ -561,21 +506,14 @@ const Orders: React.FC = () => {
 
                       {/* Status Badge */}
                       <div
-                        className={`ff-pill ${order.status === OrderStatus.CERRADO_CON_PERDIDA ? 'ff-pill-danger' : (isDelivered ? 'ff-pill-online' : (isPreparing ? 'ff-pill-rate' : (isCanceled ? 'ff-pill-danger' : 'ff-pill-sync')))}`}
-                        style={{
-                          fontSize: '11px',
-                          padding: '3px 10px',
-                          background: order.status === OrderStatus.CERRADO_CON_PERDIDA ? '#FEE2E2' : undefined,
-                          color: order.status === OrderStatus.CERRADO_CON_PERDIDA ? '#991B1B' : undefined,
-                          border: order.status === OrderStatus.CERRADO_CON_PERDIDA ? '1px solid #FCA5A5' : undefined,
-                          fontWeight: order.status === OrderStatus.CERRADO_CON_PERDIDA ? 800 : undefined
-                        }}
+                        className={`ff-pill ${isDelivered ? 'ff-pill-online' : (isPreparing ? 'ff-pill-rate' : (isCanceled ? 'ff-pill-danger' : 'ff-pill-sync'))}`}
+                        style={{ fontSize: '11px', padding: '3px 10px' }}
                       >
                         <span
                           className="ff-pill-dot"
-                          style={{ background: order.status === OrderStatus.CERRADO_CON_PERDIDA ? '#DC2626' : (isDelivered ? '#10B981' : (isPreparing ? '#3B82F6' : (isCanceled ? '#EF4444' : '#F59E0B'))) }}
+                          style={{ background: isDelivered ? '#10B981' : (isPreparing ? '#3B82F6' : (isCanceled ? '#EF4444' : '#F59E0B')) }}
                         />
-                        <span>{order.status === OrderStatus.CERRADO_CON_PERDIDA ? 'PÉRDIDA / INCOBRABLE' : (order.status || 'PENDING')}</span>
+                        <span>{order.status || 'PENDING'}</span>
                       </div>
                     </div>
 
@@ -783,51 +721,6 @@ const Orders: React.FC = () => {
                         }}
                       >
                         Completar ✓
-                      </button>
-                    )}
-
-                    {order.status === OrderStatus.CERRADO_CON_PERDIDA && (
-                      <button
-                        type="button"
-                        onClick={() => openPaymentAlert(order)}
-                        style={{
-                          flex: 1,
-                          padding: '8px 12px',
-                          borderRadius: '10px',
-                          border: '1px solid #86EFAC',
-                          background: '#F0FDF4',
-                          color: '#15803D',
-                          fontSize: '12px',
-                          fontWeight: '800',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px'
-                        }}
-                      >
-                        <IonIcon icon={cashOutline} />
-                        Saldar / Cobrar
-                      </button>
-                    )}
-
-                    {(isPending || isPreparing) && (
-                      <button
-                        type="button"
-                        onClick={() => handleCloseWithLoss(order)}
-                        title="Cerrar pedido con pérdida / incobrable"
-                        style={{
-                          padding: '8px 10px',
-                          borderRadius: '10px',
-                          border: '1px solid #FECACA',
-                          background: '#FEF2F2',
-                          color: '#DC2626',
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Pérdida
                       </button>
                     )}
 
@@ -1127,51 +1020,7 @@ const Orders: React.FC = () => {
 
                   {/* Actions */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {selectedOrderForDetails.status === OrderStatus.CERRADO_CON_PERDIDA && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        <div style={{
-                          padding: '12px',
-                          borderRadius: '12px',
-                          background: '#FEF2F2',
-                          border: '1px solid #FCA5A5',
-                          color: '#B91C1C',
-                          fontWeight: '800',
-                          fontSize: '13px',
-                          textAlign: 'center'
-                        }}>
-                          ⚠️ PEDIDO CERRADO CON PÉRDIDA / INCOBRABLE
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const ord = selectedOrderForDetails;
-                            setSelectedOrderForDetails(null);
-                            openPaymentAlert(ord);
-                          }}
-                          style={{
-                            padding: '14px',
-                            borderRadius: '12px',
-                            border: 'none',
-                            background: '#16A34A',
-                            color: '#ffffff',
-                            fontWeight: '800',
-                            fontSize: '14px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px'
-                          }}
-                        >
-                          <IonIcon icon={cashOutline} style={{ fontSize: '18px' }} />
-                          Saldar / Cobrar Pedido (Recuperar Pérdida)
-                        </button>
-                      </div>
-                    )}
-
-                    {selectedOrderForDetails.paymentStatus !== PaymentStatus.PAID &&
-                      selectedOrderForDetails.status !== OrderStatus.CANCELED &&
-                      selectedOrderForDetails.status !== OrderStatus.CERRADO_CON_PERDIDA && (
+                    {selectedOrderForDetails.paymentStatus !== PaymentStatus.PAID && selectedOrderForDetails.status !== OrderStatus.CANCELED && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <button
                           type="button"
@@ -1253,59 +1102,39 @@ const Orders: React.FC = () => {
                       </div>
                     )}
 
-                    {selectedOrderForDetails.status !== OrderStatus.DELIVERED &&
-                      selectedOrderForDetails.status !== OrderStatus.CANCELED &&
-                      selectedOrderForDetails.status !== OrderStatus.CERRADO_CON_PERDIDA && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => handleCloseWithLoss(selectedOrderForDetails)}
-                          style={{
-                            padding: '12px',
-                            borderRadius: '12px',
-                            border: '1px solid #FCA5A5',
-                            background: '#FEF2F2',
-                            color: '#DC2626',
-                            fontWeight: '700',
-                            fontSize: '13px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          ⚠️ Cerrar con Pérdida / Incobrable
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            presentAlert({
-                              header: 'Confirmar Cancelación',
-                              message: '¿Estás seguro de cancelar este pedido? Se liberarán los productos reservados.',
-                              buttons: [
-                                { text: 'Volver', role: 'cancel' },
-                                {
-                                  text: 'Sí, Cancelar',
-                                  role: 'destructive',
-                                  handler: () => {
-                                    updateStatus(selectedOrderForDetails.id, OrderStatus.CANCELED);
-                                    setSelectedOrderForDetails(null);
-                                  }
+                    {selectedOrderForDetails.status !== OrderStatus.DELIVERED && selectedOrderForDetails.status !== OrderStatus.CANCELED && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          presentAlert({
+                            header: 'Confirmar Cancelación',
+                            message: '¿Estás seguro de cancelar este pedido? Se liberarán los productos reservados.',
+                            buttons: [
+                              { text: 'Volver', role: 'cancel' },
+                              {
+                                text: 'Sí, Cancelar',
+                                role: 'destructive',
+                                handler: () => {
+                                  updateStatus(selectedOrderForDetails.id, OrderStatus.CANCELED);
+                                  setSelectedOrderForDetails(null);
                                 }
-                              ]
-                            });
-                          }}
-                          style={{
-                            padding: '12px',
-                            borderRadius: '12px',
-                            border: '1px solid #E2E8F0',
-                            background: '#F8FAFC',
-                            color: '#64748B',
-                            fontWeight: '700',
-                            fontSize: '13px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Cancelar Pedido
-                        </button>
-                      </>
+                              }
+                            ]
+                          });
+                        }}
+                        style={{
+                          padding: '12px',
+                          borderRadius: '12px',
+                          border: '1px solid #FCA5A5',
+                          background: '#FEF2F2',
+                          color: '#DC2626',
+                          fontWeight: '700',
+                          fontSize: '13px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Cancelar Pedido
+                      </button>
                     )}
                   </div>
                 </div>

@@ -22,6 +22,7 @@ import PublicStore from './pages/PublicStore';
 import PublicAppointmentManage from './pages/PublicAppointmentManage';
 import FeedbackPage from './pages/Feedback';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import DeliveryPanel from './pages/DeliveryPanel';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { ImageViewerProvider } from './context/ImageViewerContext';
 import { UserRole } from '@nutrideli/shared-types';
@@ -59,7 +60,7 @@ const HomeRedirector: React.FC = () => {
   
   if (user?.role === UserRole.POS) return <Navigate to="/pos" replace />;
   if (user?.role === UserRole.KITCHEN) return <Navigate to="/orders" replace />;
-  if (user?.role === UserRole.DELIVERY) return <Navigate to="/orders" replace />;
+  if (user?.role === UserRole.DELIVERY) return <Navigate to="/delivery-panel" replace />;
   if (user?.role === UserRole.INVENTORY) return <Navigate to="/raw-materials" replace />;
   return <Navigate to="/dashboard" replace />;
 };
@@ -186,6 +187,7 @@ const MainLayout: React.FC = () => {
         <Route path="/calculator" element={<PrivateRoute><Calculator /></PrivateRoute>} />
         <Route path="/pos" element={<PrivateRoute><Pos /></PrivateRoute>} />
         <Route path="/orders" element={<PrivateRoute><Orders /></PrivateRoute>} />
+        <Route path="/delivery-panel" element={<PrivateRoute><DeliveryPanel /></PrivateRoute>} />
         <Route path="/delivery-zones" element={<PrivateRoute><DeliveryZones /></PrivateRoute>} />
         <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
         <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />

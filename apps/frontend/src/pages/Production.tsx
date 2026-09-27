@@ -10,15 +10,10 @@ type Product = {
   name: string;
   stockQuantity: number;
   salePrice: number;
-  category?: string;
-  is_service?: boolean;
-  product_type?: string;
-  type?: string;
-  isFormula?: boolean;
   isCombo?: boolean;
-  isPreAssembled?: boolean;
-  comboItems?: any[];
-  recipe?: any[];
+    isPreAssembled?: boolean;
+    comboItems?: any[];
+    recipe?: any[];
   physicalStock?: number;
   reservedQuantity?: number;
 };
@@ -114,38 +109,7 @@ const Production: React.FC = () => {
   };
 
   const filteredProducts = products.filter(p => {
-    // Excluir estrictamente servicios
-    if (
-      p.is_service === true ||
-      p.product_type === 'SERVICIO' ||
-      p.type === 'SERVICIO' ||
-      p.category?.toLowerCase() === 'servicios'
-    ) {
-      return false;
-    }
-
-    // Excluir estrictamente reventa directa
-    if (p.product_type === 'REVENTA' || p.type === 'REVENTA') {
-      return false;
-    }
-
-    // Debe tener receta configurada con insumos vinculados o ser combo armable
-    const hasRecipe = Array.isArray(p.recipe) && p.recipe.length > 0;
-    const isArmableCombo = Boolean(
-      p.isCombo &&
-      p.isPreAssembled &&
-      Array.isArray(p.comboItems) &&
-      p.comboItems.length > 0
-    );
-    const isConfiguredFormula = Boolean(
-      (p.isFormula || p.product_type === 'FORMULA' || p.product_type === 'ARMABLE' || p.type === 'ARMABLE') &&
-      hasRecipe
-    );
-
-    if (!hasRecipe && !isArmableCombo && !isConfiguredFormula) {
-      return false;
-    }
-
+    if (p.isCombo && (!p.isPreAssembled || !p.comboItems || p.comboItems.length === 0)) return false;
     if (searchText.trim() === '') return true;
     return p.name?.toLowerCase().includes(searchText.toLowerCase());
   });

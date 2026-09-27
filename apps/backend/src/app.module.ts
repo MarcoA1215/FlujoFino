@@ -43,8 +43,11 @@ import { CustomersModule } from './customers/customers.module';
 import { SaaSPaymentReport } from './entities/saas-payment-report.entity';
 import { PlatformConfig } from './entities/platform-config.entity';
 import { PushSubscription } from './entities/push-subscription.entity';
+import { SalaryAdvance } from './entities/salary-advance.entity';
 import { SuperAdminModule } from './superadmin/superadmin.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { SalaryAdvancesModule } from './salary-advances/salary-advances.module';
+import { DeliveriesModule } from './deliveries/deliveries.module';
 
 @Module({
   imports: [
@@ -59,7 +62,7 @@ import { NotificationsModule } from './notifications/notifications.module';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
-        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription],
+        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription, SalaryAdvance],
         synchronize: true,
       }),
       inject: [ConfigService],
@@ -76,6 +79,8 @@ import { NotificationsModule } from './notifications/notifications.module';
     CustomersModule,
     SuperAdminModule,
     NotificationsModule,
+    SalaryAdvancesModule,
+    DeliveriesModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: APP_GUARD, useClass: RolesGuard }],
