@@ -189,9 +189,12 @@ const Menu: React.FC = () => {
     >
       <IonContent>
         <div style={{ padding: '20px 16px 16px 16px', textAlign: 'center', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ width: '46px', height: '46px', background: 'var(--ion-color-primary)', color: 'white', borderRadius: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '26px', fontWeight: '900', marginBottom: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.12)' }}>
-            F
-          </div>
+          <img 
+            src="/assets/logo.png" 
+            alt="Flujo Fino" 
+            className="w-12 h-12 rounded-2xl object-cover shadow-sm" 
+            style={{ width: '48px', height: '48px', borderRadius: '16px', objectFit: 'cover', marginBottom: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.12)' }}
+          />
           
           <button 
             type="button"
