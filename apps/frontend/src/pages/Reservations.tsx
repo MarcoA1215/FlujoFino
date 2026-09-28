@@ -483,12 +483,13 @@ const Reservations: React.FC = () => {
             <button
               type="button"
               onClick={() => setViewMode('day')}
+              className={viewMode === 'day' ? 'bg-theme-primary text-white' : ''}
               style={{
                 flex: 1,
                 padding: '8px 16px',
                 borderRadius: '999px',
                 border: 'none',
-                background: viewMode === 'day' ? '#10B981' : 'transparent',
+                background: viewMode === 'day' ? 'var(--theme-primary)' : 'transparent',
                 color: viewMode === 'day' ? '#ffffff' : '#64748B',
                 fontSize: '13px',
                 fontWeight: '700',
@@ -501,12 +502,13 @@ const Reservations: React.FC = () => {
             <button
               type="button"
               onClick={() => setViewMode('week')}
+              className={viewMode === 'week' ? 'bg-theme-primary text-white' : ''}
               style={{
                 flex: 1,
                 padding: '8px 16px',
                 borderRadius: '999px',
                 border: 'none',
-                background: viewMode === 'week' ? '#10B981' : 'transparent',
+                background: viewMode === 'week' ? 'var(--theme-primary)' : 'transparent',
                 color: viewMode === 'week' ? '#ffffff' : '#64748B',
                 fontSize: '13px',
                 fontWeight: '700',
@@ -851,8 +853,8 @@ const Reservations: React.FC = () => {
                     <button
                       type="button"
                       onClick={openNew}
-                      className="ff-btn-primary"
-                      style={{ padding: '10px 20px' }}
+                      className="ff-btn-primary bg-theme-primary text-white"
+                      style={{ padding: '10px 20px', backgroundColor: 'var(--theme-primary)', color: '#ffffff' }}
                     >
                       <IonIcon icon={addOutline} />
                       Agendar Cita
@@ -894,6 +896,7 @@ const Reservations: React.FC = () => {
         {/* Floating Action Button (FAB [ + ]) */}
         <div
           onClick={openNew}
+          className="bg-theme-primary text-white"
           style={{
             position: 'fixed',
             bottom: '78px',
@@ -901,12 +904,12 @@ const Reservations: React.FC = () => {
             width: '54px',
             height: '54px',
             borderRadius: '50%',
-            background: '#10B981',
+            background: 'var(--theme-primary)',
             color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
             cursor: 'pointer',
             zIndex: 900
           }}

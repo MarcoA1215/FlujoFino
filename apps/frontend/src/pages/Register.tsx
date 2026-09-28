@@ -69,25 +69,14 @@ const Register: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100%' }}>
           <IonCard style={{ width: '100%', maxWidth: '450px', borderRadius: '16px', boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}>
             <IonCardHeader className="ion-text-center" style={{ paddingBottom: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
-                <img
-                  src="/assets/logo.png"
-                  alt="Flujo Fino"
-                  style={{
-                    width: '64px',
-                    height: '64px',
-                    maxWidth: '64px',
-                    maxHeight: '64px',
-                    borderRadius: '16px',
-                    objectFit: 'cover',
-                    display: 'block',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                  }}
-                  onError={e => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-              </div>
+              <img
+                src="/assets/logo.png"
+                alt="Flujo Fino"
+                className="w-14 h-14 rounded-2xl object-cover shadow-sm mx-auto mb-2"
+                onError={e => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
               <IonCardTitle style={{ fontWeight: 'bold' }}>Registro</IonCardTitle>
               <p style={{ margin: '5px 0 10px 0', color: 'gray' }}>Paso {step} de 2</p>
             </IonCardHeader>

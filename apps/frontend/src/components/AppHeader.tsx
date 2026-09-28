@@ -219,7 +219,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   return (
     <>
       <IonHeader className="ion-no-border">
-        <IonToolbar className="ff-header-toolbar" style={{ '--background': '#ffffff', borderBottom: '1px solid #E2E8F0', padding: '0 4px' } as any}>
+        <IonToolbar className="ff-header-toolbar" style={{ '--background': 'var(--theme-header, #ffffff)', borderBottom: '1px solid #E2E8F0', padding: '0 4px' } as any}>
           <IonButtons slot="start">
             <IonMenuButton color="dark" />
           </IonButtons>

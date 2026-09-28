@@ -245,8 +245,8 @@ const Customers: React.FC = () => {
               <button
                 type="button"
                 onClick={openNew}
-                className="ff-btn-primary"
-                style={{ padding: '10px 20px' }}
+                className="ff-btn-primary bg-theme-primary text-white"
+                style={{ padding: '10px 20px', backgroundColor: 'var(--theme-primary)', color: '#ffffff' }}
               >
                 <IonIcon icon={addOutline} />
                 Registrar Cliente
@@ -427,6 +427,7 @@ const Customers: React.FC = () => {
         {/* FAB [+] Button */}
         <div
           onClick={openNew}
+          className="bg-theme-primary text-white"
           style={{
             position: 'fixed',
             bottom: '78px',
@@ -434,12 +435,12 @@ const Customers: React.FC = () => {
             width: '54px',
             height: '54px',
             borderRadius: '50%',
-            background: '#10B981',
+            background: 'var(--theme-primary)',
             color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
             cursor: 'pointer',
             zIndex: 900
           }}
@@ -534,8 +535,8 @@ const Customers: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="ff-btn-primary"
-                  style={{ width: '100%', padding: '14px', fontSize: '15px', borderRadius: '14px' }}
+                  className="ff-btn-primary bg-theme-primary text-white"
+                  style={{ width: '100%', padding: '14px', fontSize: '15px', borderRadius: '14px', backgroundColor: 'var(--theme-primary)', color: '#ffffff' }}
                 >
                   {editingCustomer ? 'Guardar Cambios' : 'Registrar Cliente ✓'}
                 </button>

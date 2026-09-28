@@ -235,12 +235,19 @@ const Menu: React.FC = () => {
             <IonMenuToggle key={item.id} autoHide={false}>
               <IonItem
                 className={location.pathname === item.path ? 'selected' : ''}
+                style={location.pathname === item.path ? {
+                  '--background': 'var(--theme-primary)',
+                  '--color': '#ffffff',
+                  color: '#ffffff',
+                  fontWeight: '800',
+                  borderRadius: '12px',
+                } as any : {}}
                 routerLink={item.path}
                 routerDirection="none"
                 lines="none"
                 detail={false}
               >
-                <IonIcon aria-hidden="true" slot="start" icon={item.icon} />
+                <IonIcon aria-hidden="true" slot="start" icon={item.icon} style={location.pathname === item.path ? { color: '#ffffff' } : {}} />
                 <IonLabel>{item.label}</IonLabel>
               </IonItem>
             </IonMenuToggle>

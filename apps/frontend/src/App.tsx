@@ -35,6 +35,7 @@ import { UserRole } from '@nutrideli/shared-types';
 import { useContext, useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { usePushNotifications } from './hooks/usePushNotifications';
+import { apiClient } from './api/client';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -180,6 +181,42 @@ const MainLayout: React.FC = () => {
   const { isReportModalOpen, setIsReportModalOpen } = useContext(SubscriptionContext);
   const location = useLocation();
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+
+  const [settings, setSettings] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem('tenant_settings');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (user?.tenantId) {
+      apiClient.get('/settings').then(res => {
+        setSettings(res.data);
+        localStorage.setItem('tenant_settings', JSON.stringify(res.data));
+      }).catch(console.error);
+    }
+  }, [user?.tenantId]);
+
+  useEffect(() => {
+    const handleSettingsUpdate = (e: any) => {
+      if (e.detail) {
+        setSettings(e.detail);
+      }
+    };
+    window.addEventListener('settings_updated', handleSettingsUpdate);
+    return () => window.removeEventListener('settings_updated', handleSettingsUpdate);
+  }, []);
+
+  useEffect(() => {
+    const primary = settings?.themePrimaryColor || '#10b981';
+    const header = settings?.themeHeaderColor || '#ffffff';
+    document.documentElement.style.setProperty('--theme-primary', primary);
+    document.documentElement.style.setProperty('--theme-header', header);
+    document.documentElement.style.setProperty('--ion-color-primary', primary);
+  }, [settings?.themePrimaryColor, settings?.themeHeaderColor]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);

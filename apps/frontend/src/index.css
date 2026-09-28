@@ -1,1 +1,16 @@
-/* Clean empty file */
+:root {
+  --theme-primary: #10b981;
+  --theme-header: #ffffff;
+}
+
+.bg-theme-primary {
+  background-color: var(--theme-primary) !important;
+}
+
+.text-theme-primary {
+  color: var(--theme-primary) !important;
+}
+
+.border-theme-primary {
+  border-color: var(--theme-primary) !important;
+}

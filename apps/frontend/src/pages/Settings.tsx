@@ -268,14 +268,14 @@ const SettingsPage: React.FC = () => {
 
       setSettings(updatedSettings);
       localStorage.setItem('flujofino_cached_settings', JSON.stringify(updatedSettings));
+      localStorage.setItem('tenant_settings', JSON.stringify(updatedSettings));
+      window.dispatchEvent(new CustomEvent('settings_updated', { detail: updatedSettings }));
 
-      if (updatedSettings.themePrimaryColor) {
-        document.documentElement.style.setProperty('--ion-color-primary', updatedSettings.themePrimaryColor);
-      }
-      if (updatedSettings.themeHeaderColor) {
-        document.documentElement.style.setProperty('--ion-color-success', updatedSettings.themeHeaderColor);
-        document.documentElement.style.setProperty('--ion-color-tertiary', updatedSettings.themeHeaderColor);
-      }
+      const primary = updatedSettings.themePrimaryColor || '#10b981';
+      const header = updatedSettings.themeHeaderColor || '#ffffff';
+      document.documentElement.style.setProperty('--theme-primary', primary);
+      document.documentElement.style.setProperty('--theme-header', header);
+      document.documentElement.style.setProperty('--ion-color-primary', primary);
 
       presentToast({
         message: 'Configuración guardada',

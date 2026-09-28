@@ -899,7 +899,8 @@ const Pos: React.FC = () => {
               <button
                 key={cat}
                 type="button"
-                className={`ff-chip ${selectedCategory === cat ? 'active' : ''}`}
+                className={`ff-chip ${selectedCategory === cat ? 'active bg-theme-primary text-white border-theme-primary' : ''}`}
+                style={selectedCategory === cat ? { backgroundColor: 'var(--theme-primary)', color: '#ffffff', borderColor: 'var(--theme-primary)' } : {}}
                 onClick={() => setSelectedCategory(cat)}
               >
                 {cat}
@@ -1035,16 +1036,17 @@ const Pos: React.FC = () => {
                               e.stopPropagation();
                               addToCart(p);
                             }}
+                            className="bg-theme-primary text-white"
                             style={{
                               width: '32px',
                               height: '32px',
                               borderRadius: '50%',
-                              background: '#10B981',
+                              backgroundColor: 'var(--theme-primary)',
                               color: '#ffffff',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)',
+                              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
                               cursor: 'pointer'
                             }}
                           >

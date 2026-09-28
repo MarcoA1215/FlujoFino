@@ -66,8 +66,8 @@ const Dashboard: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('/pos')}
-              className="ff-btn-primary"
-              style={{ padding: '12px 14px', borderRadius: '14px', fontSize: '13px' }}
+              className="ff-btn-primary bg-theme-primary text-white"
+              style={{ padding: '12px 14px', borderRadius: '14px', fontSize: '13px', backgroundColor: 'var(--theme-primary)', color: '#ffffff' }}
             >
               <IonIcon icon={cardOutline} style={{ fontSize: '18px' }} />
               Nueva Venta
