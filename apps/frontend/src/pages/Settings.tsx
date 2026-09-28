@@ -966,14 +966,51 @@ const SettingsPage: React.FC = () => {
                 <IonCardContent>
                   <p style={{marginBottom: '15px'}}>Cambia los colores base de tu sucursal para que coincidan con tu marca.</p>
                   
-                  <IonItem>
-                    <IonLabel position="stacked">Color Principal (Menú y Botones)</IonLabel>
-                    <IonInput type="text" placeholder="#1E293B" value={settings.themePrimaryColor || ''} onIonChange={e => setSettings({...settings, themePrimaryColor: e.detail.value!})} />
-                  </IonItem>
-                  <IonItem>
-                    <IonLabel position="stacked">Color Encabezados (Superior)</IonLabel>
-                    <IonInput type="text" placeholder="#334155" value={settings.themeHeaderColor || ''} onIonChange={e => setSettings({...settings, themeHeaderColor: e.detail.value!})} />
-                  </IonItem>
+                  <div className="space-y-4 pt-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                        Color Principal (Menú y Botones)
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={/^#[0-9A-Fa-f]{6}$/.test(settings.themePrimaryColor || '') ? settings.themePrimaryColor : '#10b981'}
+                          onChange={e => setSettings({ ...settings, themePrimaryColor: e.target.value.toUpperCase() })}
+                          className="w-10 h-10 rounded-full cursor-pointer border border-slate-300 shadow-xs overflow-hidden p-0 bg-transparent shrink-0"
+                        />
+                        <input
+                          type="text"
+                          maxLength={7}
+                          value={settings.themePrimaryColor || ''}
+                          placeholder="#10B981"
+                          onChange={e => setSettings({ ...settings, themePrimaryColor: e.target.value })}
+                          className="w-32 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-mono text-sm uppercase focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                        Color Encabezados (Superior)
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={/^#[0-9A-Fa-f]{6}$/.test(settings.themeHeaderColor || '') ? settings.themeHeaderColor : '#ffffff'}
+                          onChange={e => setSettings({ ...settings, themeHeaderColor: e.target.value.toUpperCase() })}
+                          className="w-10 h-10 rounded-full cursor-pointer border border-slate-300 shadow-xs overflow-hidden p-0 bg-transparent shrink-0"
+                        />
+                        <input
+                          type="text"
+                          maxLength={7}
+                          value={settings.themeHeaderColor || ''}
+                          placeholder="#FFFFFF"
+                          onChange={e => setSettings({ ...settings, themeHeaderColor: e.target.value })}
+                          className="w-32 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-mono text-sm uppercase focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </IonCardContent>
               </IonCard>
             </IonCol>
