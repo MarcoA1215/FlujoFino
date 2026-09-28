@@ -275,11 +275,31 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {!isClientMode && (
             <div style={{ marginTop: 'auto', paddingTop: '10px', display: 'flex', gap: '8px' }}>
               {isResale && onAddStock && (
-                <IonButton expand="block" size="small" color="success" onClick={() => onAddStock(p)} style={{ flex: 1, margin: 0, fontWeight: '700' }}>
+                <IonButton
+                  expand="block"
+                  size="small"
+                  onClick={() => onAddStock(p)}
+                  style={{
+                    flex: 1,
+                    margin: 0,
+                    fontWeight: '700',
+                    backgroundColor: 'var(--theme-primary)',
+                    color: 'var(--theme-primary-contrast)',
+                    '--background': 'var(--theme-primary)',
+                    '--color': 'var(--theme-primary-contrast)'
+                  }}
+                >
                   + Cargar Stock
                 </IonButton>
               )}
-              <IonButton expand={isResale && onAddStock ? undefined : "block"} size="small" fill="outline" color="primary" onClick={openOptions} style={{ margin: 0, fontWeight: '600' }}>
+              <IonButton
+                expand={isResale && onAddStock ? undefined : "block"}
+                size="small"
+                fill="outline"
+                className="border border-slate-300 text-slate-700"
+                onClick={openOptions}
+                style={{ margin: 0, fontWeight: '600', color: '#334155', '--border-color': '#cbd5e1' }}
+              >
                 Opciones
               </IonButton>
             </div>

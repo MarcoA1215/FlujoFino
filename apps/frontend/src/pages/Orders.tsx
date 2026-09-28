@@ -439,8 +439,8 @@ const Orders: React.FC = () => {
             <div className="ff-chips-container" style={{ padding: 0, margin: 0 }}>
               <button
                 type="button"
-                className={`ff-chip ${tab === 'activos' ? 'active bg-theme-primary text-white border-theme-primary' : ''}`}
-                style={tab === 'activos' ? { backgroundColor: 'var(--theme-primary)', color: '#ffffff', borderColor: 'var(--theme-primary)' } : {}}
+                className={`ff-chip ${tab === 'activos' ? 'active bg-theme-primary border-theme-primary' : ''}`}
+                style={tab === 'activos' ? { backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast)', borderColor: 'var(--theme-primary)' } : {}}
                 onClick={() => setTab('activos')}
               >
                 Activos ({counts.activos})

@@ -44,8 +44,9 @@ import axios from 'axios';
 import { useImageViewer } from '../context/ImageViewerContext';
 import { requestAndSubscribePush } from '../services/push-notification.service';
 import { playNotificationSound } from '../utils/audio';
+import { getContrastColor } from '../utils/colors';
 
-const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:3001').replace(/\/+$/, '');
 
 interface StoreProduct {
   id: string;
@@ -572,6 +573,9 @@ const PublicStore: React.FC = () => {
   };
 
   const headerColor = storeData?.settings?.themeHeaderColor || '#0f172a';
+  const headerContrast = getContrastColor(headerColor);
+  const primaryColor = storeData?.settings?.themePrimaryColor || '#10b981';
+  const primaryContrast = getContrastColor(primaryColor);
 
   if (loading) {
     return (
@@ -711,8 +715,8 @@ const PublicStore: React.FC = () => {
     return (
       <IonPage>
         <IonHeader>
-          <IonToolbar style={{ ['--background' as any]: headerColor, color: '#fff' }}>
-            <IonTitle>{storeData?.tenant?.name || 'Tienda Online'}</IonTitle>
+          <IonToolbar style={{ ['--background' as any]: headerColor, color: headerContrast, ['--color' as any]: headerContrast }}>
+            <IonTitle style={{ color: headerContrast, fontWeight: 'bold' }}>{storeData?.tenant?.name || 'Tienda Online'}</IonTitle>
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding" style={{ maxWidth: '600px', margin: '0 auto' }}>
@@ -820,8 +824,8 @@ const PublicStore: React.FC = () => {
     <IonPage>
       {/* Header */}
       <IonHeader>
-        <IonToolbar style={{ ['--background' as any]: headerColor, color: '#fff' }}>
-          <IonTitle style={{ fontWeight: 'bold' }}>{storeData?.tenant?.name || 'Tienda Online'}</IonTitle>
+        <IonToolbar style={{ ['--background' as any]: headerColor, color: headerContrast, ['--color' as any]: headerContrast }}>
+          <IonTitle style={{ fontWeight: 'bold', color: headerContrast }}>{storeData?.tenant?.name || 'Tienda Online'}</IonTitle>
           <IonButtons slot="end">
             {storeData?.settings?.companyPhone && (
               <IonButton
@@ -834,8 +838,8 @@ const PublicStore: React.FC = () => {
                 <IonIcon slot="icon-only" icon={logoWhatsapp} style={{ color: '#25D366', fontSize: '1.5rem' }} />
               </IonButton>
             )}
-            <IonButton onClick={() => setIsCartOpen(true)} style={{ position: 'relative' }}>
-              <IonIcon slot="icon-only" icon={cartOutline} style={{ fontSize: '1.6rem' }} />
+            <IonButton onClick={() => setIsCartOpen(true)} style={{ position: 'relative', color: headerContrast }}>
+              <IonIcon slot="icon-only" icon={cartOutline} style={{ fontSize: '1.6rem', color: headerContrast }} />
               {cartTotalItems > 0 && (
                 <IonBadge
                   color="danger"
@@ -1239,14 +1243,17 @@ const PublicStore: React.FC = () => {
           >
             <IonButton
               expand="block"
-              color="success"
               onClick={() => setIsCartOpen(true)}
               style={{
-                boxShadow: '0 8px 20px rgba(22, 163, 74, 0.35)',
+                boxShadow: '0 8px 20px rgba(0, 0, 0, 0.2)',
                 borderRadius: '12px',
                 height: '52px',
                 fontWeight: 'bold',
                 fontSize: '1rem',
+                backgroundColor: primaryColor,
+                color: primaryContrast,
+                '--background': primaryColor,
+                '--color': primaryContrast,
               }}
             >
               <IonIcon slot="start" icon={cartOutline} style={{ fontSize: '1.3rem' }} />
@@ -1258,11 +1265,11 @@ const PublicStore: React.FC = () => {
         {/* Cart and Checkout Modal */}
         <IonModal isOpen={isCartOpen} onDidDismiss={() => setIsCartOpen(false)}>
           <IonHeader>
-            <IonToolbar style={{ ['--background' as any]: headerColor, color: '#fff' }}>
-              <IonTitle>Mi Carrito ({cartTotalItems})</IonTitle>
+            <IonToolbar style={{ ['--background' as any]: headerColor, color: headerContrast, ['--color' as any]: headerContrast }}>
+              <IonTitle style={{ color: headerContrast, fontWeight: 'bold' }}>Mi Carrito ({cartTotalItems})</IonTitle>
               <IonButtons slot="end">
-                <IonButton onClick={() => setIsCartOpen(false)}>
-                  <IonIcon slot="icon-only" icon={closeOutline} />
+                <IonButton onClick={() => setIsCartOpen(false)} style={{ color: headerContrast }}>
+                  <IonIcon slot="icon-only" icon={closeOutline} style={{ color: headerContrast }} />
                 </IonButton>
               </IonButtons>
             </IonToolbar>
@@ -1804,10 +1811,18 @@ const PublicStore: React.FC = () => {
                 {/* Confirm Button */}
                 <IonButton
                   expand="block"
-                  color={hasSupplierPreorder ? 'tertiary' : 'success'}
                   disabled={isSubmitting}
                   onClick={handleCheckout}
-                  style={{ height: '52px', fontWeight: 'bold', fontSize: '1rem', borderRadius: '10px' }}
+                  style={{
+                    height: '52px',
+                    fontWeight: 'bold',
+                    fontSize: '1rem',
+                    borderRadius: '10px',
+                    backgroundColor: hasSupplierPreorder ? '#6366f1' : primaryColor,
+                    color: hasSupplierPreorder ? '#ffffff' : primaryContrast,
+                    '--background': hasSupplierPreorder ? '#6366f1' : primaryColor,
+                    '--color': hasSupplierPreorder ? '#ffffff' : primaryContrast,
+                  }}
                 >
                   {isSubmitting ? (
                     <IonSpinner name="crescent" />

@@ -133,7 +133,7 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
                 type="button"
                 onClick={handleSendCode}
                 disabled={loading}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+                className="w-full bg-theme-primary font-bold py-3 px-4 rounded-xl shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
               >
                 {loading ? <IonSpinner name="crescent" style={{ width: '18px', height: '18px' }} /> : 'Enviar Código al Correo'}
               </button>
@@ -171,7 +171,7 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
                 type="button"
                 onClick={handleVerify}
                 disabled={loading || code.length !== 6}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+                className="w-full bg-theme-primary font-bold py-3 px-4 rounded-xl shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
               >
                 {loading ? <IonSpinner name="crescent" style={{ width: '18px', height: '18px' }} /> : 'Confirmar Verificación'}
               </button>

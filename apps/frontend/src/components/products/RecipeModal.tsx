@@ -132,9 +132,9 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
   return (
     <IonModal isOpen={!!product} onDidDismiss={onClose}>
       <IonHeader>
-        <IonToolbar color="light">
-          <IonTitle>{product?.isCombo ? 'Configurar Combo:' : 'Receta:'} {product?.name}</IonTitle>
-          <IonButtons slot="end"><IonButton onClick={onClose}>Cerrar</IonButton></IonButtons>
+        <IonToolbar style={{ ['--background' as any]: '#ffffff', color: '#0f172a', borderBottom: '1px solid #e2e8f0' }}>
+          <IonTitle style={{ color: '#0f172a', fontWeight: 'bold' }}>{product?.isCombo ? 'Configurar Combo:' : 'Receta:'} {product?.name}</IonTitle>
+          <IonButtons slot="end"><IonButton onClick={onClose} style={{ color: '#0f172a', fontWeight: 'bold' }}>Cerrar</IonButton></IonButtons>
         </IonToolbar>
       </IonHeader>
       <IonContent className="ion-padding">
@@ -266,7 +266,22 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
         </IonGrid>
       </IonContent>
       <IonFooter>
-        <IonToolbar><IonButton expand="block" color="success" style={{ margin: '10px' }} onClick={saveRecipe}>Guardar Composición y Costos</IonButton></IonToolbar>
+        <IonToolbar style={{ ['--background' as any]: '#ffffff', borderTop: '1px solid #e2e8f0' }}>
+          <IonButton
+            expand="block"
+            style={{
+              margin: '10px',
+              backgroundColor: 'var(--theme-primary)',
+              color: 'var(--theme-primary-contrast)',
+              '--background': 'var(--theme-primary)',
+              '--color': 'var(--theme-primary-contrast)',
+              fontWeight: '700'
+            }}
+            onClick={saveRecipe}
+          >
+            Guardar Composición y Costos
+          </IonButton>
+        </IonToolbar>
       </IonFooter>
     </IonModal>
   );

@@ -208,10 +208,10 @@ const RawMaterials: React.FC = () => {
 
     <IonModal isOpen={showCreateModal} onDidDismiss={() => setShowCreateModal(false)}>
       <IonHeader>
-        <IonToolbar color="success">
-          <IonTitle>Agregar Insumo</IonTitle>
+        <IonToolbar style={{ ['--background' as any]: '#ffffff', color: '#0f172a', borderBottom: '1px solid #e2e8f0' }}>
+          <IonTitle style={{ color: '#0f172a', fontWeight: 'bold' }}>Agregar Insumo</IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={() => setShowCreateModal(false)}>Cerrar</IonButton>
+            <IonButton onClick={() => setShowCreateModal(false)} style={{ color: '#0f172a', fontWeight: 'bold' }}>Cerrar</IonButton>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
@@ -297,7 +297,14 @@ const RawMaterials: React.FC = () => {
                     </div>
                   )}
 
-                  <IonButton expand="block" color="success" className="ion-margin-top" onClick={handleCreate}>Guardar</IonButton>
+                  <IonButton
+                    expand="block"
+                    className="ion-margin-top"
+                    style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast)', '--background': 'var(--theme-primary)', '--color': 'var(--theme-primary-contrast)', fontWeight: '700', borderRadius: '10px' }}
+                    onClick={handleCreate}
+                  >
+                    Guardar
+                  </IonButton>
                 </IonCardContent>
               </IonCard>
             
@@ -307,10 +314,10 @@ const RawMaterials: React.FC = () => {
     {/* Modal Editar Insumo & Extras */}
     <IonModal isOpen={Boolean(editingMaterial)} onDidDismiss={() => setEditingMaterial(null)}>
       <IonHeader>
-        <IonToolbar color="success">
-          <IonTitle>Editar Insumo y Configurar Extras</IonTitle>
+        <IonToolbar style={{ ['--background' as any]: '#ffffff', color: '#0f172a', borderBottom: '1px solid #e2e8f0' }}>
+          <IonTitle style={{ color: '#0f172a', fontWeight: 'bold' }}>Editar Insumo y Configurar Extras</IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={() => setEditingMaterial(null)}>Cerrar</IonButton>
+            <IonButton onClick={() => setEditingMaterial(null)} style={{ color: '#0f172a', fontWeight: 'bold' }}>Cerrar</IonButton>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
@@ -383,7 +390,12 @@ const RawMaterials: React.FC = () => {
               )}
             </div>
 
-            <IonButton expand="block" color="success" className="ion-margin-top" onClick={handleSaveEdit} style={{ fontWeight: '700', borderRadius: '10px' }}>
+            <IonButton
+              expand="block"
+              className="ion-margin-top"
+              onClick={handleSaveEdit}
+              style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast)', '--background': 'var(--theme-primary)', '--color': 'var(--theme-primary-contrast)', fontWeight: '700', borderRadius: '10px' }}
+            >
               Guardar Insumo y Extras
             </IonButton>
           </IonCardContent>

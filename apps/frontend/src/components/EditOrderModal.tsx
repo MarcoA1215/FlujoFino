@@ -133,10 +133,10 @@ export const EditOrderModal: React.FC<Props> = ({ order, isOpen, onClose, onSucc
   return (
     <IonModal isOpen={isOpen} onDidDismiss={onClose}>
       <IonHeader>
-        <IonToolbar color="primary">
-          <IonTitle>Editar Pedido</IonTitle>
+        <IonToolbar style={{ ['--background' as any]: '#ffffff', color: '#0f172a', borderBottom: '1px solid #e2e8f0' }}>
+          <IonTitle style={{ color: '#0f172a', fontWeight: 'bold' }}>Editar Pedido</IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={onClose}>Cerrar</IonButton>
+            <IonButton onClick={onClose} style={{ color: '#0f172a', fontWeight: 'bold' }}>Cerrar</IonButton>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
@@ -235,7 +235,19 @@ export const EditOrderModal: React.FC<Props> = ({ order, isOpen, onClose, onSucc
                     <h2 style={{ fontWeight: 'bold', color: '#2dd36f' }}>${totalCart.toFixed(2)}</h2>
                   </div>
 
-                  <IonButton expand="block" color="primary" className="ion-margin-top" size="large" onClick={handleSave}>
+                  <IonButton
+                    expand="block"
+                    className="ion-margin-top"
+                    size="large"
+                    style={{
+                      backgroundColor: 'var(--theme-primary)',
+                      color: 'var(--theme-primary-contrast)',
+                      '--background': 'var(--theme-primary)',
+                      '--color': 'var(--theme-primary-contrast)',
+                      fontWeight: '800'
+                    }}
+                    onClick={handleSave}
+                  >
                     Guardar Cambios
                   </IonButton>
                 </IonCardContent>

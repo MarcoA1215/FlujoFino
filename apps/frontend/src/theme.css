@@ -204,10 +204,10 @@ body {
 }
 
 .ff-chip.active {
-  background: var(--ff-emerald);
-  color: #ffffff;
-  border-color: var(--ff-emerald);
-  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+  background: var(--theme-primary, var(--ff-emerald));
+  color: var(--theme-primary-contrast, #ffffff);
+  border-color: var(--theme-primary, var(--ff-emerald));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 /* Search Bar Pill */
@@ -269,8 +269,8 @@ body {
 
 /* Primary Button */
 .ff-btn-primary {
-  background: var(--ff-emerald);
-  color: #ffffff;
+  background: var(--theme-primary, var(--ff-emerald));
+  color: var(--theme-primary-contrast, #ffffff);
   border: none;
   border-radius: var(--ff-radius-md);
   padding: 10px 18px;
@@ -281,13 +281,13 @@ body {
   justify-content: center;
   gap: 8px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: all 0.15s ease;
   outline: none;
 }
 .ff-btn-primary:active {
   transform: scale(0.97);
-  background: var(--ff-emerald-dark);
+  opacity: 0.9;
 }
 
 /* Bottom Sheet Modal Styling */
