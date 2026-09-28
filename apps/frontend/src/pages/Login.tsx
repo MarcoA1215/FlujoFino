@@ -255,11 +255,20 @@ const Login: React.FC = () => {
           ) : (
             <IonCard style={{ width: '100%', maxWidth: '400px', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.08)' }}>
               <IonCardHeader className="ion-text-center">
-                <div className="flex justify-center mb-4">
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
                   <img 
                     src="/assets/logo.png" 
                     alt="Flujo Fino" 
-                    className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-2xl shadow-sm self-center" 
+                    style={{
+                      width: '72px',
+                      height: '72px',
+                      maxWidth: '72px',
+                      maxHeight: '72px',
+                      borderRadius: '16px',
+                      objectFit: 'cover',
+                      display: 'block',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}
                     onError={e => {
                       (e.target as HTMLElement).style.display = 'none';
                     }}
