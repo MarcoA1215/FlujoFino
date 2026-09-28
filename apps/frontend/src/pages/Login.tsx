@@ -256,9 +256,9 @@ const Login: React.FC = () => {
             <IonCard style={{ width: '100%', maxWidth: '400px', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.08)' }}>
               <IonCardHeader className="ion-text-center">
                 <img
-                  src="/assets/logo.png"
-                  alt="Flujo Fino"
-                  className="w-16 h-16 rounded-2xl object-cover shadow-sm mx-auto mb-3"
+                  src="/assets/logo.png" 
+                  alt="Flujo Fino" 
+                  className="w-20 h-20 mx-auto mb-3 rounded-2xl object-cover shadow-md"
                   onError={e => {
                     (e.target as HTMLElement).style.display = 'none';
                   }}
