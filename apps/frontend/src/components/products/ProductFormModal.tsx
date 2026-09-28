@@ -203,12 +203,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   return (
     <IonModal isOpen={isOpen} onDidDismiss={onClose}>
       <IonHeader>
-        <IonToolbar style={{ ['--background' as any]: '#ffffff', color: '#0f172a', borderBottom: '1px solid #e2e8f0' }}>
-          <IonTitle style={{ color: '#0f172a', fontWeight: 'bold' }}>
+        <IonToolbar color="primary">
+          <IonTitle>
             {product ? `Editar: ${product.name}` : isCombo ? 'Nuevo Combo' : isResale ? 'Nuevo Producto para Reventa' : isFormula ? 'Nuevo Producto Armable' : 'Nuevo Servicio / Cita'}
           </IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={onClose} style={{ color: '#0f172a', fontWeight: 'bold' }}>
+            <IonButton onClick={onClose}>
               <IonIcon icon={closeOutline} />
             </IonButton>
           </IonButtons>
@@ -585,26 +585,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
       <IonFooter className="ion-no-border" style={{ backgroundColor: '#ffffff', borderTop: '1px solid #e2e8f0', padding: '10px 16px' }}>
         <div style={{ maxWidth: '640px', margin: '0 auto', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-          <IonButton
-            fill="outline"
-            className="border border-slate-300 text-slate-700"
-            style={{ color: '#334155', '--border-color': '#cbd5e1' }}
-            onClick={onClose}
-            disabled={saving}
-          >
+          <IonButton fill="outline" color="medium" onClick={onClose} disabled={saving}>
             Cancelar
           </IonButton>
-          <IonButton
-            style={{
-              backgroundColor: 'var(--theme-primary)',
-              color: 'var(--theme-primary-contrast)',
-              '--background': 'var(--theme-primary)',
-              '--color': 'var(--theme-primary-contrast)',
-              fontWeight: '700'
-            }}
-            onClick={handleSave}
-            disabled={saving}
-          >
+          <IonButton color="primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Guardando...' : (product ? 'Guardar Cambios' : 'Crear')}
           </IonButton>
         </div>

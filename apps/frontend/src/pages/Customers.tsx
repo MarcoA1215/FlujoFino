@@ -245,8 +245,8 @@ const Customers: React.FC = () => {
               <button
                 type="button"
                 onClick={openNew}
-                className="ff-btn-primary bg-theme-primary"
-                style={{ padding: '10px 20px', backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast)' }}
+                className="ff-btn-primary bg-theme-primary text-white"
+                style={{ padding: '10px 20px', backgroundColor: 'var(--theme-primary)', color: '#ffffff' }}
               >
                 <IonIcon icon={addOutline} />
                 Registrar Cliente
@@ -535,8 +535,8 @@ const Customers: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="ff-btn-primary bg-theme-primary"
-                  style={{ width: '100%', padding: '14px', fontSize: '15px', borderRadius: '14px', backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast)' }}
+                  className="ff-btn-primary bg-theme-primary text-white"
+                  style={{ width: '100%', padding: '14px', fontSize: '15px', borderRadius: '14px', backgroundColor: 'var(--theme-primary)', color: '#ffffff' }}
                 >
                   {editingCustomer ? 'Guardar Cambios' : 'Registrar Cliente ✓'}
                 </button>

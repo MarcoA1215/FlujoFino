@@ -155,7 +155,7 @@ const Calculator: React.FC = () => {
                           <h2 style={{ fontWeight: 'bold' }}>{p.name}</h2>
                           <p>{p.salePrice.toFixed(2)}</p>
                         </IonLabel>
-                        <IonButton slot="end" style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast)', '--background': 'var(--theme-primary)', '--color': 'var(--theme-primary-contrast)' }} onClick={() => addToCart(p)}>
+                        <IonButton slot="end" onClick={() => addToCart(p)}>
                           <IonIcon icon={addOutline} slot="icon-only" />
                         </IonButton>
                       </IonItem>
@@ -293,13 +293,7 @@ const Calculator: React.FC = () => {
                   </div>
 
                   <div className="ion-margin-top ion-text-center">
-                    <IonButton
-                      fill="outline"
-                      className="border border-slate-300 text-slate-700"
-                      style={{ color: '#334155', '--border-color': '#cbd5e1' }}
-                      onClick={clearCart}
-                      disabled={cart.length === 0}
-                    >
+                    <IonButton color="medium" fill="outline" onClick={clearCart} disabled={cart.length === 0}>
                       <IonIcon icon={trashOutline} slot="start" />
                       Limpiar
                     </IonButton>
@@ -307,29 +301,13 @@ const Calculator: React.FC = () => {
                   <IonGrid className="ion-no-padding ion-margin-top">
   <IonRow>
     <IonCol size="6" style={{ paddingRight: '5px' }}>
-      <IonButton
-        expand="block"
-        fill="outline"
-        className="border border-slate-300 text-slate-700"
-        style={{ color: '#334155', fontWeight: '700', '--border-color': '#cbd5e1' }}
-        onClick={handleCopyTicket}
-      >
+      <IonButton expand="block" color="secondary" onClick={handleCopyTicket}>
         <IonIcon slot="start" icon={copyOutline} />
         Copiar
       </IonButton>
     </IonCol>
     <IonCol size="6" style={{ paddingLeft: '5px' }}>
-      <IonButton
-        expand="block"
-        style={{
-          backgroundColor: 'var(--theme-primary)',
-          color: 'var(--theme-primary-contrast)',
-          '--background': 'var(--theme-primary)',
-          '--color': 'var(--theme-primary-contrast)',
-          fontWeight: '700'
-        }}
-        onClick={passToPos}
-      >
+      <IonButton expand="block" color="tertiary" onClick={passToPos}>
         <IonIcon slot="start" icon={cartOutline} />
         A Caja
       </IonButton>

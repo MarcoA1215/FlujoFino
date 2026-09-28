@@ -17,9 +17,8 @@ import {
 } from 'ionicons/icons';
 import { useImageViewer } from '../context/ImageViewerContext';
 import { requestAndSubscribePush } from '../services/push-notification.service';
-import { getContrastColor } from '../utils/colors';
 
-const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:3001').replace(/\/+$/, '');
+const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const PublicBooking: React.FC = () => {
   const { openImage } = useImageViewer();
@@ -553,9 +552,6 @@ const PublicBooking: React.FC = () => {
   const hasStore = Boolean(tenantInfo?.hasStore ?? ((tenantInfo?.featureBuySell || tenantInfo?.featureRecipes) && tenantInfo?.featureShowCatalog !== false));
   const companyPhone = tenantInfo?.companyPhone || tenantInfo?.settings?.companyPhone || '';
   const headerColor = tenantInfo?.settings?.themeHeaderColor || '#0f172a';
-  const headerContrast = getContrastColor(headerColor);
-  const primaryColor = tenantInfo?.settings?.themePrimaryColor || '#10b981';
-  const primaryContrast = getContrastColor(primaryColor);
 
   // Ensure step 1 is never active if bookingRequireService is disabled
   useEffect(() => {
@@ -578,21 +574,21 @@ const PublicBooking: React.FC = () => {
     <IonPage>
       {/* Header matching PublicStore */}
       <IonHeader>
-        <IonToolbar style={{ ['--background' as any]: headerColor, color: headerContrast, ['--color' as any]: headerContrast }}>
+        <IonToolbar style={{ ['--background' as any]: headerColor, color: '#fff' }}>
           {step > (isServiceRequired ? 1 : 2) ? (
             <IonButtons slot="start">
-              <IonButton fill="clear" onClick={goBack} style={{ color: headerContrast }} title="Regresar">
-                <IonIcon slot="icon-only" icon={chevronBackOutline} style={{ color: headerContrast }} />
+              <IonButton fill="clear" onClick={goBack} style={{ color: '#fff' }} title="Regresar">
+                <IonIcon slot="icon-only" icon={chevronBackOutline} />
               </IonButton>
             </IonButtons>
           ) : hasStore ? (
             <IonButtons slot="start">
-              <IonButton fill="clear" onClick={() => (window.location.href = `/store/${tenantId}`)} style={{ color: headerContrast }} title="Volver a la Tienda">
-                <IonIcon slot="icon-only" icon={chevronBackOutline} style={{ color: headerContrast }} />
+              <IonButton fill="clear" onClick={() => (window.location.href = `/store/${tenantId}`)} style={{ color: '#fff' }} title="Volver a la Tienda">
+                <IonIcon slot="icon-only" icon={chevronBackOutline} />
               </IonButton>
             </IonButtons>
           ) : null}
-          <IonTitle style={{ fontWeight: 'bold', color: headerContrast }}>{tenantInfo?.name || 'Agendar Cita'}</IonTitle>
+          <IonTitle style={{ fontWeight: 'bold' }}>{tenantInfo?.name || 'Agendar Cita'}</IonTitle>
           <IonButtons slot="end">
             {companyPhone && (
               <IonButton
@@ -611,7 +607,7 @@ const PublicBooking: React.FC = () => {
                 onClick={() => (window.location.href = `/store/${tenantId}`)}
                 title="Ir al Catálogo / Tienda"
               >
-                <IonIcon slot="icon-only" icon={cartOutline} style={{ color: headerContrast, fontSize: '1.5rem' }} />
+                <IonIcon slot="icon-only" icon={cartOutline} style={{ color: '#fff', fontSize: '1.5rem' }} />
               </IonButton>
             )}
           </IonButtons>
@@ -1576,8 +1572,8 @@ const PublicBooking: React.FC = () => {
                       width: '100%',
                       marginTop: '20px',
                       padding: '16px 20px',
-                      backgroundColor: primaryColor,
-                      color: primaryContrast,
+                      backgroundColor: '#10B981',
+                      color: '#ffffff',
                       border: 'none',
                       borderRadius: '12px',
                       fontSize: '16px',
@@ -1588,7 +1584,7 @@ const PublicBooking: React.FC = () => {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.15)',
+                      boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
                       transition: 'all 0.2s ease',
                     }}
                   >
@@ -1603,10 +1599,10 @@ const PublicBooking: React.FC = () => {
 
       <IonModal isOpen={showCatalog} onDidDismiss={() => setShowCatalog(false)}>
         <IonHeader>
-          <IonToolbar style={{ ['--background' as any]: '#ffffff', color: '#0f172a', borderBottom: '1px solid #e2e8f0' }}>
-            <IonTitle style={{ color: '#0f172a', fontWeight: 'bold' }}>Portafolio y Trabajos</IonTitle>
+          <IonToolbar color="primary">
+            <IonTitle>Portafolio y Trabajos</IonTitle>
             <IonButtons slot="end">
-              <IonButton onClick={() => setShowCatalog(false)} style={{ color: '#0f172a', fontWeight: 'bold' }}>Cerrar</IonButton>
+              <IonButton onClick={() => setShowCatalog(false)}>Cerrar</IonButton>
             </IonButtons>
           </IonToolbar>
         </IonHeader>

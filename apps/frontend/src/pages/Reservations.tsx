@@ -483,14 +483,14 @@ const Reservations: React.FC = () => {
             <button
               type="button"
               onClick={() => setViewMode('day')}
-              className={viewMode === 'day' ? 'bg-theme-primary' : ''}
+              className={viewMode === 'day' ? 'bg-theme-primary text-white' : ''}
               style={{
                 flex: 1,
                 padding: '8px 16px',
                 borderRadius: '999px',
                 border: 'none',
                 background: viewMode === 'day' ? 'var(--theme-primary)' : 'transparent',
-                color: viewMode === 'day' ? 'var(--theme-primary-contrast)' : '#64748B',
+                color: viewMode === 'day' ? '#ffffff' : '#64748B',
                 fontSize: '13px',
                 fontWeight: '700',
                 cursor: 'pointer',
@@ -502,14 +502,14 @@ const Reservations: React.FC = () => {
             <button
               type="button"
               onClick={() => setViewMode('week')}
-              className={viewMode === 'week' ? 'bg-theme-primary' : ''}
+              className={viewMode === 'week' ? 'bg-theme-primary text-white' : ''}
               style={{
                 flex: 1,
                 padding: '8px 16px',
                 borderRadius: '999px',
                 border: 'none',
                 background: viewMode === 'week' ? 'var(--theme-primary)' : 'transparent',
-                color: viewMode === 'week' ? 'var(--theme-primary-contrast)' : '#64748B',
+                color: viewMode === 'week' ? '#ffffff' : '#64748B',
                 fontSize: '13px',
                 fontWeight: '700',
                 cursor: 'pointer',
@@ -853,8 +853,8 @@ const Reservations: React.FC = () => {
                     <button
                       type="button"
                       onClick={openNew}
-                      className="ff-btn-primary bg-theme-primary"
-                      style={{ padding: '10px 20px', backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast)' }}
+                      className="ff-btn-primary bg-theme-primary text-white"
+                      style={{ padding: '10px 20px', backgroundColor: 'var(--theme-primary)', color: '#ffffff' }}
                     >
                       <IonIcon icon={addOutline} />
                       Agendar Cita

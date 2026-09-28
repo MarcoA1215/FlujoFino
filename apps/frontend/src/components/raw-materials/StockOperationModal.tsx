@@ -84,12 +84,12 @@ export const StockOperationModal: React.FC<Props> = ({ material, operationType, 
   return (
     <IonModal isOpen={!!material && !!operationType} onDidDismiss={onClose}>
       <IonHeader>
-        <IonToolbar style={{ ['--background' as any]: '#ffffff', color: '#0f172a', borderBottom: '1px solid #e2e8f0' }}>
-          <IonTitle style={{ color: '#0f172a', fontWeight: 'bold' }}>
+        <IonToolbar color={operationType === 'restock' ? 'success' : 'danger'}>
+          <IonTitle>
             {operationType === 'restock' ? 'Comprar Insumo' : 'Registrar Pérdida'}
           </IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={onClose} style={{ color: '#0f172a', fontWeight: 'bold' }}>Cerrar</IonButton>
+            <IonButton onClick={onClose}>Cerrar</IonButton>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
@@ -152,19 +152,7 @@ export const StockOperationModal: React.FC<Props> = ({ material, operationType, 
               </IonNote>
             )}
 
-            <IonButton
-              expand="block"
-              style={operationType === 'restock' ? {
-                backgroundColor: 'var(--theme-primary)',
-                color: 'var(--theme-primary-contrast)',
-                '--background': 'var(--theme-primary)',
-                '--color': 'var(--theme-primary-contrast)',
-                fontWeight: '700'
-              } : { fontWeight: '700' }}
-              color={operationType === 'restock' ? undefined : 'danger'}
-              className="ion-margin-top"
-              onClick={handleSave}
-            >
+            <IonButton expand="block" color={operationType === 'restock' ? 'success' : 'danger'} className="ion-margin-top" onClick={handleSave}>
               Confirmar
             </IonButton>
           </>

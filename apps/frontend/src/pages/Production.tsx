@@ -145,8 +145,8 @@ const Production: React.FC = () => {
                   fontWeight: 600,
                   fontSize: '0.85rem',
                   cursor: 'pointer',
-                  background: tab === 'fabricar' ? 'var(--theme-primary)' : 'transparent',
-                  color: tab === 'fabricar' ? 'var(--theme-primary-contrast)' : '#64748B',
+                  background: tab === 'fabricar' ? '#10B981' : 'transparent',
+                  color: tab === 'fabricar' ? '#ffffff' : '#64748B',
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -161,8 +161,8 @@ const Production: React.FC = () => {
                   fontWeight: 600,
                   fontSize: '0.85rem',
                   cursor: 'pointer',
-                  background: tab === 'historial' ? 'var(--theme-primary)' : 'transparent',
-                  color: tab === 'historial' ? 'var(--theme-primary-contrast)' : '#64748B',
+                  background: tab === 'historial' ? '#10B981' : 'transparent',
+                  color: tab === 'historial' ? '#ffffff' : '#64748B',
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -221,13 +221,7 @@ const Production: React.FC = () => {
                                         </IonBadge>
                                       </div>
                                     </div>
-                                  <IonButton
-                                    size="small"
-                                    fill="solid"
-                                    style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast)', '--background': 'var(--theme-primary)', '--color': 'var(--theme-primary-contrast)', fontWeight: '700' }}
-                                    onClick={() => openProduceAlert(p)}
-                                    expand="block"
-                                  >
+                                  <IonButton size="small" fill="solid" color="primary" onClick={() => openProduceAlert(p)} expand="block">
                                     Producir Lote
                                   </IonButton>
                                 </IonCardContent>
