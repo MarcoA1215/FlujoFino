@@ -53,9 +53,13 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
             <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: '#0f172a', lineHeight: '1.3', wordBreak: 'break-word' }}>
               {m.name}
             </h2>
-            <IonBadge color={m.stockQuantity <= m.minStockAlert ? 'danger' : 'success'} style={{ borderRadius: '8px', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600 }}>
+            <span style={
+              m.stockQuantity <= m.minStockAlert
+                ? { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', borderRadius: '8px', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap' }
+                : { background: 'var(--theme-primary)', color: 'var(--theme-primary-contrast)', borderRadius: '8px', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap' }
+            }>
               {m.stockQuantity.toFixed(2)} {m.unit}
-            </IonBadge>
+            </span>
           </div>
           
           <p style={{ margin: '0 0 8px 0', color: '#64748b', fontSize: '0.85rem' }}>
