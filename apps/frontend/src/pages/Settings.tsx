@@ -470,9 +470,15 @@ const SettingsPage: React.FC = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Estado actual:</span>
                         {subscription.status === TenantStatus.ACTIVE && (
-                          <IonBadge color="success" style={{ padding: '6px 10px', fontSize: '12px', fontWeight: 700 }}>
-                            ✅ ACTIVO
-                          </IonBadge>
+                          <span 
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold shadow-xs"
+                            style={{
+                              backgroundColor: 'var(--theme-primary)',
+                              color: 'var(--theme-primary-contrast)'
+                            }}
+                          >
+                            ✓ ACTIVO
+                          </span>
                         )}
                         {subscription.status === TenantStatus.TRIAL && (
                           <IonBadge color="warning" style={{ padding: '6px 10px', fontSize: '12px', fontWeight: 700 }}>

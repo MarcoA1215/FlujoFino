@@ -8,7 +8,7 @@ import {
 import axios from 'axios';
 import { useEffect } from 'react';
 
-const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:3001').replace(/\/+$/, '');
 const FALLBACK_VAPID_PUBLIC_KEY =
   'BOVNV5aBYlzYON15tj1DdHNuR-YNYsotD3BRGgoCjIOEchUZ2C8rRd7nhDOP-Qis-x5rPKcmpdXOJ9N2hPNGsAI';
 
