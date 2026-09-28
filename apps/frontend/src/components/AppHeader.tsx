@@ -23,6 +23,7 @@ import { UserRole } from '@nutrideli/shared-types';
 import { apiClient } from '../api/client';
 import { offlineDb } from '../services/offline-db';
 import { DailyCashCloseModal } from './DailyCashCloseModal';
+import { EmailVerificationModal } from './EmailVerificationModal';
 
 interface AppHeaderProps {
   title?: string;
@@ -52,6 +53,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const [pendingOfflineCount, setPendingOfflineCount] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [showCashCloseModal, setShowCashCloseModal] = useState<boolean>(false);
+  const [showVerifyModal, setShowVerifyModal] = useState<boolean>(false);
 
   const [exchangeRate, setExchangeRate] = useState<number>(() => {
     try {
@@ -308,11 +310,53 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             {children}
           </IonButtons>
         </IonToolbar>
+
+        {user && !user.isEmailVerified && (
+          <div
+            style={{
+              background: '#fffbeb',
+              borderBottom: '1px solid #fef3c7',
+              padding: '6px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '12px',
+              color: '#b45309',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>⚠️</span>
+              <span style={{ fontWeight: '600' }}>Correo no verificado</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowVerifyModal(true)}
+              style={{
+                background: '#fef3c7',
+                border: '1px solid #fde68a',
+                color: '#b45309',
+                fontWeight: '700',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                padding: '3px 10px',
+                transition: 'all 0.2s',
+              }}
+            >
+              Verificar ahora
+            </button>
+          </div>
+        )}
       </IonHeader>
 
       <DailyCashCloseModal
         isOpen={showCashCloseModal}
         onClose={() => setShowCashCloseModal(false)}
+      />
+
+      <EmailVerificationModal
+        isOpen={showVerifyModal}
+        onClose={() => setShowVerifyModal(false)}
       />
     </>
   );

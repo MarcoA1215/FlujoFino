@@ -140,8 +140,11 @@ export class UsersService implements OnModuleInit {
         const user = transactionalEntityManager.create(User, {
           username: data.username,
           email: data.email,
+          identification: data.identification || null,
+          phone: data.phone || null,
           passwordHash: hash,
           role: data.role || UserRole.POS,
+          isEmailVerified: false,
         });
         savedUser = await transactionalEntityManager.save(user);
         // We can auto-accept if the admin created them, but let's make them PENDING too for consistency, 
@@ -204,6 +207,13 @@ export class UsersService implements OnModuleInit {
     }
     if (data.salaryPeriod !== undefined) {
       access.salaryPeriod = data.salaryPeriod || null;
+    }
+
+    if (data.identification !== undefined || data.phone !== undefined) {
+      await this.usersRepo.update(userId, {
+        ...(data.identification !== undefined ? { identification: data.identification } : {}),
+        ...(data.phone !== undefined ? { phone: data.phone } : {}),
+      });
     }
 
     await this.usersRepo.manager.save(access);

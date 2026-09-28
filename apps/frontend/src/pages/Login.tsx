@@ -1,5 +1,23 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonButton, IonSpinner, useIonToast } from '@ionic/react';
+import {
+  IonPage,
+  IonContent,
+  IonCard,
+  IonCardHeader,
+  IonCardTitle,
+  IonCardContent,
+  IonItem,
+  IonLabel,
+  IonInput,
+  IonButton,
+  IonSpinner,
+  useIonToast,
+  IonModal,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonButtons
+} from '@ionic/react';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import { useIonRouter } from '@ionic/react';
@@ -120,6 +138,56 @@ const Login: React.FC = () => {
     setStatusMessage('');
   };
 
+  // Forgot Password modal state
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotCode, setForgotCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [forgotStep, setForgotStep] = useState<'EMAIL' | 'RESET'>('EMAIL');
+  const [isForgotLoading, setIsForgotLoading] = useState(false);
+
+  const handleRequestResetCode = async () => {
+    if (!forgotEmail || !forgotEmail.trim()) {
+      return presentToast({ message: 'Ingresa tu correo electrónico', duration: 3000, color: 'warning' });
+    }
+    setIsForgotLoading(true);
+    try {
+      const res = await apiClient.post('/auth/forgot-password', { email: forgotEmail.trim() });
+      presentToast({ message: res.data?.message || 'Código enviado a tu correo', duration: 3500, color: 'success' });
+      setForgotStep('RESET');
+    } catch (err: any) {
+      presentToast({ message: err.response?.data?.message || 'Error al solicitar código', duration: 3500, color: 'danger' });
+    } finally {
+      setIsForgotLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!forgotCode || !newPassword) {
+      return presentToast({ message: 'Ingresa el código y tu nueva contraseña', duration: 3000, color: 'warning' });
+    }
+    if (newPassword.trim().length < 6) {
+      return presentToast({ message: 'La contraseña debe tener al menos 6 caracteres', duration: 3000, color: 'warning' });
+    }
+    setIsForgotLoading(true);
+    try {
+      const res = await apiClient.post('/auth/reset-password', {
+        email: forgotEmail.trim(),
+        code: forgotCode.trim(),
+        newPassword: newPassword.trim(),
+      });
+      presentToast({ message: res.data?.message || 'Contraseña restablecida con éxito', duration: 3500, color: 'success' });
+      setShowForgotPassword(false);
+      setForgotStep('EMAIL');
+      setForgotCode('');
+      setNewPassword('');
+    } catch (err: any) {
+      presentToast({ message: err.response?.data?.message || 'Error al restablecer contraseña', duration: 3500, color: 'danger' });
+    } finally {
+      setIsForgotLoading(false);
+    }
+  };
+
   return (
     <IonPage>
       <IonContent fullscreen className="ion-padding" style={{ '--background': '#f4f5f8' } as any}>
@@ -185,11 +253,16 @@ const Login: React.FC = () => {
               </IonCardContent>
             </IonCard>
           ) : (
-            <IonCard style={{ width: '100%', maxWidth: '400px' }}>
+            <IonCard style={{ width: '100%', maxWidth: '400px', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.08)' }}>
               <IonCardHeader className="ion-text-center">
-                <div style={{ width: '60px', height: '60px', background: 'var(--ion-color-primary)', color: 'white', borderRadius: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '36px', fontWeight: '900', margin: '0 auto 15px auto', boxShadow: '0 4px 10px rgba(0,0,0,0.15)' }}>
-                  F
-                </div>
+                <img
+                  src="/assets/logo.png"
+                  alt="Flujo Fino"
+                  className="w-16 h-16 rounded-2xl object-cover shadow-sm mx-auto mb-3"
+                  onError={e => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
                 <IonCardTitle style={{ fontWeight: 'bold' }}>Flujo Fino</IonCardTitle>
                 <p style={{ margin: '5px 0 0 0', color: 'gray' }}>Iniciar Sesión</p>
               </IonCardHeader>
@@ -202,9 +275,51 @@ const Login: React.FC = () => {
                   <IonLabel position="stacked">Contraseña</IonLabel>
                   <IonInput type="password" value={password} onIonInput={e => setPassword(e.detail.value!)} onKeyPress={e => e.key === 'Enter' && handleLogin()} />
                 </IonItem>
+
+                <div style={{ textAlign: 'right', marginTop: '8px', marginBottom: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotEmail(username.includes('@') ? username : '');
+                      setForgotStep('EMAIL');
+                      setShowForgotPassword(true);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--ion-color-primary, #10b981)',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      padding: 0,
+                      fontWeight: '600',
+                    }}
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </div>
+
                 <IonButton expand="block" className="ion-margin-top" onClick={handleLogin}>
                   Entrar
                 </IonButton>
+
+                <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                  <a
+                    href={`https://wa.me/${import.meta.env.VITE_SUPPORT_WHATSAPP || '584145652381'}?text=${encodeURIComponent('Hola, tengo problemas para acceder o mi correo es incorrecto en Flujo Fino. ¿Podrían asistirme?')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      fontSize: '12px',
+                      color: '#059669',
+                      textDecoration: 'none',
+                      fontWeight: '600',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <span>💬</span> ¿Problemas para acceder o correo incorrecto? Contactar a Soporte por WhatsApp
+                  </a>
+                </div>
                 
                 <div style={{ marginTop: '20px', textAlign: 'center' }}>
                   <p style={{ color: 'gray', fontSize: '14px', margin: 0 }}>¿No tienes cuenta?</p>
@@ -215,6 +330,121 @@ const Login: React.FC = () => {
               </IonCardContent>
             </IonCard>
           )}
+
+          {/* Modal Recuperación de Contraseña */}
+          <IonModal
+            isOpen={showForgotPassword}
+            onDidDismiss={() => setShowForgotPassword(false)}
+            style={{ '--max-width': '420px', '--height': 'auto', '--border-radius': '16px' } as any}
+          >
+            <IonHeader className="ion-no-border">
+              <IonToolbar style={{ '--background': '#ffffff', borderBottom: '1px solid #e2e8f0' } as any}>
+                <IonTitle style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>
+                  Recuperar Contraseña
+                </IonTitle>
+                <IonButtons slot="end">
+                  <IonButton onClick={() => setShowForgotPassword(false)} color="medium">Cerrar</IonButton>
+                </IonButtons>
+              </IonToolbar>
+            </IonHeader>
+
+            <IonContent className="ion-padding" style={{ '--background': '#ffffff' } as any}>
+              <div style={{ padding: '8px 4px' }}>
+                {forgotStep === 'EMAIL' ? (
+                  <div>
+                    <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px', lineHeight: '1.4' }}>
+                      Ingresa el correo electrónico asociado a tu cuenta para enviarte un código de seguridad de 6 dígitos.
+                    </p>
+                    <IonItem lines="full" className="ion-margin-bottom" style={{ '--background': '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' } as any}>
+                      <IonLabel position="stacked">Correo Electrónico</IonLabel>
+                      <IonInput
+                        type="email"
+                        value={forgotEmail}
+                        placeholder="tu-correo@ejemplo.com"
+                        onIonInput={e => setForgotEmail(e.detail.value!)}
+                      />
+                    </IonItem>
+                    <button
+                      type="button"
+                      onClick={handleRequestResetCode}
+                      disabled={isForgotLoading}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm mt-4"
+                    >
+                      {isForgotLoading ? <IonSpinner name="crescent" style={{ width: '18px', height: '18px' }} /> : 'Solicitar Código'}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
+                      Enviamos un código de 6 dígitos a <strong>{forgotEmail}</strong>. Ingrésalo junto con tu nueva clave:
+                    </p>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
+                        Código de 6 dígitos
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={forgotCode}
+                        onChange={e => setForgotCode(e.target.value.replace(/\D/g, ''))}
+                        placeholder="123456"
+                        autoFocus
+                        style={{
+                          width: '100%',
+                          letterSpacing: '6px',
+                          textAlign: 'center',
+                          fontSize: '22px',
+                          fontWeight: '800',
+                          padding: '10px',
+                          borderRadius: '12px',
+                          border: '1px solid #cbd5e1',
+                          background: '#f8fafc',
+                          color: '#0f172a',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
+                        Nueva Contraseña
+                      </label>
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        placeholder="Mínimo 6 caracteres"
+                        style={{
+                          width: '100%',
+                          padding: '11px 14px',
+                          borderRadius: '12px',
+                          border: '1px solid #cbd5e1',
+                          background: '#f8fafc',
+                          color: '#0f172a',
+                          outline: 'none',
+                          fontSize: '14px',
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleResetPassword}
+                      disabled={isForgotLoading || forgotCode.length !== 6 || !newPassword}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm mt-2"
+                    >
+                      {isForgotLoading ? <IonSpinner name="crescent" style={{ width: '18px', height: '18px' }} /> : 'Restablecer Contraseña'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForgotStep('EMAIL')}
+                      style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '12px', textDecoration: 'underline', cursor: 'pointer', padding: '4px' }}
+                    >
+                      Volver a ingresar correo
+                    </button>
+                  </div>
+                )}
+              </div>
+            </IonContent>
+          </IonModal>
         </div>
       </IonContent>
     </IonPage>

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
@@ -6,6 +6,8 @@ import { DataSource } from 'typeorm';
 import { Settings } from '../entities/settings.entity';
 import { AccessRequest, AccessRequestStatus } from '../entities/access-request.entity';
 import { UserRole } from '@nutrideli/shared-types';
+import { MailService } from '../mail/mail.service';
+import { User } from '../entities/user.entity';
 
 function toMinutes(hhmm: string): number {
   const parts = hhmm.split(':');
@@ -52,7 +54,8 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-    private dataSource: DataSource
+    private dataSource: DataSource,
+    private mailService: MailService,
   ) {}
 
   async validateUser(username: string, pass: string, requestedTenantId?: string): Promise<{ user: any, tenantId: string | null, role: string, tenantName: string, workspaces: any[] } | null> {
@@ -276,10 +279,20 @@ export class AuthService {
   }
 
   async login(user: any, tenantId: string, role: string, tenantName?: string) {
-    const payload = { username: user.username, email: user.email, sub: user.id, role: role, tenantId: tenantId, tenantName: tenantName || 'Flujo Fino' };
+    const payload = {
+      username: user.username,
+      email: user.email,
+      identification: user.identification,
+      phone: user.phone,
+      isEmailVerified: !!user.isEmailVerified,
+      sub: user.id || user.sub,
+      role: role,
+      tenantId: tenantId,
+      tenantName: tenantName || 'Flujo Fino',
+    };
     return {
       access_token: this.jwtService.sign(payload),
-      user: payload
+      user: payload,
     };
   }
 
@@ -331,12 +344,14 @@ export class AuthService {
       // 2. Create User
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(body.password, salt);
-      const user = queryRunner.manager.create('User', {
+      const user = queryRunner.manager.create(User, {
         username: body.username,
         email: body.email,
+        identification: body.identification || null,
+        phone: body.phone || null,
         passwordHash: hashedPassword,
-        role: 'ADMIN', // Global role
-        isActive: true,
+        role: UserRole.ADMIN, // Global role
+        isEmailVerified: false,
       });
       const savedUser: any = await queryRunner.manager.save(user);
 
@@ -407,5 +422,167 @@ export class AuthService {
       role: a.role,
       status: a.status
     }));
+  }
+
+  async sendVerification(emailOrUsername?: string, userId?: string) {
+    const userRepo = this.dataSource.getRepository(User);
+    let user: User | null = null;
+
+    if (userId) {
+      user = await userRepo.findOne({ where: { id: userId } });
+    } else if (emailOrUsername) {
+      const trimmed = emailOrUsername.trim();
+      user = await userRepo.findOne({
+        where: [
+          { email: trimmed.toLowerCase() },
+          { username: trimmed }
+        ]
+      });
+    }
+
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    if (user.isEmailVerified) {
+      return { success: true, message: 'El correo electrónico ya se encuentra verificado.', isEmailVerified: true };
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 15 * 60 * 1000);
+
+    user.emailVerificationCode = code;
+    user.emailVerificationExpires = expires;
+    await userRepo.save(user);
+
+    await this.mailService.sendVerificationCode(user.email, code);
+
+    return {
+      success: true,
+      message: `Código de verificación enviado a ${user.email}`,
+      email: user.email,
+    };
+  }
+
+  async verifyEmail(email: string, code: string) {
+    if (!email || !code) {
+      throw new BadRequestException('Correo y código son requeridos');
+    }
+
+    const userRepo = this.dataSource.getRepository(User);
+    const trimmedEmail = email.trim();
+    const user = await userRepo.findOne({
+      where: [
+        { email: trimmedEmail.toLowerCase() },
+        { username: trimmedEmail }
+      ]
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    if (!user.emailVerificationCode || !user.emailVerificationExpires) {
+      throw new BadRequestException('No hay un código de verificación pendiente para esta cuenta');
+    }
+
+    if (new Date() > new Date(user.emailVerificationExpires)) {
+      throw new BadRequestException('El código de verificación ha expirado. Solicita uno nuevo.');
+    }
+
+    if (user.emailVerificationCode.trim() !== code.trim()) {
+      throw new BadRequestException('El código de verificación es incorrecto');
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationCode = null as any;
+    user.emailVerificationExpires = null as any;
+    await userRepo.save(user);
+
+    return {
+      success: true,
+      message: 'Correo verificado exitosamente',
+      isEmailVerified: true,
+    };
+  }
+
+  async forgotPassword(email: string) {
+    if (!email) {
+      throw new BadRequestException('El correo es requerido');
+    }
+
+    const userRepo = this.dataSource.getRepository(User);
+    const trimmedEmail = email.trim();
+    const user = await userRepo.findOne({
+      where: [
+        { email: trimmedEmail.toLowerCase() },
+        { username: trimmedEmail }
+      ]
+    });
+
+    if (!user) {
+      throw new NotFoundException('No existe una cuenta registrada con este correo electrónico');
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 15 * 60 * 1000);
+
+    user.resetPasswordCode = code;
+    user.resetPasswordExpires = expires;
+    await userRepo.save(user);
+
+    await this.mailService.sendPasswordResetCode(user.email, code);
+
+    return {
+      success: true,
+      message: `Código de recuperación enviado a ${user.email}`,
+      email: user.email,
+    };
+  }
+
+  async resetPassword(email: string, code: string, newPassword: string) {
+    if (!email || !code || !newPassword) {
+      throw new BadRequestException('Correo, código y nueva contraseña son requeridos');
+    }
+
+    if (newPassword.trim().length < 6) {
+      throw new BadRequestException('La nueva contraseña debe tener al menos 6 caracteres');
+    }
+
+    const userRepo = this.dataSource.getRepository(User);
+    const trimmedEmail = email.trim();
+    const user = await userRepo.findOne({
+      where: [
+        { email: trimmedEmail.toLowerCase() },
+        { username: trimmedEmail }
+      ]
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    if (!user.resetPasswordCode || !user.resetPasswordExpires) {
+      throw new BadRequestException('No hay una solicitud de recuperación activa para esta cuenta');
+    }
+
+    if (new Date() > new Date(user.resetPasswordExpires)) {
+      throw new BadRequestException('El código de recuperación ha expirado. Solicita uno nuevo.');
+    }
+
+    if (user.resetPasswordCode.trim() !== code.trim()) {
+      throw new BadRequestException('El código de recuperación es incorrecto');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.passwordHash = await bcrypt.hash(newPassword, salt);
+    user.resetPasswordCode = null as any;
+    user.resetPasswordExpires = null as any;
+    await userRepo.save(user);
+
+    return {
+      success: true,
+      message: 'Tu contraseña ha sido restablecida exitosamente. Ya puedes iniciar sesión.',
+    };
   }
 }

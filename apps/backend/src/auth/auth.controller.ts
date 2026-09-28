@@ -33,6 +33,31 @@ export class AuthController {
     return this.authService.registerTenant(body);
   }
 
+  @Public()
+  @Post('send-verification')
+  async sendVerification(@Request() req: any, @Body() body: { email?: string; username?: string }) {
+    const identifier = body?.email || body?.username || req?.user?.email || req?.user?.username;
+    return this.authService.sendVerification(identifier, req?.user?.id);
+  }
+
+  @Public()
+  @Post('verify-email')
+  async verifyEmail(@Body() body: { email: string; code: string }) {
+    return this.authService.verifyEmail(body.email, body.code);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  async forgotPassword(@Body() body: { email: string }) {
+    return this.authService.forgotPassword(body.email);
+  }
+
+  @Public()
+  @Post('reset-password')
+  async resetPassword(@Body() body: { email: string; code: string; newPassword: string }) {
+    return this.authService.resetPassword(body.email, body.code, body.newPassword);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('me')
   getProfile(@Request() req) {

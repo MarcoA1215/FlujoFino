@@ -19,6 +19,27 @@ export class User {
   @Column({ type: 'varchar', default: UserRole.POS })
   role: UserRole;
 
+  @Column({ nullable: true })
+  identification: string;
+
+  @Column({ nullable: true })
+  phone: string;
+
+  @Column({ default: false })
+  isEmailVerified: boolean;
+
+  @Column({ nullable: true })
+  emailVerificationCode: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  emailVerificationExpires: Date;
+
+  @Column({ nullable: true })
+  resetPasswordCode: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  resetPasswordExpires: Date;
+
   @CreateDateColumn()
   createdAt: Date;
 

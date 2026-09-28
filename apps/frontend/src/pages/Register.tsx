@@ -11,6 +11,8 @@ const Register: React.FC = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [identification, setIdentification] = useState('');
+  const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState('');
 
   useEffect(() => {
@@ -41,6 +43,8 @@ const Register: React.FC = () => {
         username,
         email,
         password,
+        identification: identification.trim() || undefined,
+        phone: phone.trim() || undefined,
         referralCode: referralCode.trim() || undefined,
         featureCustomerSchedules,
         featureRecipes,
@@ -65,9 +69,14 @@ const Register: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100%' }}>
           <IonCard style={{ width: '100%', maxWidth: '450px', borderRadius: '16px', boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}>
             <IonCardHeader className="ion-text-center" style={{ paddingBottom: 0 }}>
-              <div style={{ width: '50px', height: '50px', background: 'var(--ion-color-primary)', color: 'white', borderRadius: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '28px', fontWeight: '900', margin: '0 auto 10px auto', boxShadow: '0 4px 10px rgba(0,0,0,0.15)' }}>
-                F
-              </div>
+              <img
+                src="/assets/logo.png"
+                alt="Flujo Fino"
+                className="w-14 h-14 rounded-2xl object-cover shadow-sm mx-auto mb-2"
+                onError={e => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
               <IonCardTitle style={{ fontWeight: 'bold' }}>Registro</IonCardTitle>
               <p style={{ margin: '5px 0 10px 0', color: 'gray' }}>Paso {step} de 2</p>
             </IonCardHeader>
@@ -81,6 +90,14 @@ const Register: React.FC = () => {
                   <IonItem lines="full" className="ion-margin-bottom">
                     <IonLabel position="stacked">Correo Electrónico</IonLabel>
                     <IonInput type="email" value={email} placeholder="Ej. admin@negocio.com" onIonInput={e => setEmail(e.detail.value!)} />
+                  </IonItem>
+                  <IonItem lines="full" className="ion-margin-bottom">
+                    <IonLabel position="stacked">Cédula de Identidad (Opcional)</IonLabel>
+                    <IonInput value={identification} placeholder="Ej. V-12345678" onIonInput={e => setIdentification(e.detail.value!)} />
+                  </IonItem>
+                  <IonItem lines="full" className="ion-margin-bottom">
+                    <IonLabel position="stacked">Teléfono / WhatsApp (Opcional)</IonLabel>
+                    <IonInput type="tel" value={phone} placeholder="Ej. 04141234567" onIonInput={e => setPhone(e.detail.value!)} />
                   </IonItem>
                   <IonItem lines="full" className="ion-margin-bottom">
                     <IonLabel position="stacked">Usuario Administrador</IonLabel>

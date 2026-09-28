@@ -8,6 +8,9 @@ interface User {
   id: string;
   username: string;
   email?: string;
+  identification?: string;
+  phone?: string;
+  isEmailVerified?: boolean;
   role: UserRole;
   tenantId?: string;
   tenantName?: string;
@@ -18,6 +21,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (token: string, user: User, workspaces?: any[]) => Promise<void>;
+  updateUser: (updatedFields: Partial<User>) => Promise<void>;
   logout: () => Promise<void>;
   switchWorkspace: (tenantId: string) => Promise<void>;
   isAuthenticated: boolean;
@@ -55,6 +59,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   };
 
+  const updateUser = async (updatedFields: Partial<User>) => {
+    if (!user) return;
+    const updated = { ...user, ...updatedFields };
+    setUser(updated);
+    await Preferences.set({ key: 'user', value: JSON.stringify(updated) });
+  };
+
   const switchWorkspace = async (tenantId: string) => {
     const res = await apiClient.post('/auth/select-workspace', { tenantId });
     if (res.data.requiresApproval) {
@@ -90,7 +101,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, switchWorkspace, isAuthenticated: !!token, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, updateUser, logout, switchWorkspace, isAuthenticated: !!token, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
