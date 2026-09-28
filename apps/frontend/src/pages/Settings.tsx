@@ -39,6 +39,7 @@ import {
   checkmarkCircleOutline,
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
+import { getContrastColor } from '../utils/colors';
 import { AuthContext } from '../context/AuthContext';
 import {
   UserRole,
@@ -273,9 +274,12 @@ const SettingsPage: React.FC = () => {
 
       const primary = updatedSettings.themePrimaryColor || '#10b981';
       const header = updatedSettings.themeHeaderColor || '#ffffff';
+      const contrastText = getContrastColor(primary);
       document.documentElement.style.setProperty('--theme-primary', primary);
+      document.documentElement.style.setProperty('--theme-primary-contrast', contrastText);
       document.documentElement.style.setProperty('--theme-header', header);
       document.documentElement.style.setProperty('--ion-color-primary', primary);
+      document.documentElement.style.setProperty('--ion-color-primary-contrast', contrastText);
 
       presentToast({
         message: 'Configuración guardada',
@@ -439,15 +443,23 @@ const SettingsPage: React.FC = () => {
                         </IonButton>
 
                         <IonButton
-                          color="success"
-                          style={{ flex: 1, minWidth: '160px', fontWeight: 700 }}
+                          fill="outline"
+                          className="border border-slate-300 text-slate-700"
+                          style={{
+                            flex: 1,
+                            minWidth: '160px',
+                            fontWeight: 700,
+                            '--border-color': '#cbd5e1',
+                            '--color': '#334155',
+                            color: '#334155'
+                          }}
                           onClick={() => {
                             const link = `${window.location.origin}/register?ref=${subscription.referralCode}`;
                             const msg = `¡Hola! Te recomiendo Flujo Fino para administrar tu negocio (punto de venta, pedidos, inventario y delivery). Regístrate gratis con mi enlace de invitación: ${link}`;
                             window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
                           }}
                         >
-                          <IonIcon icon={logoWhatsapp} slot="start" />
+                          <IonIcon icon={logoWhatsapp} slot="start" style={{ color: '#25D366' }} />
                           Compartir por WhatsApp
                         </IonButton>
                       </div>

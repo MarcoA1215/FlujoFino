@@ -36,6 +36,7 @@ import { useContext, useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { apiClient } from './api/client';
+import { getContrastColor } from './utils/colors';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -213,9 +214,12 @@ const MainLayout: React.FC = () => {
   useEffect(() => {
     const primary = settings?.themePrimaryColor || '#10b981';
     const header = settings?.themeHeaderColor || '#ffffff';
+    const contrastText = getContrastColor(primary);
     document.documentElement.style.setProperty('--theme-primary', primary);
+    document.documentElement.style.setProperty('--theme-primary-contrast', contrastText);
     document.documentElement.style.setProperty('--theme-header', header);
     document.documentElement.style.setProperty('--ion-color-primary', primary);
+    document.documentElement.style.setProperty('--ion-color-primary-contrast', contrastText);
   }, [settings?.themePrimaryColor, settings?.themeHeaderColor]);
 
   useEffect(() => {

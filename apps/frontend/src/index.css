@@ -1,10 +1,12 @@
 :root {
   --theme-primary: #10b981;
+  --theme-primary-contrast: #ffffff;
   --theme-header: #ffffff;
 }
 
 .bg-theme-primary {
   background-color: var(--theme-primary) !important;
+  color: var(--theme-primary-contrast) !important;
 }
 
 .text-theme-primary {
