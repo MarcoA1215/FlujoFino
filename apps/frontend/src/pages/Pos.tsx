@@ -61,9 +61,6 @@ type Product = {
   isPreAssembled?: boolean;
   comboItems?: any[];
   product_type?: string;
-  physicalStock?: number;
-  stock?: number;
-  is_service?: boolean;
 };
 
 type CartItem = {
@@ -218,8 +215,16 @@ const Pos: React.FC = () => {
   const fetchDeliveryZones = async () => {
     try {
       const res = await apiClient.get<DeliveryZone[]>('/delivery-zones');
-      setDeliveryZones(res.data.filter(z => z.isActive));
-    } catch (e) {}
+      const rawZones = Array.isArray(res.data) ? res.data : [];
+      const zones = rawZones.map((z: any) => ({
+        ...z,
+        feePrice: Number(z.priceUSD ?? z.feePrice ?? 0),
+        priceUSD: Number(z.priceUSD ?? z.feePrice ?? 0)
+      }));
+      setDeliveryZones(zones);
+    } catch (e) {
+      console.error('Error cargando zonas de delivery:', e);
+    }
   };
 
   const fetchEmployees = async () => {
@@ -527,7 +532,7 @@ const Pos: React.FC = () => {
   const deliveryFee = useMemo(() => {
     if (deliveryMethod !== DeliveryMethod.DELIVERY || !deliveryZoneId) return 0;
     const zone = deliveryZones.find(z => z.id === deliveryZoneId);
-    return zone ? Number(zone.feePrice) : 0;
+    return zone ? Number((zone as any).priceUSD ?? zone.feePrice ?? 0) : 0;
   }, [deliveryMethod, deliveryZoneId, deliveryZones]);
 
   const discountAmount = useMemo(() => {
@@ -906,12 +911,7 @@ const Pos: React.FC = () => {
           <IonGrid style={{ padding: 0, marginTop: '8px' }}>
             <IonRow>
               {filteredProducts.map(p => {
-                const isService = p.is_service === true || p.product_type === 'SERVICIO' || p.category === 'Servicios' || Boolean(p.durationMinutes);
-                const isFormula = Boolean((p.recipe && p.recipe.length > 0) || p.product_type === 'FORMULA' || (p.isCombo && p.isPreAssembled));
-                const physicalStockVal = Number(p.physicalStock ?? 0);
-                const regularStockVal = Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.physicalStock ?? p.stockQuantity ?? 0));
-                const currentPhysicalStock = isFormula ? physicalStockVal : regularStockVal;
-
+                const isService = settings?.featureProduction === false || p.category === 'Servicios' || !!p.durationMinutes;
                 const img = Array.isArray(p.images) && p.images.length > 0
                   ? p.images[p.images.length - 1]
                   : (typeof p.images === 'string' && p.images ? (p.images as string).split(',').pop()?.trim() : null);
@@ -1020,13 +1020,13 @@ const Pos: React.FC = () => {
                               fontWeight: '600',
                               padding: '3px 8px',
                               borderRadius: '6px',
-                              background: isService ? '#ECFDF5' : (currentPhysicalStock <= 0 ? '#FEF2F2' : '#F1F5F9'),
-                              color: isService ? '#047857' : (currentPhysicalStock <= 0 ? '#991B1B' : '#475569')
+                              background: isService ? '#ECFDF5' : (p.stockQuantity <= 0 ? '#FEF2F2' : '#F1F5F9'),
+                              color: isService ? '#047857' : (p.stockQuantity <= 0 ? '#991B1B' : '#475569')
                             }}
                           >
                             {isService
                               ? (p.durationMinutes ? `⏱️ ${p.durationMinutes}m` : 'Servicio')
-                              : (currentPhysicalStock <= 0 ? 'Agotado' : `${currentPhysicalStock} en stock`)}
+                              : (p.stockQuantity <= 0 ? 'Agotado' : `Stock: ${p.stockQuantity}`)}
                           </span>
 
                           {/* Circular Add Button */}
@@ -1301,12 +1301,12 @@ const Pos: React.FC = () => {
                         <select
                           value={deliveryZoneId}
                           onChange={e => setDeliveryZoneId(e.target.value)}
-                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#ffffff', fontSize: '13px', color: '#0F172A' }}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
                         >
                           <option value="">Selecciona zona de envío...</option>
-                          {deliveryZones.map(z => (
-                            <option key={z.id} value={z.id}>
-                              {z.name} (+${Number(z.feePrice).toFixed(2)})
+                          {deliveryZones.map(zone => (
+                            <option key={zone.id} value={zone.id}>
+                              {zone.name} (+${zone.priceUSD})
                             </option>
                           ))}
                         </select>
@@ -1318,7 +1318,7 @@ const Pos: React.FC = () => {
                         <select
                           value={deliveryUserId}
                           onChange={e => setDeliveryUserId(e.target.value)}
-                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#ffffff', fontSize: '13px', color: '#0F172A' }}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
                         >
                           <option value="">Sin asignar / A convenir</option>
                           {employees.filter(e => e.role === UserRole.DELIVERY).map(d => (
@@ -1390,16 +1390,7 @@ const Pos: React.FC = () => {
                       <select
                         value={employeeId}
                         onChange={e => setEmployeeId(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '11px 14px',
-                          borderRadius: '12px',
-                          border: '1px solid #E2E8F0',
-                          outline: 'none',
-                          fontSize: '14px',
-                          color: '#0F172A',
-                          background: '#ffffff'
-                        }}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
                       >
                         <option value="">Sin asignar</option>
                         {employees.map(emp => (
