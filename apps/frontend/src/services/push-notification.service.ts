@@ -106,6 +106,14 @@ export async function registerPushNotifications(
   if (!identifier) return false;
 
   if (Capacitor.isNativePlatform()) {
+    // Skip FCM push registration if Firebase is not configured (no google-services.json)
+    // PushNotifications.register() crashes at runtime without Firebase initialization
+    const hasFirebase = !!(window as any).firebase || 
+      document.querySelector('meta[name="firebase-configured"]');
+    if (!hasFirebase) {
+      console.warn('[Push] Firebase not configured — skipping native push registration');
+      return false;
+    }
     try {
       let permStatus = await PushNotifications.checkPermissions();
       if (permStatus.receive === 'prompt') {
