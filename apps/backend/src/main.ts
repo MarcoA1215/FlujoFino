@@ -36,6 +36,9 @@ async function bootstrap() {
     'http://localhost:3000',
     'http://localhost:3001',
     'https://flujofino.onrender.com',
+    'capacitor://localhost',   // Capacitor Android WebView
+    'ionic://localhost',       // Capacitor iOS WebView
+    'http://localhost',        // Capacitor web fallback
   ];
 
   app.enableCors({
