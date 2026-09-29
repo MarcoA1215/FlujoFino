@@ -35,14 +35,19 @@ export class AuthController {
 
   @Public()
   @Post('send-verification')
-  async sendVerification(@Request() req: any, @Body() body: { email?: string; username?: string }) {
-    const identifier = body?.email || body?.username || req?.user?.email || req?.user?.username;
-    return this.authService.sendVerification(identifier, req?.user?.id);
+  async sendVerification(@Body() body: { email: string; username?: string }) {
+    if (!body.email && !body.username) {
+      throw new BadRequestException('Debes proporcionar el correo o nombre de usuario');
+    }
+    return this.authService.sendVerificationCode(body.email, body.username);
   }
 
   @Public()
   @Post('verify-email')
   async verifyEmail(@Body() body: { email: string; code: string }) {
+    if (!body.email || !body.code) {
+      throw new BadRequestException('Correo y código son requeridos');
+    }
     return this.authService.verifyEmail(body.email, body.code);
   }
 

@@ -85,6 +85,14 @@ interface Settings {
   themeHeaderColor?: string;
 }
 
+  const getPublicBaseUrl = () => {
+  // Si estamos dentro de la APK en Android (Capacitor) o en localhost
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.protocol === 'capacitor:')) {
+    return 'https://flujo-fino-frontend.vercel.app'; // 👈 Tu dominio público real de Vercel
+  }
+  return window.location.origin;
+};
+
 const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<Settings>({});
   const [subscription, setSubscription] = useState<MySubscriptionDTO | null>(null);
@@ -295,6 +303,8 @@ const SettingsPage: React.FC = () => {
   };
 
   if (user?.role !== UserRole.ADMIN) {
+
+
     return (
       <IonPage>
         <IonHeader>
@@ -433,7 +443,7 @@ const SettingsPage: React.FC = () => {
                           color="primary"
                           style={{ flex: 1, minWidth: '160px', fontWeight: 700 }}
                           onClick={() => {
-                            const link = `${window.location.origin}/register?ref=${subscription.referralCode}`;
+                            const link = `${getPublicBaseUrl()}/register?ref=${subscription.referralCode}`;
                             navigator.clipboard?.writeText(link);
                             presentToast({ message: 'Enlace de registro copiado al portapapeles', duration: 2000, color: 'success' });
                           }}
@@ -454,7 +464,7 @@ const SettingsPage: React.FC = () => {
                             color: '#334155'
                           }}
                           onClick={() => {
-                            const link = `${window.location.origin}/register?ref=${subscription.referralCode}`;
+                            const link = `${getPublicBaseUrl()}/register?ref=${subscription.referralCode}`;
                             const msg = `¡Hola! Te recomiendo Flujo Fino para administrar tu negocio (punto de venta, pedidos, inventario y delivery). Regístrate gratis con mi enlace de invitación: ${link}`;
                             window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
                           }}
@@ -875,7 +885,7 @@ const SettingsPage: React.FC = () => {
                       <IonInput 
                         readonly 
                         disabled={settings.featureShowCatalog === false}
-                        value={`${window.location.origin}/store/${settings.publicToken || user?.tenantId}`} 
+                        value={`${getPublicBaseUrl()}/store/${settings.publicToken || user?.tenantId}`} 
                         style={{ backgroundColor: settings.featureShowCatalog === false ? '#f1f5f9' : 'white', padding: '10px', borderRadius: '6px', marginBottom: '10px', border: '1px solid #cbd5e1' }} 
                       />
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -884,7 +894,7 @@ const SettingsPage: React.FC = () => {
                           color="success" 
                           disabled={settings.featureShowCatalog === false}
                           onClick={() => {
-                            navigator.clipboard.writeText(`${window.location.origin}/store/${settings.publicToken || user?.tenantId}`);
+                            navigator.clipboard?.writeText(`${getPublicBaseUrl()}/store/${settings.publicToken || user?.tenantId}`);
                             presentToast({ message: '¡Enlace de tienda copiado!', duration: 2000, color: 'success' });
                           }}
                         >
@@ -896,7 +906,7 @@ const SettingsPage: React.FC = () => {
                           color="success" 
                           disabled={settings.featureShowCatalog === false}
                           onClick={() => {
-                            window.open(`${window.location.origin}/store/${settings.publicToken || user?.tenantId}`, '_blank');
+                            window.open(`${getPublicBaseUrl()}/store/${settings.publicToken || user?.tenantId}`, '_blank');
                           }}
                         >
                           Abrir Tienda
@@ -919,7 +929,7 @@ const SettingsPage: React.FC = () => {
                       </p>
                       <IonInput 
                         readonly 
-                        value={`${window.location.origin}/book/${settings.publicToken || user?.tenantId}`} 
+                        value={`${getPublicBaseUrl()}/book/${settings.publicToken || user?.tenantId}`} 
                         style={{ backgroundColor: 'white', padding: '10px', borderRadius: '6px', marginBottom: '10px', border: '1px solid #cbd5e1' }} 
                       />
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -927,7 +937,7 @@ const SettingsPage: React.FC = () => {
                           size="small" 
                           color="secondary" 
                           onClick={() => {
-                            navigator.clipboard.writeText(`${window.location.origin}/book/${settings.publicToken || user?.tenantId}`);
+                            navigator.clipboard?.writeText(`${getPublicBaseUrl()}/book/${settings.publicToken || user?.tenantId}`);
                             presentToast({ message: '¡Enlace copiado!', duration: 2000, color: 'success' });
                           }}
                         >
@@ -938,7 +948,7 @@ const SettingsPage: React.FC = () => {
                           fill="outline" 
                           color="secondary" 
                           onClick={() => {
-                            window.open(`${window.location.origin}/book/${settings.publicToken || user?.tenantId}`, '_blank');
+                            window.open(`${getPublicBaseUrl()}/book/${settings.publicToken || user?.tenantId}`, '_blank');
                           }}
                         >
                           Abrir Reservaciones
@@ -1305,7 +1315,8 @@ const SettingsPage: React.FC = () => {
                       <IonIcon icon={checkmarkCircleOutline} slot="start" />
                       Enviar Reporte de Pago
                     </>
-                  )}
+              )
+              }
                 </IonButton>
               </div>
             </div>

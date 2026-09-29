@@ -132,6 +132,9 @@ export class SettingsService implements OnModuleInit {
     }
     if (payload.slotInterval !== undefined) settings.slotInterval = payload.slotInterval;
 
+    if (payload.themePrimaryColor !== undefined) settings.themePrimaryColor = payload.themePrimaryColor;
+    if (payload.themeHeaderColor !== undefined) settings.themeHeaderColor = payload.themeHeaderColor;
+
     await this.settingsRepo.save(settings);
     return this.getSettings(tenantId);
   }

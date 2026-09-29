@@ -424,22 +424,20 @@ export class AuthService {
     }));
   }
 
-  async sendVerification(emailOrUsername?: string, userId?: string) {
+  async sendVerificationCode(email: string, username?: string) {
     const userRepo = this.dataSource.getRepository(User);
-    let user: User | null = null;
+    const trimmedEmail = email ? email.trim().toLowerCase() : '';
+    const trimmedUsername = username ? username.trim() : '';
 
-    if (userId) {
-      user = await userRepo.findOne({ where: { id: userId } });
-    } else if (emailOrUsername) {
-      const trimmed = emailOrUsername.trim();
-      user = await userRepo.findOne({
-        where: [
-          { email: trimmed.toLowerCase() },
-          { username: trimmed }
-        ]
-      });
+    const conditions: any[] = [];
+    if (trimmedEmail) conditions.push({ email: trimmedEmail });
+    if (trimmedUsername) conditions.push({ username: trimmedUsername });
+
+    if (conditions.length === 0) {
+      throw new BadRequestException('Debes proporcionar el correo o nombre de usuario');
     }
 
+    const user = await userRepo.findOne({ where: conditions });
     if (!user) {
       throw new NotFoundException('Usuario no encontrado');
     }
@@ -452,15 +450,14 @@ export class AuthService {
     const expires = new Date(Date.now() + 15 * 60 * 1000);
 
     user.emailVerificationCode = code;
-    user.emailVerificationExpires = expires;
+    user.emailVerificationExpiresAt = expires;
     await userRepo.save(user);
 
     await this.mailService.sendVerificationCode(user.email, code);
 
     return {
       success: true,
-      message: `Código de verificación enviado a ${user.email}`,
-      email: user.email,
+      message: 'Código de verificación enviado al correo',
     };
   }
 
@@ -470,11 +467,11 @@ export class AuthService {
     }
 
     const userRepo = this.dataSource.getRepository(User);
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
     const user = await userRepo.findOne({
       where: [
-        { email: trimmedEmail.toLowerCase() },
-        { username: trimmedEmail }
+        { email: trimmedEmail },
+        { username: email.trim() }
       ]
     });
 
@@ -482,27 +479,26 @@ export class AuthService {
       throw new NotFoundException('Usuario no encontrado');
     }
 
-    if (!user.emailVerificationCode || !user.emailVerificationExpires) {
+    if (!user.emailVerificationCode || !user.emailVerificationExpiresAt) {
       throw new BadRequestException('No hay un código de verificación pendiente para esta cuenta');
     }
 
-    if (new Date() > new Date(user.emailVerificationExpires)) {
-      throw new BadRequestException('El código de verificación ha expirado. Solicita uno nuevo.');
+    if (new Date() > new Date(user.emailVerificationExpiresAt)) {
+      throw new BadRequestException('El código es inválido o ha expirado');
     }
 
     if (user.emailVerificationCode.trim() !== code.trim()) {
-      throw new BadRequestException('El código de verificación es incorrecto');
+      throw new BadRequestException('El código es inválido o ha expirado');
     }
 
     user.isEmailVerified = true;
-    user.emailVerificationCode = null as any;
-    user.emailVerificationExpires = null as any;
+    user.emailVerificationCode = null;
+    user.emailVerificationExpiresAt = null;
     await userRepo.save(user);
 
     return {
       success: true,
-      message: 'Correo verificado exitosamente',
-      isEmailVerified: true,
+      message: 'Correo verificado con éxito',
     };
   }
 

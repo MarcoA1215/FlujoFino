@@ -25,14 +25,14 @@ export class User {
   @Column({ nullable: true })
   phone: string;
 
-  @Column({ default: false })
+  @Column({ name: 'is_email_verified', type: 'boolean', default: false })
   isEmailVerified: boolean;
 
-  @Column({ nullable: true })
-  emailVerificationCode: string;
+  @Column({ name: 'email_verification_code', type: 'varchar', length: 6, nullable: true })
+  emailVerificationCode: string | null;
 
-  @Column({ type: 'timestamp', nullable: true })
-  emailVerificationExpires: Date;
+  @Column({ name: 'email_verification_expires_at', type: 'timestamp', nullable: true })
+  emailVerificationExpiresAt: Date | null;
 
   @Column({ nullable: true })
   resetPasswordCode: string;
