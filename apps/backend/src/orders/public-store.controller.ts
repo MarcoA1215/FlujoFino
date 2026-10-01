@@ -73,6 +73,7 @@ export class PublicStoreController {
 
     const products = await this.productRepo.find({
       where: { tenantId },
+      relations: { comboItems: { component: true } },
       order: { category: 'ASC', name: 'ASC' },
     });
 
@@ -85,7 +86,16 @@ export class PublicStoreController {
     });
 
     const storeProducts = nonServiceProducts.map((p) => {
-      const availableStock = Math.max(0, Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.stockQuantity || 0)));
+      let availableStock = Math.max(0, Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.stockQuantity || 0)));
+      if (p.isCombo && !p.isPreAssembled && p.comboItems && p.comboItems.length > 0) {
+        let minAvail = Infinity;
+        for (const ci of p.comboItems) {
+          const compStock = ci.component?.physicalStock ?? ci.component?.stockQuantity ?? 0;
+          const possible = Math.floor(compStock / (ci.quantity || 1));
+          if (possible < minAvail) minAvail = possible;
+        }
+        availableStock = minAvail === Infinity ? 0 : Math.max(0, minAvail);
+      }
       const isUnderDemand = p.availabilityType === 'BAJO_ENCARGO' || Boolean(p.isSupplierPreorder);
 
       return {
@@ -122,6 +132,15 @@ export class PublicStoreController {
         companyBank: settings?.companyBank || '',
         companyCedula: settings?.companyCedula || '',
         companyPhone: settings?.companyPhone || '',
+        companyAccountNumber: settings?.companyAccountNumber || '',
+        companyAccountHolder: settings?.companyAccountHolder || '',
+        binancePayId: settings?.binancePayId || '',
+        binanceEmail: settings?.binanceEmail || '',
+        acceptCashUsd: settings?.acceptCashUsd !== false,
+        acceptPagoMovil: settings?.acceptPagoMovil !== false,
+        acceptCardPos: settings?.acceptCardPos === true,
+        acceptBinance: settings?.acceptBinance === true,
+        acceptTransfer: settings?.acceptTransfer === true,
         themePrimaryColor: settings?.themePrimaryColor || '#1e293b',
         themeHeaderColor: settings?.themeHeaderColor || '#334155',
         featureBuySell: settings?.featureBuySell ?? false,
@@ -187,6 +206,7 @@ export class PublicStoreController {
 
       const product = await this.productRepo.findOne({
         where: { tenantId, id: item.productId },
+        relations: { comboItems: { component: true } },
       });
 
       if (!product) {
@@ -209,7 +229,16 @@ export class PublicStoreController {
 
       const isExemptFromStock = product.isSupplierPreorder || product.availabilityType === 'BAJO_ENCARGO';
       if (!isExemptFromStock) {
-        const availableStock = Math.max(0, Number(product.stock !== undefined && product.stock !== null ? product.stock : (product.stockQuantity || 0)));
+        let availableStock = Math.max(0, Number(product.stock !== undefined && product.stock !== null ? product.stock : (product.stockQuantity || 0)));
+        if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
+          let minAvail = Infinity;
+          for (const ci of product.comboItems) {
+            const compStock = ci.component?.physicalStock ?? ci.component?.stockQuantity ?? 0;
+            const possible = Math.floor(compStock / (ci.quantity || 1));
+            if (possible < minAvail) minAvail = possible;
+          }
+          availableStock = minAvail === Infinity ? 0 : Math.max(0, minAvail);
+        }
         if (availableStock <= 0) {
           throw new BadRequestException(
             `El producto "${product.name}" se encuentra agotado.`
@@ -245,6 +274,7 @@ export class PublicStoreController {
       message: 'Pedido realizado con éxito',
       orderId: createdOrder.id,
       orderNumber: createdOrder.id.slice(0, 8).toUpperCase(),
+      status: createdOrder.status,
       totalAmount: createdOrder.totalAmount,
       totalAmountBs: createdOrder.amountBs,
       deliveryMethod: createdOrder.deliveryMethod,

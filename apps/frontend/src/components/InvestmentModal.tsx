@@ -57,6 +57,7 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
   const [amountUSD, setAmountUSD] = useState('');
   const [amountBS, setAmountBS] = useState('');
   const [description, setDescription] = useState('');
+  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [exchangeRate, setExchangeRate] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('flujofino_exchange_rate');
@@ -330,6 +331,8 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
                       fontSize: '15px',
                       fontWeight: 700,
                       boxSizing: 'border-box',
+                      background: '#FFFFFF',
+                      color: '#0F172A',
                     }}
                     required
                   />
@@ -354,6 +357,8 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
                       fontSize: '15px',
                       fontWeight: 700,
                       boxSizing: 'border-box',
+                      background: '#FFFFFF',
+                      color: '#0F172A',
                     }}
                   />
                 </div>
@@ -375,6 +380,8 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
                       border: '1px solid #CBD5E1',
                       fontSize: '13px',
                       boxSizing: 'border-box',
+                      background: '#FFFFFF',
+                      color: '#0F172A',
                     }}
                   />
                 </div>
@@ -399,6 +406,8 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
                       border: '1px solid #CBD5E1',
                       fontSize: '13px',
                       boxSizing: 'border-box',
+                      background: '#FFFFFF',
+                      color: '#0F172A',
                     }}
                   />
                 </div>
@@ -420,6 +429,8 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
                     border: '1px solid #CBD5E1',
                     fontSize: '13px',
                     boxSizing: 'border-box',
+                    background: '#FFFFFF',
+                    color: '#0F172A',
                   }}
                   required
                 />

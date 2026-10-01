@@ -256,12 +256,7 @@ const Calculator: React.FC = () => {
                           <IonCol size="6">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                               <span>Tasa (Bs):</span>
-                              <IonInput 
-                                type="number" min="0" 
-                                value={exchangeRate} 
-                                readonly
-                                style={{ border: '1px solid #ccc', borderRadius: '4px', padding: '0 5px', width: '80px', background: '#f9f9f9', opacity: 0.8 }}
-                              />
+                              <span style={{ fontWeight: 'bold', color: '#0F172A', background: '#F1F5F9', padding: '4px 8px', borderRadius: '6px' }}>Bs. {Number(exchangeRate || 0).toFixed(2)}</span>
                             </div>
                           </IonCol>
                           <IonCol size="6" className="ion-text-right">

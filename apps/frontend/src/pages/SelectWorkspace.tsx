@@ -7,7 +7,7 @@ import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
 
 const SelectWorkspace: React.FC = () => {
-  const { user, login, logout } = useContext(AuthContext);
+  const { user, login, logout, token } = useContext(AuthContext);
   const router = useIonRouter();
   const [presentToast] = useIonToast();
 
@@ -48,8 +48,7 @@ const SelectWorkspace: React.FC = () => {
       await apiClient.post(`/auth/invitations/${tenantId}/reject`);
       presentToast({ message: 'Invitación rechazada', duration: 2000, color: 'medium' });
       // Remove from UI
-      const token = localStorage.getItem('token') || '';
-      login(token, { ...user!, workspaces: workspaces.filter((w: any) => w.tenantId !== tenantId) }, undefined);
+      login(token || '', { ...user!, workspaces: workspaces.filter((w: any) => w.tenantId !== tenantId) }, undefined);
     } catch (e: any) {
       presentToast({ message: 'Error al rechazar invitación', duration: 3000, color: 'danger' });
     }
@@ -63,7 +62,7 @@ const SelectWorkspace: React.FC = () => {
   return (
     <IonPage>
       <IonContent className="ion-padding" style={{ '--background': '#f4f5f8' } as any}>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100%' }}>
           <IonCard style={{ width: '100%', maxWidth: '400px' }}>
             <IonCardHeader className="ion-text-center">
               <div style={{ width: '60px', height: '60px', background: 'var(--ion-color-primary)', color: 'white', borderRadius: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '36px', fontWeight: '900', margin: '0 auto 15px auto', boxShadow: '0 4px 10px rgba(0,0,0,0.15)' }}>

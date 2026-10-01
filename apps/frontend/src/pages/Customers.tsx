@@ -2,6 +2,11 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import {
   IonPage,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonButtons,
+  IonButton,
   IonContent,
   IonIcon,
   IonSpinner,
@@ -451,97 +456,95 @@ const Customers: React.FC = () => {
 
         {/* Create / Edit Modal */}
         <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)} style={{ '--border-radius': '20px' } as any}>
-          <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-              <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
+          <IonHeader>
+            <IonToolbar style={{ ['--background' as any]: '#ffffff', borderBottom: '1px solid #E2E8F0', padding: '0 8px' }}>
+              <IonTitle style={{ fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
                 {editingCustomer ? 'Editar Cliente' : 'Registrar Nuevo Cliente'}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-              >
-                <IonIcon icon={closeOutline} style={{ color: '#64748B' }} />
-              </button>
+              </IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setShowModal(false)} color="medium">
+                  <IonIcon icon={closeOutline} slot="icon-only" />
+                </IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+
+          <IonContent className="ion-padding" style={{ ['--background' as any]: '#ffffff' }}>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                Nombre Completo *
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Ej. Carlos Mendoza"
+                style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+              />
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
-                    Nombre Completo *
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder="Ej. Carlos Mendoza"
-                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
-                  />
-                </div>
-
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
-                    Teléfono (WhatsApp) *
-                  </label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    placeholder="0414-1234567"
-                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
-                      Cédula / ID
-                    </label>
-                    <input
-                      type="text"
-                      value={identification}
-                      onChange={e => setIdentification(e.target.value)}
-                      placeholder="V-12345678"
-                      style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
-                      Visitas Previas
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={totalVisits}
-                      onChange={e => setTotalVisits(Number(e.target.value) || 0)}
-                      style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
-                    Notas Internas / Preferencias
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={notes}
-                    onChange={e => setNotes(e.target.value)}
-                    placeholder="Ej. Prefiere degradado alto, café sin azúcar..."
-                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', fontFamily: 'inherit' }}
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  className="ff-btn-primary bg-theme-primary text-white"
-                  style={{ width: '100%', padding: '14px', fontSize: '15px', borderRadius: '14px', backgroundColor: 'var(--theme-primary)', color: '#ffffff' }}
-                >
-                  {editingCustomer ? 'Guardar Cambios' : 'Registrar Cliente ✓'}
-                </button>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                Teléfono (WhatsApp) *
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="0414-1234567"
+                style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+              />
             </div>
-          </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                  Cédula / ID
+                </label>
+                <input
+                  type="text"
+                  value={identification}
+                  onChange={e => setIdentification(e.target.value)}
+                  placeholder="V-12345678"
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                  Visitas Previas
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={totalVisits}
+                  onChange={e => setTotalVisits(Number(e.target.value) || 0)}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                Notas Internas / Preferencias
+              </label>
+              <textarea
+                rows={3}
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Ej. Prefiere degradado alto, café sin azúcar..."
+                style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', fontFamily: 'inherit' }}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSave}
+              className="ff-btn-primary bg-theme-primary text-white"
+              style={{ width: '100%', padding: '14px', fontSize: '15px', borderRadius: '14px', backgroundColor: 'var(--theme-primary)', color: '#ffffff' }}
+            >
+              {editingCustomer ? 'Guardar Cambios' : 'Registrar Cliente ✓'}
+            </button>
+          </IonContent>
         </IonModal>
       </IonContent>
     </IonPage>

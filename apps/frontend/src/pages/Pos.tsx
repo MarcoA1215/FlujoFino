@@ -247,6 +247,41 @@ const Pos: React.FC = () => {
     fetchRate();
     fetchDeliveryZones();
     fetchEmployees();
+
+    // Check for calculator quoted cart
+    const calcCartRaw = localStorage.getItem('calculator_cart');
+    const calcZoneRaw = localStorage.getItem('calculator_zone');
+    if (calcCartRaw) {
+      try {
+        const parsed = JSON.parse(calcCartRaw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const loadedItems: CartItem[] = parsed.map((item: any) => ({
+            cartItemId: Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+            product: item.product,
+            quantity: item.quantity || 1,
+            unitPrice: Number(item.product?.salePrice || item.unitPrice || 0),
+            hasModifications: false,
+            removedIngredients: [],
+            addedExtras: [],
+          }));
+          setCart(loadedItems);
+          if (calcZoneRaw) {
+            setDeliveryMethod(DeliveryMethod.DELIVERY);
+            setDeliveryZoneId(calcZoneRaw);
+          }
+          presentToast({
+            message: 'Cotización de Calculadora cargada en el carrito',
+            duration: 2500,
+            color: 'success'
+          });
+        }
+      } catch (err) {
+        console.error('Error cargando carrito de calculadora:', err);
+      } finally {
+        localStorage.removeItem('calculator_cart');
+        localStorage.removeItem('calculator_zone');
+      }
+    }
   }, []);
 
   // Handle passed location state (e.g. from Reservations or Orders)
@@ -281,25 +316,64 @@ const Pos: React.FC = () => {
         }));
         setCart(loadedCart);
       }
-    } else if (location.state && (location.state as any).reservationToBill) {
-      const resData = (location.state as any).reservationToBill;
-      setCustomerName(resData.customerName || '');
-      setCustomerPhone(resData.customerPhone || '');
-      setTableNumber(resData.tableNumber || '');
-      setLinkedReservationId(resData.id);
-
-      if (resData.serviceId) {
-        apiClient.get<Product[]>('/products').then(res => {
-          const found = res.data.find(p => p.id === resData.serviceId);
-          if (found) {
-            setCart([{ cartItemId: Date.now().toString(), product: found, quantity: 1, unitPrice: found.salePrice, hasModifications: false }]);
-          }
-        }).catch(() => {});
-      }
     } else {
       const params = new URLSearchParams(location.search || window.location.search);
       const editOrderIdFromUrl = params.get('editOrderId');
-      if (editOrderIdFromUrl && !editingOrderId) {
+      const reservationIdFromUrl = params.get('reservationId');
+      const storedReservationRaw = sessionStorage.getItem('reservation_to_bill');
+      const navReservation = location.state && (location.state as any).reservationToBill;
+
+      if (reservationIdFromUrl || storedReservationRaw || navReservation) {
+        let resData: any = navReservation || (storedReservationRaw ? JSON.parse(storedReservationRaw) : null);
+        
+        const loadReservationIntoPos = (resToLoad: any) => {
+          setCustomerName(resToLoad.customerName || '');
+          setCustomerPhone(resToLoad.customerPhone || '');
+          setTableNumber(resToLoad.tableNumber || '');
+          setLinkedReservationId(resToLoad.id);
+          if (resToLoad.employeeId) setEmployeeId(resToLoad.employeeId);
+          
+          // Si el cliente ya dio un abono al reservar, reflejarlo
+          if (resToLoad.abonosTotal && Number(resToLoad.abonosTotal) > 0) {
+            setInitialAbono(Number(resToLoad.abonosTotal).toString());
+            setPaymentMethod('PENDING');
+          }
+
+          if (resToLoad.serviceId) {
+            const sIds = String(resToLoad.serviceId).split(',').map((s: string) => s.trim()).filter(Boolean);
+            apiClient.get<Product[]>('/products').then(pRes => {
+              const matchedItems: CartItem[] = [];
+              for (const sId of sIds) {
+                const found = pRes.data.find(p => p.id === sId);
+                if (found) {
+                  matchedItems.push({
+                    cartItemId: Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                    product: found,
+                    quantity: 1,
+                    unitPrice: Number(found.salePrice || 0),
+                    hasModifications: false,
+                    removedIngredients: [],
+                    addedExtras: []
+                  });
+                }
+              }
+              if (matchedItems.length > 0) {
+                setCart(matchedItems);
+              }
+            }).catch(console.error);
+          }
+          sessionStorage.removeItem('reservation_to_bill');
+        };
+
+        if (resData && (!reservationIdFromUrl || resData.id === reservationIdFromUrl)) {
+          loadReservationIntoPos(resData);
+        } else if (reservationIdFromUrl) {
+          apiClient.get(`/reservations`).then(rList => {
+            const found = rList.data.find((r: any) => r.id === reservationIdFromUrl);
+            if (found) loadReservationIntoPos(found);
+          }).catch(console.error);
+        }
+      } else if (editOrderIdFromUrl && !editingOrderId) {
         apiClient.get(`/orders/${editOrderIdFromUrl}`).then(res => {
           const order = res.data;
           if (order) {
@@ -1494,7 +1568,7 @@ const Pos: React.FC = () => {
                     )}
 
                     {/* Punto de Venta */}
-                    {settings?.acceptCardPos !== false && (
+                    {settings?.acceptCardPos === true && (
                       <button
                         type="button"
                         onClick={() => setPaymentMethod('PUNTO')}

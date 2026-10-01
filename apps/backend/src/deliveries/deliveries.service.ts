@@ -71,13 +71,58 @@ export class DeliveriesService {
       };
     });
 
+    const activeOrders = await this.getMyActiveOrders(tenantId, deliveryUserId);
+
     return {
       completedCount: orders.length,
+      activeCount: activeOrders.length,
       totalFletesUSD: Number(totalFletesUSD.toFixed(2)),
       totalFletesBS: Number(totalFletesBS.toFixed(2)),
       exchangeRate,
+      activeOrders,
       orders: formattedOrders,
     };
+  }
+
+  async getMyActiveOrders(tenantId: string, deliveryUserId: string) {
+    const exchangeRate = await this.getEffectiveExchangeRate(tenantId);
+
+    const orders = await this.orderRepo.find({
+      where: [
+        { tenantId, deliveryUserId, status: OrderStatus.PREPARING },
+        { tenantId, deliveryUserId, status: OrderStatus.IN_TRANSIT },
+      ],
+      relations: {
+        deliveryZone: true,
+        items: true,
+      },
+      order: { createdAt: 'ASC' },
+    });
+
+    return orders.map(o => {
+      const fleteUSD = Number(o.deliveryFee || 0);
+      const fleteBS = Number((fleteUSD * exchangeRate).toFixed(2));
+
+      return {
+        id: o.id,
+        orderNumber: o.id.slice(0, 8).toUpperCase(),
+        status: o.status,
+        customerName: o.customerName,
+        customerPhone: o.customerPhone,
+        customerAddress: o.customerAddress,
+        deliveryZone: o.deliveryZone?.name || 'Zona General',
+        deliveryFeeUSD: fleteUSD,
+        deliveryFeeBS: fleteBS,
+        totalAmount: Number(o.totalAmount || 0),
+        paymentStatus: o.paymentStatus,
+        paymentMethod: o.paymentMethod,
+        items: (o.items || []).map(i => ({
+          name: i.productName,
+          quantity: i.quantity,
+        })),
+        createdAt: o.createdAt,
+      };
+    });
   }
 
   async getAdminSummary(tenantId: string) {

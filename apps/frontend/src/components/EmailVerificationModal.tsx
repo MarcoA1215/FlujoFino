@@ -88,7 +88,7 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
   };
 
   return (
-    <IonModal isOpen={isOpen} onDidDismiss={onClose} style={{ '--max-width': '420px', '--height': 'auto', '--border-radius': '16px' } as any}>
+    <IonModal isOpen={isOpen} onDidDismiss={onClose} style={{ '--max-width': '420px', '--height': '380px', '--border-radius': '16px' } as any}>
       <IonHeader className="ion-no-border">
         <IonToolbar style={{ '--background': '#ffffff', borderBottom: '1px solid #e2e8f0' } as any}>
           <IonTitle style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>

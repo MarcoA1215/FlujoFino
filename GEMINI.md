@@ -1,3 +1,6 @@
+IGNORR LA REGLA CAVEMAN A MENOS QUE SE ESPECIFIQUE LO CONTRARIO
+
+
 <!-- # REGLA CAVEMAN (AHORRO ESTRICTO DE TOKENS)
 - Sé extremadamente conciso y directo (habla como cavernícola: frases telegráficas cortas).
 - Elimina saludos, introducciones amables, conclusiones y cortesías ("¡Claro!", "Con gusto te ayudo", etc.).

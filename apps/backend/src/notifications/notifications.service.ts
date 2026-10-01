@@ -119,7 +119,7 @@ export class NotificationsService {
       title: '¡Nuevo Pedido recibido! 🛍️',
       body: `Pedido #${orderNumber} por $${amount} de ${customer}`,
       data: {
-        url: '/pedidos',
+        url: '/orders',
         orderId: order?.id,
         type: 'NEW_ORDER',
       },
@@ -135,7 +135,7 @@ export class NotificationsService {
       title: '¡Nueva Cita reservada! 📅',
       body: `${customer} reservó "${serviceName}" ${time ? `a las ${time}` : ''}`.trim(),
       data: {
-        url: '/agenda',
+        url: '/reservations',
         reservationId: reservation?.id,
         type: 'NEW_RESERVATION',
       },

@@ -207,6 +207,20 @@ const PublicBooking: React.FC = () => {
           return;
         }
 
+        // Select first active payment method dynamically
+        const minDep = Number(res.data.minDepositPercentage || 0);
+        let defaultMethod = 'PAGO_MOVIL';
+        if (res.data.acceptPagoMovil !== false) {
+          defaultMethod = 'PAGO_MOVIL';
+        } else if (res.data.acceptTransfer === true) {
+          defaultMethod = 'TRANSFER';
+        } else if (res.data.acceptBinance === true) {
+          defaultMethod = 'BINANCE';
+        } else if (minDep === 0 && res.data.acceptCashUsd !== false) {
+          defaultMethod = 'CASH';
+        }
+        setBookingPaymentMethod(defaultMethod);
+
         // If require service is NOT enabled, skip step 1 directly to date/time selection (step 2)
         if (res.data.bookingRequireService === false) {
           setStep(2);

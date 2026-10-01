@@ -278,23 +278,27 @@ export class UsersService implements OnModuleInit {
     const req = await accessReqRepo.findOne({ where: { id: requestId, tenantId } });
     if (!req) throw new NotFoundException('Solicitud no encontrada');
 
-    const payload = {
-      username: req.userName,
-      sub: req.userId,
-      role: req.role,
-      tenantId: req.tenantId,
-      tenantName: 'Flujo Fino',
-    };
-
-    const tenant = await this.usersRepo.manager.findOne(Tenant, { where: { id: tenantId } });
-    if (tenant) {
-      payload.tenantName = tenant.name;
-    }
-
     const user = await this.usersRepo.findOne({
       where: { id: req.userId },
       relations: { tenantAccess: { tenant: true } },
     });
+
+    const tenant = await this.usersRepo.manager.findOne(Tenant, { where: { id: tenantId } });
+    const tenantName = tenant ? tenant.name : 'Flujo Fino';
+
+    const payload = {
+      id: user?.id || req.userId,
+      username: req.userName,
+      email: user?.email,
+      identification: user?.identification,
+      phone: user?.phone,
+      isEmailVerified: !!user?.isEmailVerified,
+      sub: req.userId,
+      role: req.role,
+      tenantId: req.tenantId,
+      tenantName: tenantName,
+    };
+
     const allWorkspaces = user?.tenantAccess?.map(a => ({
       tenantId: a.tenantId,
       name: a.tenant?.name || 'Sucursal',

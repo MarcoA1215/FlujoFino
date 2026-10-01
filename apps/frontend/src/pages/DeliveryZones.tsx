@@ -145,7 +145,7 @@ const DeliveryZones: React.FC = () => {
           </IonFabButton>
         </IonFab>
 
-        <IonModal isOpen={showModal} onDidDismiss={closeModal} initialBreakpoint={0.5} breakpoints={[0, 0.5, 0.8]}>
+        <IonModal isOpen={showModal} onDidDismiss={closeModal} initialBreakpoint={0.5} breakpoints={[0.5, 0.85]}>
           <IonHeader>
             <IonToolbar>
               <IonTitle>{editingZone ? 'Editar Zona' : 'Nueva Zona'}</IonTitle>

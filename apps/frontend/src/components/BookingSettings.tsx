@@ -126,7 +126,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                       type="time" 
                       value={bulkStart} 
                       onIonInput={e => setBulkStart(e.detail.value!)} 
-                      style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '110px' }} 
+                      style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '145px' }} 
                     />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -135,7 +135,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                       type="time" 
                       value={bulkEnd} 
                       onIonInput={e => setBulkEnd(e.detail.value!)} 
-                      style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '110px' }} 
+                      style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '145px' }} 
                     />
                   </div>
                   <IonButton size="small" color="primary" fill="outline" onClick={handleApplyBulkHours}>
@@ -157,8 +157,8 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                   return (
                     <IonRow key={day.id} className="ion-align-items-center" style={{ borderBottom: '1px solid #f1f5f9', padding: '10px 0' }}>
                       <IonCol size="12" sizeSm="4" sizeMd="3">
-                        <IonToggle checked={dayData.isOpen} onIonChange={e => handleDayChange(day.id, 'isOpen', e.detail.checked)}>
-                          <span style={{ fontSize: '14px', fontWeight: dayData.isOpen ? '600' : 'normal', color: dayData.isOpen ? '#0f172a' : '#64748b' }}>
+                        <IonToggle checked={dayData.isOpen} onIonChange={e => handleDayChange(day.id, 'isOpen', e.detail.checked)} justify="space-between">
+                          <span slot="label" style={{ fontSize: '14px', fontWeight: dayData.isOpen ? '600' : 'normal', color: dayData.isOpen ? '#0f172a' : '#64748b' }}>
                             {day.name}
                           </span>
                         </IonToggle>
@@ -172,7 +172,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                                 type="time" 
                                 value={dayData.startTime || '08:00'} 
                                 onIonInput={e => handleDayChange(day.id, 'startTime', e.detail.value)} 
-                                style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '120px' }} 
+                                style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '145px' }} 
                               />
                             </div>
                             <span>-</span>
@@ -182,7 +182,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                                 type="time" 
                                 value={dayData.endTime || '18:00'} 
                                 onIonInput={e => handleDayChange(day.id, 'endTime', e.detail.value)} 
-                                style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '120px' }} 
+                                style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '145px' }} 
                               />
                             </div>
                           </div>

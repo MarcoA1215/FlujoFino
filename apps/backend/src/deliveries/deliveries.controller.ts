@@ -10,8 +10,15 @@ export class DeliveriesController {
   @Get('my-history')
   getMyHistory(@Request() req: any) {
     const tenantId = req.user.tenantId;
-    const userId = req.user.id;
+    const userId = req.user.id || req.user.sub;
     return this.deliveriesService.getMyHistory(tenantId, userId);
+  }
+
+  @Get('my-active')
+  getMyActiveOrders(@Request() req: any) {
+    const tenantId = req.user.tenantId;
+    const userId = req.user.id || req.user.sub;
+    return this.deliveriesService.getMyActiveOrders(tenantId, userId);
   }
 
   @Get('admin-summary')

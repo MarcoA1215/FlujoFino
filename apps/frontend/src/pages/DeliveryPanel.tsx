@@ -29,11 +29,30 @@ interface DeliveryOrder {
   deliveredAt: string;
 }
 
+interface ActiveDeliveryOrder {
+  id: string;
+  orderNumber: string;
+  status: string;
+  customerName: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  deliveryZone: string;
+  deliveryFeeUSD: number;
+  deliveryFeeBS: number;
+  totalAmount: number;
+  paymentStatus: string;
+  paymentMethod?: string;
+  items?: { name: string; quantity: number }[];
+  createdAt: string;
+}
+
 interface MyDeliveryHistory {
   completedCount: number;
+  activeCount?: number;
   totalFletesUSD: number;
   totalFletesBS: number;
   exchangeRate: number;
+  activeOrders?: ActiveDeliveryOrder[];
   orders: DeliveryOrder[];
 }
 
@@ -130,6 +149,122 @@ const DeliveryPanel: React.FC = () => {
               </IonCol>
             </IonRow>
           </IonGrid>
+
+          {/* Pedidos Asignados Activos (PREPARING / IN_TRANSIT) */}
+          <div style={{ marginTop: '10px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>🛵 Pedidos Activos Asignados</span>
+                <IonBadge color={history?.activeOrders && history.activeOrders.length > 0 ? 'warning' : 'medium'}>
+                  {history?.activeOrders?.length || 0}
+                </IonBadge>
+              </h3>
+            </div>
+
+            {!history?.activeOrders || history.activeOrders.length === 0 ? (
+              <div
+                style={{
+                  background: 'white',
+                  borderRadius: '16px',
+                  padding: '24px 20px',
+                  textAlign: 'center',
+                  border: '1px dashed #CBD5E1',
+                }}
+              >
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748B' }}>
+                  No tienes pedidos pendientes de entrega asignados en este momento.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {history.activeOrders.map(order => (
+                  <div
+                    key={order.id}
+                    style={{
+                      background: 'white',
+                      borderRadius: '14px',
+                      padding: '16px',
+                      border: '2px solid #38BDF8',
+                      boxShadow: '0 2px 8px rgba(56, 189, 248, 0.15)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 800, fontSize: '15px', color: '#0F172A' }}>
+                            Orden #{order.orderNumber}
+                          </span>
+                          <IonBadge color={order.status === 'IN_TRANSIT' ? 'tertiary' : 'warning'}>
+                            {order.status === 'IN_TRANSIT' ? 'EN RUTA' : 'EN PREPARACIÓN'}
+                          </IonBadge>
+                        </div>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', marginTop: '4px' }}>
+                          👤 {order.customerName}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontWeight: 900, color: '#0284C7', fontSize: '15px' }}>
+                          Flete: +${order.deliveryFeeUSD.toFixed(2)} USD
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>
+                          Bs. {order.deliveryFeeBS.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {order.customerAddress && (
+                      <div style={{ fontSize: '13px', color: '#334155', margin: '8px 0', padding: '8px 10px', background: '#F0F9FF', borderRadius: '8px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                        <IonIcon icon={mapOutline} style={{ color: '#0284C7', fontSize: '16px', marginTop: '2px', flexShrink: 0 }} />
+                        <div>
+                          <strong>Dirección de Entrega:</strong> {order.customerAddress} ({order.deliveryZone})
+                        </div>
+                      </div>
+                    )}
+
+                    {order.items && order.items.length > 0 && (
+                      <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '8px' }}>
+                        📦 <strong>Contenido:</strong> {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid #F1F5F9', marginTop: '8px' }}>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <IonBadge color={order.paymentStatus === 'PAID' ? 'success' : 'warning'}>
+                          {order.paymentStatus === 'PAID' ? 'PAGADO' : 'COBRAR AL ENTREGAR'}
+                        </IonBadge>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                          Total: ${order.totalAmount.toFixed(2)}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {order.customerPhone && (
+                          <a
+                            href={`tel:${order.customerPhone}`}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: '#EFF6FF',
+                              color: '#1D4ED8',
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              textDecoration: 'none',
+                            }}
+                          >
+                            <IonIcon icon={callOutline} />
+                            Llamar ({order.customerPhone})
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Historial de Envíos */}
           <div style={{ marginTop: '10px' }}>

@@ -132,19 +132,25 @@ export const StockOperationModal: React.FC<Props> = ({ material, operationType, 
 
             {operationType === 'restock' && (
               <IonItem>
-                <IonLabel position="stacked" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-  <span>Costo Total de la Compra</span>
-  <IonSelect value={currency} onIonChange={e => setCurrency(e.detail.value)} style={{ minHeight: 'auto', padding: '0', background: '#eee', borderRadius: '4px', paddingLeft: '5px', paddingRight: '5px' }}>
-    <IonSelectOption value="USD">$ USD</IonSelectOption>
-    <IonSelectOption value="VES">Bs. VES</IonSelectOption>
-  </IonSelect>
-</IonLabel>
-                <IonInput 
-                  type="number" step="any" 
-                  value={cost} 
-                  onIonInput={e => setCost(parseFloat(e.detail.value!) || undefined)} 
-                  placeholder="0.00" 
-                />
+                <IonLabel position="stacked">Costo Total de la Compra</IonLabel>
+                <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '8px', marginTop: '4px' }}>
+                  <IonInput 
+                    type="number" step="any" 
+                    value={cost} 
+                    onIonInput={e => setCost(parseFloat(e.detail.value!) || undefined)} 
+                    placeholder="0.00" 
+                    style={{ flex: 1 }}
+                  />
+                  <IonSelect 
+                    value={currency} 
+                    onIonChange={e => setCurrency(e.detail.value)} 
+                    interface="popover"
+                    style={{ minHeight: '36px', background: '#F1F5F9', borderRadius: '8px', padding: '0 8px', fontWeight: 600 }}
+                  >
+                    <IonSelectOption value="USD">$ USD</IonSelectOption>
+                    <IonSelectOption value="VES">Bs. VES</IonSelectOption>
+                  </IonSelect>
+                </div>
               </IonItem>
             )}
 

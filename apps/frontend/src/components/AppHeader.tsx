@@ -49,7 +49,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const [presentAlert] = useIonAlert();
 
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
-  const [isSimulatingOffline, setIsSimulatingOffline] = useState<boolean>(false);
+  const [isSimulatingOffline, setIsSimulatingOffline] = useState<boolean>(() => localStorage.getItem('flujofino_simulating_offline') === 'true');
   const [pendingOfflineCount, setPendingOfflineCount] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [showCashCloseModal, setShowCashCloseModal] = useState<boolean>(false);
@@ -110,12 +110,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     const nextVal = !isSimulatingOffline;
     setIsSimulatingOffline(nextVal);
     if (nextVal) {
+      localStorage.setItem('flujofino_simulating_offline', 'true');
       presentToast({
         message: '⚡ Modo offline simulado activado para pruebas locales',
         duration: 2500,
         color: 'warning'
       });
     } else {
+      localStorage.removeItem('flujofino_simulating_offline');
       presentToast({
         message: '🟢 Modo en línea activo: Conexión normal restaurada',
         duration: 2500,

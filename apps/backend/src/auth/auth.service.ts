@@ -280,6 +280,7 @@ export class AuthService {
 
   async login(user: any, tenantId: string, role: string, tenantName?: string) {
     const payload = {
+      id: user.id || user.sub,
       username: user.username,
       email: user.email,
       identification: user.identification,
@@ -453,7 +454,10 @@ export class AuthService {
     user.emailVerificationExpiresAt = expires;
     await userRepo.save(user);
 
-    await this.mailService.sendVerificationCode(user.email, code);
+    const mailSent = await this.mailService.sendVerificationCode(user.email, code);
+    if (!mailSent) {
+      throw new BadRequestException('No se pudo enviar el correo electrónico. Revisa las credenciales SMTP o la consola del servidor.');
+    }
 
     return {
       success: true,
@@ -527,7 +531,10 @@ export class AuthService {
     user.resetPasswordExpires = expires;
     await userRepo.save(user);
 
-    await this.mailService.sendPasswordResetCode(user.email, code);
+    const mailSent = await this.mailService.sendPasswordResetCode(user.email, code);
+    if (!mailSent) {
+      throw new BadRequestException('No se pudo enviar el correo electrónico. Revisa las credenciales SMTP o la consola del servidor.');
+    }
 
     return {
       success: true,

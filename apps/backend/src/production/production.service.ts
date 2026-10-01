@@ -58,9 +58,11 @@ export class ProductionService {
 
           ci.component.physicalStock -= required;
           ci.component.stockQuantity -= required;
+          ci.component.stock = ci.component.stockQuantity;
           await manager.save(Product, ci.component);
 
-          totalBatchCost += required * (0);
+          const compCost = Number(ci.component.cost || ci.component.estimatedCost || 0);
+          totalBatchCost += required * compCost;
         }
       } else {
         if (!product.recipe || product.recipe.length === 0) {
@@ -113,6 +115,7 @@ export class ProductionService {
       // 3. Incrementar el stock de Producto Terminado
       product.stockQuantity += quantityToProduce;
       product.physicalStock += quantityToProduce; // Ensure physical stock increases too
+      product.stock = product.stockQuantity;
       const updatedProduct = await manager.save(Product, product);
 
       // 4. Registrar el lote
@@ -157,6 +160,7 @@ export class ProductionService {
 
       product.stockQuantity -= batch.quantity;
       product.physicalStock -= batch.quantity;
+      product.stock = product.stockQuantity;
       await manager.save(Product, product);
 
       if (product.isCombo && product.isPreAssembled) {
@@ -165,6 +169,7 @@ export class ProductionService {
             if (ci.component) {
               ci.component.physicalStock += ci.quantity * batch.quantity;
               ci.component.stockQuantity += ci.quantity * batch.quantity;
+              ci.component.stock = ci.component.stockQuantity;
               await manager.save(Product, ci.component);
             }
           }

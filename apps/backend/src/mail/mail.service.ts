@@ -23,14 +23,28 @@ export class MailService {
       return;
     }
 
-    this.transporter = nodemailer.createTransport({
-      host: host || 'smtp.gmail.com',
-      port: Number(port),
-      secure,
-      auth: {
-        user,
-        pass,
-      },
+    const isGmail = (host && host.includes('gmail')) || (user && user.includes('@gmail.com'));
+
+    this.transporter = nodemailer.createTransport(
+      isGmail
+        ? {
+            service: 'gmail',
+            auth: { user, pass },
+          }
+        : {
+            host: host || 'smtp.gmail.com',
+            port: Number(port),
+            secure,
+            auth: { user, pass },
+          }
+    );
+
+    this.transporter.verify((error) => {
+      if (error) {
+        this.logger.error(`❌ Error autenticando con el servidor SMTP: ${error.message}`);
+      } else {
+        this.logger.log(`✅ Conexión SMTP exitosa. Listo para enviar desde: ${user}`);
+      }
     });
   }
 
@@ -79,10 +93,14 @@ export class MailService {
   }
 
   private async sendMail(to: string, subject: string, html: string): Promise<boolean> {
-    const from = this.configService.get<string>('MAIL_FROM') || this.configService.get<string>('MAIL_USER') || 'no-reply@flujofino.com';
+    const user = this.configService.get<string>('MAIL_USER') || 'no-reply@flujofino.com';
+    const rawFrom = this.configService.get<string>('MAIL_FROM');
+    const from = (rawFrom && rawFrom.includes('@')) ? rawFrom : `"Flujo Fino" <${user}>`;
 
     if (!this.transporter) {
       this.logger.log(`[SIMULATED MAIL] To: ${to} | Subject: ${subject}`);
+      const codeMatch = html.match(/>\s*(\d{6})\s*</) || html.match(/(?<!#)\b\d{6}\b/);
+      console.log('🔑 [MODO SIMULACIÓN] CÓDIGO DE VERIFICACIÓN:', codeMatch ? (codeMatch[1] || codeMatch[0]) : 'N/A');
       return true;
     }
 
@@ -95,7 +113,7 @@ export class MailService {
       });
       return true;
     } catch (error) {
-      this.logger.error(`Error enviando correo a ${to}:`, error);
+      this.logger.error('Error detallado de envío:', error);
       return false;
     }
   }

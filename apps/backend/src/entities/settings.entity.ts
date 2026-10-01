@@ -80,7 +80,7 @@ export class Settings {
   @Column('boolean', { default: true })
   featureShowCatalog: boolean;
 
-  @Column('boolean', { default: false })
+  @Column('boolean', { default: true })
   bookingRequireService: boolean;
 
   @Column('boolean', { default: false })

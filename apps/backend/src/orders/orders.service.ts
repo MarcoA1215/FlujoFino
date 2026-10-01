@@ -5,13 +5,14 @@ import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Product } from '../entities/product.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
-import { PaymentStatus, OrderStatus, MovementType, DeliveryMethod, UserRole } from '@nutrideli/shared-types';
+import { PaymentStatus, OrderStatus, MovementType, DeliveryMethod, UserRole, ReservationStatus } from '@nutrideli/shared-types';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { DeliveryZone } from '../entities/delivery-zone.entity';
 import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Settings } from '../entities/settings.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
+import { Reservation } from '../entities/reservation.entity';
 
 export class CreateOrderDto {
   @IsString()
@@ -557,6 +558,22 @@ export class OrdersService {
         } else if (savedOrder.abonosTotal > 0 && savedOrder.abonosTotal < savedOrder.totalAmount) {
           savedOrder.paymentStatus = PaymentStatus.PARTIAL;
         }
+
+        if (dto.linkedReservationId) {
+          try {
+            const reservationRepo = manager.getRepository(Reservation);
+            const reservation = await reservationRepo.findOne({
+              where: { id: dto.linkedReservationId, tenantId },
+            });
+            if (reservation) {
+              reservation.status = ReservationStatus.COMPLETED;
+              await reservationRepo.save(reservation);
+            }
+          } catch (resErr) {
+            console.error('Error actualizando estado de reservación vinculada:', resErr);
+          }
+        }
+
         return manager.save(Order, savedOrder);
     });
   }
@@ -672,80 +689,83 @@ export class OrdersService {
       }
 
       if (status === OrderStatus.CANCELED) {
-        // Reverse inventory
-        const itemProductIds = Array.from(new Set((order.items || []).map(i => i.productId).filter(Boolean)));
-        const products = itemProductIds.length > 0 ? await manager.find(Product, {
-          where: { tenantId, id: In(itemProductIds) },
-          relations: { comboItems: { component: true }, recipe: { rawMaterial: true } }
-        }) : [];
-        const productMap = new Map(products.map(p => [p.id, p]));
+        const wasPreorder = order.status === OrderStatus.SOLICITUD_ENCARGO || order.status === OrderStatus.CANCELADO_PROVEEDOR;
+        if (!wasPreorder) {
+          // Reverse inventory
+          const itemProductIds = Array.from(new Set((order.items || []).map(i => i.productId).filter(Boolean)));
+          const products = itemProductIds.length > 0 ? await manager.find(Product, {
+            where: { tenantId, id: In(itemProductIds) },
+            relations: { comboItems: { component: true }, recipe: { rawMaterial: true } }
+          }) : [];
+          const productMap = new Map(products.map(p => [p.id, p]));
 
-        for (const item of order.items) {
-          const product = productMap.get(item.productId);
-          
-          if (product) {
-            if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
-              // Restore combo components
-              for (const ci of product.comboItems) {
-                if (ci.component) {
-                  ci.component.stockQuantity += (item.quantity * ci.quantity);
-                  if (order.status === OrderStatus.DELIVERED) {
-                     ci.component.physicalStock += (item.quantity * ci.quantity);
+          for (const item of order.items) {
+            const product = productMap.get(item.productId);
+            
+            if (product) {
+              if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
+                // Restore combo components
+                for (const ci of product.comboItems) {
+                  if (ci.component) {
+                    ci.component.stockQuantity += (item.quantity * ci.quantity);
+                    if (order.status === OrderStatus.DELIVERED) {
+                       ci.component.physicalStock += (item.quantity * ci.quantity);
+                    }
+                    await manager.save(Product, ci.component);
                   }
-                  await manager.save(Product, ci.component);
                 }
-              }
-            } else if (!product.is_service && product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
-              // Restore raw materials (except removed)
-              for (const ri of product.recipe) {
-                if (ri.rawMaterial) {
-                  const isRemoved = item.removedIngredients?.some(rem => 
-                    rem === ri.rawMaterial.id || rem.toLowerCase() === ri.rawMaterial.name.toLowerCase()
-                  );
-                  if (isRemoved) continue;
+              } else if (!product.is_service && product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
+                // Restore raw materials (except removed)
+                for (const ri of product.recipe) {
+                  if (ri.rawMaterial) {
+                    const isRemoved = item.removedIngredients?.some(rem => 
+                      rem === ri.rawMaterial.id || rem.toLowerCase() === ri.rawMaterial.name.toLowerCase()
+                    );
+                    if (isRemoved) continue;
 
-                  ri.rawMaterial.stockQuantity += (item.quantity * ri.quantity);
-                  await manager.save(RawMaterial, ri.rawMaterial);
-                  const mov = manager.create(StockMovement, { tenantId,
-                    rawMaterialId: ri.rawMaterial.id,
-                    type: MovementType.IN,
-                    quantity: item.quantity * ri.quantity,
-                    totalCost: (item.quantity * ri.quantity) * ri.rawMaterial.costPerUnit,
-                    description: 'Reverso por Cancelación de Pedido: ' + order.id
-                  });
-                  await manager.save(StockMovement, mov);
-                }
-              }
-            } else if (!product.isCombo || product.isPreAssembled) {
-                const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
-                if (!isService) {
-                  const restored = (Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0) + item.quantity;
-                  product.stock = restored;
-                  product.stockQuantity = restored;
-                  if (order.status === OrderStatus.DELIVERED) {
-                    product.physicalStock = (Number(product.physicalStock) || 0) + item.quantity;
+                    ri.rawMaterial.stockQuantity += (item.quantity * ri.quantity);
+                    await manager.save(RawMaterial, ri.rawMaterial);
+                    const mov = manager.create(StockMovement, { tenantId,
+                      rawMaterialId: ri.rawMaterial.id,
+                      type: MovementType.IN,
+                      quantity: item.quantity * ri.quantity,
+                      totalCost: (item.quantity * ri.quantity) * ri.rawMaterial.costPerUnit,
+                      description: 'Reverso por Cancelación de Pedido: ' + order.id
+                    });
+                    await manager.save(StockMovement, mov);
                   }
-                  await manager.save(Product, product);
                 }
-            }
+              } else if (!product.isCombo || product.isPreAssembled) {
+                  const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
+                  if (!isService) {
+                    const restored = (Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0) + item.quantity;
+                    product.stock = restored;
+                    product.stockQuantity = restored;
+                    if (order.status === OrderStatus.DELIVERED) {
+                      product.physicalStock = (Number(product.physicalStock) || 0) + item.quantity;
+                    }
+                    await manager.save(Product, product);
+                  }
+              }
 
-            // Restore added extras
-            if (item.addedExtras && item.addedExtras.length > 0) {
-              for (const extra of item.addedExtras) {
-                if (!extra.rawMaterialId) continue;
-                const extraRm = await manager.findOne(RawMaterial, { where: { tenantId, id: extra.rawMaterialId } });
-                if (extraRm) {
-                  const extraQty = (Number(extra.quantity) || 1) * item.quantity;
-                  extraRm.stockQuantity += extraQty;
-                  await manager.save(RawMaterial, extraRm);
-                  const mov = manager.create(StockMovement, { tenantId,
-                    rawMaterialId: extraRm.id,
-                    type: MovementType.IN,
-                    quantity: extraQty,
-                    totalCost: extraQty * extraRm.costPerUnit,
-                    description: `Reverso Extra (${extra.name}) por Cancelación: ${order.id}`
-                  });
-                  await manager.save(StockMovement, mov);
+              // Restore added extras
+              if (item.addedExtras && item.addedExtras.length > 0) {
+                for (const extra of item.addedExtras) {
+                  if (!extra.rawMaterialId) continue;
+                  const extraRm = await manager.findOne(RawMaterial, { where: { tenantId, id: extra.rawMaterialId } });
+                  if (extraRm) {
+                    const extraQty = (Number(extra.quantity) || 1) * item.quantity;
+                    extraRm.stockQuantity += extraQty;
+                    await manager.save(RawMaterial, extraRm);
+                    const mov = manager.create(StockMovement, { tenantId,
+                      rawMaterialId: extraRm.id,
+                      type: MovementType.IN,
+                      quantity: extraQty,
+                      totalCost: extraQty * extraRm.costPerUnit,
+                      description: `Reverso Extra (${extra.name}) por Cancelación: ${order.id}`
+                    });
+                    await manager.save(StockMovement, mov);
+                  }
                 }
               }
             }
@@ -843,10 +863,13 @@ export class OrdersService {
               }
             }
           } else if (!product.isCombo || product.isPreAssembled) {
+            const isService = product.is_service === true || product.category === 'Servicios' || Boolean(product.durationMinutes);
+            if (!isService) {
               const currentPhysical = physicalStockMap.get(product.id) || 0;
               if (currentPhysical < item.quantity) {
-              canFulfill = false;
-            } else {
+                canFulfill = false;
+                break;
+              }
               deductions.set(product.id, (deductions.get(product.id) || 0) + item.quantity);
             }
           }
@@ -928,6 +951,7 @@ export class OrdersService {
           for (const cItem of product.comboItems) {
             if(cItem.component) {
               cItem.component.stockQuantity += (quantity * cItem.quantity * multiplier);
+              cItem.component.stock = cItem.component.stockQuantity;
               await manager.save(Product, cItem.component);
             }
           }
@@ -939,9 +963,10 @@ export class OrdersService {
             }
           }
         } else if (!product.isCombo || product.isPreAssembled) {
-          const isService = product.category === 'Servicios' || Boolean(product.durationMinutes);
+          const isService = product.is_service === true || product.category === 'Servicios' || Boolean(product.durationMinutes);
           if (!isService) {
             product.stockQuantity += (quantity * multiplier);
+            product.stock = product.stockQuantity;
             await manager.save(Product, product);
           }
         }
@@ -1188,9 +1213,17 @@ export class OrdersService {
   }
 
   async getDailyCashSummary(tenantId: string, dateStr?: string) {
-    const targetDate = dateStr ? new Date(dateStr) : new Date();
-    const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0, 0);
-    const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+    let startOfDay: Date;
+    let endOfDay: Date;
+    if (dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      startOfDay = new Date(y, m - 1, d, 0, 0, 0, 0);
+      endOfDay = new Date(y, m - 1, d, 23, 59, 59, 999);
+    } else {
+      const now = new Date();
+      startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    }
 
     const orders = await this.dataSource.getRepository(Order).find({
       where: {
@@ -1330,6 +1363,25 @@ export class OrdersService {
         totalCashUSD += usdIn;
       }
 
+      if (o.paymentStatus === PaymentStatus.PARTIAL) {
+        let cashAbonoUSD = 0;
+        if (Array.isArray(o.abonosHistory) && o.abonosHistory.length > 0) {
+          for (const abono of o.abonosHistory) {
+            const m = (abono.method || '').toUpperCase();
+            if (m === 'USD' || m === 'CASH' || m === 'EFECTIVO') {
+              cashAbonoUSD += Number(abono.amount || 0);
+            }
+          }
+        } else if (o.paymentMethod === 'USD' || o.paymentMethod === 'CASH') {
+          cashAbonoUSD = abonos;
+        }
+
+        if (cashAbonoUSD > 0) {
+          totalCashReceivedUSD += cashAbonoUSD;
+          totalCashUSD += cashAbonoUSD;
+        }
+      }
+
       recentOrders.push({
         id: o.id,
         orderNumber: o.id.slice(0, 8).toUpperCase(),
@@ -1355,7 +1407,7 @@ export class OrdersService {
     const expenses = await this.dataSource.getRepository(OperatingExpense).find({
       where: {
         tenantId,
-        paymentMethod: 'CASH',
+        paymentMethod: In(['CASH', 'CASH_USD', 'USD']),
         createdAt: Between(startOfDay, endOfDay),
       },
       order: { createdAt: 'DESC' },

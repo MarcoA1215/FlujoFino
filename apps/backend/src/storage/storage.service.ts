@@ -2,7 +2,7 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ConfigService } from '@nestjs/config';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 const sharp = require('sharp');
 
 @Injectable()
@@ -44,7 +44,7 @@ export class StorageService {
         extension = 'webp';
       }
 
-      const fileName = `${path}/${uuidv4()}.${extension}`;
+      const fileName = `${path}/${randomUUID()}.${extension}`;
       
       const command = new PutObjectCommand({
         Bucket: this.bucket, // Supabase storage bucket name. E.g., 'img_catalogo'
@@ -57,7 +57,11 @@ export class StorageService {
 
       // Return the public URL or relative path based on whether the bucket is public
       // Since it's supabase, standard public url format:
-      return `https://sobczifocynyrcwfhezm.supabase.co/storage/v1/object/public/${this.bucket}/${fileName}`;
+      const endpoint = this.configService.get<string>('S3_ENDPOINT') || '';
+      const supabaseHost = endpoint.includes('storage.supabase.co')
+        ? endpoint.replace('/storage/v1/s3', '')
+        : 'https://sobczifocynyrcwfhezm.supabase.co';
+      return `${supabaseHost}/storage/v1/object/public/${this.bucket}/${fileName}`;
     } catch (error) {
       console.error('Error uploading file to storage:', error);
       throw new InternalServerErrorException('Could not upload file');

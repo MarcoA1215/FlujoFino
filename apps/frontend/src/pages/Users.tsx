@@ -19,6 +19,7 @@ import {
   IonButtons,
   IonMenuButton,
   useIonToast,
+  useIonAlert,
   IonIcon,
   IonSelect,
   IonSelectOption,
@@ -86,7 +87,7 @@ const Users: React.FC = () => {
 
   const [selectedUserForPay, setSelectedUserForPay] = useState<UserData | null>(null);
   const [payAmount, setPayAmount] = useState('');
-  const [payMethod, setPayMethod] = useState('USD');
+  const [payMethod, setPayMethod] = useState('CASH_USD');
   const [payDate, setPayDate] = useState(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]);
   const [deductAdvances, setDeductAdvances] = useState(true);
 
@@ -104,6 +105,7 @@ const Users: React.FC = () => {
   const [accessRequests, setAccessRequests] = useState<any[]>([]);
   
   const [presentToast] = useIonToast();
+  const [presentAlert] = useIonAlert();
   const { user } = useContext(AuthContext);
 
   const fetchAccessRequests = async () => {
@@ -264,7 +266,7 @@ const Users: React.FC = () => {
       setDeductAdvances(false);
       setPayAmount(base > 0 ? String(base) : '');
     }
-    setPayMethod('USD');
+    setPayMethod('CASH_USD');
     setPayDate(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]);
   };
 
@@ -347,14 +349,27 @@ const Users: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await apiClient.delete(`/users/${id}`);
-      presentToast({ message: 'Usuario eliminado', duration: 2000, color: 'success' });
-      fetchUsers();
-    } catch (e) {
-      presentToast({ message: 'Error al eliminar', duration: 3000, color: 'danger' });
-    }
+  const handleDelete = (id: string, username?: string) => {
+    presentAlert({
+      header: 'Confirmar eliminación',
+      message: `¿Estás seguro de que deseas eliminar a "${username || 'este usuario'}" del negocio? Esta acción revocará todos sus accesos.`,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Eliminar',
+          role: 'destructive',
+          handler: async () => {
+            try {
+              await apiClient.delete(`/users/${id}`);
+              presentToast({ message: 'Usuario eliminado exitosamente', duration: 2000, color: 'success' });
+              fetchUsers();
+            } catch (e: any) {
+              presentToast({ message: 'Error al eliminar: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
+            }
+          },
+        },
+      ],
+    });
   };
 
   if (user?.role !== UserRole.ADMIN) {
@@ -473,12 +488,8 @@ const Users: React.FC = () => {
                             <IonSelect value={role} onIonChange={e => setRole(e.detail.value)}>
                               <IonSelectOption value={UserRole.ADMIN}>Administrador</IonSelectOption>
                               <IonSelectOption value={UserRole.POS}>Cajero / Atención (POS)</IonSelectOption>
-                              {settings?.featureRecipes !== false && (
-                                <IonSelectOption value={UserRole.KITCHEN}>Especialista en Servicio / Preparación</IonSelectOption>
-                              )}
-                              {settings?.featureBuySell !== false && (
-                                <IonSelectOption value={UserRole.DELIVERY}>Repartidor / Entregas</IonSelectOption>
-                              )}
+                              <IonSelectOption value={UserRole.KITCHEN}>Especialista en Servicio / Preparación</IonSelectOption>
+                              <IonSelectOption value={UserRole.DELIVERY}>Repartidor / Entregas</IonSelectOption>
                               <IonSelectOption value={UserRole.INVENTORY}>Control de Inventario / Insumos</IonSelectOption>
                             </IonSelect>
                           </IonItem>
@@ -514,7 +525,7 @@ const Users: React.FC = () => {
                           </IonRow>
                           <IonItem>
                             <IonLabel position="stacked">Sueldo Acordado (USD)</IonLabel>
-                            <IonInput type="number" min="0" placeholder="Ej: 50" value={salaryAmount} onIonChange={e => setSalaryAmount(e.detail.value!)} />
+                            <IonInput type="number" min="0" placeholder="Ej: 50" value={salaryAmount} onIonInput={e => setSalaryAmount(e.detail.value!)} />
                           </IonItem>
                           <IonItem>
                             <IonLabel position="stacked">Frecuencia de Pago</IonLabel>
@@ -622,7 +633,7 @@ const Users: React.FC = () => {
                                     💵 Pagar
                                   </IonButton>
                                   {u.username !== 'admin' && !isCurrentUser && (
-                                    <IonButton size="small" color="danger" fill="clear" onClick={() => handleDelete(u.id)}>
+                                    <IonButton size="small" color="danger" fill="clear" onClick={() => handleDelete(u.id, u.username)}>
                                       Eliminar
                                     </IonButton>
                                   )}
@@ -852,10 +863,10 @@ const Users: React.FC = () => {
       {selectedUserForEdit && (
         <IonModal isOpen={!!selectedUserForEdit} onDidDismiss={() => setSelectedUserForEdit(null)}>
           <IonHeader>
-            <IonToolbar color="dark">
-              <IonTitle>Editar: {selectedUserForEdit.username}</IonTitle>
+            <IonToolbar style={{ ['--background' as any]: '#ffffff', borderBottom: '1px solid #E2E8F0', padding: '4px 8px' }}>
+              <IonTitle style={{ color: '#0F172A', fontWeight: 700 }}>Editar: {selectedUserForEdit.username}</IonTitle>
               <IonButtons slot="end">
-                <IonButton onClick={() => setSelectedUserForEdit(null)}>Cerrar</IonButton>
+                <IonButton color="medium" onClick={() => setSelectedUserForEdit(null)}>Cerrar</IonButton>
               </IonButtons>
             </IonToolbar>
           </IonHeader>
@@ -870,12 +881,8 @@ const Users: React.FC = () => {
               <IonSelect value={editRole} onIonChange={e => setEditRole(e.detail.value)}>
                 <IonSelectOption value={UserRole.ADMIN}>Administrador</IonSelectOption>
                 <IonSelectOption value={UserRole.POS}>Cajero / Atención (POS)</IonSelectOption>
-                {settings?.featureRecipes !== false && (
-                  <IonSelectOption value={UserRole.KITCHEN}>Especialista en Servicio / Preparación</IonSelectOption>
-                )}
-                {settings?.featureBuySell !== false && (
-                  <IonSelectOption value={UserRole.DELIVERY}>Repartidor / Entregas</IonSelectOption>
-                )}
+                <IonSelectOption value={UserRole.KITCHEN}>Especialista en Servicio / Preparación</IonSelectOption>
+                <IonSelectOption value={UserRole.DELIVERY}>Repartidor / Entregas</IonSelectOption>
                 <IonSelectOption value={UserRole.INVENTORY}>Control de Inventario / Insumos</IonSelectOption>
               </IonSelect>
             </IonItem>
@@ -919,7 +926,7 @@ const Users: React.FC = () => {
                 min="0" 
                 placeholder="Ej: 50" 
                 value={editSalaryAmount} 
-                onIonChange={e => setEditSalaryAmount(e.detail.value!)} 
+                onIonInput={e => setEditSalaryAmount(e.detail.value!)} 
               />
             </IonItem>
 
@@ -948,10 +955,10 @@ const Users: React.FC = () => {
       {selectedUserForPay && (
         <IonModal isOpen={!!selectedUserForPay} onDidDismiss={() => setSelectedUserForPay(null)}>
           <IonHeader>
-            <IonToolbar>
-              <IonTitle>Registrar Pago a {selectedUserForPay.username}</IonTitle>
+            <IonToolbar style={{ ['--background' as any]: '#ffffff', borderBottom: '1px solid #E2E8F0', padding: '4px 8px' }}>
+              <IonTitle style={{ color: '#0F172A', fontWeight: 700 }}>Registrar Pago a {selectedUserForPay.username}</IonTitle>
               <IonButtons slot="end">
-                <IonButton onClick={() => setSelectedUserForPay(null)}>Cerrar</IonButton>
+                <IonButton color="medium" onClick={() => setSelectedUserForPay(null)}>Cerrar</IonButton>
               </IonButtons>
             </IonToolbar>
           </IonHeader>
@@ -971,7 +978,7 @@ const Users: React.FC = () => {
             )}
             <IonItem>
               <IonLabel position="stacked">Monto a Pagar (USD)</IonLabel>
-              <IonInput type="number" min="0" placeholder="Ej. 20" value={payAmount} onIonChange={e => setPayAmount(e.detail.value!)} />
+              <IonInput type="number" min="0" placeholder="Ej. 20" value={payAmount} onIonInput={e => setPayAmount(e.detail.value!)} />
             </IonItem>
             <IonItem>
               <IonLabel position="stacked">Método de Pago</IonLabel>
@@ -990,7 +997,7 @@ const Users: React.FC = () => {
             )}
             <IonItem>
               <IonLabel position="stacked">Fecha</IonLabel>
-              <IonInput type="date" value={payDate} onIonChange={e => setPayDate(e.detail.value!)} />
+              <IonInput type="date" value={payDate} onIonInput={e => setPayDate(e.detail.value!)} />
             </IonItem>
             
             <IonButton expand="block" color="success" className="ion-margin-top" onClick={handlePaySalary}>
@@ -1012,10 +1019,10 @@ const Users: React.FC = () => {
       {selectedUserAdvancesModal && (
         <IonModal isOpen={!!selectedUserAdvancesModal} onDidDismiss={() => setSelectedUserAdvancesModal(null)}>
           <IonHeader>
-            <IonToolbar color="danger">
-              <IonTitle>Vales Pendientes: {selectedUserAdvancesModal.username}</IonTitle>
+            <IonToolbar style={{ ['--background' as any]: '#ffffff', borderBottom: '1px solid #E2E8F0', padding: '4px 8px' }}>
+              <IonTitle style={{ color: '#0F172A', fontWeight: 700 }}>Vales Pendientes: {selectedUserAdvancesModal.username}</IonTitle>
               <IonButtons slot="end">
-                <IonButton onClick={() => setSelectedUserAdvancesModal(null)}>Cerrar</IonButton>
+                <IonButton color="medium" onClick={() => setSelectedUserAdvancesModal(null)}>Cerrar</IonButton>
               </IonButtons>
             </IonToolbar>
           </IonHeader>
@@ -1083,10 +1090,10 @@ const Users: React.FC = () => {
       {selectedDriverDetails && (
         <IonModal isOpen={!!selectedDriverDetails} onDidDismiss={() => setSelectedDriverDetails(null)}>
           <IonHeader>
-            <IonToolbar color="dark">
-              <IonTitle>Entregas: {selectedDriverDetails.username}</IonTitle>
+            <IonToolbar style={{ ['--background' as any]: '#ffffff', borderBottom: '1px solid #E2E8F0', padding: '4px 8px' }}>
+              <IonTitle style={{ color: '#0F172A', fontWeight: 700 }}>Entregas: {selectedDriverDetails.username}</IonTitle>
               <IonButtons slot="end">
-                <IonButton onClick={() => setSelectedDriverDetails(null)}>Cerrar</IonButton>
+                <IonButton color="medium" onClick={() => setSelectedDriverDetails(null)}>Cerrar</IonButton>
               </IonButtons>
             </IonToolbar>
           </IonHeader>

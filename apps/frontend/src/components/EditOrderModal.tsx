@@ -240,8 +240,6 @@ export const EditOrderModal: React.FC<Props> = ({ order, isOpen, onClose, onSucc
                     className="ion-margin-top"
                     size="large"
                     style={{
-                      backgroundColor: 'var(--theme-primary)',
-                      color: 'var(--theme-primary-contrast)',
                       '--background': 'var(--theme-primary)',
                       '--color': 'var(--theme-primary-contrast)',
                       fontWeight: '800'

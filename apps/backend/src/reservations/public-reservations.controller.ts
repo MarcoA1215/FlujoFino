@@ -149,13 +149,25 @@ export class PublicReservationsController {
     const totalAmount = Number(dto.totalAmount || 0);
     const minDepositPct = Number(settings?.minDepositPercentage || 0);
 
-    // Validate payment reference
-    if (dto.paymentMethod && dto.paymentMethod !== 'CASH') {
+    // Validate payment reference and minimum deposit
+    if (minDepositPct > 0 && totalAmount > 0) {
+      if (dto.paymentMethod === 'CASH') {
+        throw new BadRequestException(`Este negocio requiere un abono mínimo del ${minDepositPct}% para agendar citas. Debes abonar mediante un método electrónico.`);
+      }
+      if (!dto.paymentReference || !dto.paymentReference.trim()) {
+        throw new BadRequestException(`Este negocio requiere un abono mínimo del ${minDepositPct}% para reservar. Por favor ingresa el comprobante de pago.`);
+      }
+      const requiredMin = Number(((totalAmount * minDepositPct) / 100).toFixed(2));
+      const payAmount = Number(dto.paymentAmount || 0);
+      if (payAmount < requiredMin) {
+        throw new BadRequestException(
+          `El monto abonado ($${payAmount.toFixed(2)}) es inferior al abono mínimo requerido del ${minDepositPct}% ($${requiredMin.toFixed(2)}).`
+        );
+      }
+    } else if (dto.paymentMethod && dto.paymentMethod !== 'CASH') {
       if (!dto.paymentReference || !dto.paymentReference.trim()) {
         throw new BadRequestException('Por favor ingresa el número de referencia del comprobante de pago.');
       }
-    } else if (minDepositPct > 0 && totalAmount > 0 && (!dto.paymentReference || !dto.paymentReference.trim())) {
-      throw new BadRequestException(`Este negocio requiere un abono mínimo del ${minDepositPct}% para reservar. Por favor ingresa el comprobante de pago.`);
     }
 
     // Synchronize customer profile

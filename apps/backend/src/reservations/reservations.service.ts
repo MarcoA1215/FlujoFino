@@ -80,14 +80,24 @@ export class ReservationsService {
     const productNameMap = new Map(products.map(p => [p.name.trim().toLowerCase(), p]));
 
     // Determine requested reservation duration
-    let reqDuration = interval;
-    let currentProd = serviceId ? productMap.get(serviceId) : null;
-    if (!currentProd && serviceName) {
-      currentProd = productNameMap.get(serviceName.trim().toLowerCase());
+    let reqDuration = 0;
+    if (serviceId) {
+      const sIds = serviceId.split(',').map(s => s.trim()).filter(Boolean);
+      for (const sId of sIds) {
+        const sp = productMap.get(sId);
+        if (sp && sp.durationMinutes) reqDuration += Number(sp.durationMinutes);
+        else reqDuration += interval;
+      }
     }
-    if (currentProd && currentProd.durationMinutes) {
-      reqDuration = Number(currentProd.durationMinutes);
+    if (reqDuration === 0 && serviceName) {
+      const names = serviceName.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      for (const nm of names) {
+        const sp = productNameMap.get(nm);
+        if (sp && sp.durationMinutes) reqDuration += Number(sp.durationMinutes);
+        else reqDuration += interval;
+      }
     }
+    if (reqDuration <= 0) reqDuration = interval;
 
     const [th, tm] = time.split(':').map(Number);
     const reqStart = th * 60 + tm;
@@ -96,14 +106,24 @@ export class ReservationsService {
     for (const res of existing) {
       const [rh, rm] = res.time.split(':').map(Number);
       const exStart = rh * 60 + rm;
-      let exDuration = interval;
-      let sp = res.serviceId ? productMap.get(res.serviceId) : null;
-      if (!sp && res.serviceName) {
-        sp = productNameMap.get(res.serviceName.trim().toLowerCase());
+      let exDuration = 0;
+      if (res.serviceId) {
+        const sIds = res.serviceId.split(',').map(s => s.trim()).filter(Boolean);
+        for (const sId of sIds) {
+          const sp = productMap.get(sId);
+          if (sp && sp.durationMinutes) exDuration += Number(sp.durationMinutes);
+          else exDuration += interval;
+        }
       }
-      if (sp && sp.durationMinutes) {
-        exDuration = Number(sp.durationMinutes);
+      if (exDuration === 0 && res.serviceName) {
+        const names = res.serviceName.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        for (const nm of names) {
+          const sp = productNameMap.get(nm);
+          if (sp && sp.durationMinutes) exDuration += Number(sp.durationMinutes);
+          else exDuration += interval;
+        }
       }
+      if (exDuration <= 0) exDuration = interval;
       const exEnd = exStart + exDuration;
 
       // Overlap: reqStart < exEnd && reqEnd > exStart
@@ -274,17 +294,35 @@ export class ReservationsService {
         .orderBy('res.time', 'ASC')
         .getMany();
 
+      const productRepo = manager.getRepository('Product');
+      const products: any[] = await productRepo.find({ where: { tenantId } });
+      const productMap = new Map(products.map(p => [p.id, p]));
+      const productNameMap = new Map(products.map(p => [p.name.trim().toLowerCase(), p]));
+
       const affected: any[] = [];
 
       for (const res of reservations) {
         const startMins = this.timeToMinutes(res.time);
         const newStartMins = startMins + minutes;
         
-        let duration = interval;
-        if (res.serviceId && settings?.services) {
-           const svc = settings.services.find((s: any) => s.id === res.serviceId);
-           if (svc && svc.durationMinutes) duration = svc.durationMinutes;
+        let duration = 0;
+        if (res.serviceId) {
+          const sIds = res.serviceId.split(',').map(s => s.trim()).filter(Boolean);
+          for (const sId of sIds) {
+            const sp = productMap.get(sId);
+            if (sp && sp.durationMinutes) duration += Number(sp.durationMinutes);
+            else duration += interval;
+          }
         }
+        if (duration === 0 && res.serviceName) {
+          const names = res.serviceName.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+          for (const nm of names) {
+            const sp = productNameMap.get(nm);
+            if (sp && sp.durationMinutes) duration += Number(sp.durationMinutes);
+            else duration += interval;
+          }
+        }
+        if (duration <= 0) duration = interval;
 
         const newEndMins = newStartMins + duration;
 
@@ -341,7 +379,7 @@ export class ReservationsService {
       title: 'Aviso de Retraso de Reserva',
       body: message,
       data: {
-        url: `/booking`,
+        url: `/appointment/${id}`,
         reservationId: id,
       },
     };

@@ -47,9 +47,20 @@ const BottomNav: React.FC = () => {
     }
   }, [isAuthenticated, user?.tenantId]);
 
+  useEffect(() => {
+    if ((user?.role === UserRole.POS || (user?.role as string) === 'POS') && location.pathname === '/dashboard') {
+      navigate('/pos', { replace: true });
+    }
+  }, [user?.role, location.pathname, navigate]);
+
   if (!isAuthenticated || !user?.tenantId) return null;
 
-  // Don't show on public views or platform-admin
+  // SuperAdmin never sees BottomNav
+  if (user.role === UserRole.SUPERADMIN || (user.role as string) === 'SUPERADMIN') {
+    return null;
+  }
+
+  // Don't show on public views, platform-admin or feedback
   const isPublicRoute =
     location.pathname.startsWith('/book') ||
     location.pathname.startsWith('/store') ||
@@ -59,19 +70,34 @@ const BottomNav: React.FC = () => {
     location.pathname === '/register' ||
     location.pathname === '/select-workspace' ||
     location.pathname === '/subscription-expired' ||
-    location.pathname === '/platform-admin';
+    location.pathname === '/platform-admin' ||
+    location.pathname.startsWith('/platform-admin') ||
+    location.pathname === '/feedback' ||
+    location.pathname.startsWith('/feedback');
 
   if (isPublicRoute) return null;
 
-  // Role check: kitchen or delivery might have restricted views
-  if (user.role === UserRole.KITCHEN || user.role === UserRole.DELIVERY) {
+  // Role check: kitchen, delivery or inventory have restricted views
+  if (
+    user.role === UserRole.KITCHEN ||
+    user.role === UserRole.DELIVERY ||
+    user.role === UserRole.INVENTORY ||
+    (user.role as string) === 'INVENTORY'
+  ) {
     return null;
   }
 
   const isReservationsEnabled = settings.enableReservations !== undefined ? Boolean(settings.enableReservations) : Boolean(settings.featureCustomerSchedules);
 
   const navItems: BottomNavItem[] = [
-    { id: 'home', title: 'Inicio', path: '/dashboard', outlineIcon: homeOutline, activeIcon: home, isVisible: true },
+    {
+      id: 'home',
+      title: 'Inicio',
+      path: '/dashboard',
+      outlineIcon: homeOutline,
+      activeIcon: home,
+      isVisible: user.role !== UserRole.POS && (user.role as string) !== 'POS'
+    },
     { id: 'agenda', title: 'Agenda', path: '/reservations', outlineIcon: calendarOutline, activeIcon: calendar, isVisible: isReservationsEnabled },
     { id: 'orders', title: 'Pedidos', path: '/orders', outlineIcon: cartOutline, activeIcon: cart, isVisible: !isReservationsEnabled },
     { id: 'customers', title: 'Clientes', path: '/customers', outlineIcon: peopleOutline, activeIcon: people, isVisible: true },

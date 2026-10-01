@@ -57,13 +57,16 @@ export class SalaryAdvancesService {
       const savedAdvance = await manager.save(advance);
 
       // 2. Registrar egreso en caja activa (OperatingExpense)
+      const todayStr = new Date().toISOString().split('T')[0];
+      const expenseCreatedAt = advanceDate === todayStr ? new Date() : new Date(advanceDate);
+
       const expense = manager.create(OperatingExpense, {
         tenantId,
         description: `Vale Empleado: ${dto.reason || 'Anticipo'} - ${user.username} ($${amountUSD.toFixed(2)} / Bs. ${amountBS.toFixed(2)})`,
         amount: amountUSD,
         paymentMethod: 'CASH',
         category: 'VALE_EMPLEADO',
-        createdAt: new Date(advanceDate),
+        createdAt: expenseCreatedAt,
       });
       await manager.save(expense);
 

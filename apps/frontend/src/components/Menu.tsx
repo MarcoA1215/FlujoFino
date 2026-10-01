@@ -134,7 +134,9 @@ const Menu: React.FC = () => {
 
   const isProductionEnabled = settings.enableProduction !== undefined ? Boolean(settings.enableProduction) : (settings.featureProduction !== false);
   const isReservationsEnabled = settings.enableReservations !== undefined ? Boolean(settings.enableReservations) : Boolean(settings.featureCustomerSchedules);
-  const isDeliveryEnabled = settings.enableDelivery !== undefined ? Boolean(settings.enableDelivery) : Boolean(settings.featureBuySell);
+  const isDeliveryEnabled = settings.enableDelivery !== undefined 
+    ? Boolean(settings.enableDelivery) 
+    : Boolean(settings.featureBuySell || settings.featureProduction || isProductionEnabled || user?.role === UserRole.DELIVERY);
   const isRecipesEnabled = settings.enableFormulas !== undefined ? Boolean(settings.enableFormulas) : Boolean(settings.featureRecipes);
 
   const navItems: NavItem[] = [
@@ -145,10 +147,10 @@ const Menu: React.FC = () => {
     { id: 'calculator', label: 'Calculadora de Costos', path: '/calculator', icon: calculatorOutline, isVisible: isRecipesEnabled },
     { id: 'pos', label: 'Caja', path: '/pos', icon: cashOutline, isVisible: true },
     { id: 'orders', label: 'Pedidos / Tickets', path: '/orders', icon: cartOutline, isVisible: true },
-    { id: 'delivery-panel', label: 'Panel Repartidor', path: '/delivery-panel', icon: mapOutline, isVisible: isDeliveryEnabled },
+    { id: 'delivery-panel', label: 'Panel Repartidor', path: '/delivery-panel', icon: mapOutline, isVisible: isDeliveryEnabled || user?.role === UserRole.DELIVERY },
     { id: 'reservations', label: 'Reservaciones', path: '/reservations', icon: calendarOutline, isVisible: isReservationsEnabled },
     { id: 'customers', label: 'Clientes', path: '/customers', icon: personCircleOutline, isVisible: true },
-    { id: 'delivery-zones', label: 'Zonas Delivery', path: '/delivery-zones', icon: mapOutline, isVisible: isDeliveryEnabled },
+    { id: 'delivery-zones', label: 'Zonas Delivery', path: '/delivery-zones', icon: mapOutline, isVisible: isDeliveryEnabled && (user?.role === UserRole.ADMIN || (user?.role as string) === 'ADMIN') },
     { id: 'users', label: 'Usuarios', path: '/users', icon: peopleOutline, isVisible: user?.role === UserRole.ADMIN },
     { id: 'feedback', label: 'Ayuda y Comentarios', path: '/feedback', icon: chatbubbleOutline, isVisible: true },
     { id: 'settings', label: 'Configuración', path: '/settings', icon: settingsOutline, isVisible: user?.role === UserRole.ADMIN }

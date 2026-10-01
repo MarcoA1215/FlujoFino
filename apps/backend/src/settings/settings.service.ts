@@ -145,14 +145,17 @@ export class SettingsService implements OnModuleInit {
   }
 
   async updateExchangeRate(rate: number, tenantId?: string) {
-    await this.settingsRepo.update({ id: 'GLOBAL' }, { exchangeRateBs: rate });
     if (tenantId) {
-      const tenantSettings = await this.settingsRepo.findOne({ where: { tenantId } });
-      if (tenantSettings) {
+      let tenantSettings = await this.settingsRepo.findOne({ where: { tenantId } });
+      if (!tenantSettings) {
+        const { randomUUID } = require('crypto');
+        tenantSettings = this.settingsRepo.create({ id: randomUUID(), tenantId, exchangeRateBs: rate });
+      } else {
         tenantSettings.exchangeRateBs = rate;
-        await this.settingsRepo.save(tenantSettings);
       }
+      await this.settingsRepo.save(tenantSettings);
     } else {
+      await this.settingsRepo.update({ id: 'GLOBAL' }, { exchangeRateBs: rate });
       await this.settingsRepo.createQueryBuilder()
         .update(Settings)
         .set({ exchangeRateBs: rate })

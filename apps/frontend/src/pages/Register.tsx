@@ -51,7 +51,7 @@ const Register: React.FC = () => {
         featureBuySell
       });
       // Auto login
-      login(res.data.access_token, res.data.user);
+      login(res.data.access_token, res.data.user, res.data.workspaces);
       presentToast({ message: '¡Negocio registrado con éxito!', duration: 3000, color: 'success' });
       router.push('/dashboard', 'root', 'replace');
     } catch (e: any) {
