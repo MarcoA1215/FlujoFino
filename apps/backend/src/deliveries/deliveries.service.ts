@@ -20,9 +20,18 @@ export class DeliveriesService {
     private readonly settingsRepo: Repository<Settings>,
   ) {}
 
-  async getMyHistory(tenantId: string, deliveryUserId: string) {
+  private async getEffectiveExchangeRate(tenantId: string): Promise<number> {
     const settings = await this.settingsRepo.findOne({ where: { tenantId } });
-    const exchangeRate = Number(settings?.exchangeRateBs || 40.0);
+    let rate = settings?.exchangeRateBs ? Number(settings.exchangeRateBs) : 0;
+    if (!rate || rate <= 0) {
+      const globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+      rate = globalSettings?.exchangeRateBs ? Number(globalSettings.exchangeRateBs) : 0;
+    }
+    return rate > 0 ? rate : 40.0;
+  }
+
+  async getMyHistory(tenantId: string, deliveryUserId: string) {
+    const exchangeRate = await this.getEffectiveExchangeRate(tenantId);
 
     const orders = await this.orderRepo.find({
       where: {
@@ -72,8 +81,7 @@ export class DeliveriesService {
   }
 
   async getAdminSummary(tenantId: string) {
-    const settings = await this.settingsRepo.findOne({ where: { tenantId } });
-    const exchangeRate = Number(settings?.exchangeRateBs || 40.0);
+    const exchangeRate = await this.getEffectiveExchangeRate(tenantId);
 
     // Obtener todos los usuarios con rol DELIVERY en el tenant
     const deliveryAccesses = await this.accessRepo.find({

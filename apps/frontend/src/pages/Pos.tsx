@@ -112,7 +112,7 @@ const Pos: React.FC = () => {
         return Number(saved);
       }
     } catch (e) {}
-    return 40.0;
+    return 0;
   });
   const [allowPartialPayments, setAllowPartialPayments] = useState<boolean>(false);
   const [settings, setSettings] = useState<any>(() => {

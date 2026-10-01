@@ -22,7 +22,15 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const { user, isAuthenticated } = useContext(AuthContext);
   const [subscription, setSubscription] = useState<MySubscriptionDTO | null>(null);
   const [platformConfig, setPlatformConfig] = useState<PlatformConfigDTO | null>(null);
-  const [exchangeRate, setExchangeRate] = useState<number>(36.5);
+  const [exchangeRate, setExchangeRate] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('flujofino_exchange_rate');
+      if (saved && !isNaN(Number(saved)) && Number(saved) > 0) {
+        return Number(saved);
+      }
+    } catch (e) {}
+    return 0;
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
 

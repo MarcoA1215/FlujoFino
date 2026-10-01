@@ -916,6 +916,14 @@ const Users: React.FC = () => {
                 <IonSelectOption value="PAGO_MOVIL">Pago Móvil</IonSelectOption>
               </IonSelect>
             </IonItem>
+            {payMethod === 'PAGO_MOVIL' && (
+              <div style={{ marginTop: '10px', padding: '10px 14px', background: '#EFF6FF', borderRadius: '8px', border: '1px solid #BFDBFE', color: '#1E40AF', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Transferir en Bolívares:</span>
+                <IonBadge color="primary" style={{ fontSize: '13px', padding: '6px 10px' }}>
+                  Bs. {(Number(payAmount || 0) * (Number(settings?.exchangeRateBs) || 1)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                </IonBadge>
+              </div>
+            )}
             <IonItem>
               <IonLabel position="stacked">Fecha</IonLabel>
               <IonInput type="date" value={payDate} onIonChange={e => setPayDate(e.detail.value!)} />
@@ -933,6 +941,7 @@ const Users: React.FC = () => {
         isOpen={showAdvanceModal}
         onClose={() => setShowAdvanceModal(false)}
         onSuccess={() => fetchPendingAdvances()}
+        defaultExchangeRate={Number(settings?.exchangeRateBs) || undefined}
       />
 
       {/* Modal Detalle de Vales Pendientes del Empleado */}

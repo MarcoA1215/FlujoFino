@@ -73,7 +73,7 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
           {m.allowAsExtra && (
             <div style={{ marginBottom: '8px' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#ECFDF5', color: '#065F46', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, border: '1px solid #A7F3D0' }}>
-                ✨ Extra en POS: +${extraPriceCalculated} USD
+                ✨ Extra en Caja: +${extraPriceCalculated} USD
               </span>
             </div>
           )}

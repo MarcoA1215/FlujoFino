@@ -35,7 +35,18 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
   const [amountBS, setAmountBS] = useState<string>('');
   const [reason, setReason] = useState<string>('');
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [exchangeRate, setExchangeRate] = useState<number>(defaultExchangeRate || 40.0);
+  const [exchangeRate, setExchangeRate] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('flujofino_exchange_rate');
+      if (saved && !isNaN(Number(saved)) && Number(saved) > 0) {
+        return Number(saved);
+      }
+    } catch (e) {}
+    if (defaultExchangeRate && defaultExchangeRate > 0) {
+      return defaultExchangeRate;
+    }
+    return 0;
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [presentToast] = useIonToast();
@@ -49,6 +60,23 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      apiClient
+        .get('/settings/exchange-rate')
+        .then((res) => {
+          const fetchedRate = Number(res.data?.exchangeRateBs || res.data?.rate || res.data);
+          if (!isNaN(fetchedRate) && fetchedRate > 0) {
+            setExchangeRate(fetchedRate);
+            setAmountUSD((currentUSD) => {
+              const num = parseFloat(currentUSD);
+              if (!isNaN(num) && num > 0) {
+                setAmountBS((num * fetchedRate).toFixed(2));
+              }
+              return currentUSD;
+            });
+          }
+        })
+        .catch(() => {});
+
       if (!propEmployees || propEmployees.length === 0) {
         apiClient
           .get('/users/employees')
@@ -245,7 +273,7 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
           </div>
 
           <div style={{ fontSize: '11px', color: '#64748B', marginTop: '-6px' }}>
-            Tasa de cambio activa: <b>Bs. {exchangeRate.toFixed(2)} / USD</b>
+            Tasa de cambio activa: <b>Bs. {exchangeRate > 0 ? exchangeRate.toFixed(2) : '0.00'} / USD</b>
           </div>
 
           <div>

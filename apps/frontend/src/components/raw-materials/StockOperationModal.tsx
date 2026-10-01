@@ -15,7 +15,7 @@ interface Props {
   onSuccess: () => void;
 }
 
-export const StockOperationModal: React.FC<Props> = ({ material, operationType, onClose, onSuccess, exchangeRate = 36.5 }) => {
+export const StockOperationModal: React.FC<Props> = ({ material, operationType, onClose, onSuccess, exchangeRate }) => {
   const [presentToast] = useIonToast();
   const [quantity, setQuantity] = useState<number | undefined>();
   const [unit, setUnit] = useState<string>('base');
@@ -48,8 +48,22 @@ export const StockOperationModal: React.FC<Props> = ({ material, operationType, 
           presentToast({ message: 'Ingresa el costo', duration: 2000, color: 'warning' });
           return;
         }
+
+        let effectiveRate = exchangeRate && exchangeRate > 0 ? exchangeRate : 0;
+        if (!effectiveRate || effectiveRate <= 0) {
+          try {
+            const saved = localStorage.getItem('flujofino_exchange_rate');
+            if (saved && !isNaN(Number(saved)) && Number(saved) > 0) {
+              effectiveRate = Number(saved);
+            }
+          } catch (e) {}
+        }
+        if (!effectiveRate || effectiveRate <= 0) {
+          effectiveRate = 1;
+        }
+
         const costUSD: number = currency === 'VES'
-          ? Number(cost) / (exchangeRate && exchangeRate > 0 ? exchangeRate : 1)
+          ? Number(cost) / effectiveRate
           : Number(cost);
         await apiClient.post(`/raw-materials/${material.id}/restock`, {
           quantity: finalQuantity,

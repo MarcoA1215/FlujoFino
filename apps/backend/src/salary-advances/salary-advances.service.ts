@@ -30,7 +30,12 @@ export class SalaryAdvancesService {
     let rate = dto.exchangeRate;
     if (!rate || rate <= 0) {
       const settings = await this.settingsRepo.findOne({ where: { tenantId } });
-      rate = Number(settings?.exchangeRateBs || 40.0);
+      let effectiveRate = settings?.exchangeRateBs ? Number(settings.exchangeRateBs) : 0;
+      if (!effectiveRate || effectiveRate <= 0) {
+        const globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+        effectiveRate = globalSettings?.exchangeRateBs ? Number(globalSettings.exchangeRateBs) : 0;
+      }
+      rate = effectiveRate > 0 ? effectiveRate : 40.0;
     }
 
     const amountUSD = Number(dto.amountUSD);
