@@ -57,8 +57,18 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
   const [amountUSD, setAmountUSD] = useState('');
   const [amountBS, setAmountBS] = useState('');
   const [description, setDescription] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [exchangeRate, setExchangeRate] = useState<number>(defaultExchangeRate || 40.0);
+  const [exchangeRate, setExchangeRate] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('flujofino_exchange_rate');
+      if (saved && !isNaN(Number(saved)) && Number(saved) > 0) {
+        return Number(saved);
+      }
+    } catch (e) {}
+    if (defaultExchangeRate && defaultExchangeRate > 0) {
+      return defaultExchangeRate;
+    }
+    return 0;
+  });
 
   const [presentToast] = useIonToast();
 

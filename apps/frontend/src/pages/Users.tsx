@@ -26,6 +26,7 @@ import {
   IonModal,
   IonSegment,
   IonSegmentButton,
+  IonToggle,
 } from '@ionic/react';
 import { refreshOutline, walletOutline, carOutline, peopleOutline, timeOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
@@ -87,6 +88,7 @@ const Users: React.FC = () => {
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('USD');
   const [payDate, setPayDate] = useState(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]);
+  const [deductAdvances, setDeductAdvances] = useState(true);
 
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserData | null>(null);
   const [editRole, setEditRole] = useState<UserRole>(UserRole.POS);
@@ -250,6 +252,44 @@ const Users: React.FC = () => {
     }
   };
 
+  const handleOpenPayModal = (u: UserData) => {
+    setSelectedUserForPay(u);
+    const adv = advancesTotalsByUser[u.id];
+    const advTotal = Number(adv?.totalUSD || 0);
+    const base = Number(u.salaryAmount) || 0;
+    if (advTotal > 0) {
+      setDeductAdvances(true);
+      setPayAmount(base > 0 ? String(Math.max(0, Number((base - advTotal).toFixed(2)))) : '');
+    } else {
+      setDeductAdvances(false);
+      setPayAmount(base > 0 ? String(base) : '');
+    }
+    setPayMethod('USD');
+    setPayDate(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]);
+  };
+
+  const handleToggleDeductAdvances = (checked: boolean) => {
+    setDeductAdvances(checked);
+    if (!selectedUserForPay) return;
+    const adv = advancesTotalsByUser[selectedUserForPay.id];
+    const advTotal = Number(adv?.totalUSD || 0);
+    const base = Number(selectedUserForPay.salaryAmount) || 0;
+    if (base > 0) {
+      if (checked) {
+        setPayAmount(String(Math.max(0, Number((base - advTotal).toFixed(2)))));
+      } else {
+        setPayAmount(String(base));
+      }
+    } else {
+      const current = Number(payAmount) || 0;
+      if (checked) {
+        setPayAmount(String(Math.max(0, Number((current - advTotal).toFixed(2)))));
+      } else {
+        setPayAmount(String(Number((current + advTotal).toFixed(2))));
+      }
+    }
+  };
+
   const handlePaySalary = async () => {
     if (!selectedUserForPay || !payAmount) return;
     try {
@@ -259,6 +299,17 @@ const Users: React.FC = () => {
         method: payMethod,
         date: payDate
       });
+
+      if (deductAdvances) {
+        const userAdvances = pendingAdvances.filter(a => a.userId === selectedUserForPay.id);
+        if (userAdvances.length > 0) {
+          await Promise.allSettled(
+            userAdvances.map(a => apiClient.patch(`/salary-advances/${a.id}/deduct`))
+          );
+          await fetchPendingAdvances();
+        }
+      }
+
       presentToast({ message: 'Pago registrado como gasto de nómina', duration: 3000, color: 'success' });
       setSelectedUserForPay(null);
       setPayAmount('');
@@ -567,7 +618,7 @@ const Users: React.FC = () => {
                                   <IonButton size="small" color="primary" fill="clear" onClick={() => handleOpenEdit(u)}>
                                     ✏️ Editar
                                   </IonButton>
-                                  <IonButton size="small" color="success" fill="clear" onClick={() => setSelectedUserForPay(u)}>
+                                  <IonButton size="small" color="success" fill="clear" onClick={() => handleOpenPayModal(u)}>
                                     💵 Pagar
                                   </IonButton>
                                   {u.username !== 'admin' && !isCurrentUser && (
@@ -905,6 +956,19 @@ const Users: React.FC = () => {
             </IonToolbar>
           </IonHeader>
           <IonContent className="ion-padding">
+            {advancesTotalsByUser[selectedUserForPay.id]?.totalUSD > 0 && (
+              <IonItem lines="none" style={{ marginTop: '4px', marginBottom: '12px', background: '#FEF2F2', borderRadius: '12px', border: '1px solid #FECACA' }}>
+                <IonLabel color="danger" style={{ fontSize: '13px', fontWeight: 700 }}>
+                  Descontar vales pendientes (-${Number(advancesTotalsByUser[selectedUserForPay.id].totalUSD).toFixed(2)} USD)
+                </IonLabel>
+                <IonToggle
+                  slot="end"
+                  color="danger"
+                  checked={deductAdvances}
+                  onIonChange={e => handleToggleDeductAdvances(e.detail.checked)}
+                />
+              </IonItem>
+            )}
             <IonItem>
               <IonLabel position="stacked">Monto a Pagar (USD)</IonLabel>
               <IonInput type="number" min="0" placeholder="Ej. 20" value={payAmount} onIonChange={e => setPayAmount(e.detail.value!)} />

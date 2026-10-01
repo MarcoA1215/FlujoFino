@@ -118,6 +118,29 @@ const Dashboard: React.FC = () => {
               <IonIcon icon={peopleOutline} style={{ fontSize: '18px', color: '#3B82F6' }} />
               Clientes
             </button>
+
+            <button
+              type="button"
+              onClick={() => setShowInvestmentModal(true)}
+              style={{
+                background: '#ffffff',
+                border: '1px solid #E2E8F0',
+                color: '#0F172A',
+                borderRadius: '14px',
+                padding: '12px 14px',
+                fontSize: '13px',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                boxShadow: 'var(--ff-shadow-sm)'
+              }}
+            >
+              <IonIcon icon={trendingUpOutline} style={{ fontSize: '18px', color: '#8B5CF6' }} />
+              Inversión / Aporte de Capital
+            </button>
           </div>
 
           {!summary ? (
