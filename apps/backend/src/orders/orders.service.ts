@@ -11,6 +11,7 @@ import { DeliveryZone } from '../entities/delivery-zone.entity';
 import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Settings } from '../entities/settings.entity';
+import { OperatingExpense } from '../entities/operating-expense.entity';
 
 export class CreateOrderDto {
   @IsString()
@@ -1326,13 +1327,7 @@ export class OrdersService {
       } else if (o.paymentStatus === PaymentStatus.PAID) {
         const usdIn = Number(o.usdReceived) || orderTotal;
         totalCashReceivedUSD += usdIn;
-        if (o.changeMethod === 'PAGO_MOVIL' || o.changeMethod === 'CASH_BS') {
-          // Cash drawer kept the full usdReceived!
-          totalCashUSD += usdIn;
-        } else {
-          // Cash drawer gave change in USD cash, so net cash added is orderTotal
-          totalCashUSD += (usdIn - changeAmt);
-        }
+        totalCashUSD += usdIn;
       }
 
       recentOrders.push({
@@ -1357,6 +1352,30 @@ export class OrdersService {
       });
     }
 
+    const expenses = await this.dataSource.getRepository(OperatingExpense).find({
+      where: {
+        tenantId,
+        paymentMethod: 'CASH',
+        createdAt: Between(startOfDay, endOfDay),
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    let totalCashExpensesUSD = 0;
+    const cashExpensesList = expenses.map(e => {
+      const amt = Number(e.amount || 0);
+      totalCashExpensesUSD += amt;
+      return {
+        id: e.id,
+        description: e.description,
+        amount: Number(amt.toFixed(2)),
+        category: e.category,
+        createdAt: e.createdAt,
+      };
+    });
+
+    const netCashUSD = Number((totalCashUSD - totalCashChangeUSD - totalCashExpensesUSD).toFixed(2));
+
     return {
       date: startOfDay.toISOString().split('T')[0],
       exchangeRate,
@@ -1370,8 +1389,12 @@ export class OrdersService {
       totalCashUSD: Number(totalCashUSD.toFixed(2)),
       totalCashReceivedUSD: Number(totalCashReceivedUSD.toFixed(2)),
       totalCashChangeUSD: Number(totalCashChangeUSD.toFixed(2)),
+      totalCashExpensesUSD: Number(totalCashExpensesUSD.toFixed(2)),
+      netCashUSD,
+      cashExpensesList,
       totalPagoMovilChangeBs: Number(totalPagoMovilChangeBs.toFixed(2)),
       ordersCount: orders.filter(o => o.status !== OrderStatus.CANCELED).length,
+      cashOrdersCount: orders.filter(o => o.paymentStatus === PaymentStatus.PAID && o.paymentMethod !== 'PAGO_MOVIL' && o.paymentMethod !== 'PUNTO' && !o.pagoMovilBank?.toLowerCase().includes('punto') && !(o.paymentMethod !== 'USD' && o.pagoMovilRef)).length,
       paidOrdersCount: orders.filter(o => o.paymentStatus === PaymentStatus.PAID && o.status !== OrderStatus.CANCELED).length,
       pendingOrdersCount: orders.filter(o => o.paymentStatus !== PaymentStatus.PAID && o.status !== OrderStatus.CANCELED).length,
       cancelledOrdersCount: orders.filter(o => o.status === OrderStatus.CANCELED).length,

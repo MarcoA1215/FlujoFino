@@ -45,11 +45,17 @@ export const DailyCashCloseModal: React.FC<DailyCashCloseModalProps> = ({ isOpen
 
   const copyCashReportToWhatsApp = () => {
     if (!cashSummary) return;
+    const netCash = Number(cashSummary.netCashUSD !== undefined ? cashSummary.netCashUSD : ((cashSummary.totalCashUSD || 0) - (cashSummary.totalCashChangeUSD || 0) - (cashSummary.totalCashExpensesUSD || 0)));
     const text = `📊 *CIERRE DE CAJA / ARQUEO DIARIO*
 📅 Fecha: ${cashSummary.date}
 💱 Tasa BCV: Bs. ${Number(cashSummary.exchangeRate || 0).toFixed(2)}
 
-💵 *TOTAL EFECTIVO USD:* $${Number(cashSummary.totalCashUSD || 0).toFixed(2)}
+💵 *ARQUEO EFECTIVO USD (GAVETA FÍSICA):*
+• Efectivo Cobrado Ventas: $${Number(cashSummary.totalCashUSD || 0).toFixed(2)}
+• (-) Vueltos entregados: -$${Number(cashSummary.totalCashChangeUSD || 0).toFixed(2)}
+• (-) Egresos / Vales de caja: -$${Number(cashSummary.totalCashExpensesUSD || 0).toFixed(2)}
+👉 *= EFECTIVO NETO EN GAVETA:* $${netCash.toFixed(2)}
+
 💳 *PUNTO DE VENTA (Bs.):* Bs. ${Number(cashSummary.totalPuntoBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (equiv. $${Number(cashSummary.totalPuntoUSD || 0).toFixed(2)})
 📱 *PAGO MÓVIL (Bs.):* Bs. ${Number(cashSummary.totalPagoMovilBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (equiv. $${Number(cashSummary.totalPagoMovilUSD || 0).toFixed(2)})
 💰 *TOTAL INGRESOS COBRADOS:* $${Number(cashSummary.totalPaidUSD || 0).toFixed(2)}
@@ -61,6 +67,7 @@ export const DailyCashCloseModal: React.FC<DailyCashCloseModalProps> = ({ isOpen
 - 🏪 En Tienda: ${cashSummary.inStoreOrdersCount}
 - 🛵 Delivery: ${cashSummary.deliveryOrdersCount}
 - 🛒 Tienda Web: ${cashSummary.webOrdersCount}
+${cashSummary.cashExpensesList?.length > 0 ? `\n💸 *EGRESOS / VALES DE CAJA (${cashSummary.cashExpensesList.length}):*\n` + cashSummary.cashExpensesList.map((e: any) => `• ${e.description}: -$${Number(e.amount).toFixed(2)}`).join('\n') : ''}
 ${cashSummary.puntoList?.length > 0 ? `\n💳 *VENTAS POR PUNTO DE VENTA (${cashSummary.puntoList.length}):*\n` + cashSummary.puntoList.map((p: any) => `• Ref: ${p.ref || 'S/R'} | Bs. ${Number(p.amountBs).toFixed(2)} | ${p.bank || 'Punto'} | ${p.customerName || 'Cliente'}`).join('\n') : ''}
 ${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS (${cashSummary.pagoMovilList.length}):*\n` + cashSummary.pagoMovilList.map((p: any) => `• Ref: ${p.ref || 'S/R'} | Bs. ${Number(p.amountBs).toFixed(2)} | ${p.customerName || 'Cliente'}`).join('\n') : ''}
 ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSummary.vueltosList.length}):*\n` + cashSummary.vueltosList.map((v: any) => `• #${v.orderNumber} - ${v.customerName}: $${Number(v.amountUsd).toFixed(2)} (${v.method === 'PAGO_MOVIL' ? `Pago Móvil Ref: ${v.ref}` : v.method === 'CASH_BS' ? 'Efectivo Bs' : 'Efectivo USD'})`).join('\n') : ''}
@@ -117,13 +124,33 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', marginBottom: '14px' }}>
                 {/* Cash USD */}
                 <div style={{ background: '#ffffff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '14px', borderLeft: '4px solid #10B981' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: '#065F46' }}>
-                    <IonIcon icon={walletOutline} /> EFECTIVO USD
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: '#065F46' }}>
+                      <IonIcon icon={walletOutline} /> EFECTIVO EN GAVETA
+                    </div>
+                    <small style={{ color: '#64748B', fontSize: '11px' }}>{cashSummary.cashOrdersCount || 0} operaciones</small>
                   </div>
-                  <div style={{ fontSize: '22px', fontWeight: '900', color: '#0F172A', margin: '6px 0 2px 0' }}>
-                    ${Number(cashSummary.totalCashUSD || 0).toFixed(2)}
+                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#0F172A', margin: '6px 0 8px 0' }}>
+                    ${Number(cashSummary.netCashUSD !== undefined ? cashSummary.netCashUSD : ((cashSummary.totalCashUSD || 0) - (cashSummary.totalCashChangeUSD || 0) - (cashSummary.totalCashExpensesUSD || 0))).toFixed(2)}
                   </div>
-                  <small style={{ color: '#64748B', fontSize: '11px' }}>{cashSummary.cashOrdersCount || 0} operaciones</small>
+                  <div style={{ fontSize: '11px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '3px', borderTop: '1px dashed #CBD5E1', paddingTop: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Efectivo Cobrado Ventas:</span>
+                      <span style={{ fontWeight: '600', color: '#0F172A' }}>+${Number(cashSummary.totalCashUSD || 0).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>(-) Vueltos entregados:</span>
+                      <span style={{ fontWeight: '600', color: '#DC2626' }}>-${Number(cashSummary.totalCashChangeUSD || 0).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>(-) Egresos de caja:</span>
+                      <span style={{ fontWeight: '600', color: '#DC2626' }}>-${Number(cashSummary.totalCashExpensesUSD || 0).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '800', color: '#059669', borderTop: '1px solid #E2E8F0', paddingTop: '4px', marginTop: '2px' }}>
+                      <span>= Efectivo Neto en Gaveta:</span>
+                      <span>${Number(cashSummary.netCashUSD !== undefined ? cashSummary.netCashUSD : ((cashSummary.totalCashUSD || 0) - (cashSummary.totalCashChangeUSD || 0) - (cashSummary.totalCashExpensesUSD || 0))).toFixed(2)}</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Punto de Venta */}
@@ -148,6 +175,35 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
                   <small style={{ color: '#64748B', fontSize: '11px' }}>≈ ${Number(cashSummary.totalPagoMovilUSD || 0).toFixed(2)} ({cashSummary.pagoMovilList?.length || 0} tr.)</small>
                 </div>
               </div>
+
+              {/* Sección de Egresos y Vales de Caja */}
+              {Number(cashSummary.totalCashExpensesUSD || 0) > 0 && (
+                <div style={{ background: '#FEF2F2', borderRadius: '16px', border: '1px solid #FECACA', padding: '14px 16px', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: '#991B1B' }}>
+                      💸 Egresos / Vales de Caja (-${Number(cashSummary.totalCashExpensesUSD).toFixed(2)} USD)
+                    </div>
+                    <small style={{ color: '#B91C1C', fontSize: '11px', fontWeight: '700' }}>
+                      {cashSummary.cashExpensesList?.length || 0} salidas
+                    </small>
+                  </div>
+                  <div style={{ maxHeight: '140px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {cashSummary.cashExpensesList?.map((exp: any, idx: number) => (
+                      <div key={exp.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', background: '#ffffff', padding: '7px 10px', borderRadius: '8px', border: '1px solid #FEE2E2' }}>
+                        <div>
+                          <div style={{ fontWeight: '700', color: '#1E293B' }}>{exp.description}</div>
+                          <span style={{ display: 'block', color: '#64748B', fontSize: '10px' }}>
+                            {exp.category === 'VALE_EMPLEADO' ? '👤 Vale Empleado' : exp.category} • {new Date(exp.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <div style={{ textAlign: 'right', fontWeight: '800', color: '#DC2626' }}>
+                          -${Number(exp.amount).toFixed(2)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Sección de Vueltos Registrados */}
               {Array.isArray(cashSummary.vueltosList) && cashSummary.vueltosList.length > 0 && (
