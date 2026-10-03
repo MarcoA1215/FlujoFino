@@ -227,7 +227,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
     try {
       let targetRate = exchangeRate;
-      let targetSymbol = mode === 'COP' ? 'COP' : (mode === 'EUR' ? '€' : 'Bs.');
+      let targetSymbol = mode === 'EUR' ? '€' : 'Bs.';
       const payload: any = {
         mode,
         currencySymbol: targetSymbol,
@@ -250,8 +250,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         targetRate = Number(availableRates?.usdt || availableRates?.parallel || exchangeRate);
       } else if (mode === 'EUR') {
         targetRate = Number(availableRates?.eur || 40.0);
-      } else if (mode === 'COP') {
-        targetRate = Number(availableRates?.cop || 4000.0);
       }
 
       await apiClient.put('/settings/exchange-rate', payload);
@@ -644,39 +642,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 </div>
                 <div style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A' }}>
                   Bs. {Number(availableRates?.eur || 40).toFixed(2)}
-                </div>
-              </div>
-
-              {/* Opción COP */}
-              <div
-                onClick={() => handleApplyRateMode('COP')}
-                style={{
-                  padding: '12px 14px',
-                  borderRadius: '12px',
-                  border: exchangeRateMode === 'COP' ? '2px solid #10B981' : '1px solid #E2E8F0',
-                  background: exchangeRateMode === 'COP' ? '#ECFDF5' : '#F8FAFC',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  transition: 'all 0.15s'
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    🇨🇴 Peso Colombiano (COP)
-                    {exchangeRateMode === 'COP' && (
-                      <span style={{ fontSize: '10px', background: '#10B981', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
-                        ACTIVA
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
-                    Zona Fronteriza / Táchira
-                  </div>
-                </div>
-                <div style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A' }}>
-                  {Number(availableRates?.cop || 4000).toLocaleString('es-CO')} COP
                 </div>
               </div>
 

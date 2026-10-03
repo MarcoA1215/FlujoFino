@@ -30,7 +30,6 @@ export class SettingsService implements OnModuleInit {
           parallel: 40.0,
           usdt: 40.0,
           eur: 43.0,
-          cop: 4000.0,
           updatedAt: new Date().toISOString(),
         },
       });
@@ -76,9 +75,6 @@ export class SettingsService implements OnModuleInit {
       case 'EUR':
         effectiveRate = Number(globalCache?.eur || 40.0);
         break;
-      case 'COP':
-        effectiveRate = Number(globalCache?.cop || 4000.0);
-        break;
       default:
         effectiveRate = Number(globalCache?.bcv || tenantSettings.exchangeRateBs || 40.0);
     }
@@ -102,7 +98,7 @@ export class SettingsService implements OnModuleInit {
         const { encodeTenantId } = require('../utils/tenant-crypto');
         const effectiveRate = await this.getEffectiveRate(tenantId);
         const mode = tenantSettings.exchangeRateMode || 'BCV';
-        const defaultSymbol = mode === 'COP' ? 'COP' : (mode === 'EUR' ? '€' : 'Bs.');
+        const defaultSymbol = mode === 'EUR' ? '€' : 'Bs.';
         const currencySymbol = tenantSettings.currencySymbol || defaultSymbol;
 
         return { 
@@ -233,7 +229,7 @@ export class SettingsService implements OnModuleInit {
     };
   }
 
-  async updateExchangeRate(rate?: number, tenantId?: string, mode?: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'COP' | 'MANUAL', manualRate?: number) {
+  async updateExchangeRate(rate?: number, tenantId?: string, mode?: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'MANUAL', manualRate?: number) {
     if (tenantId) {
       let tenantSettings = await this.settingsRepo.findOne({ where: { tenantId } });
       if (!tenantSettings) {
@@ -242,8 +238,7 @@ export class SettingsService implements OnModuleInit {
       }
       if (mode !== undefined) {
         tenantSettings.exchangeRateMode = mode;
-        if (mode === 'COP') tenantSettings.currencySymbol = 'COP';
-        else if (mode === 'EUR') tenantSettings.currencySymbol = '€';
+        if (mode === 'EUR') tenantSettings.currencySymbol = '€';
         else tenantSettings.currencySymbol = 'Bs.';
       }
       if (manualRate !== undefined) {
@@ -327,13 +322,6 @@ export class SettingsService implements OnModuleInit {
           (item.market?.toLowerCase() === 'bcv' && item.pair?.toUpperCase()?.includes('EUR'))
         );
 
-        // cop: Peso Colombiano (pair === 'COP/VES' o COP/USD)
-        const copItem = rates.find((item: any) => 
-          item.pair?.toUpperCase() === 'COP/VES' || 
-          item.pair?.toUpperCase() === 'COP/USD' ||
-          item.market?.toLowerCase()?.includes('cop')
-        );
-
         let globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
         if (!globalSettings) {
           globalSettings = this.settingsRepo.create({ id: 'GLOBAL' });
@@ -344,14 +332,12 @@ export class SettingsService implements OnModuleInit {
         const parallelVal = getRateValue(parallelItem) ?? currentCache.parallel ?? bcvVal;
         const usdtVal = getRateValue(usdtItem) ?? currentCache.usdt ?? parallelVal;
         const eurVal = getRateValue(eurItem) ?? currentCache.eur ?? Number((bcvVal * 1.08).toFixed(2));
-        const copVal = getRateValue(copItem) ?? currentCache.cop ?? 4000.0;
 
         const newRatesCache = {
           bcv: bcvVal,
           parallel: parallelVal,
           usdt: usdtVal,
           eur: eurVal,
-          cop: copVal,
           updatedAt: new Date().toISOString(),
         };
 
@@ -359,7 +345,7 @@ export class SettingsService implements OnModuleInit {
         globalSettings.exchangeRateBs = bcvVal;
         await this.settingsRepo.save(globalSettings);
 
-        this.logger.log(`Tasas Cotizave sincronizadas con éxito: BCV=${bcvVal}, Paralelo=${parallelVal}, USDT=${usdtVal}, EUR=${eurVal}, COP=${copVal}`);
+        this.logger.log(`Tasas Cotizave sincronizadas con éxito: BCV=${bcvVal}, Paralelo=${parallelVal}, USDT=${usdtVal}, EUR=${eurVal}`);
       } else {
         this.logger.error('No se pudo extraer la tasa de la estructura JSON: ' + JSON.stringify(data).substring(0, 300));
       }

@@ -272,14 +272,13 @@ export interface CustomerLookupResponse {
   identification?: string;
 }
 
-export type ExchangeRateMode = 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'COP' | 'MANUAL';
+export type ExchangeRateMode = 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'MANUAL';
 
 export interface RatesCache {
   bcv?: number;
   parallel?: number;
   usdt?: number;
   eur?: number;
-  cop?: number;
   updatedAt?: string;
 }
 

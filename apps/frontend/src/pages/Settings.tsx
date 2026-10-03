@@ -54,7 +54,7 @@ import { AppHeader } from '../components/AppHeader';
 
 interface Settings {
   exchangeRateBs?: number;
-  exchangeRateMode?: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'COP' | 'MANUAL';
+  exchangeRateMode?: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'MANUAL';
   manualExchangeRate?: number | null;
   currencySymbol?: string;
   availableRates?: {
@@ -62,7 +62,6 @@ interface Settings {
     parallel?: number;
     usdt?: number;
     eur?: number;
-    cop?: number;
     updatedAt?: string;
   } | null;
   companyBank?: string;
@@ -661,7 +660,7 @@ const SettingsPage: React.FC = () => {
                       fontWeight: 800,
                       fontSize: '12px'
                     }}>
-                      TASA ACTIVA: {settings.currencySymbol || (settings.exchangeRateMode === 'COP' ? 'COP' : 'Bs.')} {Number(settings.exchangeRateBs || exchangeRate || 40).toFixed(2)}
+                      TASA ACTIVA: {settings.currencySymbol || (settings.exchangeRateMode === 'EUR' ? '€' : 'Bs.')} {Number(settings.exchangeRateBs || exchangeRate || 40).toFixed(2)}
                     </span>
                   </div>
                 </IonCardHeader>
@@ -683,16 +682,13 @@ const SettingsPage: React.FC = () => {
                             value={settings.exchangeRateMode || 'BCV'}
                             onIonChange={e => {
                               const newMode = e.detail.value;
-                              let newSymbol = 'Bs.';
-                              if (newMode === 'COP') newSymbol = 'COP';
-                              else if (newMode === 'EUR') newSymbol = '€';
+                              let newSymbol = newMode === 'EUR' ? '€' : 'Bs.';
                               
                               let nextRate = settings.exchangeRateBs;
                               if (newMode === 'BCV') nextRate = settings.availableRates?.bcv || nextRate;
                               else if (newMode === 'PARALELO') nextRate = settings.availableRates?.parallel || nextRate;
                               else if (newMode === 'USDT') nextRate = settings.availableRates?.usdt || nextRate;
                               else if (newMode === 'EUR') nextRate = settings.availableRates?.eur || nextRate;
-                              else if (newMode === 'COP') nextRate = settings.availableRates?.cop || 4000;
                               else if (newMode === 'MANUAL') nextRate = settings.manualExchangeRate || nextRate;
 
                               setSettings({
@@ -708,7 +704,6 @@ const SettingsPage: React.FC = () => {
                             <IonSelectOption value="PARALELO">📈 Dólar Paralelo / Promedio (USD)</IonSelectOption>
                             <IonSelectOption value="USDT">🟡 Binance P2P USDT (USD)</IonSelectOption>
                             <IonSelectOption value="EUR">💶 Euro Oficial BCV (EUR)</IonSelectOption>
-                            <IonSelectOption value="COP">🇨🇴 Peso Colombiano (COP) - Zonas Fronterizas</IonSelectOption>
                             <IonSelectOption value="MANUAL">✏️ Tasa Personalizada (Manual)</IonSelectOption>
                           </IonSelect>
                         </IonItem>
@@ -721,12 +716,11 @@ const SettingsPage: React.FC = () => {
                           </IonLabel>
                           <IonSelect
                             interface="popover"
-                            value={settings.currencySymbol || (settings.exchangeRateMode === 'COP' ? 'COP' : (settings.exchangeRateMode === 'EUR' ? '€' : 'Bs.'))}
+                            value={settings.currencySymbol || (settings.exchangeRateMode === 'EUR' ? '€' : 'Bs.')}
                             onIonChange={e => setSettings({ ...settings, currencySymbol: e.detail.value })}
                             style={{ minHeight: '44px', fontWeight: 600 }}
                           >
                             <IonSelectOption value="Bs.">Bs. (Bolívares)</IonSelectOption>
-                            <IonSelectOption value="COP">COP (Pesos Colombianos)</IonSelectOption>
                             <IonSelectOption value="€">€ (Euros)</IonSelectOption>
                           </IonSelect>
                         </IonItem>
@@ -803,19 +797,6 @@ const SettingsPage: React.FC = () => {
                                 <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>💶 Euro BCV</div>
                                 <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
                                   Bs. {Number(settings.availableRates?.eur || 40).toFixed(2)}
-                                </div>
-                              </div>
-
-                              <div style={{
-                                background: settings.exchangeRateMode === 'COP' ? '#dbeafe' : '#ffffff',
-                                border: settings.exchangeRateMode === 'COP' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                                padding: '8px 12px',
-                                borderRadius: '8px',
-                                textAlign: 'center'
-                              }}>
-                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>🇨🇴 COP</div>
-                                <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
-                                  {Number(settings.availableRates?.cop || 4000).toLocaleString('es-CO')}
                                 </div>
                               </div>
                             </div>

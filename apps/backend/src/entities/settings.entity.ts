@@ -14,13 +14,13 @@ export class Settings {
     type: 'varchar',
     default: 'BCV',
   })
-  exchangeRateMode: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'COP' | 'MANUAL';
+  exchangeRateMode: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'MANUAL';
 
   @Column('decimal', { precision: 12, scale: 4, nullable: true, transformer: new ColumnNumericTransformer() })
   manualExchangeRate: number | null;
 
   @Column({ type: 'varchar', default: 'Bs.' })
-  currencySymbol: string; // 'Bs.' | 'COP' | '€'
+  currencySymbol: string; // 'Bs.' | '€'
 
   @Column('jsonb', { nullable: true })
   ratesCache: {
@@ -28,7 +28,6 @@ export class Settings {
     parallel?: number;
     usdt?: number;
     eur?: number;
-    cop?: number;
     updatedAt?: string;
   } | null;
 
