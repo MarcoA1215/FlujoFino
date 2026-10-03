@@ -66,19 +66,30 @@ const Register: React.FC = () => {
   return (
     <IonPage>
       <IonContent fullscreen className="ion-padding" style={{ '--background': '#f4f5f8' } as any}>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100%' }}>
-          <IonCard style={{ width: '100%', maxWidth: '450px', borderRadius: '16px', boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}>
-            <IonCardHeader className="ion-text-center" style={{ paddingBottom: 0 }}>
-              <img
-                src="/assets/logo.png"
-                alt="Flujo Fino"
-                className="w-14 h-14 rounded-2xl object-cover shadow-sm mx-auto mb-2"
-                onError={e => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100%', padding: '20px 0' }}>
+          <IonCard style={{ width: '100%', maxWidth: '400px', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.08)' }}>
+            <IonCardHeader className="ion-text-center">
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+                <img
+                  src="/assets/logo.png"
+                  alt="Flujo Fino"
+                  style={{
+                    width: '72px',
+                    height: '72px',
+                    maxWidth: '72px',
+                    maxHeight: '72px',
+                    borderRadius: '16px',
+                    objectFit: 'cover',
+                    display: 'block',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}
+                  onError={e => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              </div>
               <IonCardTitle style={{ fontWeight: 'bold' }}>Registro</IonCardTitle>
-              <p style={{ margin: '5px 0 10px 0', color: 'gray' }}>Paso {step} de 2</p>
+              <p style={{ margin: '5px 0 0 0', color: 'gray' }}>Paso {step} de 2</p>
             </IonCardHeader>
             <IonCardContent>
               {step === 1 && (
