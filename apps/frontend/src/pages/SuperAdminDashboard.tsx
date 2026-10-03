@@ -48,6 +48,7 @@ import {
   cardOutline,
   medalOutline,
   checkmarkDoneOutline,
+  personAddOutline,
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import {
@@ -60,6 +61,7 @@ import {
   type PlatformConfigDTO,
   type SuperAdminPromoterDTO,
   type PromoterCommissionDTO,
+  type CreatePromoterDTO,
   PromoterCommissionStatus,
 } from '@nutrideli/shared-types';
 
@@ -89,6 +91,19 @@ const SuperAdminDashboard: React.FC = () => {
   const [payoutPaymentMethod, setPayoutPaymentMethod] = useState<'PAGO_MOVIL' | 'BINANCE'>('PAGO_MOVIL');
   const [payoutReference, setPayoutReference] = useState<string>('');
   const [isProcessingCommissionPayout, setIsProcessingCommissionPayout] = useState<boolean>(false);
+
+  // New Promoter Modal
+  const [isCreatePromoterOpen, setIsCreatePromoterOpen] = useState<boolean>(false);
+  const [newPromoterUsername, setNewPromoterUsername] = useState<string>('');
+  const [newPromoterEmail, setNewPromoterEmail] = useState<string>('');
+  const [newPromoterPassword, setNewPromoterPassword] = useState<string>('');
+  const [newPromoterCode, setNewPromoterCode] = useState<string>('');
+  const [newPromoterPhone, setNewPromoterPhone] = useState<string>('');
+  const [newPromoterPagoMovilPhone, setNewPromoterPagoMovilPhone] = useState<string>('');
+  const [newPromoterPagoMovilCedula, setNewPromoterPagoMovilCedula] = useState<string>('');
+  const [newPromoterPagoMovilBank, setNewPromoterPagoMovilBank] = useState<string>('');
+  const [newPromoterBinancePayId, setNewPromoterBinancePayId] = useState<string>('');
+  const [isCreatingPromoter, setIsCreatingPromoter] = useState<boolean>(false);
 
   // Platform accounts configuration
   const [platformConfig, setPlatformConfig] = useState<PlatformConfigDTO>({
@@ -190,6 +205,62 @@ const SuperAdminDashboard: React.FC = () => {
       });
     } finally {
       setIsProcessingCommissionPayout(false);
+    }
+  };
+
+  const handleCreatePromoter = async () => {
+    if (!newPromoterUsername.trim()) {
+      presentToast({ message: 'Ingresa un nombre de usuario para el promotor', duration: 2500, color: 'warning' });
+      return;
+    }
+    if (!newPromoterEmail.trim()) {
+      presentToast({ message: 'Ingresa el correo electrónico del promotor', duration: 2500, color: 'warning' });
+      return;
+    }
+
+    try {
+      setIsCreatingPromoter(true);
+      const payload: CreatePromoterDTO = {
+        username: newPromoterUsername.trim(),
+        email: newPromoterEmail.trim(),
+        password: newPromoterPassword.trim() || undefined,
+        code: newPromoterCode.trim() || undefined,
+        phone: newPromoterPhone.trim() || undefined,
+        pagoMovilPhone: newPromoterPagoMovilPhone.trim() || undefined,
+        pagoMovilCedula: newPromoterPagoMovilCedula.trim() || undefined,
+        pagoMovilBank: newPromoterPagoMovilBank.trim() || undefined,
+        binancePayId: newPromoterBinancePayId.trim() || undefined,
+      };
+
+      const res = await apiClient.post<SuperAdminPromoterDTO>('/superadmin/promoters', payload);
+
+      presentToast({
+        message: `¡Promotor "${res.data.username}" registrado con código ${res.data.code}!`,
+        duration: 3500,
+        color: 'success',
+      });
+
+      // Limpiar formulario y cerrar modal
+      setNewPromoterUsername('');
+      setNewPromoterEmail('');
+      setNewPromoterPassword('');
+      setNewPromoterCode('');
+      setNewPromoterPhone('');
+      setNewPromoterPagoMovilPhone('');
+      setNewPromoterPagoMovilCedula('');
+      setNewPromoterPagoMovilBank('');
+      setNewPromoterBinancePayId('');
+      setIsCreatePromoterOpen(false);
+
+      await loadData();
+    } catch (err: any) {
+      presentToast({
+        message: 'Error al crear promotor: ' + (err.response?.data?.message || err.message),
+        duration: 3500,
+        color: 'danger',
+      });
+    } finally {
+      setIsCreatingPromoter(false);
     }
   };
 
@@ -780,13 +851,23 @@ const SuperAdminDashboard: React.FC = () => {
         {/* TAB: PROMOTORES Y COMISIONES */}
         {activeTab === 'promoters' && (
           <div>
-            <div style={{ marginBottom: '16px' }}>
-              <IonSearchbar
-                placeholder="Buscar por código de promotor, usuario o correo..."
-                value={searchTerm}
-                onIonInput={(e) => setSearchTerm(e.detail.value || '')}
-                style={{ padding: 0 }}
-              />
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '240px' }}>
+                <IonSearchbar
+                  placeholder="Buscar por código de promotor, usuario o correo..."
+                  value={searchTerm}
+                  onIonInput={(e) => setSearchTerm(e.detail.value || '')}
+                  style={{ padding: 0 }}
+                />
+              </div>
+              <IonButton
+                color="primary"
+                style={{ fontWeight: 700 }}
+                onClick={() => setIsCreatePromoterOpen(true)}
+              >
+                <IonIcon icon={personAddOutline} slot="start" />
+                + Nuevo Promotor
+              </IonButton>
             </div>
 
             {loading && (
@@ -1492,6 +1573,198 @@ const SuperAdminDashboard: React.FC = () => {
                 </IonCard>
               </div>
             )}
+          </IonContent>
+        </IonModal>
+
+        {/* MODAL: REGISTRAR NUEVO PROMOTOR */}
+        <IonModal isOpen={isCreatePromoterOpen} onDidDismiss={() => setIsCreatePromoterOpen(false)}>
+          <IonHeader>
+            <IonToolbar color="primary">
+              <IonTitle style={{ fontWeight: 700 }}>
+                Nuevo Promotor de Calle
+              </IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setIsCreatePromoterOpen(false)}>Cerrar</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+
+          <IonContent className="ion-padding">
+            <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+              <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', marginBottom: '16px', border: '1px solid #e2e8f0', fontSize: '13px', color: '#475569' }}>
+                💡 <strong>Perfil de Promotor:</strong> Este usuario tendrá rol <code>PROMOTOR</code> con acceso exclusivo a su panel de captación y comisiones (<code>/promoter</code>). No requiere tener negocio propio.
+              </div>
+
+              <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px' }}>
+                <IonCardHeader style={{ paddingBottom: '4px' }}>
+                  <IonCardTitle style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                    1. Datos de Acceso
+                  </IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  <IonRow>
+                    <IonCol size="12" sizeMd="6">
+                      <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '12px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700, color: '#0f172a' }}>
+                          Nombre de Usuario *
+                        </IonLabel>
+                        <IonInput
+                          placeholder="Ej: juancarlos"
+                          value={newPromoterUsername}
+                          onIonInput={(e) => setNewPromoterUsername(e.detail.value || '')}
+                        />
+                      </IonItem>
+                    </IonCol>
+
+                    <IonCol size="12" sizeMd="6">
+                      <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '12px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700, color: '#0f172a' }}>
+                          Correo Electrónico *
+                        </IonLabel>
+                        <IonInput
+                          type="email"
+                          placeholder="promotor@gmail.com"
+                          value={newPromoterEmail}
+                          onIonInput={(e) => setNewPromoterEmail(e.detail.value || '')}
+                        />
+                      </IonItem>
+                    </IonCol>
+
+                    <IonCol size="12" sizeMd="6">
+                      <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '12px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700, color: '#0f172a' }}>
+                          Contraseña Inicial
+                        </IonLabel>
+                        <IonInput
+                          type="text"
+                          placeholder="Por defecto: 123456"
+                          value={newPromoterPassword}
+                          onIonInput={(e) => setNewPromoterPassword(e.detail.value || '')}
+                        />
+                      </IonItem>
+                    </IonCol>
+
+                    <IonCol size="12" sizeMd="6">
+                      <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '12px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700, color: '#0f172a' }}>
+                          Código Personalizado (Opcional)
+                        </IonLabel>
+                        <IonInput
+                          placeholder="Ej: PROM-JUAN"
+                          value={newPromoterCode}
+                          onIonInput={(e) => setNewPromoterCode(e.detail.value || '')}
+                        />
+                      </IonItem>
+                    </IonCol>
+
+                    <IonCol size="12">
+                      <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700, color: '#0f172a' }}>
+                          Teléfono de Contacto (WhatsApp)
+                        </IonLabel>
+                        <IonInput
+                          type="tel"
+                          placeholder="Ej: 04141234567"
+                          value={newPromoterPhone}
+                          onIonInput={(e) => setNewPromoterPhone(e.detail.value || '')}
+                        />
+                      </IonItem>
+                    </IonCol>
+                  </IonRow>
+                </IonCardContent>
+              </IonCard>
+
+              <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px' }}>
+                <IonCardHeader style={{ paddingBottom: '4px' }}>
+                  <IonCardTitle style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                    2. Datos de Pago para Comisiones (Opcional)
+                  </IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  <IonRow>
+                    <IonCol size="12" sizeMd="6">
+                      <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '12px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700, color: '#475569' }}>
+                          Pago Móvil - Teléfono
+                        </IonLabel>
+                        <IonInput
+                          placeholder="04141234567"
+                          value={newPromoterPagoMovilPhone}
+                          onIonInput={(e) => setNewPromoterPagoMovilPhone(e.detail.value || '')}
+                        />
+                      </IonItem>
+                    </IonCol>
+
+                    <IonCol size="12" sizeMd="6">
+                      <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '12px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700, color: '#475569' }}>
+                          Pago Móvil - Cédula
+                        </IonLabel>
+                        <IonInput
+                          placeholder="V-12345678"
+                          value={newPromoterPagoMovilCedula}
+                          onIonInput={(e) => setNewPromoterPagoMovilCedula(e.detail.value || '')}
+                        />
+                      </IonItem>
+                    </IonCol>
+
+                    <IonCol size="12" sizeMd="6">
+                      <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '12px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700, color: '#475569' }}>
+                          Pago Móvil - Banco
+                        </IonLabel>
+                        <IonInput
+                          placeholder="Ej: Banesco (0134)"
+                          value={newPromoterPagoMovilBank}
+                          onIonInput={(e) => setNewPromoterPagoMovilBank(e.detail.value || '')}
+                        />
+                      </IonItem>
+                    </IonCol>
+
+                    <IonCol size="12" sizeMd="6">
+                      <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '12px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700, color: '#475569' }}>
+                          Binance Pay ID
+                        </IonLabel>
+                        <IonInput
+                          placeholder="Ej: 123456789"
+                          value={newPromoterBinancePayId}
+                          onIonInput={(e) => setNewPromoterBinancePayId(e.detail.value || '')}
+                        />
+                      </IonItem>
+                    </IonCol>
+                  </IonRow>
+                </IonCardContent>
+              </IonCard>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '16px', marginBottom: '24px' }}>
+                <IonButton
+                  expand="block"
+                  fill="outline"
+                  color="medium"
+                  style={{ flex: 1, fontWeight: 700 }}
+                  onClick={() => setIsCreatePromoterOpen(false)}
+                >
+                  Cancelar
+                </IonButton>
+                <IonButton
+                  expand="block"
+                  color="primary"
+                  style={{ flex: 2, fontWeight: 800 }}
+                  onClick={handleCreatePromoter}
+                  disabled={isCreatingPromoter}
+                >
+                  {isCreatingPromoter ? (
+                    <IonSpinner name="crescent" />
+                  ) : (
+                    <>
+                      <IonIcon icon={personAddOutline} slot="start" />
+                      Crear Promotor
+                    </>
+                  )}
+                </IonButton>
+              </div>
+            </div>
           </IonContent>
         </IonModal>
       </IonContent>

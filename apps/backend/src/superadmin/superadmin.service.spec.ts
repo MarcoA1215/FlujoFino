@@ -8,6 +8,7 @@ import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { PlatformConfig } from '../entities/platform-config.entity';
 import { Promoter } from '../entities/promoter.entity';
 import { PromoterCommission } from '../entities/promoter-commission.entity';
+import { User } from '../entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   TenantPlanType,
@@ -23,6 +24,7 @@ describe('SuperAdminService', () => {
   let paymentReportRepo: any;
   let userAccessRepo: any;
   let platformConfigRepo: any;
+  let userRepo: any;
   let promoterRepo: any;
   let commissionRepo: any;
   let dataSource: any;
@@ -55,9 +57,17 @@ describe('SuperAdminService', () => {
       save: jest.fn((entity) => Promise.resolve(entity)),
     };
 
+    userRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn((data) => ({ ...data, id: 'mock-user-id' })),
+      save: jest.fn((entity) => Promise.resolve(entity)),
+    };
+
     promoterRepo = {
       find: jest.fn(),
       findOne: jest.fn(),
+      create: jest.fn((data) => ({ ...data, id: 'mock-promoter-id' })),
       save: jest.fn((entity) => Promise.resolve(entity)),
     };
 
@@ -108,6 +118,10 @@ describe('SuperAdminService', () => {
         {
           provide: getRepositoryToken(PlatformConfig),
           useValue: platformConfigRepo,
+        },
+        {
+          provide: getRepositoryToken(User),
+          useValue: userRepo,
         },
         {
           provide: getRepositoryToken(Promoter),
@@ -449,6 +463,50 @@ describe('SuperAdminService', () => {
         }),
         ['ADMIN'],
       );
+    });
+  });
+
+  describe('createPromoter', () => {
+    it('creates a new promoter with default code generation and password', async () => {
+      userRepo.findOne.mockResolvedValue(null);
+      promoterRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.createPromoter({
+        username: 'carlos',
+        email: 'carlos@promotor.com',
+        phone: '04141234567',
+        pagoMovilPhone: '04141234567',
+        pagoMovilCedula: 'V-12345678',
+        pagoMovilBank: '0134',
+      });
+
+      expect(result).toBeDefined();
+      expect(result.username).toBe('carlos');
+      expect(result.email).toBe('carlos@promotor.com');
+      expect(result.code).toMatch(/^PROM-CARLOS/);
+      expect(userRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          username: 'carlos',
+          email: 'carlos@promotor.com',
+          role: 'PROMOTOR',
+        }),
+      );
+      expect(promoterRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pagoMovilCedula: 'V-12345678',
+          isActive: true,
+        }),
+      );
+    });
+
+    it('throws error if user already exists', async () => {
+      userRepo.findOne.mockResolvedValue({ id: 'existing-id' });
+      await expect(
+        service.createPromoter({
+          username: 'existing',
+          email: 'existing@promotor.com',
+        }),
+      ).rejects.toThrow('Ya existe un usuario con este correo electrónico o nombre de usuario');
     });
   });
 });

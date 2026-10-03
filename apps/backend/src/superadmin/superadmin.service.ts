@@ -5,10 +5,12 @@ import { Tenant } from '../entities/tenant.entity';
 import { SaaSPaymentReport } from '../entities/saas-payment-report.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { PlatformConfig } from '../entities/platform-config.entity';
+import { User } from '../entities/user.entity';
 import { Promoter } from '../entities/promoter.entity';
 import { PromoterCommission } from '../entities/promoter-commission.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpdatePlatformConfigDto } from './dto/update-platform-config.dto';
+import * as bcrypt from 'bcryptjs';
 import {
   TenantPlanType,
   TenantStatus,
@@ -23,6 +25,7 @@ import {
   PromoterRank,
   SuperAdminPromoterDTO,
   PromoterCommissionDTO,
+  CreatePromoterDTO,
 } from '@nutrideli/shared-types';
 
 @Injectable()
@@ -38,6 +41,8 @@ export class SuperAdminService {
     private readonly userAccessRepo: Repository<UserTenantAccess>,
     @InjectRepository(PlatformConfig)
     private readonly platformConfigRepo: Repository<PlatformConfig>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     @InjectRepository(Promoter)
     private readonly promoterRepo: Repository<Promoter>,
     @InjectRepository(PromoterCommission)
@@ -736,6 +741,100 @@ export class SuperAdminService {
     commission.paymentReference = paymentReference.trim();
 
     return await this.commissionRepo.save(commission);
+  }
+
+  /**
+   * SuperAdmin: Crear un nuevo Promotor de Calle y su cuenta de usuario.
+   */
+  async createPromoter(dto: CreatePromoterDTO): Promise<SuperAdminPromoterDTO> {
+    if (!dto.email || !dto.email.trim()) {
+      throw new BadRequestException('El correo electrónico es obligatorio');
+    }
+    if (!dto.username || !dto.username.trim()) {
+      throw new BadRequestException('El nombre de usuario es obligatorio');
+    }
+
+    const email = dto.email.trim().toLowerCase();
+    const username = dto.username.trim();
+
+    // Validar si ya existe el usuario
+    const existingUser = await this.userRepo.findOne({
+      where: [{ email }, { username }],
+    });
+    if (existingUser) {
+      throw new BadRequestException('Ya existe un usuario con este correo electrónico o nombre de usuario');
+    }
+
+    // Código de promotor
+    let code = dto.code ? dto.code.trim().toUpperCase() : '';
+    if (!code) {
+      // Generar código único: PROM-NOMBRE o PROM-XXXX
+      const sanitizedUsername = username.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8);
+      const randomSuffix = Math.floor(100 + Math.random() * 900);
+      code = `PROM-${sanitizedUsername || 'AGENTE'}${randomSuffix}`;
+    } else {
+      if (!code.startsWith('PROM-')) {
+        code = `PROM-${code}`;
+      }
+    }
+
+    // Verificar si el código ya existe
+    const existingPromoterWithCode = await this.promoterRepo.findOne({
+      where: { code },
+    });
+    if (existingPromoterWithCode) {
+      throw new BadRequestException(`El código de promotor ${code} ya está en uso`);
+    }
+
+    // Contraseña
+    const plainPassword = dto.password && dto.password.trim() ? dto.password.trim() : '123456';
+    const passwordHash = await bcrypt.hash(plainPassword, 10);
+
+    // Crear el usuario con rol PROMOTOR
+    const user = this.userRepo.create({
+      username,
+      email,
+      passwordHash,
+      role: UserRole.PROMOTOR,
+      phone: dto.phone ? dto.phone.trim() : undefined,
+      isEmailVerified: true,
+    });
+    const savedUser = await this.userRepo.save(user);
+
+    // Crear la ficha de Promotor
+    const promoter = this.promoterRepo.create({
+      userId: savedUser.id,
+      code,
+      pagoMovilPhone: dto.pagoMovilPhone ? dto.pagoMovilPhone.trim() : null,
+      pagoMovilCedula: dto.pagoMovilCedula ? dto.pagoMovilCedula.trim() : null,
+      pagoMovilBank: dto.pagoMovilBank ? dto.pagoMovilBank.trim() : null,
+      binancePayId: dto.binancePayId ? dto.binancePayId.trim() : null,
+      isActive: true,
+    });
+    const savedPromoter = await this.promoterRepo.save(promoter);
+
+    return {
+      id: savedPromoter.id,
+      userId: savedUser.id,
+      username: savedUser.username,
+      email: savedUser.email,
+      phone: savedUser.phone || null,
+      code: savedPromoter.code,
+      isActive: savedPromoter.isActive,
+      pagoMovilPhone: savedPromoter.pagoMovilPhone,
+      pagoMovilCedula: savedPromoter.pagoMovilCedula,
+      pagoMovilBank: savedPromoter.pagoMovilBank,
+      binancePayId: savedPromoter.binancePayId,
+      currentRank: PromoterRank.MADERA,
+      monthlyActivations: 0,
+      rankBonusUSD: 0,
+      totalAffiliatedTenants: 0,
+      pendingBalanceUSD: 0,
+      paidBalanceUSD: 0,
+      totalCommissionsUSD: 0,
+      commissions: [],
+      createdAt: savedPromoter.createdAt ? savedPromoter.createdAt.toISOString() : new Date().toISOString(),
+    };
   }
 }
 

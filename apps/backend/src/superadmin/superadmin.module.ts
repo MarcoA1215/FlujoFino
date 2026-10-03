@@ -6,13 +6,14 @@ import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { PlatformConfig } from '../entities/platform-config.entity';
 import { Promoter } from '../entities/promoter.entity';
 import { PromoterCommission } from '../entities/promoter-commission.entity';
+import { User } from '../entities/user.entity';
 import { SuperAdminService } from './superadmin.service';
 import { SuperAdminController } from './superadmin.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Tenant, SaaSPaymentReport, UserTenantAccess, PlatformConfig, Promoter, PromoterCommission]),
+    TypeOrmModule.forFeature([Tenant, SaaSPaymentReport, UserTenantAccess, PlatformConfig, Promoter, PromoterCommission, User]),
     NotificationsModule,
   ],
   controllers: [SuperAdminController],

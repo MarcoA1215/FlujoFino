@@ -530,5 +530,17 @@ export interface SuperAdminPromoterDTO {
   createdAt: string;
 }
 
+export interface CreatePromoterDTO {
+  username: string;
+  email: string;
+  password?: string;
+  code?: string;
+  phone?: string;
+  pagoMovilPhone?: string;
+  pagoMovilCedula?: string;
+  pagoMovilBank?: string;
+  binancePayId?: string;
+}
+
 
 
