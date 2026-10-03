@@ -122,13 +122,19 @@ export class PublicStoreController {
       new Set(storeProducts.map((p) => p.category).filter(Boolean))
     );
 
+    let rate = Number(settings?.exchangeRateBs || 0);
+    if (!rate || rate === 40.0) {
+      const globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+      rate = Number(globalSettings?.exchangeRateBs || 40.0);
+    }
+
     return {
       tenant: {
         id: token,
         name: tenant.name,
       },
       settings: {
-        exchangeRateBs: Number(settings?.exchangeRateBs || 40.0),
+        exchangeRateBs: rate,
         companyBank: settings?.companyBank || '',
         companyCedula: settings?.companyCedula || '',
         companyPhone: settings?.companyPhone || '',

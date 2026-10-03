@@ -39,7 +39,8 @@ import {
   checkmarkCircleOutline,
   chatbubbleOutline,
   personCircleOutline,
-  shieldCheckmarkOutline
+  shieldCheckmarkOutline,
+  medalOutline,
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 
@@ -73,10 +74,6 @@ const Menu: React.FC = () => {
         setSettings(res.data);
         if (res.data.themePrimaryColor) {
           document.documentElement.style.setProperty('--ion-color-primary', res.data.themePrimaryColor);
-        }
-        if (res.data.themeHeaderColor) {
-          document.documentElement.style.setProperty('--ion-color-success', res.data.themeHeaderColor);
-          document.documentElement.style.setProperty('--ion-color-tertiary', res.data.themeHeaderColor);
         }
       }).catch(e => console.log(e));
     }
@@ -158,7 +155,9 @@ const Menu: React.FC = () => {
 
   let visibleItems: NavItem[] = navItems.filter(i => i.isVisible);
 
-  if (!user?.tenantId) {
+  const isPromotor = user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR';
+
+  if (!user?.tenantId && !isSuperAdmin && !isPromotor) {
     visibleItems = [];
   } else if (user?.role === UserRole.POS) {
     visibleItems = visibleItems.filter(i => ['/pos', '/orders', '/calculator', '/reservations', '/customers'].includes(i.path));
@@ -168,6 +167,12 @@ const Menu: React.FC = () => {
     visibleItems = visibleItems.filter(i => ['/delivery-panel', '/orders'].includes(i.path));
   } else if (user?.role === UserRole.INVENTORY) {
     visibleItems = visibleItems.filter(i => ['/raw-materials', '/products'].includes(i.path));
+  }
+
+  if (isPromotor) {
+    visibleItems = [
+      { id: 'promoter-panel', label: 'Mi Panel de Promotor', path: '/promoter', icon: medalOutline, isVisible: true },
+    ];
   }
 
   if (isSuperAdmin) {
@@ -239,8 +244,8 @@ const Menu: React.FC = () => {
                 className={location.pathname === item.path ? 'selected' : ''}
                 style={location.pathname === item.path ? {
                   '--background': 'var(--theme-primary)',
-                  '--color': '#ffffff',
-                  color: '#ffffff',
+                  '--color': 'var(--theme-primary-contrast, #ffffff)',
+                  color: 'var(--theme-primary-contrast, #ffffff)',
                   fontWeight: '800',
                   borderRadius: '12px',
                 } as any : {}}
@@ -249,7 +254,7 @@ const Menu: React.FC = () => {
                 lines="none"
                 detail={false}
               >
-                <IonIcon aria-hidden="true" slot="start" icon={item.icon} style={location.pathname === item.path ? { color: '#ffffff' } : {}} />
+                <IonIcon aria-hidden="true" slot="start" icon={item.icon} style={location.pathname === item.path ? { color: 'var(--theme-primary-contrast, #ffffff)' } : {}} />
                 <IonLabel>{item.label}</IonLabel>
               </IonItem>
             </IonMenuToggle>

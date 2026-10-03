@@ -45,11 +45,14 @@ import { PlatformConfig } from './entities/platform-config.entity';
 import { PushSubscription } from './entities/push-subscription.entity';
 import { SalaryAdvance } from './entities/salary-advance.entity';
 import { Investment } from './entities/investment.entity';
+import { Promoter } from './entities/promoter.entity';
+import { PromoterCommission } from './entities/promoter-commission.entity';
 import { SuperAdminModule } from './superadmin/superadmin.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SalaryAdvancesModule } from './salary-advances/salary-advances.module';
 import { DeliveriesModule } from './deliveries/deliveries.module';
 import { InvestmentsModule } from './investments/investments.module';
+import { PromotersModule } from './promoters/promoters.module';
 
 @Module({
   imports: [
@@ -64,7 +67,7 @@ import { InvestmentsModule } from './investments/investments.module';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
-        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription, SalaryAdvance, Investment],
+        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription, SalaryAdvance, Investment, Promoter, PromoterCommission],
         synchronize: true,
       }),
       inject: [ConfigService],
@@ -84,6 +87,7 @@ import { InvestmentsModule } from './investments/investments.module';
     SalaryAdvancesModule,
     DeliveriesModule,
     InvestmentsModule,
+    PromotersModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: APP_GUARD, useClass: RolesGuard }],

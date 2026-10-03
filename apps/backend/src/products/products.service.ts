@@ -180,6 +180,25 @@ export class ProductsService {
     return { success: true };
   }
 
+  async findArchived(tenantId: string) {
+    const products = await this.productRepo.find({
+      where: { tenantId },
+      withDeleted: true,
+      order: { deletedAt: 'DESC' },
+    });
+    return products.filter((p) => p.deletedAt !== null);
+  }
+
+  async restore(tenantId: string, id: string) {
+    const product = await this.productRepo.findOne({
+      where: { tenantId, id },
+      withDeleted: true,
+    });
+    if (!product) throw new NotFoundException('Producto archivado no encontrado');
+    await this.productRepo.restore({ tenantId, id });
+    return { success: true };
+  }
+
   
   async unpackKit(tenantId: string, id: string) {
     return this.dataSource.transaction(async (manager) => {

@@ -53,6 +53,18 @@ import { BookingSettings } from '../components/BookingSettings';
 import { AppHeader } from '../components/AppHeader';
 
 interface Settings {
+  exchangeRateBs?: number;
+  exchangeRateMode?: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'COP' | 'MANUAL';
+  manualExchangeRate?: number | null;
+  currencySymbol?: string;
+  availableRates?: {
+    bcv?: number;
+    parallel?: number;
+    usdt?: number;
+    eur?: number;
+    cop?: number;
+    updatedAt?: string;
+  } | null;
   companyBank?: string;
   companyCedula?: string;
   companyPhone?: string;
@@ -241,6 +253,9 @@ const SettingsPage: React.FC = () => {
 
     try {
       const payload: Partial<Settings> = { 
+        exchangeRateMode: settings.exchangeRateMode || 'BCV',
+        manualExchangeRate: settings.manualExchangeRate !== undefined && settings.manualExchangeRate !== null ? Number(settings.manualExchangeRate) : null,
+        currencySymbol: settings.currencySymbol || (settings.exchangeRateMode === 'COP' ? 'COP' : (settings.exchangeRateMode === 'EUR' ? '€' : 'Bs.')),
         companyBank: settings.companyBank, 
         companyCedula: settings.companyCedula, 
         companyPhone: settings.companyPhone,
@@ -614,6 +629,239 @@ const SettingsPage: React.FC = () => {
                       onIonChange={e => setSettings({...settings, requireApprovalAlways: e.detail.checked})} 
                     />
                   </IonItem>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
+          </IonRow>
+
+          {/* Tarjeta Destacada: Tasa de Facturación y Conversión */}
+          <IonRow>
+            <IonCol size="12">
+              <IonCard style={{
+                borderRadius: '16px',
+                border: '2px solid #10b981',
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.12)',
+                background: '#ffffff',
+                marginBottom: '16px'
+              }}>
+                <IonCardHeader style={{
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.03) 100%)',
+                  paddingBottom: '12px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <IonCardTitle style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      💱 Tasa de Facturación y Conversión
+                    </IonCardTitle>
+                    <span style={{
+                      background: '#ecfdf5',
+                      color: '#065f46',
+                      border: '1px solid #a7f3d0',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      fontWeight: 800,
+                      fontSize: '12px'
+                    }}>
+                      TASA ACTIVA: {settings.currencySymbol || (settings.exchangeRateMode === 'COP' ? 'COP' : 'Bs.')} {Number(settings.exchangeRateBs || exchangeRate || 40).toFixed(2)}
+                    </span>
+                  </div>
+                </IonCardHeader>
+
+                <IonCardContent style={{ paddingTop: '16px' }}>
+                  <p style={{ color: '#475569', fontSize: '14px', lineHeight: '1.5', margin: '0 0 16px 0' }}>
+                    Selecciona qué tasa de cambio utiliza tu negocio para calcular el equivalente en moneda local para tus ventas, cobros y punto de venta. Las órdenes anteriores mantendrán su tasa histórica de forma inmutable.
+                  </p>
+
+                  <IonGrid style={{ padding: 0 }}>
+                    <IonRow>
+                      <IonCol size="12" sizeMd="6">
+                        <IonItem style={{ background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                          <IonLabel position="stacked" style={{ fontWeight: 700, color: '#1e293b' }}>
+                            Modo de Tasa Cambiaria *
+                          </IonLabel>
+                          <IonSelect
+                            interface="popover"
+                            value={settings.exchangeRateMode || 'BCV'}
+                            onIonChange={e => {
+                              const newMode = e.detail.value;
+                              let newSymbol = 'Bs.';
+                              if (newMode === 'COP') newSymbol = 'COP';
+                              else if (newMode === 'EUR') newSymbol = '€';
+                              
+                              let nextRate = settings.exchangeRateBs;
+                              if (newMode === 'BCV') nextRate = settings.availableRates?.bcv || nextRate;
+                              else if (newMode === 'PARALELO') nextRate = settings.availableRates?.parallel || nextRate;
+                              else if (newMode === 'USDT') nextRate = settings.availableRates?.usdt || nextRate;
+                              else if (newMode === 'EUR') nextRate = settings.availableRates?.eur || nextRate;
+                              else if (newMode === 'COP') nextRate = settings.availableRates?.cop || 4000;
+                              else if (newMode === 'MANUAL') nextRate = settings.manualExchangeRate || nextRate;
+
+                              setSettings({
+                                ...settings,
+                                exchangeRateMode: newMode,
+                                currencySymbol: newSymbol,
+                                exchangeRateBs: nextRate
+                              });
+                            }}
+                            style={{ minHeight: '44px', fontWeight: 600 }}
+                          >
+                            <IonSelectOption value="BCV">🏛️ Dólar Oficial BCV (USD)</IonSelectOption>
+                            <IonSelectOption value="PARALELO">📈 Dólar Paralelo / Promedio (USD)</IonSelectOption>
+                            <IonSelectOption value="USDT">🟡 Binance P2P USDT (USD)</IonSelectOption>
+                            <IonSelectOption value="EUR">💶 Euro Oficial BCV (EUR)</IonSelectOption>
+                            <IonSelectOption value="COP">🇨🇴 Peso Colombiano (COP) - Zonas Fronterizas</IonSelectOption>
+                            <IonSelectOption value="MANUAL">✏️ Tasa Personalizada (Manual)</IonSelectOption>
+                          </IonSelect>
+                        </IonItem>
+                      </IonCol>
+
+                      <IonCol size="12" sizeMd="6">
+                        <IonItem style={{ background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                          <IonLabel position="stacked" style={{ fontWeight: 700, color: '#1e293b' }}>
+                            Símbolo de Moneda Secundaria
+                          </IonLabel>
+                          <IonSelect
+                            interface="popover"
+                            value={settings.currencySymbol || (settings.exchangeRateMode === 'COP' ? 'COP' : (settings.exchangeRateMode === 'EUR' ? '€' : 'Bs.'))}
+                            onIonChange={e => setSettings({ ...settings, currencySymbol: e.detail.value })}
+                            style={{ minHeight: '44px', fontWeight: 600 }}
+                          >
+                            <IonSelectOption value="Bs.">Bs. (Bolívares)</IonSelectOption>
+                            <IonSelectOption value="COP">COP (Pesos Colombianos)</IonSelectOption>
+                            <IonSelectOption value="€">€ (Euros)</IonSelectOption>
+                          </IonSelect>
+                        </IonItem>
+                      </IonCol>
+
+                      {/* Información en tiempo real si es modo automático */}
+                      {(settings.exchangeRateMode || 'BCV') !== 'MANUAL' && (
+                        <IonCol size="12">
+                          <div style={{
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '12px',
+                            padding: '14px 16px',
+                            marginTop: '8px'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e40af' }}>
+                                ⚡ Tasa Sincronizada Automáticamente en Tiempo Real:
+                              </div>
+                              {settings.availableRates?.updatedAt && (
+                                <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                  Última actualización: {new Date(settings.availableRates.updatedAt).toLocaleTimeString('es-VE')}
+                                </div>
+                              )}
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
+                              <div style={{
+                                background: settings.exchangeRateMode === 'BCV' || !settings.exchangeRateMode ? '#dbeafe' : '#ffffff',
+                                border: settings.exchangeRateMode === 'BCV' || !settings.exchangeRateMode ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                textAlign: 'center'
+                              }}>
+                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>🏛️ BCV</div>
+                                <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                                  Bs. {Number(settings.availableRates?.bcv || settings.exchangeRateBs || 40).toFixed(2)}
+                                </div>
+                              </div>
+
+                              <div style={{
+                                background: settings.exchangeRateMode === 'PARALELO' ? '#dbeafe' : '#ffffff',
+                                border: settings.exchangeRateMode === 'PARALELO' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                textAlign: 'center'
+                              }}>
+                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>📈 Paralelo</div>
+                                <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                                  Bs. {Number(settings.availableRates?.parallel || settings.availableRates?.bcv || settings.exchangeRateBs || 40).toFixed(2)}
+                                </div>
+                              </div>
+
+                              <div style={{
+                                background: settings.exchangeRateMode === 'USDT' ? '#dbeafe' : '#ffffff',
+                                border: settings.exchangeRateMode === 'USDT' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                textAlign: 'center'
+                              }}>
+                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>🟡 USDT</div>
+                                <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                                  Bs. {Number(settings.availableRates?.usdt || settings.availableRates?.parallel || settings.exchangeRateBs || 40).toFixed(2)}
+                                </div>
+                              </div>
+
+                              <div style={{
+                                background: settings.exchangeRateMode === 'EUR' ? '#dbeafe' : '#ffffff',
+                                border: settings.exchangeRateMode === 'EUR' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                textAlign: 'center'
+                              }}>
+                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>💶 Euro BCV</div>
+                                <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                                  Bs. {Number(settings.availableRates?.eur || 40).toFixed(2)}
+                                </div>
+                              </div>
+
+                              <div style={{
+                                background: settings.exchangeRateMode === 'COP' ? '#dbeafe' : '#ffffff',
+                                border: settings.exchangeRateMode === 'COP' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                textAlign: 'center'
+                              }}>
+                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>🇨🇴 COP</div>
+                                <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                                  {Number(settings.availableRates?.cop || 4000).toLocaleString('es-CO')}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </IonCol>
+                      )}
+
+                      {/* Input si es modo MANUAL */}
+                      {settings.exchangeRateMode === 'MANUAL' && (
+                        <IonCol size="12">
+                          <div style={{
+                            background: '#fefce8',
+                            border: '1px solid #fde047',
+                            borderRadius: '12px',
+                            padding: '14px 16px',
+                            marginTop: '8px'
+                          }}>
+                            <IonItem color="light" style={{ borderRadius: '8px' }}>
+                              <IonLabel position="stacked" style={{ fontWeight: 800, color: '#854d0e' }}>
+                                ✏️ Tasa Personalizada Manual ({settings.currencySymbol || 'Bs.'} por 1 USD) *
+                              </IonLabel>
+                              <IonInput
+                                type="number"
+                                step="0.01"
+                                min="0.0001"
+                                value={settings.manualExchangeRate !== undefined && settings.manualExchangeRate !== null ? settings.manualExchangeRate : (settings.exchangeRateBs || 40.0)}
+                                onIonInput={e => {
+                                  const val = parseFloat(e.detail.value!);
+                                  setSettings({
+                                    ...settings,
+                                    manualExchangeRate: isNaN(val) ? null : val,
+                                    exchangeRateBs: isNaN(val) ? 40 : val
+                                  });
+                                }}
+                                placeholder="Ej. 55.00"
+                                style={{ fontSize: '16px', fontWeight: 700 }}
+                              />
+                            </IonItem>
+                            <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#713f12' }}>
+                              💡 Esta tasa personalizada se usará de forma prioritaria para facturar todas las nuevas ventas.
+                            </p>
+                          </div>
+                        </IonCol>
+                      )}
+                    </IonRow>
+                  </IonGrid>
                 </IonCardContent>
               </IonCard>
             </IonCol>

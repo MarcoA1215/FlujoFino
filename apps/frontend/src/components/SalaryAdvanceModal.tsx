@@ -8,6 +8,8 @@ import {
   IonButton,
   IonContent,
   IonIcon,
+  IonSelect,
+  IonSelectOption,
   useIonToast,
   useIonAlert,
 } from '@ionic/react';
@@ -197,28 +199,32 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
               Trabajador *
             </label>
-            <select
+            <IonSelect
+              interface="popover"
               value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
+              placeholder="Selecciona trabajador..."
+              onIonChange={(e) => setSelectedUserId(e.detail.value)}
               style={{
                 width: '100%',
-                padding: '12px',
+                padding: '4px 12px',
                 borderRadius: '10px',
                 border: '1px solid #CBD5E1',
                 background: '#ffffff',
                 fontSize: '14px',
                 fontWeight: 600,
                 color: '#0F172A',
-              }}
-              required
+                minHeight: '44px',
+                '--padding-start': '0px',
+                '--padding-end': '0px',
+              } as any}
             >
-              <option value="">Selecciona trabajador...</option>
+              <IonSelectOption value="">Selecciona trabajador...</IonSelectOption>
               {employees.map((e) => (
-                <option key={e.id} value={e.id}>
+                <IonSelectOption key={e.id} value={e.id}>
                   👤 {e.username || e.name} ({e.role || 'Empleado'})
-                </option>
+                </IonSelectOption>
               ))}
-            </select>
+            </IonSelect>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>

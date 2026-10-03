@@ -1,4 +1,4 @@
-import { Controller, Get, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DeliveriesService } from './deliveries.service';
 
@@ -25,5 +25,19 @@ export class DeliveriesController {
   getAdminSummary(@Request() req: any) {
     const tenantId = req.user.tenantId;
     return this.deliveriesService.getAdminSummary(tenantId);
+  }
+
+  @Patch(':id/start')
+  startDelivery(@Request() req: any, @Param('id') id: string) {
+    const tenantId = req.user.tenantId;
+    const userId = req.user.id || req.user.sub;
+    return this.deliveriesService.startDelivery(tenantId, id, userId);
+  }
+
+  @Patch(':id/complete')
+  completeDelivery(@Request() req: any, @Param('id') id: string) {
+    const tenantId = req.user.tenantId;
+    const userId = req.user.id || req.user.sub;
+    return this.deliveriesService.completeDelivery(tenantId, id, userId);
   }
 }

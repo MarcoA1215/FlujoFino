@@ -24,6 +24,7 @@ import FeedbackPage from './pages/Feedback';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import DeliveryPanel from './pages/DeliveryPanel';
 import SubscriptionExpired from './pages/SubscriptionExpired';
+import PromoterDashboard from './pages/PromoterDashboard';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { SubscriptionProvider, SubscriptionContext } from './context/SubscriptionContext';
 import { ImageViewerProvider } from './context/ImageViewerContext';
@@ -66,6 +67,11 @@ const HomeRedirector: React.FC = () => {
   if (isSuperAdmin) {
     return <Navigate to="/platform-admin" replace />;
   }
+
+  const isPromotor = user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR';
+  if (isPromotor) {
+    return <Navigate to="/promoter" replace />;
+  }
   
   if (!user?.tenantId) return <Navigate to="/select-workspace" replace />;
 
@@ -95,7 +101,24 @@ const RegisterRoute: React.FC = () => {
   return <Register />;
 };
 
-const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const getRoleDefaultPath = (role?: UserRole | string): string => {
+  switch (role) {
+    case UserRole.PROMOTOR:
+      return '/promoter';
+    case UserRole.POS:
+      return '/pos';
+    case UserRole.DELIVERY:
+      return '/delivery-panel';
+    case UserRole.KITCHEN:
+      return '/orders';
+    case UserRole.INVENTORY:
+      return '/raw-materials';
+    default:
+      return '/dashboard';
+  }
+};
+
+const PrivateRoute: React.FC<{ children: React.ReactNode; allowedRoles?: UserRole[] }> = ({ children, allowedRoles }) => {
   const { isAuthenticated, isLoading, user } = useContext(AuthContext);
   const { isExpired, isLoading: isSubLoading } = useContext(SubscriptionContext);
 
@@ -109,6 +132,13 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   if (!isSuperAdmin && user?.tenantId && isExpired) {
     return <Navigate to="/subscription-expired" replace />;
+  }
+
+  if (allowedRoles && user?.role && !isSuperAdmin) {
+    const hasRole = allowedRoles.includes(user.role as UserRole);
+    if (!hasRole) {
+      return <Navigate to={getRoleDefaultPath(user.role)} replace />;
+    }
   }
 
   return <>{children}</>;
@@ -139,6 +169,18 @@ const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
   if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+};
+
+const PromoterRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading, user } = useContext(AuthContext);
+  if (isLoading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
+  const isPromotor = user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR';
+  if (!isSuperAdmin && !isPromotor) {
+    return <Navigate to="/dashboard" replace />;
+  }
   return <>{children}</>;
 };
 
@@ -241,6 +283,7 @@ const MainLayout: React.FC = () => {
                         location.pathname.startsWith('/appointment');
   const isExpiredRoute = location.pathname === '/subscription-expired';
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
+  const isPromotor = user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR';
 
   return (
     <>
@@ -262,8 +305,8 @@ const MainLayout: React.FC = () => {
           ⚡ Modo Sin Conexión: Visualizando agenda, clientes y catálogo guardados localmente.
         </div>
       )}
-      {!isPublicRoute && !isExpiredRoute && <SubscriptionWarningBanner />}
-      <IonSplitPane contentId="main" when={!isPublicRoute && !isExpiredRoute && (user?.tenantId || isSuperAdmin) ? 'md' : false}>
+      {!isPublicRoute && !isExpiredRoute && !isPromotor && <SubscriptionWarningBanner />}
+      <IonSplitPane contentId="main" when={!isPublicRoute && !isExpiredRoute && (user?.tenantId || isSuperAdmin || isPromotor) ? 'md' : false}>
         {!isPublicRoute && !isExpiredRoute && <Menu />}
         <IonRouterOutlet id="main">
         <Route path="/book/:tenantId" element={<PublicBooking />} />
@@ -276,7 +319,7 @@ const MainLayout: React.FC = () => {
         <Route path="/register" element={<RegisterRoute />} />
         <Route path="/select-workspace" element={<PrivateRoute><SelectWorkspace /></PrivateRoute>} />
         
-        <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+        <Route path="/dashboard" element={<PrivateRoute allowedRoles={[UserRole.ADMIN]}><Dashboard /></PrivateRoute>} />
         <Route path="/raw-materials" element={<PrivateRoute><RawMaterials /></PrivateRoute>} />
         <Route path="/products" element={<PrivateRoute><Products /></PrivateRoute>} />
         <Route path="/production" element={<PrivateRoute><Production /></PrivateRoute>} />
@@ -285,11 +328,12 @@ const MainLayout: React.FC = () => {
         <Route path="/orders" element={<PrivateRoute><Orders /></PrivateRoute>} />
         <Route path="/delivery-panel" element={<PrivateRoute><DeliveryPanel /></PrivateRoute>} />
         <Route path="/delivery-zones" element={<PrivateRoute><DeliveryZones /></PrivateRoute>} />
-        <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
-        <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
+        <Route path="/users" element={<PrivateRoute allowedRoles={[UserRole.ADMIN]}><Users /></PrivateRoute>} />
+        <Route path="/settings" element={<PrivateRoute allowedRoles={[UserRole.ADMIN]}><SettingsPage /></PrivateRoute>} />
         <Route path="/reservations" element={<PrivateRoute><Reservations /></PrivateRoute>} />
         <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
         <Route path="/feedback" element={<PrivateRoute><FeedbackPage /></PrivateRoute>} />
+        <Route path="/promoter" element={<PromoterRoute><PromoterDashboard /></PromoterRoute>} />
         <Route path="/platform-admin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
       </IonRouterOutlet>
       </IonSplitPane>

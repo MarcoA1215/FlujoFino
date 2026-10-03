@@ -4,13 +4,15 @@ import { Tenant } from '../entities/tenant.entity';
 import { SaaSPaymentReport } from '../entities/saas-payment-report.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { PlatformConfig } from '../entities/platform-config.entity';
+import { Promoter } from '../entities/promoter.entity';
+import { PromoterCommission } from '../entities/promoter-commission.entity';
 import { SuperAdminService } from './superadmin.service';
 import { SuperAdminController } from './superadmin.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Tenant, SaaSPaymentReport, UserTenantAccess, PlatformConfig]),
+    TypeOrmModule.forFeature([Tenant, SaaSPaymentReport, UserTenantAccess, PlatformConfig, Promoter, PromoterCommission]),
     NotificationsModule,
   ],
   controllers: [SuperAdminController],

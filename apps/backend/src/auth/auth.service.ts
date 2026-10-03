@@ -8,6 +8,8 @@ import { AccessRequest, AccessRequestStatus } from '../entities/access-request.e
 import { UserRole } from '@nutrideli/shared-types';
 import { MailService } from '../mail/mail.service';
 import { User } from '../entities/user.entity';
+import { PlatformConfig } from '../entities/platform-config.entity';
+import { Promoter } from '../entities/promoter.entity';
 
 function toMinutes(hhmm: string): number {
   const parts = hhmm.split(':');
@@ -109,6 +111,9 @@ export class AuthService {
     if (!access) {
       if ((user.role as string) === 'ADMIN' || isSuperAdmin) {
         return { user: result, tenantId: requestedTenantId || 'admin-system', role: user.role, tenantName: 'Sistema Central', workspaces };
+      }
+      if (user.role === UserRole.PROMOTOR || (user.role as string) === 'PROMOTOR') {
+        return { user: result, tenantId: requestedTenantId || 'promoter-space', role: UserRole.PROMOTOR, tenantName: 'Red de Promotores', workspaces };
       }
       throw new UnauthorizedException('El usuario no tiene acceso a ninguna sucursal');
     }
@@ -303,30 +308,59 @@ export class AuthService {
     await queryRunner.startTransaction();
 
     try {
-      // 1. Create Tenant with SaaS subscription details (15-day trial)
-      const trialEndsAt = new Date();
-      trialEndsAt.setDate(trialEndsAt.getDate() + 15);
+      // Consultar PlatformConfig ('default') para sincronizar valores globales
+      const platformConfig = await queryRunner.manager.findOne(PlatformConfig, { where: { id: 'default' } });
+      const trialDays = platformConfig?.defaultTrialDays ?? 15;
+      const basePrice = platformConfig?.defaultMonthlyPrice !== undefined ? Number(platformConfig.defaultMonthlyPrice) : 20.00;
 
-      // Generate unique referral code for this new business (e.g., BURG-9X2A)
+      // 1. Create Tenant with SaaS subscription details
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
+
+      // Generate unique referral code for this new business with 6 random chars and collision check
       const cleanPrefix = (body.tenantName || 'FF')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/[^a-zA-Z0-9]/g, '')
         .substring(0, 4)
         .toUpperCase() || 'FF';
-      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const myReferralCode = `${cleanPrefix}-${randomSuffix}`;
 
-      // Resolve referrer if a referral code or ID was provided
+      let myReferralCode = '';
+      let codeExists = true;
+      let attempts = 0;
+      while (codeExists && attempts < 10) {
+        attempts++;
+        const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+        myReferralCode = `${cleanPrefix}-${randomSuffix}`;
+        const existing = await queryRunner.manager.createQueryBuilder('Tenant', 't')
+          .where('t.referral_code = :code', { code: myReferralCode })
+          .getOne();
+        if (!existing) {
+          codeExists = false;
+        }
+      }
+
+      // Resolve referrer or promoter if a referral code or ID was provided
       let referredByTenantId: string | null = null;
+      let promoterId: string | null = null;
+
       if (body.referralCode && typeof body.referralCode === 'string' && body.referralCode.trim()) {
         const inputCode = body.referralCode.trim().toUpperCase();
-        const referrerTenant: any = await queryRunner.manager.createQueryBuilder('Tenant', 't')
-          .where('UPPER(t.referral_code) = :code', { code: inputCode })
-          .orWhere('CAST(t.id AS VARCHAR) = :codeId', { codeId: body.referralCode.trim() })
-          .getOne();
-        if (referrerTenant) {
-          referredByTenantId = referrerTenant.id;
+        if (inputCode.startsWith('PROM-')) {
+          const promoter = await queryRunner.manager.findOne(Promoter, {
+            where: { code: inputCode },
+          });
+          if (promoter) {
+            promoterId = promoter.id;
+          }
+        } else {
+          const referrerTenant: any = await queryRunner.manager.createQueryBuilder('Tenant', 't')
+            .where('UPPER(t.referral_code) = :code', { code: inputCode })
+            .orWhere('CAST(t.id AS VARCHAR) = :codeId', { codeId: body.referralCode.trim() })
+            .getOne();
+          if (referrerTenant) {
+            referredByTenantId = referrerTenant.id;
+          }
         }
       }
 
@@ -337,8 +371,9 @@ export class AuthService {
         plan_type: 'REGULAR',
         trial_ends_at: trialEndsAt,
         referred_by_tenant_id: referredByTenantId || body.referredByTenantId || null,
+        promoterId: promoterId || body.promoterId || null,
         referral_code: myReferralCode,
-        base_price: 20.00,
+        base_price: basePrice,
       });
       const savedTenant: any = await queryRunner.manager.save(tenant);
 
@@ -456,7 +491,18 @@ export class AuthService {
 
     const mailSent = await this.mailService.sendVerificationCode(user.email, code);
     if (!mailSent) {
-      throw new BadRequestException('No se pudo enviar el correo electrónico. Revisa las credenciales SMTP o la consola del servidor.');
+      const errorDetail = (this.mailService as any).getLastError?.();
+      if (errorDetail && errorDetail.includes('Render bloquea')) {
+        return {
+          success: true,
+          message: 'Render bloquea SMTP en su plan gratuito. Tu código de verificación de 6 dígitos se imprimió en los Logs de Render.',
+          simulated: true,
+        };
+      }
+      const errorMsg = errorDetail
+        ? `No se pudo enviar el correo electrónico (${errorDetail}). Revisa las credenciales SMTP en Render/servidor.`
+        : 'No se pudo enviar el correo electrónico. Revisa las credenciales SMTP o la consola del servidor.';
+      throw new BadRequestException(errorMsg);
     }
 
     return {
@@ -533,7 +579,11 @@ export class AuthService {
 
     const mailSent = await this.mailService.sendPasswordResetCode(user.email, code);
     if (!mailSent) {
-      throw new BadRequestException('No se pudo enviar el correo electrónico. Revisa las credenciales SMTP o la consola del servidor.');
+      const errorDetail = (this.mailService as any).getLastError?.();
+      const errorMsg = errorDetail
+        ? `No se pudo enviar el correo electrónico (${errorDetail}). Revisa las credenciales SMTP en Render/servidor.`
+        : 'No se pudo enviar el correo electrónico. Revisa las credenciales SMTP o la consola del servidor.';
+      throw new BadRequestException(errorMsg);
     }
 
     return {

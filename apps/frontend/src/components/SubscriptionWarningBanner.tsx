@@ -18,8 +18,8 @@ export const SubscriptionWarningBanner: React.FC = () => {
     return null;
   }
 
-  // Mostrar únicamente si faltan entre 1 y 5 días
-  if (daysLeft < 1 || daysLeft > 5) {
+  // Mostrar únicamente si faltan entre 0 y 5 días
+  if (daysLeft < 0 || daysLeft > 5 || isExpired) {
     return null;
   }
 
@@ -44,7 +44,13 @@ export const SubscriptionWarningBanner: React.FC = () => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <IonIcon icon={warningOutline} style={{ fontSize: '1.2rem', color: '#d97706' }} />
         <span>
-          ⚠️ Tu período de prueba vence en <strong>{daysLeft} {daysLeft === 1 ? 'día' : 'días'}</strong>.
+          {daysLeft === 0 ? (
+            <>⚠️ Tu período de prueba vence hoy</>
+          ) : (
+            <>
+              ⚠️ Tu período de prueba vence en <strong>{daysLeft} {daysLeft === 1 ? 'día' : 'días'}</strong>.
+            </>
+          )}
         </span>
       </div>
 

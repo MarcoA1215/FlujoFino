@@ -30,8 +30,11 @@ export class SettingsController {
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
   @Put('exchange-rate')
-  updateRate(@Request() req: any, @Body('rate') rate: number) {
-    return this.settingsService.updateExchangeRate(rate, req.user?.tenantId);
+  updateRate(@Request() req: any, @Body() body: any) {
+    const rate = typeof body?.rate === 'number' ? body.rate : (typeof body === 'number' ? body : undefined);
+    const mode = body?.mode;
+    const manualRate = body?.manualRate;
+    return this.settingsService.updateExchangeRate(rate, req.user?.tenantId, mode, manualRate);
   }
 }
 

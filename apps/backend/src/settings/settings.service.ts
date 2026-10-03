@@ -20,7 +20,20 @@ export class SettingsService implements OnModuleInit {
   async onModuleInit() {
     const exists = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
     if (!exists) {
-      await this.settingsRepo.save({ id: 'GLOBAL', exchangeRateBs: 40.0 });
+      await this.settingsRepo.save({
+        id: 'GLOBAL',
+        exchangeRateBs: 40.0,
+        exchangeRateMode: 'BCV',
+        currencySymbol: 'Bs.',
+        ratesCache: {
+          bcv: 40.0,
+          parallel: 40.0,
+          usdt: 40.0,
+          eur: 43.0,
+          cop: 4000.0,
+          updatedAt: new Date().toISOString(),
+        },
+      });
     }
 
     setInterval(() => {
@@ -30,25 +43,88 @@ export class SettingsService implements OnModuleInit {
     setTimeout(() => this.syncCotizave(), 5000);
   }
 
+  async getEffectiveRate(tenantId?: string): Promise<number> {
+    const globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+    const globalCache = globalSettings?.ratesCache;
+    const globalBcv = globalCache?.bcv ? Number(globalCache.bcv) : (globalSettings?.exchangeRateBs ? Number(globalSettings.exchangeRateBs) : 40.0);
+
+    if (!tenantId) {
+      return globalBcv;
+    }
+
+    const tenantSettings = await this.settingsRepo.findOne({ where: { tenantId } });
+    if (!tenantSettings) {
+      return globalBcv;
+    }
+
+    const mode = tenantSettings.exchangeRateMode || 'BCV';
+    let effectiveRate = globalBcv;
+
+    switch (mode) {
+      case 'MANUAL':
+        effectiveRate = Number(tenantSettings.manualExchangeRate || tenantSettings.exchangeRateBs || 40.0);
+        break;
+      case 'BCV':
+        effectiveRate = Number(globalCache?.bcv || tenantSettings.exchangeRateBs || 40.0);
+        break;
+      case 'PARALELO':
+        effectiveRate = Number(globalCache?.parallel || globalCache?.bcv || 40.0);
+        break;
+      case 'USDT':
+        effectiveRate = Number(globalCache?.usdt || globalCache?.parallel || 40.0);
+        break;
+      case 'EUR':
+        effectiveRate = Number(globalCache?.eur || 40.0);
+        break;
+      case 'COP':
+        effectiveRate = Number(globalCache?.cop || 4000.0);
+        break;
+      default:
+        effectiveRate = Number(globalCache?.bcv || tenantSettings.exchangeRateBs || 40.0);
+    }
+
+    if (mode !== 'MANUAL' && Number(tenantSettings.exchangeRateBs) !== effectiveRate) {
+      tenantSettings.exchangeRateBs = effectiveRate;
+      await this.settingsRepo.save(tenantSettings);
+    }
+
+    return effectiveRate;
+  }
+
   async getSettings(tenantId?: string) {
     const globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
     const globalRate = globalSettings?.exchangeRateBs ? Number(globalSettings.exchangeRateBs) : 40.0;
+    const availableRates = globalSettings?.ratesCache || null;
 
     if (tenantId) {
       const tenantSettings = await this.settingsRepo.findOne({ where: { tenantId } });
       if (tenantSettings) {
         const { encodeTenantId } = require('../utils/tenant-crypto');
-        const tenantRate = Number(tenantSettings.exchangeRateBs || 0);
-        // Si el tenant tiene la tasa en 40.0 (default) o vacía, toma la tasa real activa sincronizada
-        const effectiveRate = (tenantRate > 0 && tenantRate !== 40.0) ? tenantRate : globalRate;
+        const effectiveRate = await this.getEffectiveRate(tenantId);
+        const mode = tenantSettings.exchangeRateMode || 'BCV';
+        const defaultSymbol = mode === 'COP' ? 'COP' : (mode === 'EUR' ? '€' : 'Bs.');
+        const currencySymbol = tenantSettings.currencySymbol || defaultSymbol;
+
         return { 
           ...tenantSettings, 
           exchangeRateBs: effectiveRate,
+          exchangeRateMode: mode,
+          manualExchangeRate: tenantSettings.manualExchangeRate,
+          currencySymbol,
+          availableRates,
           publicToken: encodeTenantId(tenantId) 
         };
       }
     }
-    return globalSettings || { exchangeRateBs: globalRate };
+
+    return {
+      ...(globalSettings || {}),
+      exchangeRateBs: globalRate,
+      exchangeRateMode: 'BCV',
+      manualExchangeRate: null,
+      currencySymbol: 'Bs.',
+      availableRates,
+    };
   }
 
   async updateSettings(tenantId: string | undefined, payload: Partial<Settings>) {
@@ -66,7 +142,14 @@ export class SettingsService implements OnModuleInit {
       }
     }
     
+    if (payload.exchangeRateMode !== undefined) settings.exchangeRateMode = payload.exchangeRateMode;
+    if (payload.manualExchangeRate !== undefined) settings.manualExchangeRate = payload.manualExchangeRate;
+    if (payload.currencySymbol !== undefined) settings.currencySymbol = payload.currencySymbol;
+    if (payload.ratesCache !== undefined) settings.ratesCache = payload.ratesCache;
     if (payload.exchangeRateBs !== undefined) settings.exchangeRateBs = payload.exchangeRateBs;
+    if (settings.exchangeRateMode === 'MANUAL' && payload.manualExchangeRate !== undefined && payload.manualExchangeRate !== null) {
+      settings.exchangeRateBs = payload.manualExchangeRate;
+    }
     if (payload.companyBank !== undefined) settings.companyBank = payload.companyBank;
     if (payload.companyCedula !== undefined) settings.companyCedula = payload.companyCedula;
     if (payload.companyPhone !== undefined) settings.companyPhone = payload.companyPhone;
@@ -141,26 +224,46 @@ export class SettingsService implements OnModuleInit {
 
   async getExchangeRate(tenantId?: string) {
     const s = await this.getSettings(tenantId);
-    return { exchangeRateBs: Number(s.exchangeRateBs || 40.0) };
+    return {
+      exchangeRateBs: Number(s.exchangeRateBs || 40.0),
+      exchangeRateMode: s.exchangeRateMode || 'BCV',
+      manualExchangeRate: s.manualExchangeRate,
+      currencySymbol: s.currencySymbol || 'Bs.',
+      availableRates: s.availableRates || null,
+    };
   }
 
-  async updateExchangeRate(rate: number, tenantId?: string) {
+  async updateExchangeRate(rate?: number, tenantId?: string, mode?: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'COP' | 'MANUAL', manualRate?: number) {
     if (tenantId) {
       let tenantSettings = await this.settingsRepo.findOne({ where: { tenantId } });
       if (!tenantSettings) {
         const { randomUUID } = require('crypto');
-        tenantSettings = this.settingsRepo.create({ id: randomUUID(), tenantId, exchangeRateBs: rate });
-      } else {
+        tenantSettings = this.settingsRepo.create({ id: randomUUID(), tenantId });
+      }
+      if (mode !== undefined) {
+        tenantSettings.exchangeRateMode = mode;
+        if (mode === 'COP') tenantSettings.currencySymbol = 'COP';
+        else if (mode === 'EUR') tenantSettings.currencySymbol = '€';
+        else tenantSettings.currencySymbol = 'Bs.';
+      }
+      if (manualRate !== undefined) {
+        tenantSettings.manualExchangeRate = manualRate;
+      }
+      if (rate !== undefined && (!mode || mode === 'MANUAL')) {
+        tenantSettings.manualExchangeRate = rate;
         tenantSettings.exchangeRateBs = rate;
       }
       await this.settingsRepo.save(tenantSettings);
+      await this.getEffectiveRate(tenantId);
     } else {
-      await this.settingsRepo.update({ id: 'GLOBAL' }, { exchangeRateBs: rate });
-      await this.settingsRepo.createQueryBuilder()
-        .update(Settings)
-        .set({ exchangeRateBs: rate })
-        .where('exchangeRateBs = :def OR exchangeRateBs IS NULL', { def: 40.0 })
-        .execute();
+      if (rate !== undefined) {
+        await this.settingsRepo.update({ id: 'GLOBAL' }, { exchangeRateBs: rate });
+        await this.settingsRepo.createQueryBuilder()
+          .update(Settings)
+          .set({ exchangeRateBs: rate })
+          .where('(exchangeRateMode = :defMode OR exchangeRateMode IS NULL) AND (exchangeRateBs = :def OR exchangeRateBs IS NULL)', { defMode: 'BCV', def: 40.0 })
+          .execute();
+      }
     }
     return this.getExchangeRate(tenantId);
   }
@@ -176,8 +279,8 @@ export class SettingsService implements OnModuleInit {
       this.logger.log('Sincronizando tasa de cambio desde Cotizave...');
       const response = await fetch('https://api.cotizave.com/v1/fx/rates', {
         headers: {
-          'X-API-Key': apiKey
-        }
+          'X-API-Key': apiKey,
+        },
       });
       
       if (!response.ok) {
@@ -186,22 +289,77 @@ export class SettingsService implements OnModuleInit {
       
       const data = await response.json();
       
-      let rate = null;
+      const getRateValue = (item: any): number | null => {
+        if (!item) return null;
+        const val = item.mid ?? item.price ?? item.value ?? item.rate;
+        const parsed = parseFloat(val);
+        return isNaN(parsed) ? null : parsed;
+      };
 
-      // Según el log de error, la respuesta tiene "rates" que es un array, y usa la propiedad "mid"
       if (data.rates && Array.isArray(data.rates)) {
-        const bcvItem = data.rates.find((item: any) => item.market?.toLowerCase() === 'bcv') 
-                     || data.rates.find((item: any) => item.market?.toLowerCase() === 'reference')
-                     || data.rates.find((item: any) => item.type?.toLowerCase() === 'reference');
-                     
-        if (bcvItem) {
-          rate = bcvItem.mid || bcvItem.price || bcvItem.value || bcvItem.rate;
-        }
-      }
+        const rates = data.rates;
 
-      if (rate && !isNaN(parseFloat(rate))) {
-        await this.updateExchangeRate(parseFloat(rate));
-        this.logger.log(`Tasa BCV actualizada con éxito: ${parseFloat(rate)} Bs`);
+        // bcv: market === 'bcv' y pair === 'USD/VES' (o reference)
+        const bcvItem = rates.find((item: any) => 
+          (item.market?.toLowerCase() === 'bcv' && (item.pair?.toUpperCase() === 'USD/VES' || !item.pair)) ||
+          item.market?.toLowerCase() === 'reference' ||
+          item.type?.toLowerCase() === 'reference'
+        );
+
+        // parallel: market === 'enparalelovzla' o parallel
+        const parallelItem = rates.find((item: any) => 
+          item.market?.toLowerCase() === 'enparalelovzla' || 
+          item.market?.toLowerCase() === 'parallel' ||
+          item.market?.toLowerCase() === 'paralelo' ||
+          item.type?.toLowerCase() === 'parallel'
+        );
+
+        // usdt: Binance P2P o USDT (market === 'binance' o pair === 'USDT/VES')
+        const usdtItem = rates.find((item: any) => 
+          item.market?.toLowerCase() === 'binance' || 
+          item.pair?.toUpperCase() === 'USDT/VES' ||
+          item.market?.toLowerCase() === 'usdt'
+        );
+
+        // eur: Euro BCV (pair === 'EUR/VES')
+        const eurItem = rates.find((item: any) => 
+          item.pair?.toUpperCase() === 'EUR/VES' ||
+          (item.market?.toLowerCase() === 'bcv' && item.pair?.toUpperCase()?.includes('EUR'))
+        );
+
+        // cop: Peso Colombiano (pair === 'COP/VES' o COP/USD)
+        const copItem = rates.find((item: any) => 
+          item.pair?.toUpperCase() === 'COP/VES' || 
+          item.pair?.toUpperCase() === 'COP/USD' ||
+          item.market?.toLowerCase()?.includes('cop')
+        );
+
+        let globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+        if (!globalSettings) {
+          globalSettings = this.settingsRepo.create({ id: 'GLOBAL' });
+        }
+        const currentCache = globalSettings.ratesCache || {};
+
+        const bcvVal = getRateValue(bcvItem) ?? currentCache.bcv ?? (globalSettings.exchangeRateBs ? Number(globalSettings.exchangeRateBs) : 40.0);
+        const parallelVal = getRateValue(parallelItem) ?? currentCache.parallel ?? bcvVal;
+        const usdtVal = getRateValue(usdtItem) ?? currentCache.usdt ?? parallelVal;
+        const eurVal = getRateValue(eurItem) ?? currentCache.eur ?? Number((bcvVal * 1.08).toFixed(2));
+        const copVal = getRateValue(copItem) ?? currentCache.cop ?? 4000.0;
+
+        const newRatesCache = {
+          bcv: bcvVal,
+          parallel: parallelVal,
+          usdt: usdtVal,
+          eur: eurVal,
+          cop: copVal,
+          updatedAt: new Date().toISOString(),
+        };
+
+        globalSettings.ratesCache = newRatesCache;
+        globalSettings.exchangeRateBs = bcvVal;
+        await this.settingsRepo.save(globalSettings);
+
+        this.logger.log(`Tasas Cotizave sincronizadas con éxito: BCV=${bcvVal}, Paralelo=${parallelVal}, USDT=${usdtVal}, EUR=${eurVal}, COP=${copVal}`);
       } else {
         this.logger.error('No se pudo extraer la tasa de la estructura JSON: ' + JSON.stringify(data).substring(0, 300));
       }

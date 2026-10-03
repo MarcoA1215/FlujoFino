@@ -94,4 +94,19 @@ export class SuperAdminController {
   ) {
     return await this.superadminService.rejectPayment(id, reason);
   }
+
+  @Get('promoters')
+  @UseGuards(SuperAdminGuard)
+  async getPromoters() {
+    return await this.superadminService.getPromotersOverview();
+  }
+
+  @Post('promoters/commissions/:id/pay')
+  @UseGuards(SuperAdminGuard)
+  async payCommission(
+    @Param('id') id: string,
+    @Body('paymentReference') paymentReference: string,
+  ) {
+    return await this.superadminService.payPromoterCommission(id, paymentReference);
+  }
 }

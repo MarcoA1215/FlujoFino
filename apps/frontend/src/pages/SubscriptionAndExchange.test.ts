@@ -18,7 +18,8 @@ describe('SaaS Subscription & Currency Exchange Engine (Frontend Logic)', () => 
     } else {
       discountPercentage = Math.min(activeReferrals * 10, 50);
       const discounted = basePrice * (1 - discountPercentage / 100);
-      finalFee = Math.max(10, Math.round(discounted * 100) / 100);
+      const minAllowedFee = Math.round(basePrice * 0.5 * 100) / 100;
+      finalFee = Math.max(minAllowedFee, Math.round(discounted * 100) / 100);
     }
 
     return { discountPercentage, finalFee };
@@ -71,6 +72,11 @@ describe('SaaS Subscription & Currency Exchange Engine (Frontend Logic)', () => 
       const res9 = calculateFrontendFee(TenantPlanType.REGULAR, 20.0, 9);
       expect(res9.discountPercentage).toBe(50);
       expect(res9.finalFee).toBe(10.0);
+
+      // Dynamic floor with custom base price
+      const resCustom = calculateFrontendFee(TenantPlanType.REGULAR, 30.0, 8);
+      expect(resCustom.discountPercentage).toBe(50);
+      expect(resCustom.finalFee).toBe(15.0);
     });
   });
 

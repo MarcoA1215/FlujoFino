@@ -8,7 +8,9 @@ import {
   useIonAlert,
   IonModal,
   useIonRouter,
-  IonSpinner
+  IonSpinner,
+  IonSelect,
+  IonSelectOption
 } from '@ionic/react';
 import {
   addOutline,
@@ -483,14 +485,14 @@ const Reservations: React.FC = () => {
             <button
               type="button"
               onClick={() => setViewMode('day')}
-              className={viewMode === 'day' ? 'bg-theme-primary text-white' : ''}
+              className={viewMode === 'day' ? 'bg-theme-primary' : ''}
               style={{
                 flex: 1,
                 padding: '8px 16px',
                 borderRadius: '999px',
                 border: 'none',
                 background: viewMode === 'day' ? 'var(--theme-primary)' : 'transparent',
-                color: viewMode === 'day' ? '#ffffff' : '#64748B',
+                color: viewMode === 'day' ? 'var(--theme-primary-contrast, #ffffff)' : '#64748B',
                 fontSize: '13px',
                 fontWeight: '700',
                 cursor: 'pointer',
@@ -502,14 +504,14 @@ const Reservations: React.FC = () => {
             <button
               type="button"
               onClick={() => setViewMode('week')}
-              className={viewMode === 'week' ? 'bg-theme-primary text-white' : ''}
+              className={viewMode === 'week' ? 'bg-theme-primary' : ''}
               style={{
                 flex: 1,
                 padding: '8px 16px',
                 borderRadius: '999px',
                 border: 'none',
                 background: viewMode === 'week' ? 'var(--theme-primary)' : 'transparent',
-                color: viewMode === 'week' ? '#ffffff' : '#64748B',
+                color: viewMode === 'week' ? 'var(--theme-primary-contrast, #ffffff)' : '#64748B',
                 fontSize: '13px',
                 fontWeight: '700',
                 cursor: 'pointer',
@@ -853,8 +855,8 @@ const Reservations: React.FC = () => {
                     <button
                       type="button"
                       onClick={openNew}
-                      className="ff-btn-primary bg-theme-primary text-white"
-                      style={{ padding: '10px 20px', backgroundColor: 'var(--theme-primary)', color: '#ffffff' }}
+                      className="ff-btn-primary bg-theme-primary"
+                      style={{ padding: '10px 20px', backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast, #ffffff)' }}
                     >
                       <IonIcon icon={addOutline} />
                       Agendar Cita
@@ -896,7 +898,7 @@ const Reservations: React.FC = () => {
         {/* Floating Action Button (FAB [ + ]) */}
         <div
           onClick={openNew}
-          className="bg-theme-primary text-white"
+          className="bg-theme-primary"
           style={{
             position: 'fixed',
             bottom: '78px',
@@ -905,7 +907,7 @@ const Reservations: React.FC = () => {
             height: '54px',
             borderRadius: '50%',
             background: 'var(--theme-primary)',
-            color: '#ffffff',
+            color: 'var(--theme-primary-contrast, #ffffff)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -990,36 +992,40 @@ const Reservations: React.FC = () => {
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
                     Servicio
                   </label>
-                  <select
+                  <IonSelect
+                    interface="popover"
                     value={serviceId}
-                    onChange={e => handleServiceChange(e.target.value)}
-                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#ffffff' }}
+                    placeholder="Sin servicio específico"
+                    onIonChange={e => handleServiceChange(e.detail.value)}
+                    style={{ width: '100%', minHeight: '44px', padding: '4px 12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#ffffff', '--padding-start': '0px', '--padding-end': '0px' }}
                   >
-                    <option value="">Sin servicio específico</option>
+                    <IonSelectOption value="">Sin servicio específico</IonSelectOption>
                     {products.map(p => (
-                      <option key={p.id} value={p.id}>
+                      <IonSelectOption key={p.id} value={p.id}>
                         {p.name} ({p.durationMinutes || 30} min) - ${Number(p.salePrice).toFixed(2)}
-                      </option>
+                      </IonSelectOption>
                     ))}
-                  </select>
+                  </IonSelect>
                 </div>
 
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
                     Especialista Asignado
                   </label>
-                  <select
+                  <IonSelect
+                    interface="popover"
                     value={employeeId}
-                    onChange={e => setEmployeeId(e.target.value)}
-                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#ffffff' }}
+                    placeholder="Sin asignar / Cualquiera"
+                    onIonChange={e => setEmployeeId(e.detail.value)}
+                    style={{ width: '100%', minHeight: '44px', padding: '4px 12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#ffffff', '--padding-start': '0px', '--padding-end': '0px' }}
                   >
-                    <option value="">Sin asignar / Cualquiera</option>
+                    <IonSelectOption value="">Sin asignar / Cualquiera</IonSelectOption>
                     {employees.map(emp => (
-                      <option key={emp.id} value={emp.id}>
+                      <IonSelectOption key={emp.id} value={emp.id}>
                         {emp.username || emp.name} {emp.jobTitle ? `(${emp.jobTitle})` : ''}
-                      </option>
+                      </IonSelectOption>
                     ))}
-                  </select>
+                  </IonSelect>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
@@ -1385,11 +1391,16 @@ const Reservations: React.FC = () => {
             </div>
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Minutos a desplazar:</label>
-              <select value={shiftMinutes} onChange={e => setShiftMinutes(Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1' }}>
-                <option value={15}>15 minutos</option>
-                <option value={30}>30 minutos</option>
-                <option value={60}>1 hora (60 min)</option>
-              </select>
+              <IonSelect
+                interface="popover"
+                value={shiftMinutes}
+                onIonChange={e => setShiftMinutes(Number(e.detail.value))}
+                style={{ width: '100%', minHeight: '42px', padding: '2px 10px', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#ffffff', '--padding-start': '0px', '--padding-end': '0px' }}
+              >
+                <IonSelectOption value={15}>15 minutos</IonSelectOption>
+                <IonSelectOption value={30}>30 minutos</IonSelectOption>
+                <IonSelectOption value={60}>1 hora (60 min)</IonSelectOption>
+              </IonSelect>
             </div>
             <button type="button" onClick={handleMassShift} className="ff-btn-primary" style={{ width: '100%', padding: '12px', background: '#F59E0B' }}>
               Aplicar Desplazamiento

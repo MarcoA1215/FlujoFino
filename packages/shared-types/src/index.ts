@@ -183,7 +183,8 @@ export enum UserRole {
   KITCHEN = 'KITCHEN',
   POS = 'POS',
   DELIVERY = 'DELIVERY',
-  INVENTORY = 'INVENTORY'
+  INVENTORY = 'INVENTORY',
+  PROMOTOR = 'PROMOTOR'
 }
 
 export enum ReservationStatus {
@@ -271,10 +272,26 @@ export interface CustomerLookupResponse {
   identification?: string;
 }
 
+export type ExchangeRateMode = 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'COP' | 'MANUAL';
+
+export interface RatesCache {
+  bcv?: number;
+  parallel?: number;
+  usdt?: number;
+  eur?: number;
+  cop?: number;
+  updatedAt?: string;
+}
+
 export interface SettingsDTO {
   id?: string;
   tenantId?: string;
   exchangeRateBs?: number;
+  exchangeRateMode?: ExchangeRateMode;
+  manualExchangeRate?: number | null;
+  currencySymbol?: string;
+  ratesCache?: RatesCache | null;
+  availableRates?: RatesCache | null;
   companyBank?: string;
   companyCedula?: string;
   companyPhone?: string;
@@ -422,5 +439,96 @@ export interface InvestmentDTO {
   date: string;
   createdAt?: string;
 }
+
+export enum PromoterCommissionType {
+  ACTIVATION = 'ACTIVATION',
+  RECURRING = 'RECURRING',
+}
+
+export enum PromoterCommissionStatus {
+  PENDING = 'PENDING',
+  PAID = 'PAID',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum PromoterRank {
+  MADERA = 'MADERA',
+  BRONCE = 'BRONCE',
+  PLATA = 'PLATA',
+  ORO = 'ORO',
+}
+
+export interface PromoterCommissionDTO {
+  id: string;
+  promoterId: string;
+  tenantId: string;
+  tenantName?: string;
+  type: PromoterCommissionType;
+  amountUSD: number;
+  saasPaymentReportId?: string | null;
+  status: PromoterCommissionStatus;
+  paidAt?: string | null;
+  paymentReference?: string | null;
+  createdAt: string;
+}
+
+export interface PromoterAffiliatedTenantDTO {
+  tenantId: string;
+  tenantName: string;
+  status: TenantStatus;
+  planType: TenantPlanType;
+  createdAt: string;
+  currentPeriodEndsAt?: string | null;
+  totalCommissionsUSD: number;
+  activationCommission?: PromoterCommissionDTO | null;
+  recurringCommissionsCount: number;
+  recurringCommissionsUSD: number;
+}
+
+export interface PromoterStatsDTO {
+  promoterId: string;
+  code: string;
+  currentRank: PromoterRank;
+  rankEmoji: string;
+  monthlyActivations: number;
+  rankBonusUSD: number;
+  nextRank?: {
+    rank: PromoterRank;
+    rankEmoji: string;
+    activationsNeeded: number;
+    bonusUSD: number;
+  } | null;
+  totalActivationCommissionsUSD: number;
+  totalRecurringCommissionsUSD: number;
+  totalCommissionsEarnedUSD: number;
+  totalPendingBalanceUSD: number;
+  totalPaidBalanceUSD: number;
+  affiliatedTenants: PromoterAffiliatedTenantDTO[];
+  recentCommissions: PromoterCommissionDTO[];
+}
+
+export interface SuperAdminPromoterDTO {
+  id: string;
+  userId: string;
+  username: string;
+  email: string;
+  phone?: string | null;
+  code: string;
+  isActive: boolean;
+  pagoMovilPhone?: string | null;
+  pagoMovilCedula?: string | null;
+  pagoMovilBank?: string | null;
+  binancePayId?: string | null;
+  currentRank: PromoterRank;
+  monthlyActivations: number;
+  rankBonusUSD: number;
+  totalAffiliatedTenants: number;
+  pendingBalanceUSD: number;
+  paidBalanceUSD: number;
+  totalCommissionsUSD: number;
+  commissions: PromoterCommissionDTO[];
+  createdAt: string;
+}
+
 
 

@@ -189,7 +189,10 @@ const Customers: React.FC = () => {
   };
 
   const getCleanWhatsappUrl = (phoneStr: string, customerNameStr: string) => {
-    const clean = phoneStr.replace(/[^\d]/g, '');
+    let clean = phoneStr.replace(/[^\d]/g, '');
+    if (clean.startsWith('0')) {
+      clean = `58${clean.slice(1)}`;
+    }
     const greeting = encodeURIComponent(`Hola ${customerNameStr}, te saludamos de ${user?.tenantName || 'Flujo Fino'}.`);
     return `https://wa.me/${clean}?text=${greeting}`;
   };
@@ -250,8 +253,8 @@ const Customers: React.FC = () => {
               <button
                 type="button"
                 onClick={openNew}
-                className="ff-btn-primary bg-theme-primary text-white"
-                style={{ padding: '10px 20px', backgroundColor: 'var(--theme-primary)', color: '#ffffff' }}
+                className="ff-btn-primary bg-theme-primary"
+                style={{ padding: '10px 20px', backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast, #ffffff)' }}
               >
                 <IonIcon icon={addOutline} />
                 Registrar Cliente
@@ -441,7 +444,7 @@ const Customers: React.FC = () => {
             height: '54px',
             borderRadius: '50%',
             background: 'var(--theme-primary)',
-            color: '#ffffff',
+            color: 'var(--theme-primary-contrast, #ffffff)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -539,8 +542,8 @@ const Customers: React.FC = () => {
             <button
               type="button"
               onClick={handleSave}
-              className="ff-btn-primary bg-theme-primary text-white"
-              style={{ width: '100%', padding: '14px', fontSize: '15px', borderRadius: '14px', backgroundColor: 'var(--theme-primary)', color: '#ffffff' }}
+              className="ff-btn-primary bg-theme-primary"
+              style={{ width: '100%', padding: '14px', fontSize: '15px', borderRadius: '14px', backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast, #ffffff)' }}
             >
               {editingCustomer ? 'Guardar Cambios' : 'Registrar Cliente ✓'}
             </button>

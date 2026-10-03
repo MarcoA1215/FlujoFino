@@ -101,4 +101,9 @@ export class OrdersController {
   rejectSupplier(@Request() req: any, @Param('id') id: string) {
     return this.ordersService.rejectSupplier(req.user.tenantId, id);
   }
+
+  @Patch(':id/assign-delivery')
+  assignDelivery(@Request() req: any, @Param('id') id: string, @Body('deliveryUserId') deliveryUserId?: string) {
+    return this.ordersService.assignDelivery(req.user.tenantId, id, deliveryUserId);
+  }
 }

@@ -430,6 +430,8 @@ const PublicStore: React.FC = () => {
       const payload = {
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
+        customerCedula: customerCedula.trim() || undefined,
+        pagoMovilCedula: customerCedula.trim() || undefined,
         deliveryMethod,
         deliveryZoneId: deliveryMethod === 'DELIVERY' ? selectedZoneId : undefined,
         customerAddress: deliveryMethod === 'DELIVERY' ? customerAddress.trim() : undefined,

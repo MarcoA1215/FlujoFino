@@ -10,6 +10,28 @@ export class Settings {
   @Column('decimal', { default: 40.0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   exchangeRateBs: number;
 
+  @Column({
+    type: 'varchar',
+    default: 'BCV',
+  })
+  exchangeRateMode: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'COP' | 'MANUAL';
+
+  @Column('decimal', { precision: 12, scale: 4, nullable: true, transformer: new ColumnNumericTransformer() })
+  manualExchangeRate: number | null;
+
+  @Column({ type: 'varchar', default: 'Bs.' })
+  currencySymbol: string; // 'Bs.' | 'COP' | '€'
+
+  @Column('jsonb', { nullable: true })
+  ratesCache: {
+    bcv?: number;
+    parallel?: number;
+    usdt?: number;
+    eur?: number;
+    cop?: number;
+    updatedAt?: string;
+  } | null;
+
   @Column({ nullable: true })
   companyBank: string;
 

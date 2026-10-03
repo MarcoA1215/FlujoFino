@@ -14,6 +14,8 @@ import { StorageModule } from '../storage/storage.module';
 import { CustomersModule } from '../customers/customers.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
+import { SettingsModule } from '../settings/settings.module';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -28,6 +30,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     NotificationsModule,
     StorageModule,
     CustomersModule,
+    SettingsModule,
   ],
   controllers: [OrdersController, PublicStoreController],
   providers: [OrdersService],

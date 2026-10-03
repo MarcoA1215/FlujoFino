@@ -114,6 +114,18 @@ const Pos: React.FC = () => {
     } catch (e) {}
     return 0;
   });
+  const [currencySymbol, setCurrencySymbol] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('flujofino_currency_symbol');
+      if (saved) return saved;
+      const s = localStorage.getItem('flujofino_cached_settings');
+      if (s) {
+        const parsed = JSON.parse(s);
+        if (parsed.currencySymbol) return parsed.currencySymbol;
+      }
+    } catch (e) {}
+    return 'Bs.';
+  });
   const [allowPartialPayments, setAllowPartialPayments] = useState<boolean>(false);
   const [settings, setSettings] = useState<any>(() => {
     try {
@@ -197,6 +209,10 @@ const Pos: React.FC = () => {
         setExchangeRate(rate);
         localStorage.setItem('flujofino_exchange_rate', rate.toString());
       }
+      if (s.currencySymbol) {
+        setCurrencySymbol(s.currencySymbol);
+        localStorage.setItem('flujofino_currency_symbol', s.currencySymbol);
+      }
       localStorage.setItem('flujofino_cached_settings', JSON.stringify(s));
       setAllowPartialPayments(s.allowPartialPayments !== false);
 
@@ -209,6 +225,8 @@ const Pos: React.FC = () => {
     } catch (e) {
       const cachedRate = localStorage.getItem('flujofino_exchange_rate');
       if (cachedRate && Number(cachedRate) > 0) setExchangeRate(Number(cachedRate));
+      const cachedSymbol = localStorage.getItem('flujofino_currency_symbol');
+      if (cachedSymbol) setCurrencySymbol(cachedSymbol);
     }
   };
 
@@ -282,6 +300,24 @@ const Pos: React.FC = () => {
         localStorage.removeItem('calculator_zone');
       }
     }
+
+    const handleSettingsUpdated = (e: any) => {
+      const s = e.detail;
+      if (s) {
+        if (s.exchangeRateBs) {
+          setExchangeRate(Number(s.exchangeRateBs));
+        }
+        if (s.currencySymbol) {
+          setCurrencySymbol(s.currencySymbol);
+        }
+        setSettings((prev: any) => ({ ...prev, ...s }));
+      }
+    };
+
+    window.addEventListener('settings_updated', handleSettingsUpdated);
+    return () => {
+      window.removeEventListener('settings_updated', handleSettingsUpdated);
+    };
   }, []);
 
   // Handle passed location state (e.g. from Reservations or Orders)
@@ -627,6 +663,12 @@ const Pos: React.FC = () => {
     return totalCart * exchangeRate;
   }, [totalCart, exchangeRate]);
 
+  const formatLocalAmount = (val: number) => {
+    return currencySymbol === 'COP'
+      ? Number(val).toLocaleString('es-CO')
+      : Number(val).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   // Vuelto calculation for Cash USD
   const vueltoUsd = useMemo(() => {
     if (typeof usdReceived === 'number' && usdReceived >= totalCart) {
@@ -746,6 +788,8 @@ const Pos: React.FC = () => {
       changeRef: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? (changeRef.trim() || undefined) : undefined,
       initialAbono: paymentMethod === 'PENDING' ? abonoAmount : undefined,
       bypassMinDeposit: paymentMethod === 'PENDING' ? bypassMinDeposit : undefined,
+      amountBs: Number(totalCartBs.toFixed(2)),
+      exchangeRate: exchangeRate,
       exchangeRateBs: exchangeRate,
       linkedReservationId: linkedReservationId || undefined
     };
@@ -973,8 +1017,8 @@ const Pos: React.FC = () => {
               <button
                 key={cat}
                 type="button"
-                className={`ff-chip ${selectedCategory === cat ? 'active bg-theme-primary text-white border-theme-primary' : ''}`}
-                style={selectedCategory === cat ? { backgroundColor: 'var(--theme-primary)', color: '#ffffff', borderColor: 'var(--theme-primary)' } : {}}
+                className={`ff-chip ${selectedCategory === cat ? 'active bg-theme-primary border-theme-primary' : ''}`}
+                style={selectedCategory === cat ? { backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast, #ffffff)', borderColor: 'var(--theme-primary)' } : {}}
                 onClick={() => setSelectedCategory(cat)}
               >
                 {cat}
@@ -1083,7 +1127,7 @@ const Pos: React.FC = () => {
                             </span>
                           </div>
                           <div style={{ fontSize: '11px', fontWeight: '500', color: '#64748B', marginTop: '1px' }}>
-                            (Bs. {(p.salePrice * exchangeRate).toFixed(2)})
+                            ({currencySymbol} {currencySymbol === 'COP' ? Number(p.salePrice * exchangeRate).toLocaleString('es-CO') : (p.salePrice * exchangeRate).toFixed(2)})
                           </div>
                         </div>
 
@@ -1110,13 +1154,13 @@ const Pos: React.FC = () => {
                               e.stopPropagation();
                               addToCart(p);
                             }}
-                            className="bg-theme-primary text-white"
+                            className="bg-theme-primary"
                             style={{
                               width: '32px',
                               height: '32px',
                               borderRadius: '50%',
                               backgroundColor: 'var(--theme-primary)',
-                              color: '#ffffff',
+                              color: 'var(--theme-primary-contrast, #ffffff)',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -1154,7 +1198,7 @@ const Pos: React.FC = () => {
                   {totalCartItems} {totalCartItems === 1 ? 'item' : 'items'} &bull; ${totalCart.toFixed(2)}
                 </div>
                 <div style={{ fontSize: '11px', color: '#94A3B8' }}>
-                  Bs. {totalCartBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {currencySymbol} {currencySymbol === 'COP' ? Number(totalCartBs).toLocaleString('es-CO') : totalCartBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
@@ -1308,14 +1352,16 @@ const Pos: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '2px dashed #E2E8F0' }}>
                     <div>
                       <span style={{ fontSize: '13px', fontWeight: '600', color: '#64748B' }}>Total a Pagar:</span>
-                      <div style={{ fontSize: '11px', color: '#64748B' }}>Tasa: Bs. {exchangeRate.toFixed(2)}</div>
+                      <div style={{ fontSize: '11px', color: '#64748B' }}>
+                        Tasa: {currencySymbol} {currencySymbol === 'COP' ? Number(exchangeRate).toLocaleString('es-CO') : exchangeRate.toFixed(2)}
+                      </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '20px', fontWeight: '900', color: '#10B981' }}>
                         ${totalCart.toFixed(2)}
                       </div>
                       <div style={{ fontSize: '12px', fontWeight: '700', color: '#0F172A' }}>
-                        Bs. {totalCartBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {currencySymbol} {currencySymbol === 'COP' ? Number(totalCartBs).toLocaleString('es-CO') : totalCartBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
                   </div>
@@ -1374,35 +1420,41 @@ const Pos: React.FC = () => {
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
                           Zona de Envío *
                         </label>
-                        <select
+                        <IonSelect
+                          interface="popover"
                           value={deliveryZoneId}
-                          onChange={e => setDeliveryZoneId(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                          placeholder="Selecciona zona de envío..."
+                          onIonChange={e => setDeliveryZoneId(e.detail.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-slate-800 text-sm"
+                          style={{ '--padding-start': '0px', '--padding-end': '0px', minHeight: '42px' }}
                         >
-                          <option value="">Selecciona zona de envío...</option>
+                          <IonSelectOption value="">Selecciona zona de envío...</IonSelectOption>
                           {deliveryZones.map(zone => (
-                            <option key={zone.id} value={zone.id}>
+                            <IonSelectOption key={zone.id} value={zone.id}>
                               {zone.name} (+${zone.priceUSD})
-                            </option>
+                            </IonSelectOption>
                           ))}
-                        </select>
+                        </IonSelect>
                       </div>
                       <div>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
                           🛵 Repartidor Asignado
                         </label>
-                        <select
+                        <IonSelect
+                          interface="popover"
                           value={deliveryUserId}
-                          onChange={e => setDeliveryUserId(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                          placeholder="Sin asignar / A convenir"
+                          onIonChange={e => setDeliveryUserId(e.detail.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-slate-800 text-sm"
+                          style={{ '--padding-start': '0px', '--padding-end': '0px', minHeight: '42px' }}
                         >
-                          <option value="">Sin asignar / A convenir</option>
+                          <IonSelectOption value="">Sin asignar / A convenir</IonSelectOption>
                           {employees.filter(e => e.role === UserRole.DELIVERY).map(d => (
-                            <option key={d.id} value={d.id}>
+                            <IonSelectOption key={d.id} value={d.id}>
                               🛵 {d.username || d.name}
-                            </option>
+                            </IonSelectOption>
                           ))}
-                        </select>
+                        </IonSelect>
                       </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -1463,18 +1515,21 @@ const Pos: React.FC = () => {
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '6px' }}>
                         Atendido por (Opcional)
                       </label>
-                      <select
+                      <IonSelect
+                        interface="popover"
                         value={employeeId}
-                        onChange={e => setEmployeeId(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                        placeholder="Sin asignar"
+                        onIonChange={e => setEmployeeId(e.detail.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-slate-800 text-sm"
+                        style={{ '--padding-start': '0px', '--padding-end': '0px', minHeight: '44px' }}
                       >
-                        <option value="">Sin asignar</option>
+                        <IonSelectOption value="">Sin asignar</IonSelectOption>
                         {employees.map(emp => (
-                          <option key={emp.id} value={emp.id}>
+                          <IonSelectOption key={emp.id} value={emp.id}>
                             {emp.name || emp.username} {emp.jobTitle ? `(${emp.jobTitle})` : ''}
-                          </option>
+                          </IonSelectOption>
                         ))}
-                      </select>
+                      </IonSelect>
                     </div>
                   )}
                 </div>
@@ -1492,14 +1547,15 @@ const Pos: React.FC = () => {
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <select
+                    <IonSelect
+                      interface="popover"
                       value={discountType}
-                      onChange={e => setDiscountType(e.target.value as any)}
-                      style={{ width: '100px', padding: '8px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#ffffff', fontSize: '12px', color: '#0F172A' }}
+                      onIonChange={e => setDiscountType(e.detail.value)}
+                      style={{ width: '110px', minHeight: '38px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#ffffff', fontSize: '12px', color: '#0F172A', '--padding-start': '8px', '--padding-end': '8px' }}
                     >
-                      <option value="FIXED">$ Fijo</option>
-                      <option value="PERCENTAGE">% Porc.</option>
-                    </select>
+                      <IonSelectOption value="FIXED">$ Fijo</IonSelectOption>
+                      <IonSelectOption value="PERCENTAGE">% Porc.</IonSelectOption>
+                    </IonSelect>
                     <input
                       type="number"
                       min="0"
@@ -1730,7 +1786,7 @@ const Pos: React.FC = () => {
                             ${vueltoUsd.toFixed(2)} USD
                           </span>
                           <span style={{ fontSize: '15px', fontWeight: '800', color: '#065F46' }}>
-                            Bs. {vueltoBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {currencySymbol} {formatLocalAmount(vueltoBs)}
                           </span>
                         </div>
 
@@ -1789,7 +1845,7 @@ const Pos: React.FC = () => {
                                   cursor: 'pointer'
                                 }}
                               >
-                                🇻🇪 Efectivo Bs
+                                🇻🇪 Efectivo {currencySymbol}
                               </button>
                             </div>
 
@@ -1797,7 +1853,7 @@ const Pos: React.FC = () => {
                             {changeMethod === 'PAGO_MOVIL' && (
                               <div style={{ background: '#ffffff', border: '1px solid #A7F3D0', borderRadius: '10px', padding: '10px' }}>
                                 <div style={{ fontSize: '11px', fontWeight: '700', color: '#047857', marginBottom: '8px' }}>
-                                  📲 Registra la transferencia de vuelto (Bs. {vueltoBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                                  📲 Registra la transferencia de vuelto ({currencySymbol} {formatLocalAmount(vueltoBs)})
                                 </div>
                                 <div style={{ marginBottom: '8px' }}>
                                   <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '2px' }}>
@@ -1848,7 +1904,7 @@ const Pos: React.FC = () => {
 
                             {changeMethod === 'CASH_BS' && (
                               <div style={{ fontSize: '11px', color: '#065F46', background: '#ffffff', padding: '8px 10px', borderRadius: '8px', border: '1px solid #A7F3D0' }}>
-                                💡 Se entregarán <b>Bs. {vueltoBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> en billetes de bolívares desde la gaveta.
+                                💡 Se entregarán <b>{currencySymbol} {formatLocalAmount(vueltoBs)}</b> en billetes físicos desde la gaveta.
                               </div>
                             )}
                           </div>
@@ -2003,7 +2059,7 @@ const Pos: React.FC = () => {
                                 +${(abonoNum - totalCart).toFixed(2)} USD
                               </div>
                               <div style={{ fontSize: '11px', fontWeight: '700', color: '#065F46' }}>
-                                Bs. {((abonoNum - totalCart) * exchangeRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {currencySymbol} {formatLocalAmount((abonoNum - totalCart) * exchangeRate)}
                               </div>
                             </>
                           ) : (
@@ -2013,7 +2069,7 @@ const Pos: React.FC = () => {
                                 ${saldoPendiente.toFixed(2)} USD
                               </div>
                               <div style={{ fontSize: '11px', fontWeight: '700', color: '#92400E' }}>
-                                Bs. {saldoPendienteBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {currencySymbol} {formatLocalAmount(saldoPendienteBs)}
                               </div>
                             </>
                           )}

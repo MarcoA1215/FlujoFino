@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThanOrEqual } from 'typeorm';
+import { Repository, MoreThanOrEqual, IsNull } from 'typeorm';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { Product } from '../entities/product.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
@@ -8,7 +8,8 @@ import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
 import { Investment } from '../entities/investment.entity';
-import { MovementType, OrderStatus, InvestmentType } from '@nutrideli/shared-types';
+import { Reservation } from '../entities/reservation.entity';
+import { MovementType, OrderStatus, InvestmentType, ReservationStatus, PaymentStatus } from '@nutrideli/shared-types';
 
 @Injectable()
 export class DashboardService {
@@ -20,10 +21,18 @@ export class DashboardService {
     @InjectRepository(OrderItem) private orderItemRepo: Repository<OrderItem>,
     @InjectRepository(OperatingExpense) private expenseRepo: Repository<OperatingExpense>,
     @InjectRepository(Investment) private investmentRepo: Repository<Investment>,
+    @InjectRepository(Reservation) private reservationRepo: Repository<Reservation>,
   ) {}
 
   async getSummary(tenantId: string) {
-    const rawMaterials = await this.rawMaterialRepo.find({ where: { tenantId } });
+    const rawMaterials = await this.rawMaterialRepo.find({
+      where: [
+        { tenantId, isActive: true },
+        { tenantId, isActive: IsNull() }
+      ]
+    });
+    const activeMaterialIds = new Set(rawMaterials.map(rm => rm.id));
+
     const products = await this.productRepo.find({
       where: { tenantId },
       relations: { recipe: { rawMaterial: true } }
@@ -44,7 +53,7 @@ export class DashboardService {
 
         if (p.recipe && p.recipe.length > 0) {
           for (const item of p.recipe) {
-            if (item.rawMaterial) {
+            if (item.rawMaterial && activeMaterialIds.has(item.rawMaterial.id)) {
               const rmId = item.rawMaterial.id;
               rawMaterialDebt[rmId] = (rawMaterialDebt[rmId] || 0) + (item.quantity * deficit);
             }
@@ -56,14 +65,20 @@ export class DashboardService {
     let totalFinishedProductCapital = 0;
     
     for (const p of products) {
-      if (p.stockQuantity > 0 && p.recipe) {
-        let costToProduce = 0;
-        for (const item of p.recipe) {
-          if (item.rawMaterial) {
-            costToProduce += item.quantity * item.rawMaterial.costPerUnit;
+      if (p.stockQuantity > 0) {
+        if (p.recipe && p.recipe.length > 0) {
+          let costToProduce = 0;
+          for (const item of p.recipe) {
+            if (item.rawMaterial) {
+              costToProduce += item.quantity * item.rawMaterial.costPerUnit;
+            }
           }
+          totalFinishedProductCapital += costToProduce * p.stockQuantity;
+        } else {
+          // Negocios de reventa directa (Retail sin receta)
+          const unitCost = Number(p.cost || p.estimatedCost || 0);
+          totalFinishedProductCapital += p.stockQuantity * unitCost;
         }
-        totalFinishedProductCapital += costToProduce * p.stockQuantity;
       }
     }
 
@@ -114,7 +129,19 @@ export class DashboardService {
       .where('o.tenantId = :tenantId', { tenantId })
       .andWhere('o.status IN (:...statuses)', { statuses: [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.DELIVERED] })
       .getRawOne();
-    const historicalRevenue = Number(revRes?.total || 0);
+    const orderRevenue = Number(revRes?.total || 0);
+
+    // Ingreso histórico de citas completadas y pagadas no facturadas previamente por POS
+    const resRevRes = await this.reservationRepo.createQueryBuilder('r')
+      .select('COALESCE(SUM(r.totalAmount), 0)', 'total')
+      .where('r.tenantId = :tenantId', { tenantId })
+      .andWhere('r.status = :status', { status: ReservationStatus.COMPLETED })
+      .andWhere('r.paymentStatus = :paymentStatus', { paymentStatus: PaymentStatus.PAID })
+      .andWhere('(r.orderId IS NULL OR r.orderId = :empty)', { empty: '' })
+      .getRawOne();
+    const reservationRevenue = Number(resRevRes?.total || 0);
+
+    const historicalRevenue = orderRevenue + reservationRevenue;
     
     // Gastos de nómina
     const payRes = await this.expenseRepo.createQueryBuilder('e')
@@ -171,6 +198,27 @@ export class DashboardService {
       const dateStr = new Date(o.createdAt).toISOString().split('T')[0];
       if (salesByDay[dateStr] !== undefined) {
         salesByDay[dateStr] += Number(o.totalAmount || 0);
+      }
+    });
+
+    const recentReservations = await this.reservationRepo.createQueryBuilder('r')
+      .where('r.tenantId = :tenantId', { tenantId })
+      .andWhere('r.status = :status', { status: ReservationStatus.COMPLETED })
+      .andWhere('r.paymentStatus = :paymentStatus', { paymentStatus: PaymentStatus.PAID })
+      .andWhere('(r.orderId IS NULL OR r.orderId = :empty)', { empty: '' })
+      .andWhere('(r.date >= :minDateStr OR r.createdAt >= :sevenDaysAgo)', {
+        minDateStr: last7Days[0],
+        sevenDaysAgo
+      })
+      .select(['r.date', 'r.createdAt', 'r.totalAmount'])
+      .getMany();
+
+    recentReservations.forEach(r => {
+      const dateStr = r.date
+        ? (typeof r.date === 'string' ? r.date.split('T')[0] : new Date(r.date).toISOString().split('T')[0])
+        : new Date(r.createdAt).toISOString().split('T')[0];
+      if (salesByDay[dateStr] !== undefined) {
+        salesByDay[dateStr] += Number(r.totalAmount || 0);
       }
     });
 

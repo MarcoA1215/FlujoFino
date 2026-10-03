@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton, IonLabel, useIonAlert, useIonToast, IonNote, IonIcon, IonModal, IonToggle } from '@ionic/react';
-import { addOutline } from 'ionicons/icons';
+import { addOutline, archiveOutline, refreshOutline, timeOutline, chevronUpOutline, chevronDownOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import type { RawMaterial } from '../types';
 import { RawMaterialCard } from '../components/raw-materials/RawMaterialCard';
@@ -45,27 +45,111 @@ const RawMaterials: React.FC = () => {
     setInputUnit(baseUnit);
   }, [baseUnit]);
 
+  const [showArchivedPanel, setShowArchivedPanel] = useState(false);
+  const [archivedMaterials, setArchivedMaterials] = useState<RawMaterial[]>([]);
+  const [loadingArchived, setLoadingArchived] = useState(false);
+
+  // Pull-down gesture state (Telegram style)
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
+  const pullStartYRef = React.useRef(0);
+  const isPullingRef = React.useRef(false);
+  const contentRef = React.useRef<HTMLIonContentElement | null>(null);
+  const scrollElementRef = React.useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.getScrollElement().then((el) => {
+        scrollElementRef.current = el;
+      });
+    }
+  }, []);
+
+  const fetchArchivedMaterials = async () => {
+    setLoadingArchived(true);
+    try {
+      const res = await apiClient.get<RawMaterial[]>('/raw-materials/archived');
+      setArchivedMaterials(res.data);
+    } catch (e) {
+      console.error(e);
+      presentToast({ message: 'Error al cargar archivados', duration: 3000, color: 'danger' });
+    } finally {
+      setLoadingArchived(false);
+    }
+  };
+
+  const unarchiveMaterial = async (m: RawMaterial) => {
+    try {
+      await apiClient.patch(`/raw-materials/${m.id}/unarchive`);
+      presentToast({ message: `Insumo "${m.name}" restaurado con éxito`, duration: 2000, color: 'success' });
+      fetchMaterials();
+      fetchArchivedMaterials();
+    } catch (e) {
+      console.error(e);
+      presentToast({ message: 'Error al restaurar insumo', duration: 3000, color: 'danger' });
+    }
+  };
+
   const archiveRawMaterial = async (m: RawMaterial) => {
-    presentAlert({
-      header: 'Archivar Insumo',
-      message: '¿Estás seguro de archivar este insumo? Desaparecerá de la lista, pero su historial se mantendrá intacto.',
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        { 
-          text: 'Archivar', 
-          role: 'destructive',
-          handler: async () => {
-            try {
-              await apiClient.patch('/raw-materials/' + m.id + '/archive');
-              fetchMaterials();
-              presentToast({ message: 'Insumo archivado', duration: 2000, color: 'success' });
-            } catch (e) {
-              presentToast({ message: 'Error al archivar', duration: 3000, color: 'danger' });
+    try {
+      const { data: usage } = await apiClient.get<{
+        inUse: boolean;
+        count: number;
+        products: Array<{ id: string; name: string }>;
+      }>(`/raw-materials/${m.id}/usage`);
+
+      if (usage.inUse) {
+        const productNames = usage.products.map(p => p.name).join(', ');
+        presentAlert({
+          header: '⚠️ Insumo en Uso',
+          message: `Este insumo forma parte de la receta de: ${productNames}. Si lo archivas sin removerlo, no podrás fabricar estos productos por falta de stock.`,
+          buttons: [
+            { text: 'Cancelar', role: 'cancel' },
+            {
+              text: 'Remover de recetas y archivar',
+              role: 'destructive',
+              handler: async () => {
+                try {
+                  await apiClient.patch(`/raw-materials/${m.id}/archive`, { removeFromRecipes: true });
+                  fetchMaterials();
+                  if (showArchivedPanel) fetchArchivedMaterials();
+                  presentToast({ message: 'Insumo removido de recetas y archivado', duration: 2500, color: 'success' });
+                } catch (e) {
+                  console.error(e);
+                  presentToast({ message: 'Error al archivar', duration: 3000, color: 'danger' });
+                }
+              }
             }
-          }
-        }
-      ]
-    });
+          ]
+        });
+      } else {
+        presentAlert({
+          header: 'Archivar Insumo',
+          message: '¿Archivar este insumo? Desaparecerá de la lista activa pero podrás acceder a él deslizando hacia abajo en el tope.',
+          buttons: [
+            { text: 'Cancelar', role: 'cancel' },
+            {
+              text: 'Archivar',
+              role: 'destructive',
+              handler: async () => {
+                try {
+                  await apiClient.patch(`/raw-materials/${m.id}/archive`);
+                  fetchMaterials();
+                  if (showArchivedPanel) fetchArchivedMaterials();
+                  presentToast({ message: 'Insumo archivado', duration: 2000, color: 'success' });
+                } catch (e) {
+                  console.error(e);
+                  presentToast({ message: 'Error al archivar', duration: 3000, color: 'danger' });
+                }
+              }
+            }
+          ]
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      presentToast({ message: 'Error al verificar uso del insumo', duration: 3000, color: 'danger' });
+    }
   };
 
   const fetchMaterials = async () => {
@@ -173,10 +257,257 @@ const RawMaterials: React.FC = () => {
     return item.name.toLowerCase().includes(searchText.toLowerCase());
   });
   
+  // Telegram-style pull-down handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const el = scrollElementRef.current;
+    if (el) {
+      if (el.scrollTop <= 1) {
+        isPullingRef.current = true;
+        pullStartYRef.current = e.touches[0].clientY;
+      } else {
+        isPullingRef.current = false;
+      }
+    } else if (contentRef.current) {
+      contentRef.current.getScrollElement().then((scrolledEl) => {
+        scrollElementRef.current = scrolledEl;
+        if (scrolledEl && scrolledEl.scrollTop <= 1) {
+          isPullingRef.current = true;
+          pullStartYRef.current = e.touches[0].clientY;
+        } else {
+          isPullingRef.current = false;
+        }
+      });
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPullingRef.current) return;
+    const currentY = e.touches[0].clientY;
+    const delta = currentY - pullStartYRef.current;
+    if (delta > 0) {
+      // Damping factor for rubber band feel
+      const distance = Math.min(100, delta * 0.45);
+      setPullDistance(distance);
+      setIsPulling(true);
+    } else {
+      setPullDistance(0);
+      setIsPulling(false);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (isPullingRef.current) {
+      if (pullDistance >= 55) {
+        // Trigger opening archived drawer
+        setShowArchivedPanel(true);
+        fetchArchivedMaterials();
+      }
+      isPullingRef.current = false;
+      setIsPulling(false);
+      setPullDistance(0);
+    }
+  };
+
+  const toggleArchivedPanel = () => {
+    if (!showArchivedPanel) {
+      fetchArchivedMaterials();
+    }
+    setShowArchivedPanel(!showArchivedPanel);
+  };
+
   return (
     <IonPage>
       <AppHeader title="Insumos (Materia Prima)" />
-      <IonContent fullscreen className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' }}>
+      <IonContent
+        ref={contentRef}
+        fullscreen
+        className="ion-padding ff-has-bottom-nav"
+        style={{ '--background': '#F8FAFC' }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Indicador de Resorte Estilo Telegram al Estirar en el Tope (0px en reposo) */}
+        <div
+          style={{
+            overflow: 'hidden',
+            maxHeight: isPulling ? `${pullDistance}px` : '0px',
+            opacity: isPulling ? Math.min(1, pullDistance / 40) : 0,
+            transform: `scale(${0.8 + (pullDistance / 100) * 0.2})`,
+            transition: isPulling ? 'none' : 'max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: pullDistance >= 55 ? '#047857' : '#64748B',
+            fontWeight: 700,
+            fontSize: '13px',
+            pointerEvents: 'none',
+            userSelect: 'none',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              background: pullDistance >= 55 ? '#D1FAE5' : '#F1F5F9',
+              border: `1px solid ${pullDistance >= 55 ? '#6EE7B7' : '#E2E8F0'}`,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+            }}
+          >
+            <IonIcon
+              icon={archiveOutline}
+              style={{
+                fontSize: '16px',
+                transform: pullDistance >= 55 ? 'rotate(-10deg) scale(1.15)' : 'none',
+                transition: 'transform 0.2s',
+              }}
+            />
+            <span>
+              {pullDistance >= 55 ? 'Soltar para abrir' : '📦 Desliza para ver Archivados'}
+            </span>
+          </div>
+        </div>
+
+        {/* Cajón / Panel Retráctil Superior de Insumos Archivados */}
+        {showArchivedPanel && (
+          <div
+            style={{
+              maxWidth: '1200px',
+              margin: '0 auto 16px auto',
+              background: '#FFFFFF',
+              borderRadius: '16px',
+              border: '1.5px solid #CBD5E1',
+              boxShadow: '0 8px 24px rgba(15, 23, 42, 0.08)',
+              overflow: 'hidden',
+              animation: 'fadeInSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            <div
+              style={{
+                background: '#0F172A',
+                color: '#FFFFFF',
+                padding: '12px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <IonIcon icon={archiveOutline} style={{ fontSize: '1.25rem', color: '#94A3B8' }} />
+                <span style={{ fontWeight: 800, fontSize: '0.95rem', letterSpacing: '-0.01em' }}>
+                  Insumos Archivados / Descontinuados ({archivedMaterials.length})
+                </span>
+              </div>
+              <button
+                onClick={() => setShowArchivedPanel(false)}
+                style={{
+                  background: '#334155',
+                  border: 'none',
+                  color: '#F8FAFC',
+                  borderRadius: '8px',
+                  padding: '4px 10px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <IonIcon icon={chevronUpOutline} />
+                <span>Ocultar</span>
+              </button>
+            </div>
+
+            <div style={{ padding: '16px' }}>
+              {loadingArchived ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: '#64748B' }}>
+                  Cargando insumos archivados...
+                </div>
+              ) : archivedMaterials.length === 0 ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>
+                  No hay insumos archivados en este momento.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {archivedMaterials.map((archived) => (
+                    <div
+                      key={archived.id}
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        background: '#F8FAFC',
+                        borderRadius: '12px',
+                        border: '1px solid #E2E8F0',
+                        gap: '12px',
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: '180px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '15px', color: '#1E293B' }}>
+                          {archived.name}
+                        </div>
+                        <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                          <span>
+                            Último Stock: <strong style={{ color: '#334155' }}>{Number(archived.stockQuantity || 0).toFixed(2)} {archived.unit}</strong>
+                          </span>
+                          <span>
+                            Costo Histórico: <strong style={{ color: '#334155' }}>${Number(archived.costPerUnit || 0).toFixed(2)} / {archived.unit}</strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button
+                          className="ff-btn-primary"
+                          onClick={() => unarchiveMaterial(archived)}
+                          style={{
+                            fontSize: '12px',
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <IonIcon icon={refreshOutline} />
+                          <span>Restaurar</span>
+                        </button>
+                        <button
+                          onClick={() => setSelectedMaterialForHistory(archived)}
+                          style={{
+                            background: '#FFFFFF',
+                            border: '1px solid #CBD5E1',
+                            color: '#334155',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <IonIcon icon={timeOutline} />
+                          <span>Historial</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '90px' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px' }}>
             <div className="ff-search-pill" style={{ flex: 1 }}>

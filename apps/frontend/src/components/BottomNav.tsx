@@ -55,12 +55,17 @@ const BottomNav: React.FC = () => {
 
   if (!isAuthenticated || !user?.tenantId) return null;
 
-  // SuperAdmin never sees BottomNav
-  if (user.role === UserRole.SUPERADMIN || (user.role as string) === 'SUPERADMIN') {
+  // SuperAdmin and Promotor never see standard store BottomNav
+  if (
+    user.role === UserRole.SUPERADMIN ||
+    (user.role as string) === 'SUPERADMIN' ||
+    user.role === UserRole.PROMOTOR ||
+    (user.role as string) === 'PROMOTOR'
+  ) {
     return null;
   }
 
-  // Don't show on public views, platform-admin or feedback
+  // Don't show on public views, platform-admin, promoter or feedback
   const isPublicRoute =
     location.pathname.startsWith('/book') ||
     location.pathname.startsWith('/store') ||
@@ -72,6 +77,8 @@ const BottomNav: React.FC = () => {
     location.pathname === '/subscription-expired' ||
     location.pathname === '/platform-admin' ||
     location.pathname.startsWith('/platform-admin') ||
+    location.pathname === '/promoter' ||
+    location.pathname.startsWith('/promoter') ||
     location.pathname === '/feedback' ||
     location.pathname.startsWith('/feedback');
 

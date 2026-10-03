@@ -189,12 +189,14 @@ export class UpdatePaymentDto {
 }
 
 import { CustomersService } from '../customers/customers.service';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class OrdersService {
   constructor(
     private dataSource: DataSource,
     private readonly customersService: CustomersService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   async addAbono(tenantId: string, orderId: string, amount: number, method?: string, ref?: string) {
@@ -248,6 +250,10 @@ export class OrdersService {
       if (item.unitPrice < 0) throw new BadRequestException('El precio no puede ser negativo');
     }
     if ((dto.discountAmount || 0) < 0) throw new BadRequestException('El descuento no puede ser negativo');
+
+    const orderExchangeRate = (dto.exchangeRate && Number(dto.exchangeRate) > 0)
+      ? Number(dto.exchangeRate)
+      : await this.settingsService.getEffectiveRate(tenantId);
 
     return this.dataSource.transaction(async (manager) => {
       let totalAmount = 0;
@@ -394,7 +400,7 @@ export class OrdersService {
         changeMethod: dto.changeMethod,
         changeRef: dto.changeRef,
         amountBs: dto.amountBs,
-        exchangeRate: dto.exchangeRate,
+        exchangeRate: orderExchangeRate,
         abonosTotal: dto.initialAbono || 0,
         abonosHistory: (dto.initialAbono && dto.initialAbono > 0) ? [{ id: Date.now().toString(), amount: dto.initialAbono, date: new Date().toISOString() }] : []
       });
@@ -419,7 +425,7 @@ export class OrdersService {
                 await manager.save(Product, ci.component);
               }
             }
-          } else if (!product.is_service && product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
+          } else if (product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
             for (const ri of product.recipe) {
               if (ri.rawMaterial) {
                 const isRemoved = itemDto.removedIngredients?.some(rem => 
@@ -485,7 +491,7 @@ export class OrdersService {
                 }
             }
         }
-        if (!product.is_service && product.recipe && product.recipe.length > 0) {
+        if (product.recipe && product.recipe.length > 0) {
             for (const ri of product.recipe) {
                 const isRemoved = itemDto.removedIngredients?.some(rem => 
                   rem === ri.rawMaterial?.id || rem.toLowerCase() === ri.rawMaterial?.name?.toLowerCase()
@@ -553,7 +559,16 @@ export class OrdersService {
         savedOrder.totalAmount = effectiveTotal - cappedDiscount;
         savedOrder.totalCost = totalCost;
         savedOrder.netProfit = savedOrder.totalAmount - deliveryFee - totalCost;
-        if (savedOrder.abonosTotal >= savedOrder.totalAmount && savedOrder.totalAmount > 0) {
+        savedOrder.exchangeRate = orderExchangeRate;
+        savedOrder.amountBs = (dto.amountBs !== undefined && Number(dto.amountBs) > 0)
+          ? Number(dto.amountBs)
+          : Number((savedOrder.totalAmount * orderExchangeRate).toFixed(2));
+        if (savedOrder.changeAmount && (!savedOrder.changeAmountBs || Number(savedOrder.changeAmountBs) === 0)) {
+          savedOrder.changeAmountBs = Number((Number(savedOrder.changeAmount) * orderExchangeRate).toFixed(2));
+        }
+        if (savedOrder.totalAmount === 0) {
+          savedOrder.paymentStatus = PaymentStatus.PAID;
+        } else if (savedOrder.abonosTotal >= savedOrder.totalAmount && savedOrder.totalAmount > 0) {
           savedOrder.paymentStatus = PaymentStatus.PAID;
         } else if (savedOrder.abonosTotal > 0 && savedOrder.abonosTotal < savedOrder.totalAmount) {
           savedOrder.paymentStatus = PaymentStatus.PARTIAL;
@@ -561,12 +576,14 @@ export class OrdersService {
 
         if (dto.linkedReservationId) {
           try {
+            savedOrder.linkedReservationId = dto.linkedReservationId;
             const reservationRepo = manager.getRepository(Reservation);
             const reservation = await reservationRepo.findOne({
               where: { id: dto.linkedReservationId, tenantId },
             });
             if (reservation) {
               reservation.status = ReservationStatus.COMPLETED;
+              reservation.orderId = savedOrder.id;
               await reservationRepo.save(reservation);
             }
           } catch (resErr) {
@@ -714,7 +731,7 @@ export class OrdersService {
                     await manager.save(Product, ci.component);
                   }
                 }
-              } else if (!product.is_service && product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
+              } else if (product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
                 // Restore raw materials (except removed)
                 for (const ri of product.recipe) {
                   if (ri.rawMaterial) {
@@ -1213,17 +1230,23 @@ export class OrdersService {
   }
 
   async getDailyCashSummary(tenantId: string, dateStr?: string) {
-    let startOfDay: Date;
-    let endOfDay: Date;
-    if (dateStr) {
-      const [y, m, d] = dateStr.split('-').map(Number);
-      startOfDay = new Date(y, m - 1, d, 0, 0, 0, 0);
-      endOfDay = new Date(y, m - 1, d, 23, 59, 59, 999);
-    } else {
-      const now = new Date();
-      startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-      endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    let targetDateStr = dateStr;
+    if (!targetDateStr) {
+      // Obtener la fecha actual en la zona horaria de Venezuela (America/Caracas, UTC-4)
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Caracas',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      targetDateStr = formatter.format(new Date()); // Formato YYYY-MM-DD
     }
+
+    // Límites del día considerando huso horario UTC-4 (America/Caracas)
+    // 00:00:00.000 Caracas = 04:00:00.000Z
+    // 23:59:59.999 Caracas = 03:59:59.999Z del día siguiente
+    const startOfDay = new Date(`${targetDateStr}T00:00:00.000-04:00`);
+    const endOfDay = new Date(`${targetDateStr}T23:59:59.999-04:00`);
 
     const orders = await this.dataSource.getRepository(Order).find({
       where: {
@@ -1234,8 +1257,7 @@ export class OrdersService {
       order: { createdAt: 'DESC' },
     });
 
-    const settings = await this.dataSource.getRepository(Settings).findOne({ where: { tenantId } });
-    const exchangeRate = Number(settings?.exchangeRateBs || 40.0);
+    const currentExchangeRate = await this.settingsService.getEffectiveRate(tenantId);
 
     let totalSalesUSD = 0;
     let totalPaidUSD = 0;
@@ -1263,6 +1285,11 @@ export class OrdersService {
 
       const orderTotal = Number(o.totalAmount || 0);
       const abonos = Number(o.abonosTotal || 0);
+      const orderRate = Number(o.exchangeRate) > 0 ? Number(o.exchangeRate) : currentExchangeRate;
+      const orderAmountBs = (o.amountBs !== undefined && o.amountBs !== null && Number(o.amountBs) > 0)
+        ? Number(o.amountBs)
+        : Number((orderTotal * orderRate).toFixed(2));
+
       totalSalesUSD += orderTotal;
 
       if (o.paymentStatus === PaymentStatus.PAID) {
@@ -1283,8 +1310,8 @@ export class OrdersService {
       // Track Vueltos
       const changeAmt = Number(o.changeAmount || 0);
       if (changeAmt > 0) {
+        const bsChange = Number(o.changeAmountBs || (changeAmt * orderRate));
         if (o.changeMethod === 'PAGO_MOVIL') {
-          const bsChange = Number(o.changeAmountBs || (changeAmt * exchangeRate));
           totalPagoMovilChangeBs += bsChange;
           vueltosList.push({
             orderId: o.id,
@@ -1297,7 +1324,6 @@ export class OrdersService {
             createdAt: o.createdAt
           });
         } else if (o.changeMethod === 'CASH_BS') {
-          const bsChange = Number(o.changeAmountBs || (changeAmt * exchangeRate));
           vueltosList.push({
             orderId: o.id,
             orderNumber: o.id.slice(0, 8).toUpperCase(),
@@ -1316,7 +1342,7 @@ export class OrdersService {
             customerName: o.customerName,
             method: 'CASH_USD',
             amountUsd: changeAmt,
-            amountBs: changeAmt * exchangeRate,
+            amountBs: bsChange,
             ref: 'Efectivo USD',
             createdAt: o.createdAt
           });
@@ -1331,9 +1357,9 @@ export class OrdersService {
       const isPagoMovil = o.paymentMethod === 'PAGO_MOVIL' || (o.paymentMethod !== 'USD' && o.pagoMovilRef && o.pagoMovilRef.trim().length > 0);
 
       if (isPunto) {
-        const bs = Number(o.amountBs || (orderTotal * exchangeRate));
+        const bs = orderAmountBs;
         totalPuntoBs += bs;
-        totalPuntoUSD += bs / exchangeRate;
+        totalPuntoUSD += bs / orderRate;
         puntoList.push({
           orderId: o.id,
           orderNumber: o.id.slice(0, 8).toUpperCase(),
@@ -1344,9 +1370,9 @@ export class OrdersService {
           createdAt: o.createdAt,
         });
       } else if (isPagoMovil) {
-        const bs = Number(o.amountBs || (orderTotal * exchangeRate));
+        const bs = orderAmountBs;
         totalPagoMovilBs += bs;
-        totalPagoMovilUSD += bs / exchangeRate;
+        totalPagoMovilUSD += bs / orderRate;
         pagoMovilList.push({
           orderId: o.id,
           orderNumber: o.id.slice(0, 8).toUpperCase(),
@@ -1429,8 +1455,8 @@ export class OrdersService {
     const netCashUSD = Number((totalCashUSD - totalCashChangeUSD - totalCashExpensesUSD).toFixed(2));
 
     return {
-      date: startOfDay.toISOString().split('T')[0],
-      exchangeRate,
+      date: targetDateStr,
+      exchangeRate: currentExchangeRate,
       totalSalesUSD: Number(totalSalesUSD.toFixed(2)),
       totalPaidUSD: Number(totalPaidUSD.toFixed(2)),
       totalPendingUSD: Number(totalPendingUSD.toFixed(2)),
@@ -1475,9 +1501,6 @@ export class OrdersService {
         }
       } catch (err) {
         console.error('Error syncing single offline order:', err);
-        if (item.offlineId) {
-          syncedOfflineIds.push(item.offlineId);
-        }
       }
     }
     return { success: true, syncedOfflineIds };
@@ -1511,6 +1534,36 @@ export class OrdersService {
     order.status = OrderStatus.CANCELADO_PROVEEDOR;
 
     return repo.save(order);
+  }
+
+  async assignDelivery(tenantId: string, id: string, deliveryUserId?: string): Promise<Order> {
+    const repo = this.dataSource.getRepository(Order);
+    const order = await repo.findOne({
+      where: { tenantId, id },
+      relations: { deliveryUser: true },
+    });
+    if (!order) {
+      throw new BadRequestException('Pedido no encontrado');
+    }
+
+    if (deliveryUserId && deliveryUserId.trim() !== '') {
+      const dAccess = await this.dataSource.manager.findOne(UserTenantAccess, {
+        where: { userId: deliveryUserId, tenantId, isActive: true },
+      });
+      if (!dAccess || dAccess.role !== UserRole.DELIVERY) {
+        throw new BadRequestException('El repartidor asignado debe ser un usuario activo con rol DELIVERY');
+      }
+      order.deliveryUserId = deliveryUserId;
+    } else {
+      order.deliveryUserId = null as any;
+    }
+
+    await repo.save(order);
+    const updated = await repo.findOne({
+      where: { tenantId, id },
+      relations: { items: { product: true, media: true }, deliveryZone: true, employee: { tenantAccess: true }, deliveryUser: true },
+    });
+    return updated!;
   }
 }
 

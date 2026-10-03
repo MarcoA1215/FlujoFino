@@ -45,6 +45,11 @@ export class ProductsController {
     return this.productsService.findAll(req.user.tenantId);
   }
 
+  @Get('archived')
+  findArchived(@Request() req: any) {
+    return this.productsService.findArchived(req.user.tenantId);
+  }
+
   @Post()
   create(@Request() req: any, @Body() dto: CreateProductDto) {
     return this.productsService.create(req.user.tenantId, dto);}
@@ -56,6 +61,11 @@ export class ProductsController {
   @Delete(':id')
   remove(@Request() req: any, @Param('id') id: string) {
     return this.productsService.remove(req.user.tenantId, id);}
+
+  @Patch(':id/restore')
+  restore(@Request() req: any, @Param('id') id: string) {
+    return this.productsService.restore(req.user.tenantId, id);
+  }
 
   @Get(':id/recipe')
   getRecipe(@Request() req: any, @Param('id') id: string) {

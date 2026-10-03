@@ -1,7 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { DeliveriesService } from './deliveries.service';
 import { Order } from '../entities/order.entity';
+import { Product } from '../entities/product.entity';
 import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Settings } from '../entities/settings.entity';
@@ -33,6 +35,17 @@ describe('DeliveriesService', () => {
       findOne: jest.fn(),
     };
 
+    const mockDataSource = {
+      transaction: jest.fn(async (cb) => {
+        const manager = {
+          findOne: mockOrderRepo.findOne,
+          find: jest.fn().mockResolvedValue([]),
+          save: jest.fn(async (entityOrClass, entity) => entity || entityOrClass),
+        };
+        return cb(manager);
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DeliveriesService,
@@ -40,6 +53,7 @@ describe('DeliveriesService', () => {
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
         { provide: getRepositoryToken(UserTenantAccess), useValue: mockAccessRepo },
         { provide: getRepositoryToken(Settings), useValue: mockSettingsRepo },
+        { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
 
@@ -149,6 +163,68 @@ describe('DeliveriesService', () => {
       expect(result.globalFletesUSD).toBe(5.0);
       expect(result.globalFletesBS).toBe(Number((5.0 * dynamicRate).toFixed(2))); // 275.00
       expect(result.drivers[0].totalFletesBS).toBe(Number((5.0 * dynamicRate).toFixed(2)));
+    });
+  });
+
+  describe('completeDelivery', () => {
+    it('debe deducir el stock físico de los productos de la orden al completar la entrega', async () => {
+      const tenantId = 'tenant-deliv-stock';
+      const orderId = 'ord-stock-1';
+      const driverId = 'driver-stock-1';
+
+      const mockOrder = {
+        id: orderId,
+        tenantId,
+        deliveryUserId: driverId,
+        status: OrderStatus.IN_TRANSIT,
+        items: [
+          { productId: 'prod-1', quantity: 2 },
+        ],
+      };
+
+      const mockProduct = {
+        id: 'prod-1',
+        tenantId,
+        physicalStock: 10,
+        isCombo: false,
+        isPreAssembled: false,
+      };
+
+      mockOrderRepo.findOne.mockResolvedValue(mockOrder);
+
+      const savedEntities: any[] = [];
+      const mockManager = {
+        findOne: jest.fn().mockImplementation((entityClass: any, options: any) => {
+          if (entityClass === Order || entityClass?.name === 'Order') {
+            return Promise.resolve(mockOrder);
+          }
+          if (entityClass === Product || entityClass?.name === 'Product') {
+            return Promise.resolve(mockProduct);
+          }
+          return Promise.resolve(null);
+        }),
+        find: jest.fn().mockImplementation((entityClass: any) => {
+          if (entityClass === Product || entityClass?.name === 'Product') {
+            return Promise.resolve([mockProduct]);
+          }
+          return Promise.resolve([]);
+        }),
+        save: jest.fn().mockImplementation((entityClass: any, entity: any) => {
+          const item = entity || entityClass;
+          savedEntities.push(item);
+          return Promise.resolve(item);
+        }),
+      };
+
+      (service as any).dataSource = {
+        transaction: jest.fn(async (cb) => cb(mockManager)),
+      };
+
+      const completed = await service.completeDelivery(tenantId, orderId, driverId);
+
+      expect(completed.status).toBe(OrderStatus.DELIVERED);
+      expect(mockProduct.physicalStock).toBe(8); // 10 - 2
+      expect(mockManager.save).toHaveBeenCalledWith(Product, mockProduct);
     });
   });
 });

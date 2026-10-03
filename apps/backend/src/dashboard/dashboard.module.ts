@@ -9,9 +9,10 @@ import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
 import { Investment } from '../entities/investment.entity';
+import { Reservation } from '../entities/reservation.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([RawMaterial, Product, StockMovement, Order, OrderItem, OperatingExpense, Investment])],
+  imports: [TypeOrmModule.forFeature([RawMaterial, Product, StockMovement, Order, OrderItem, OperatingExpense, Investment, Reservation])],
   controllers: [DashboardController],
   providers: [DashboardService],
 })

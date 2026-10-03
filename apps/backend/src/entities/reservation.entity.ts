@@ -92,6 +92,10 @@ export class Reservation {
   @Column({ type: 'text', nullable: true })
   imageUrl?: string | null;
 
+  @Index()
+  @Column({ nullable: true })
+  orderId?: string;
+
   @ManyToOne(() => Tenant)
   @JoinColumn({ name: 'tenantId' })
   tenant: Tenant;

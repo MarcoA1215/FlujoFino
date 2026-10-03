@@ -1,10 +1,12 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, DataSource } from 'typeorm';
 import { Tenant } from '../entities/tenant.entity';
 import { SaaSPaymentReport } from '../entities/saas-payment-report.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { PlatformConfig } from '../entities/platform-config.entity';
+import { Promoter } from '../entities/promoter.entity';
+import { PromoterCommission } from '../entities/promoter-commission.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpdatePlatformConfigDto } from './dto/update-platform-config.dto';
 import {
@@ -16,6 +18,11 @@ import {
   SaaSPaymentReportDTO,
   UserRole,
   MySubscriptionDTO,
+  PromoterCommissionType,
+  PromoterCommissionStatus,
+  PromoterRank,
+  SuperAdminPromoterDTO,
+  PromoterCommissionDTO,
 } from '@nutrideli/shared-types';
 
 @Injectable()
@@ -31,6 +38,11 @@ export class SuperAdminService {
     private readonly userAccessRepo: Repository<UserTenantAccess>,
     @InjectRepository(PlatformConfig)
     private readonly platformConfigRepo: Repository<PlatformConfig>,
+    @InjectRepository(Promoter)
+    private readonly promoterRepo: Repository<Promoter>,
+    @InjectRepository(PromoterCommission)
+    private readonly commissionRepo: Repository<PromoterCommission>,
+    private readonly dataSource: DataSource,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -54,13 +66,14 @@ export class SuperAdminService {
     const basePrice = Number(tenant.base_price) || 20.00;
     const planType = tenant.plan_type || TenantPlanType.REGULAR;
 
-    // Count how many active tenants were referred by this tenant
-    const activeReferrals = await this.tenantRepo.count({
-      where: {
-        referred_by_tenant_id: tenantId,
-        status: TenantStatus.ACTIVE,
-      },
-    });
+    // Count how many active tenants or valid trial tenants were referred by this tenant
+    const activeReferrals = await this.tenantRepo.createQueryBuilder('t')
+      .where('t.referred_by_tenant_id = :tenantId', { tenantId })
+      .andWhere(
+        '(t.status = :active OR (t.status = :trial AND (t.trial_ends_at > :now OR t.trial_ends_at IS NULL)))',
+        { active: TenantStatus.ACTIVE, trial: TenantStatus.TRIAL, now: new Date() }
+      )
+      .getCount();
 
     let discountPercentage = 0;
     let finalFee = basePrice;
@@ -69,15 +82,25 @@ export class SuperAdminService {
       if (activeReferrals >= 2) {
         discountPercentage = 100;
         finalFee = 0;
+
+        // Auto-activación y renovación bonificada anual si está en TRIAL o PAST_DUE
+        if (tenant.status === TenantStatus.TRIAL || tenant.status === TenantStatus.PAST_DUE) {
+          tenant.status = TenantStatus.ACTIVE;
+          tenant.isActive = true;
+          tenant.current_period_ends_at = new Date(Date.now() + 365 * 86400000);
+          await this.tenantRepo.save(tenant);
+        }
       } else {
         discountPercentage = 0;
         finalFee = basePrice;
       }
     } else {
-      // REGULAR plan
+      // REGULAR plan: 10% por referido activo, topado estrictamente al 50%
       discountPercentage = Math.min(activeReferrals * 10, 50);
       const discounted = basePrice * (1 - discountPercentage / 100);
-      finalFee = Math.max(10, Math.round(discounted * 100) / 100);
+      // Piso dinámico: nunca menos del 50% de su precio base configurado
+      const minAllowedFee = Math.round(basePrice * 0.5 * 100) / 100;
+      finalFee = Math.max(minAllowedFee, Math.round(discounted * 100) / 100);
     }
 
     return {
@@ -112,45 +135,51 @@ export class SuperAdminService {
 
     const feeCalc = await this.calculateMonthlyFee(tenantId);
 
+    // Si calculateMonthlyFee actualizó el tenant (por ejemplo, auto-activando Pioneer), recargar estado actualizado
+    const updatedTenant = await this.tenantRepo.findOne({ where: { id: tenantId } }) || tenant;
+
     const totalReferrals = await this.tenantRepo.count({
       where: { referred_by_tenant_id: tenantId },
     });
 
     const now = Date.now();
     let trialDaysLeft = 0;
-    if (tenant.status === TenantStatus.TRIAL) {
-      const trialEnd = tenant.trial_ends_at
-        ? new Date(tenant.trial_ends_at).getTime()
-        : new Date(tenant.createdAt).getTime() + 15 * 86400000;
+    if (updatedTenant.status === TenantStatus.TRIAL) {
+      const trialEnd = updatedTenant.trial_ends_at
+        ? new Date(updatedTenant.trial_ends_at).getTime()
+        : new Date(updatedTenant.createdAt).getTime() + 15 * 86400000;
       const diff = Math.ceil((trialEnd - now) / 86400000);
       trialDaysLeft = Math.max(0, diff);
     }
 
     let daysLeft = trialDaysLeft;
-    if (tenant.status === TenantStatus.ACTIVE) {
-      if (tenant.current_period_ends_at) {
-        const periodEnd = new Date(tenant.current_period_ends_at).getTime();
+    if (updatedTenant.status === TenantStatus.ACTIVE) {
+      if (updatedTenant.current_period_ends_at) {
+        const periodEnd = new Date(updatedTenant.current_period_ends_at).getTime();
         daysLeft = Math.max(0, Math.ceil((periodEnd - now) / 86400000));
       } else {
         daysLeft = 30;
       }
-    } else if (tenant.status === TenantStatus.SUSPENDED || tenant.status === TenantStatus.PAST_DUE) {
+    } else if (updatedTenant.status === TenantStatus.SUSPENDED || updatedTenant.status === TenantStatus.PAST_DUE) {
       daysLeft = 0;
     }
 
+    const isPioneerFree = updatedTenant.plan_type === TenantPlanType.PIONEER && feeCalc.activeReferrals >= 2;
     const isExpired =
-      !tenant.isActive ||
-      tenant.status === TenantStatus.SUSPENDED ||
-      tenant.status === TenantStatus.PAST_DUE ||
-      (tenant.status === TenantStatus.TRIAL && trialDaysLeft <= 0) ||
-      (tenant.status === TenantStatus.ACTIVE && daysLeft <= 0 && !!tenant.current_period_ends_at);
+      !updatedTenant.isActive ||
+      (!isPioneerFree && (
+        updatedTenant.status === TenantStatus.SUSPENDED ||
+        updatedTenant.status === TenantStatus.PAST_DUE ||
+        (updatedTenant.status === TenantStatus.TRIAL && trialDaysLeft <= 0) ||
+        (updatedTenant.status === TenantStatus.ACTIVE && daysLeft <= 0 && !!updatedTenant.current_period_ends_at)
+      ));
 
     return {
-      tenantId: tenant.id,
-      tenantName: tenant.name,
-      status: tenant.status || TenantStatus.TRIAL,
-      planType: tenant.plan_type || TenantPlanType.REGULAR,
-      referralCode: tenant.referral_code,
+      tenantId: updatedTenant.id,
+      tenantName: updatedTenant.name,
+      status: updatedTenant.status || TenantStatus.TRIAL,
+      planType: updatedTenant.plan_type || TenantPlanType.REGULAR,
+      referralCode: updatedTenant.referral_code,
       basePrice: feeCalc.basePrice,
       activeReferrals: feeCalc.activeReferrals,
       totalReferrals,
@@ -159,9 +188,9 @@ export class SuperAdminService {
       trialDaysLeft,
       daysLeft,
       isExpired,
-      trialEndsAt: tenant.trial_ends_at ? new Date(tenant.trial_ends_at).toISOString() : undefined,
-      currentPeriodEndsAt: tenant.current_period_ends_at
-        ? new Date(tenant.current_period_ends_at).toISOString()
+      trialEndsAt: updatedTenant.trial_ends_at ? new Date(updatedTenant.trial_ends_at).toISOString() : undefined,
+      currentPeriodEndsAt: updatedTenant.current_period_ends_at
+        ? new Date(updatedTenant.current_period_ends_at).toISOString()
         : undefined,
     };
   }
@@ -308,49 +337,120 @@ export class SuperAdminService {
 
   /**
    * Approve payment report:
+   * - Executes in transaction
    * - Marks report as APPROVED
    * - Extends tenant.current_period_ends_at by +30 days (from now or previous future expiration)
    * - Sets tenant.status to ACTIVE
+   * - Generates promoter commission (ACTIVATION $10 or RECURRING 10%) if tenant is linked to a promoter
    */
-  async approvePayment(reportId: string): Promise<{ success: boolean; message: string; tenant: Tenant }> {
-    const report = await this.paymentReportRepo.findOne({
-      where: { id: reportId },
-      relations: { tenant: true },
-    });
+  async approvePayment(reportId: string): Promise<{ success: boolean; message: string; tenant: Tenant; commission?: PromoterCommission | null }> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (!report) {
-      throw new NotFoundException(`Reporte de pago con id ${reportId} no encontrado`);
+    let savedTenant: Tenant;
+    let savedReport: SaaSPaymentReport;
+    let generatedCommission: PromoterCommission | null = null;
+
+    try {
+      const report = await queryRunner.manager.findOne(SaaSPaymentReport, {
+        where: { id: reportId },
+        relations: { tenant: true },
+      });
+
+      if (!report) {
+        throw new NotFoundException(`Reporte de pago con id ${reportId} no encontrado`);
+      }
+
+      if (report.status === SaaSPaymentStatus.APPROVED) {
+        throw new BadRequestException('Este pago ya fue aprobado previamente');
+      }
+
+      const tenant = await queryRunner.manager.findOne(Tenant, { where: { id: report.tenant_id } });
+      if (!tenant) {
+        throw new NotFoundException(`Negocio asociado no encontrado`);
+      }
+
+      // Extend current_period_ends_at by 30 days
+      const now = new Date();
+      const baseDate = tenant.current_period_ends_at && new Date(tenant.current_period_ends_at) > now
+        ? new Date(tenant.current_period_ends_at)
+        : now;
+
+      tenant.current_period_ends_at = new Date(baseDate.getTime() + 30 * 86400000);
+      tenant.status = TenantStatus.ACTIVE;
+      tenant.isActive = true;
+
+      report.status = SaaSPaymentStatus.APPROVED;
+      report.reject_reason = null;
+
+      savedTenant = await queryRunner.manager.save(Tenant, tenant);
+      savedReport = await queryRunner.manager.save(SaaSPaymentReport, report);
+
+      // Promoter Commission Dispatch
+      if (savedTenant.promoterId) {
+        const activationCommissionsCount = await queryRunner.manager.count(PromoterCommission, {
+          where: {
+            promoterId: savedTenant.promoterId,
+            tenantId: savedTenant.id,
+            type: PromoterCommissionType.ACTIVATION,
+          },
+        });
+
+        if (activationCommissionsCount === 0) {
+          // Caso A: Primera Activación ($10 USD)
+          const commission = queryRunner.manager.create(PromoterCommission, {
+            promoterId: savedTenant.promoterId,
+            tenantId: savedTenant.id,
+            type: PromoterCommissionType.ACTIVATION,
+            amountUSD: 10.00,
+            status: PromoterCommissionStatus.PENDING,
+            saasPaymentReportId: savedReport.id,
+          });
+          generatedCommission = await queryRunner.manager.save(PromoterCommission, commission);
+        } else {
+          // Caso B: Renovación Mensual (10% del monto neto cobrado)
+          const netAmount = Number(savedReport.amount) || 0;
+          const recurringAmount = Math.round(netAmount * 0.10 * 100) / 100;
+          const commission = queryRunner.manager.create(PromoterCommission, {
+            promoterId: savedTenant.promoterId,
+            tenantId: savedTenant.id,
+            type: PromoterCommissionType.RECURRING,
+            amountUSD: recurringAmount,
+            status: PromoterCommissionStatus.PENDING,
+            saasPaymentReportId: savedReport.id,
+          });
+          generatedCommission = await queryRunner.manager.save(PromoterCommission, commission);
+        }
+      }
+
+      await queryRunner.commitTransaction();
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
     }
 
-    if (report.status === SaaSPaymentStatus.APPROVED) {
-      throw new BadRequestException('Este pago ya fue aprobado previamente');
+    try {
+      await this.notificationsService.sendNotificationToNegocio(
+        savedTenant.id,
+        {
+          title: '¡Pago de Suscripción Aprobado! 🎉',
+          body: 'Tu cuota mensual ha sido verificada. Tu suscripción se extendió por 30 días.',
+          data: { url: '/settings' },
+        },
+        ['ADMIN'],
+      );
+    } catch (err: any) {
+      this.logger.error(`Error notifying tenant of payment approval: ${err.message}`);
     }
-
-    const tenant = await this.tenantRepo.findOne({ where: { id: report.tenant_id } });
-    if (!tenant) {
-      throw new NotFoundException(`Negocio asociado no encontrado`);
-    }
-
-    // Extend current_period_ends_at by 30 days
-    const now = new Date();
-    const baseDate = tenant.current_period_ends_at && new Date(tenant.current_period_ends_at) > now
-      ? new Date(tenant.current_period_ends_at)
-      : now;
-
-    tenant.current_period_ends_at = new Date(baseDate.getTime() + 30 * 86400000);
-    tenant.status = TenantStatus.ACTIVE;
-    tenant.isActive = true;
-
-    report.status = SaaSPaymentStatus.APPROVED;
-    report.reject_reason = null;
-
-    await this.tenantRepo.save(tenant);
-    await this.paymentReportRepo.save(report);
 
     return {
       success: true,
-      message: `Pago de $${report.amount} aprobado con éxito. Periodo de ${tenant.name} extendido 30 días hasta el ${tenant.current_period_ends_at.toLocaleDateString('es-VE')}.`,
-      tenant,
+      message: `Pago de $${savedReport.amount} aprobado con éxito. Periodo de ${savedTenant.name} extendido 30 días hasta el ${savedTenant.current_period_ends_at.toLocaleDateString('es-VE')}.`,
+      tenant: savedTenant,
+      commission: generatedCommission,
     };
   }
 
@@ -367,6 +467,20 @@ export class SuperAdminService {
     report.reject_reason = reason || 'Pago no verificado o referencia inválida';
 
     await this.paymentReportRepo.save(report);
+
+    try {
+      await this.notificationsService.sendNotificationToNegocio(
+        report.tenant_id,
+        {
+          title: 'Comprobante de Pago Rechazado ⚠️',
+          body: `Motivo: ${reason || 'Comprobante no válido o pago no recibido.'}`,
+          data: { url: '/settings' },
+        },
+        ['ADMIN'],
+      );
+    } catch (err: any) {
+      this.logger.error(`Error notifying tenant of payment rejection: ${err.message}`);
+    }
 
     return {
       success: true,
@@ -413,7 +527,7 @@ export class SuperAdminService {
         title: '¡Nuevo Pago de Suscripción Reportado!',
         body: `${storeName} reportó $${formattedAmount} USD (Ref: ${ref}). Toca para revisar y aprobar.`,
         data: {
-          url: '/superadmin/payments',
+          url: '/platform-admin?tab=payments',
           reportId: saved.id,
           tenantId,
           type: 'SAAS_PAYMENT_REPORT',
@@ -457,5 +571,172 @@ export class SuperAdminService {
     Object.assign(config, dto);
     return await this.platformConfigRepo.save(config);
   }
+
+  /**
+   * Helper to calculate rank, bonus, and next rank based on monthly activations
+   */
+  calculateRank(monthlyActivations: number): {
+    rank: PromoterRank;
+    bonusUSD: number;
+    emoji: string;
+    nextRank: { rank: PromoterRank; rankEmoji: string; activationsNeeded: number; bonusUSD: number } | null;
+  } {
+    if (monthlyActivations >= 20) {
+      return {
+        rank: PromoterRank.ORO,
+        bonusUSD: 50.00,
+        emoji: '🥇',
+        nextRank: null,
+      };
+    } else if (monthlyActivations >= 10) {
+      return {
+        rank: PromoterRank.PLATA,
+        bonusUSD: 25.00,
+        emoji: '🥈',
+        nextRank: {
+          rank: PromoterRank.ORO,
+          rankEmoji: '🥇',
+          activationsNeeded: 20 - monthlyActivations,
+          bonusUSD: 50.00,
+        },
+      };
+    } else if (monthlyActivations >= 5) {
+      return {
+        rank: PromoterRank.BRONCE,
+        bonusUSD: 10.00,
+        emoji: '🥉',
+        nextRank: {
+          rank: PromoterRank.PLATA,
+          rankEmoji: '🥈',
+          activationsNeeded: 10 - monthlyActivations,
+          bonusUSD: 25.00,
+        },
+      };
+    } else {
+      return {
+        rank: PromoterRank.MADERA,
+        bonusUSD: 0,
+        emoji: '🪵',
+        nextRank: {
+          rank: PromoterRank.BRONCE,
+          rankEmoji: '🥉',
+          activationsNeeded: 5 - monthlyActivations,
+          bonusUSD: 10.00,
+        },
+      };
+    }
+  }
+
+  /**
+   * SuperAdmin: Retorna reporte global de promotores, rangos y saldos pendientes.
+   */
+  async getPromotersOverview(): Promise<SuperAdminPromoterDTO[]> {
+    const promoters = await this.promoterRepo.find({
+      relations: {
+        user: true,
+        commissions: true,
+        tenants: true,
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    return promoters.map((promoter) => {
+      const commissions = promoter.commissions || [];
+      const monthlyActivations = commissions.filter((c) => {
+        const cDate = new Date(c.createdAt);
+        return (
+          c.type === PromoterCommissionType.ACTIVATION &&
+          cDate >= startOfMonth &&
+          cDate <= endOfMonth
+        );
+      }).length;
+
+      const rankInfo = this.calculateRank(monthlyActivations);
+
+      let pendingBalanceUSD = 0;
+      let paidBalanceUSD = 0;
+      let totalCommissionsUSD = 0;
+
+      commissions.forEach((c) => {
+        const amt = Number(c.amountUSD) || 0;
+        totalCommissionsUSD += amt;
+        if (c.status === PromoterCommissionStatus.PENDING) {
+          pendingBalanceUSD += amt;
+        } else if (c.status === PromoterCommissionStatus.PAID) {
+          paidBalanceUSD += amt;
+        }
+      });
+
+      // Map commissions DTO
+      const commissionsDto: PromoterCommissionDTO[] = commissions.map((c) => ({
+        id: c.id,
+        promoterId: c.promoterId,
+        tenantId: c.tenantId,
+        type: c.type,
+        amountUSD: Number(c.amountUSD),
+        saasPaymentReportId: c.saasPaymentReportId,
+        status: c.status,
+        paidAt: c.paidAt ? new Date(c.paidAt).toISOString() : null,
+        paymentReference: c.paymentReference,
+        createdAt: new Date(c.createdAt).toISOString(),
+      }));
+
+      return {
+        id: promoter.id,
+        userId: promoter.userId,
+        username: promoter.user?.username || 'Desconocido',
+        email: promoter.user?.email || '',
+        phone: promoter.user?.phone || null,
+        code: promoter.code,
+        isActive: promoter.isActive,
+        pagoMovilPhone: promoter.pagoMovilPhone,
+        pagoMovilCedula: promoter.pagoMovilCedula,
+        pagoMovilBank: promoter.pagoMovilBank,
+        binancePayId: promoter.binancePayId,
+        currentRank: rankInfo.rank,
+        monthlyActivations,
+        rankBonusUSD: rankInfo.bonusUSD,
+        totalAffiliatedTenants: (promoter.tenants || []).length,
+        pendingBalanceUSD: Math.round(pendingBalanceUSD * 100) / 100,
+        paidBalanceUSD: Math.round(paidBalanceUSD * 100) / 100,
+        totalCommissionsUSD: Math.round(totalCommissionsUSD * 100) / 100,
+        commissions: commissionsDto,
+        createdAt: new Date(promoter.createdAt).toISOString(),
+      };
+    });
+  }
+
+  /**
+   * SuperAdmin: Cambia el estatus de una comisión a 'PAID', guardando la referencia de Pago Móvil o Binance y la fecha actual.
+   */
+  async payPromoterCommission(commissionId: string, paymentReference: string): Promise<PromoterCommission> {
+    if (!paymentReference || !paymentReference.trim()) {
+      throw new BadRequestException('La referencia de pago es obligatoria');
+    }
+
+    const commission = await this.commissionRepo.findOne({
+      where: { id: commissionId },
+      relations: { promoter: true },
+    });
+
+    if (!commission) {
+      throw new NotFoundException(`Comisión con id ${commissionId} no encontrada`);
+    }
+
+    if (commission.status === PromoterCommissionStatus.PAID) {
+      throw new BadRequestException('Esta comisión ya fue pagada previamente');
+    }
+
+    commission.status = PromoterCommissionStatus.PAID;
+    commission.paidAt = new Date();
+    commission.paymentReference = paymentReference.trim();
+
+    return await this.commissionRepo.save(commission);
+  }
 }
+
 

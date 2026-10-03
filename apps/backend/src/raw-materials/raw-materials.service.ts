@@ -3,12 +3,14 @@ import { DataSource, Repository, IsNull, EntityManager } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
+import { RecipeItem } from '../entities/recipe-item.entity';
 import { MovementType } from '@nutrideli/shared-types';
 import { CreateRawMaterialDto } from './dto/create-raw-material.dto';
 import { RestockRawMaterialDto } from './dto/restock-raw-material.dto';
 import { UpdateRawMaterialDto } from './dto/update-raw-material.dto';
 import { RegisterLossDto } from './dto/register-loss.dto';
 import { UpdateMovementDto } from './dto/update-movement.dto';
+import { ArchiveRawMaterialDto } from './dto/archive-raw-material.dto';
 
 @Injectable()
 export class RawMaterialsService {
@@ -214,7 +216,71 @@ export class RawMaterialsService {
     });
   }
 
-  async archive(tenantId: string, id: string) {
-    await this.rawMaterialRepo.update({ id, tenantId }, { isActive: false });
+  async checkUsage(tenantId: string, id: string) {
+    const rawItems = await this.dataSource
+      .getRepository(RecipeItem)
+      .createQueryBuilder('ri')
+      .innerJoin('ri.product', 'p')
+      .where('ri.rawMaterialId = :id', { id })
+      .andWhere('p.tenantId = :tenantId', { tenantId })
+      .andWhere('p.deletedAt IS NULL')
+      .select(['p.id AS "id"', 'p.name AS "name"'])
+      .getRawMany();
+
+    // Eliminar duplicados si una receta tiene múltiples entradas para el mismo insumo
+    const uniqueMap = new Map<string, { id: string; name: string }>();
+    for (const item of rawItems) {
+      if (!uniqueMap.has(item.id)) {
+        uniqueMap.set(item.id, { id: item.id, name: item.name });
+      }
+    }
+    const products = Array.from(uniqueMap.values());
+
+    return {
+      inUse: products.length > 0,
+      count: products.length,
+      products,
+    };
+  }
+
+  async archive(tenantId: string, id: string, dto?: ArchiveRawMaterialDto) {
+    const material = await this.rawMaterialRepo.findOne({ where: { tenantId, id } });
+    if (!material) throw new NotFoundException('Insumo no encontrado');
+
+    return this.dataSource.transaction(async (manager) => {
+      if (dto?.removeFromRecipes) {
+        // Eliminar recipe_item donde rawMaterialId = id y product.tenantId = tenantId
+        await manager
+          .createQueryBuilder()
+          .delete()
+          .from(RecipeItem)
+          .where('rawMaterialId = :id', { id })
+          .andWhere('productId IN (SELECT p.id FROM product p WHERE p."tenantId" = :tenantId)', { tenantId })
+          .execute();
+      }
+
+      material.isActive = false;
+      return manager.save(RawMaterial, material);
+    });
+  }
+
+  async findArchived(tenantId: string) {
+    return this.rawMaterialRepo.find({
+      where: { tenantId, isActive: false },
+      relations: { movements: true },
+      order: { updatedAt: 'DESC' },
+    });
+  }
+
+  async unarchive(tenantId: string, id: string) {
+    const material = await this.rawMaterialRepo.findOne({ where: { tenantId, id } });
+    if (!material) throw new NotFoundException('Insumo no encontrado');
+
+    material.isActive = true;
+    const updated = await this.rawMaterialRepo.save(material);
+    return {
+      success: true,
+      material: updated,
+    };
   }
 }

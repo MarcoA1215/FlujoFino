@@ -8,15 +8,16 @@ import {
   IonButton,
   IonIcon,
   IonSpinner,
-  useIonToast,
-  useIonAlert
+  IonModal,
+  useIonToast
 } from '@ionic/react';
 import {
   cloudDoneOutline,
   cloudOfflineOutline,
   walletOutline,
   syncOutline,
-  refreshOutline
+  refreshOutline,
+  closeOutline
 } from 'ionicons/icons';
 import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
@@ -46,7 +47,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 }) => {
   const { user } = useContext(AuthContext);
   const [presentToast] = useIonToast();
-  const [presentAlert] = useIonAlert();
 
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isSimulatingOffline, setIsSimulatingOffline] = useState<boolean>(() => localStorage.getItem('flujofino_simulating_offline') === 'true');
@@ -54,6 +54,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [showCashCloseModal, setShowCashCloseModal] = useState<boolean>(false);
   const [showVerifyModal, setShowVerifyModal] = useState<boolean>(false);
+  const [showRateModal, setShowRateModal] = useState<boolean>(false);
 
   const [exchangeRate, setExchangeRate] = useState<number>(() => {
     try {
@@ -64,6 +65,25 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     } catch (e) {}
     return 40.0;
   });
+
+  const [exchangeRateMode, setExchangeRateMode] = useState<string>(() => {
+    try {
+      return localStorage.getItem('flujofino_rate_mode') || 'BCV';
+    } catch {
+      return 'BCV';
+    }
+  });
+
+  const [currencySymbol, setCurrencySymbol] = useState<string>(() => {
+    try {
+      return localStorage.getItem('flujofino_currency_symbol') || 'Bs.';
+    } catch {
+      return 'Bs.';
+    }
+  });
+
+  const [availableRates, setAvailableRates] = useState<any>(null);
+  const [manualInputRate, setManualInputRate] = useState<string>('');
 
   const refreshPendingCount = async () => {
     try {
@@ -77,10 +97,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const fetchRate = async () => {
     try {
       const res = await apiClient.get<any>('/settings');
-      if (res.data?.exchangeRateBs && Number(res.data.exchangeRateBs) > 0) {
-        const rate = Number(res.data.exchangeRateBs);
+      if (res.data) {
+        const rate = Number(res.data.exchangeRateBs || 40.0);
+        const mode = res.data.exchangeRateMode || 'BCV';
+        const symbol = res.data.currencySymbol || (mode === 'COP' ? 'COP' : (mode === 'EUR' ? '€' : 'Bs.'));
         setExchangeRate(rate);
+        setExchangeRateMode(mode);
+        setCurrencySymbol(symbol);
+        setAvailableRates(res.data.availableRates || null);
+        if (res.data.manualExchangeRate) setManualInputRate(res.data.manualExchangeRate.toString());
+        else setManualInputRate(rate.toString());
+
         localStorage.setItem('flujofino_exchange_rate', rate.toString());
+        localStorage.setItem('flujofino_rate_mode', mode);
+        localStorage.setItem('flujofino_currency_symbol', symbol);
       }
     } catch (e) {
       const saved = localStorage.getItem('flujofino_exchange_rate');
@@ -92,8 +122,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
+    const handleSettingsUpdated = (e: any) => {
+      const s = e.detail;
+      if (s) {
+        if (s.exchangeRateBs) setExchangeRate(Number(s.exchangeRateBs));
+        if (s.exchangeRateMode) setExchangeRateMode(s.exchangeRateMode);
+        if (s.currencySymbol) setCurrencySymbol(s.currencySymbol);
+        if (s.availableRates) setAvailableRates(s.availableRates);
+        if (s.manualExchangeRate) setManualInputRate(s.manualExchangeRate.toString());
+      }
+    };
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('settings_updated', handleSettingsUpdated);
 
     refreshPendingCount();
     fetchRate();
@@ -102,6 +144,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('settings_updated', handleSettingsUpdated);
       clearInterval(interval);
     };
   }, []);
@@ -170,7 +213,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     }
   };
 
-  const openRateAlert = () => {
+  const handleApplyRateMode = async (mode: string, customRate?: number) => {
     const isAdmin =
       user?.role === UserRole.ADMIN ||
       user?.role === UserRole.SUPERADMIN ||
@@ -182,38 +225,102 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       return;
     }
 
-    presentAlert({
-      header: 'Actualizar Tasa BCV',
-      subHeader: 'Define la tasa de cambio en Bolívares (Bs./$)',
-      inputs: [
-        {
-          name: 'rate',
-          type: 'number',
-          placeholder: 'Ej: 48.50',
-          value: exchangeRate.toString(),
-          attributes: { step: '0.01', min: '1' }
+    try {
+      let targetRate = exchangeRate;
+      let targetSymbol = mode === 'COP' ? 'COP' : (mode === 'EUR' ? '€' : 'Bs.');
+      const payload: any = {
+        mode,
+        currencySymbol: targetSymbol,
+      };
+
+      if (mode === 'MANUAL') {
+        const parsed = customRate ?? parseFloat(manualInputRate);
+        if (!parsed || parsed <= 0) {
+          presentToast({ message: 'Ingresa un valor numérico válido mayor a cero', duration: 2500, color: 'warning' });
+          return;
         }
-      ],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Guardar',
-          handler: async (data) => {
-            const val = parseFloat(data.rate);
-            if (val && val > 0) {
-              try {
-                await apiClient.put('/settings', { exchangeRateBs: val });
-                setExchangeRate(val);
-                localStorage.setItem('flujofino_exchange_rate', val.toString());
-                presentToast({ message: `Tasa actualizada a Bs. ${val.toFixed(2)}`, duration: 2000, color: 'success' });
-              } catch (e) {
-                presentToast({ message: 'Error al actualizar tasa en el servidor', duration: 3000, color: 'danger' });
-              }
-            }
-          }
-        }
-      ]
-    });
+        payload.manualRate = parsed;
+        payload.rate = parsed;
+        targetRate = parsed;
+      } else if (mode === 'BCV') {
+        targetRate = Number(availableRates?.bcv || exchangeRate);
+      } else if (mode === 'PARALELO') {
+        targetRate = Number(availableRates?.parallel || availableRates?.bcv || exchangeRate);
+      } else if (mode === 'USDT') {
+        targetRate = Number(availableRates?.usdt || availableRates?.parallel || exchangeRate);
+      } else if (mode === 'EUR') {
+        targetRate = Number(availableRates?.eur || 40.0);
+      } else if (mode === 'COP') {
+        targetRate = Number(availableRates?.cop || 4000.0);
+      }
+
+      await apiClient.put('/settings/exchange-rate', payload);
+
+      setExchangeRate(targetRate);
+      setExchangeRateMode(mode);
+      setCurrencySymbol(targetSymbol);
+
+      localStorage.setItem('flujofino_exchange_rate', targetRate.toString());
+      localStorage.setItem('flujofino_rate_mode', mode);
+      localStorage.setItem('flujofino_currency_symbol', targetSymbol);
+
+      try {
+        const cached = localStorage.getItem('flujofino_cached_settings');
+        const parsedCached = cached ? JSON.parse(cached) : {};
+        parsedCached.exchangeRateBs = targetRate;
+        parsedCached.exchangeRateMode = mode;
+        parsedCached.currencySymbol = targetSymbol;
+        if (mode === 'MANUAL') parsedCached.manualExchangeRate = targetRate;
+        localStorage.setItem('flujofino_cached_settings', JSON.stringify(parsedCached));
+      } catch (e) {}
+
+      window.dispatchEvent(
+        new CustomEvent('settings_updated', {
+          detail: {
+            exchangeRateBs: targetRate,
+            exchangeRateMode: mode,
+            currencySymbol: targetSymbol,
+            manualExchangeRate: mode === 'MANUAL' ? targetRate : undefined,
+            availableRates,
+          },
+        })
+      );
+
+      presentToast({
+        message: `✓ Tasa cambiada a ${mode}: ${targetSymbol} ${mode === 'COP' ? Number(targetRate).toLocaleString('es-CO') : targetRate.toFixed(2)}`,
+        duration: 2500,
+        color: 'success',
+      });
+      setShowRateModal(false);
+    } catch (e: any) {
+      console.error(e);
+      presentToast({ message: 'Error al cambiar la tasa', duration: 3000, color: 'danger' });
+    }
+  };
+
+  const getRatePillText = () => {
+    const symbol = currencySymbol || (exchangeRateMode === 'COP' ? 'COP' : 'Bs.');
+    const formattedVal =
+      exchangeRateMode === 'COP'
+        ? Number(exchangeRate).toLocaleString('es-CO')
+        : exchangeRate.toFixed(2);
+
+    switch (exchangeRateMode) {
+      case 'BCV':
+        return `BCV: ${symbol} ${formattedVal}`;
+      case 'PARALELO':
+        return `Paralelo: ${symbol} ${formattedVal}`;
+      case 'USDT':
+        return `USDT: ${symbol} ${formattedVal}`;
+      case 'EUR':
+        return `EUR: € ${formattedVal}`;
+      case 'COP':
+        return `COP: ${formattedVal}`;
+      case 'MANUAL':
+        return `Manual: ${symbol} ${formattedVal}`;
+      default:
+        return `BCV: ${symbol} ${formattedVal}`;
+    }
   };
 
   const isDisconnected = !isOnline || isSimulatingOffline;
@@ -276,10 +383,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             {showRate && (
               <div
                 className="ff-pill ff-pill-interactive ff-pill-rate"
-                onClick={openRateAlert}
-                title="Tasa de cambio actual (Clic para cambiar)"
+                onClick={() => setShowRateModal(true)}
+                title="Tasa de cambio actual (Clic para cambiar de modo)"
+                style={{ cursor: 'pointer', userSelect: 'none' }}
               >
-                <span>Bs. {exchangeRate.toFixed(2)}</span>
+                <span>{getRatePillText()}</span>
               </div>
             )}
 
@@ -360,6 +468,282 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         isOpen={showVerifyModal}
         onClose={() => setShowVerifyModal(false)}
       />
+
+      {/* Modal Rápido Selector Multitasa */}
+      <IonModal
+        isOpen={showRateModal}
+        onDidDismiss={() => setShowRateModal(false)}
+        style={{ '--border-radius': '20px', '--max-width': '520px', '--max-height': '90vh' } as any}
+      >
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#ffffff', overflow: 'hidden' }}>
+          {/* Header */}
+          <div style={{
+            padding: '16px 20px',
+            borderBottom: '1px solid #E2E8F0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.02) 100%)'
+          }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                💱 Tasa de Facturación Activa
+              </h3>
+              <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#64748B' }}>
+                Selecciona la tasa para nuevas ventas en caja y tienda
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowRateModal(false)}
+              style={{
+                background: '#F1F5F9',
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <IonIcon icon={closeOutline} style={{ fontSize: '18px', color: '#64748B' }} />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Opción BCV */}
+              <div
+                onClick={() => handleApplyRateMode('BCV')}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  border: exchangeRateMode === 'BCV' ? '2px solid #10B981' : '1px solid #E2E8F0',
+                  background: exchangeRateMode === 'BCV' ? '#ECFDF5' : '#F8FAFC',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    🏛️ Dólar Oficial BCV
+                    {exchangeRateMode === 'BCV' && (
+                      <span style={{ fontSize: '10px', background: '#10B981', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
+                        ACTIVA
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                    Tasa legal de referencia oficial BCV
+                  </div>
+                </div>
+                <div style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A' }}>
+                  Bs. {Number(availableRates?.bcv || exchangeRate).toFixed(2)}
+                </div>
+              </div>
+
+              {/* Opción Paralelo */}
+              <div
+                onClick={() => handleApplyRateMode('PARALELO')}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  border: exchangeRateMode === 'PARALELO' ? '2px solid #10B981' : '1px solid #E2E8F0',
+                  background: exchangeRateMode === 'PARALELO' ? '#ECFDF5' : '#F8FAFC',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    📈 Dólar Paralelo / Promedio
+                    {exchangeRateMode === 'PARALELO' && (
+                      <span style={{ fontSize: '10px', background: '#10B981', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
+                        ACTIVA
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                    EnParaleloVzla / Cotización de mercado
+                  </div>
+                </div>
+                <div style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A' }}>
+                  Bs. {Number(availableRates?.parallel || availableRates?.bcv || exchangeRate).toFixed(2)}
+                </div>
+              </div>
+
+              {/* Opción USDT */}
+              <div
+                onClick={() => handleApplyRateMode('USDT')}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  border: exchangeRateMode === 'USDT' ? '2px solid #10B981' : '1px solid #E2E8F0',
+                  background: exchangeRateMode === 'USDT' ? '#ECFDF5' : '#F8FAFC',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    🟡 Binance P2P USDT
+                    {exchangeRateMode === 'USDT' && (
+                      <span style={{ fontSize: '10px', background: '#10B981', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
+                        ACTIVA
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                    Cotización criptoactivo USDT/VES
+                  </div>
+                </div>
+                <div style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A' }}>
+                  Bs. {Number(availableRates?.usdt || availableRates?.parallel || exchangeRate).toFixed(2)}
+                </div>
+              </div>
+
+              {/* Opción Euro BCV */}
+              <div
+                onClick={() => handleApplyRateMode('EUR')}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  border: exchangeRateMode === 'EUR' ? '2px solid #10B981' : '1px solid #E2E8F0',
+                  background: exchangeRateMode === 'EUR' ? '#ECFDF5' : '#F8FAFC',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    💶 Euro Oficial BCV
+                    {exchangeRateMode === 'EUR' && (
+                      <span style={{ fontSize: '10px', background: '#10B981', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
+                        ACTIVA
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                    Tasa oficial BCV en Euros
+                  </div>
+                </div>
+                <div style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A' }}>
+                  Bs. {Number(availableRates?.eur || 40).toFixed(2)}
+                </div>
+              </div>
+
+              {/* Opción COP */}
+              <div
+                onClick={() => handleApplyRateMode('COP')}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  border: exchangeRateMode === 'COP' ? '2px solid #10B981' : '1px solid #E2E8F0',
+                  background: exchangeRateMode === 'COP' ? '#ECFDF5' : '#F8FAFC',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    🇨🇴 Peso Colombiano (COP)
+                    {exchangeRateMode === 'COP' && (
+                      <span style={{ fontSize: '10px', background: '#10B981', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
+                        ACTIVA
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                    Zona Fronteriza / Táchira
+                  </div>
+                </div>
+                <div style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A' }}>
+                  {Number(availableRates?.cop || 4000).toLocaleString('es-CO')} COP
+                </div>
+              </div>
+
+              {/* Opción Manual Personalizada */}
+              <div
+                style={{
+                  padding: '14px',
+                  borderRadius: '12px',
+                  border: exchangeRateMode === 'MANUAL' ? '2px solid #F59E0B' : '1px solid #E2E8F0',
+                  background: exchangeRateMode === 'MANUAL' ? '#FFFBEB' : '#ffffff',
+                  marginTop: '4px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#92400E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    ✏️ Tasa Personalizada Manual
+                    {exchangeRateMode === 'MANUAL' && (
+                      <span style={{ fontSize: '10px', background: '#F59E0B', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
+                        ACTIVA
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#78350F' }}>
+                  Ingresa tu propio valor de tasa (ej. fijado por política interna de la tienda):
+                </p>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.0001"
+                    value={manualInputRate}
+                    onChange={e => setManualInputRate(e.target.value)}
+                    placeholder="Ej. 55.00"
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #CBD5E1',
+                      fontSize: '15px',
+                      fontWeight: 700,
+                      background: '#ffffff',
+                      color: '#0F172A'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleApplyRateMode('MANUAL')}
+                    style={{
+                      padding: '10px 16px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: '#F59E0B',
+                      color: '#ffffff',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Fijar Manual
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </IonModal>
     </>
   );
 };

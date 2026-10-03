@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   IonPage,
   IonHeader,
@@ -45,6 +46,8 @@ import {
   walletOutline,
   saveOutline,
   cardOutline,
+  medalOutline,
+  checkmarkDoneOutline,
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import {
@@ -55,18 +58,37 @@ import {
   type SuperAdminTenantDTO,
   type UpdateTenantPlanDTO,
   type PlatformConfigDTO,
+  type SuperAdminPromoterDTO,
+  type PromoterCommissionDTO,
+  PromoterCommissionStatus,
 } from '@nutrideli/shared-types';
 
 const SuperAdminDashboard: React.FC = () => {
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
+  const location = useLocation();
 
-  const [activeTab, setActiveTab] = useState<'tenants' | 'payments' | 'config' | 'support'>('tenants');
+  const [activeTab, setActiveTab] = useState<'tenants' | 'payments' | 'promoters' | 'config' | 'support'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (tab && ['tenants', 'payments', 'promoters', 'config', 'support'].includes(tab)) {
+      return tab as any;
+    }
+    return 'tenants';
+  });
   const [loading, setLoading] = useState(false);
   const [tenants, setTenants] = useState<SuperAdminTenantDTO[]>([]);
   const [pendingPayments, setPendingPayments] = useState<SaaSPaymentReportDTO[]>([]);
+  const [promoters, setPromoters] = useState<SuperAdminPromoterDTO[]>([]);
   const [supportMessages, setSupportMessages] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Promoters liquidation modal
+  const [selectedPromoterForPayout, setSelectedPromoterForPayout] = useState<SuperAdminPromoterDTO | null>(null);
+  const [selectedCommissionToPay, setSelectedCommissionToPay] = useState<PromoterCommissionDTO | null>(null);
+  const [payoutPaymentMethod, setPayoutPaymentMethod] = useState<'PAGO_MOVIL' | 'BINANCE'>('PAGO_MOVIL');
+  const [payoutReference, setPayoutReference] = useState<string>('');
+  const [isProcessingCommissionPayout, setIsProcessingCommissionPayout] = useState<boolean>(false);
 
   // Platform accounts configuration
   const [platformConfig, setPlatformConfig] = useState<PlatformConfigDTO>({
@@ -97,15 +119,17 @@ const SuperAdminDashboard: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [tenantsRes, paymentsRes, supportRes, configRes] = await Promise.all([
+      const [tenantsRes, paymentsRes, supportRes, configRes, promotersRes] = await Promise.all([
         apiClient.get<SuperAdminTenantDTO[]>('/superadmin/tenants'),
         apiClient.get<SaaSPaymentReportDTO[]>('/superadmin/payments'),
         apiClient.get<any[]>('/feedback/platform'),
         apiClient.get<PlatformConfigDTO>('/superadmin/platform-config'),
+        apiClient.get<SuperAdminPromoterDTO[]>('/superadmin/promoters').catch(() => ({ data: [] })),
       ]);
       setTenants(tenantsRes.data || []);
       setPendingPayments(paymentsRes.data || []);
       setSupportMessages(supportRes.data || []);
+      setPromoters(promotersRes.data || []);
       if (configRes.data) {
         setPlatformConfig(configRes.data);
       }
@@ -117,6 +141,55 @@ const SuperAdminDashboard: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePayCommission = async () => {
+    if (!selectedCommissionToPay) return;
+    if (!payoutReference || !payoutReference.trim()) {
+      presentToast({ message: 'Por favor, introduce la referencia del pago.', duration: 3000, color: 'warning' });
+      return;
+    }
+
+    try {
+      setIsProcessingCommissionPayout(true);
+      const refText = `${payoutPaymentMethod === 'BINANCE' ? 'Binance Pay' : 'Pago Móvil'}: ${payoutReference.trim()}`;
+      await apiClient.post(`/superadmin/promoters/commissions/${selectedCommissionToPay.id}/pay`, {
+        paymentReference: refText,
+      });
+
+      presentToast({
+        message: '¡Comisión liquidada y marcada como PAGADA exitosamente!',
+        duration: 3000,
+        color: 'success',
+      });
+
+      // Update promoter modal state and reload
+      if (selectedPromoterForPayout) {
+        const updatedComms = selectedPromoterForPayout.commissions.map((c) =>
+          c.id === selectedCommissionToPay.id
+            ? { ...c, status: PromoterCommissionStatus.PAID, paymentReference: refText, paidAt: new Date().toISOString() }
+            : c,
+        );
+        setSelectedPromoterForPayout({
+          ...selectedPromoterForPayout,
+          commissions: updatedComms,
+          pendingBalanceUSD: Math.max(0, selectedPromoterForPayout.pendingBalanceUSD - selectedCommissionToPay.amountUSD),
+          paidBalanceUSD: selectedPromoterForPayout.paidBalanceUSD + selectedCommissionToPay.amountUSD,
+        });
+      }
+
+      setSelectedCommissionToPay(null);
+      setPayoutReference('');
+      await loadData();
+    } catch (err: any) {
+      presentToast({
+        message: 'Error al liquidar comisión: ' + (err.response?.data?.message || err.message),
+        duration: 3500,
+        color: 'danger',
+      });
+    } finally {
+      setIsProcessingCommissionPayout(false);
     }
   };
 
@@ -141,8 +214,13 @@ const SuperAdminDashboard: React.FC = () => {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && ['tenants', 'payments', 'config', 'support'].includes(tabParam)) {
+      setActiveTab(tabParam as any);
+    }
     loadData();
-  }, []);
+  }, [location.search]);
 
   const openEditModal = (t: SuperAdminTenantDTO) => {
     setSelectedTenant(t);
@@ -257,11 +335,11 @@ const SuperAdminDashboard: React.FC = () => {
     const q = searchTerm.toLowerCase().trim();
     if (!q) return true;
     return (
-      t.name.toLowerCase().includes(q) ||
+      (t.name && t.name.toLowerCase().includes(q)) ||
       (t.owner?.name && t.owner.name.toLowerCase().includes(q)) ||
       (t.owner?.email && t.owner.email.toLowerCase().includes(q)) ||
-      t.planType.toLowerCase().includes(q) ||
-      t.status.toLowerCase().includes(q)
+      (t.planType && t.planType.toLowerCase().includes(q)) ||
+      (t.status && t.status.toLowerCase().includes(q))
     );
   });
 
@@ -376,6 +454,12 @@ const SuperAdminDashboard: React.FC = () => {
                     {pendingCount}
                   </IonBadge>
                 )}
+              </IonLabel>
+            </IonSegmentButton>
+            <IonSegmentButton value="promoters">
+              <IonLabel style={{ fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <IonIcon icon={medalOutline} />
+                Promotores y Comisiones ({promoters.length})
               </IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="config">
@@ -689,6 +773,150 @@ const SuperAdminDashboard: React.FC = () => {
                   ))}
                 </IonRow>
               </IonGrid>
+            )}
+          </div>
+        )}
+
+        {/* TAB: PROMOTORES Y COMISIONES */}
+        {activeTab === 'promoters' && (
+          <div>
+            <div style={{ marginBottom: '16px' }}>
+              <IonSearchbar
+                placeholder="Buscar por código de promotor, usuario o correo..."
+                value={searchTerm}
+                onIonInput={(e) => setSearchTerm(e.detail.value || '')}
+                style={{ padding: 0 }}
+              />
+            </div>
+
+            {loading && (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <IonSpinner name="crescent" color="primary" />
+                <p style={{ color: '#64748b', marginTop: '8px' }}>Cargando promotores...</p>
+              </div>
+            )}
+
+            {!loading && promoters.length === 0 && (
+              <div style={{ background: '#fff', padding: '40px 20px', textAlign: 'center', borderRadius: '12px', color: '#64748b' }}>
+                <IonIcon icon={medalOutline} style={{ fontSize: '48px', color: '#cbd5e1', marginBottom: '10px' }} />
+                <p style={{ fontWeight: 600, fontSize: '16px', margin: 0 }}>No hay promotores registrados</p>
+                <p style={{ fontSize: '13px', marginTop: '4px' }}>Los usuarios con rol PROMOTOR aparecerán aquí con sus métricas.</p>
+              </div>
+            )}
+
+            {!loading && promoters.length > 0 && (
+              <div style={{ overflowX: 'auto', background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      <th style={{ padding: '14px 16px' }}>Promotor / Código</th>
+                      <th style={{ padding: '14px 16px' }}>Rango Mensual</th>
+                      <th style={{ padding: '14px 16px' }}>Tiendas Afiliadas</th>
+                      <th style={{ padding: '14px 16px' }}>Activaciones (Mes)</th>
+                      <th style={{ padding: '14px 16px' }}>Por Liquidar</th>
+                      <th style={{ padding: '14px 16px' }}>Total Pagado</th>
+                      <th style={{ padding: '14px 16px', textAlign: 'right' }}>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {promoters
+                      .filter((p) => {
+                        const q = searchTerm.toLowerCase();
+                        return (
+                          p.code.toLowerCase().includes(q) ||
+                          p.username.toLowerCase().includes(q) ||
+                          p.email.toLowerCase().includes(q)
+                        );
+                      })
+                      .map((p) => {
+                        const rankEmoji =
+                          p.currentRank === 'ORO' ? '🥇' :
+                          p.currentRank === 'PLATA' ? '🥈' :
+                          p.currentRank === 'BRONCE' ? '🥉' : '🪵';
+
+                        return (
+                          <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '14px 16px' }}>
+                              <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>
+                                {p.username}
+                              </div>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, marginTop: '4px' }}>
+                                {p.code}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                                {p.email}
+                              </div>
+                            </td>
+
+                            <td style={{ padding: '14px 16px' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 800, fontSize: '13px', background: '#f8fafc', padding: '4px 10px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                                <span>{rankEmoji}</span>
+                                <span>{p.currentRank}</span>
+                              </div>
+                              {p.rankBonusUSD > 0 && (
+                                <div style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, marginTop: '4px' }}>
+                                  🎁 Bono: +${p.rankBonusUSD} USD
+                                </div>
+                              )}
+                            </td>
+
+                            <td style={{ padding: '14px 16px' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                                <IonIcon icon={businessOutline} style={{ color: '#3b82f6', fontSize: '16px' }} />
+                                <span style={{ fontSize: '14px', color: '#0f172a' }}>{p.totalAffiliatedTenants} comercios</span>
+                              </div>
+                            </td>
+
+                            <td style={{ padding: '14px 16px' }}>
+                              <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                                {p.monthlyActivations}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                Mes actual
+                              </div>
+                            </td>
+
+                            <td style={{ padding: '14px 16px' }}>
+                              <div style={{ fontSize: '16px', fontWeight: 800, color: p.pendingBalanceUSD > 0 ? '#ea580c' : '#64748b' }}>
+                                ${p.pendingBalanceUSD.toFixed(2)} USD
+                              </div>
+                              {p.pendingBalanceUSD > 0 && (
+                                <span style={{ fontSize: '11px', background: '#ffedd5', color: '#c2410c', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                                  Pendiente
+                                </span>
+                              )}
+                            </td>
+
+                            <td style={{ padding: '14px 16px' }}>
+                              <div style={{ fontSize: '14px', fontWeight: 700, color: '#10b981' }}>
+                                ${p.paidBalanceUSD.toFixed(2)} USD
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                Histórico cobrado
+                              </div>
+                            </td>
+
+                            <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                              <IonButton
+                                size="small"
+                                color="primary"
+                                style={{ fontWeight: 700 }}
+                                onClick={() => {
+                                  setSelectedPromoterForPayout(p);
+                                  setSelectedCommissionToPay(null);
+                                  setPayoutReference('');
+                                }}
+                              >
+                                <IonIcon icon={walletOutline} slot="start" />
+                                Liquidar Comisiones
+                              </IonButton>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
@@ -1076,6 +1304,194 @@ const SuperAdminDashboard: React.FC = () => {
                 </IonButton>
               </div>
             </div>
+          </IonContent>
+        </IonModal>
+
+        {/* MODAL: LIQUIDAR COMISIONES DE PROMOTOR */}
+        <IonModal isOpen={!!selectedPromoterForPayout} onDidDismiss={() => { setSelectedPromoterForPayout(null); setSelectedCommissionToPay(null); }}>
+          <IonHeader>
+            <IonToolbar color="primary">
+              <IonTitle style={{ fontWeight: 700 }}>
+                Liquidar Comisiones - {selectedPromoterForPayout?.username} ({selectedPromoterForPayout?.code})
+              </IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => { setSelectedPromoterForPayout(null); setSelectedCommissionToPay(null); }}>Cerrar</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+
+          <IonContent className="ion-padding" style={{ '--background': '#f8fafc' } as any}>
+            {selectedPromoterForPayout && (
+              <div style={{ maxWidth: '850px', margin: '0 auto' }}>
+                {/* Resumen de cuentas de cobro del promotor */}
+                <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px' }}>
+                  <IonCardHeader style={{ paddingBottom: '6px' }}>
+                    <IonCardTitle style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                      Datos de Pago Registrados por el Promotor
+                    </IonCardTitle>
+                  </IonCardHeader>
+                  <IonCardContent>
+                    <IonGrid style={{ padding: 0 }}>
+                      <IonRow>
+                        <IonCol size="12" sizeMd="6">
+                          <div style={{ background: '#f1f5f9', padding: '10px 14px', borderRadius: '8px', fontSize: '13px' }}>
+                            <div style={{ fontWeight: 700, color: '#334155', marginBottom: '4px' }}>📱 Pago Móvil</div>
+                            <div><strong>Banco:</strong> {selectedPromoterForPayout.pagoMovilBank || 'No registrado'}</div>
+                            <div><strong>Teléfono:</strong> {selectedPromoterForPayout.pagoMovilPhone || 'No registrado'}</div>
+                            <div><strong>Cédula:</strong> {selectedPromoterForPayout.pagoMovilCedula || 'No registrado'}</div>
+                          </div>
+                        </IonCol>
+                        <IonCol size="12" sizeMd="6">
+                          <div style={{ background: '#f1f5f9', padding: '10px 14px', borderRadius: '8px', fontSize: '13px' }}>
+                            <div style={{ fontWeight: 700, color: '#334155', marginBottom: '4px' }}>🪙 Binance Pay / Cripto</div>
+                            <div><strong>Binance Pay ID / Pay:</strong> {selectedPromoterForPayout.binancePayId || 'No registrado'}</div>
+                            <div style={{ marginTop: '8px', fontWeight: 800, color: '#ea580c' }}>
+                              Saldo Pendiente Total: ${selectedPromoterForPayout.pendingBalanceUSD.toFixed(2)} USD
+                            </div>
+                          </div>
+                        </IonCol>
+                      </IonRow>
+                    </IonGrid>
+                  </IonCardContent>
+                </IonCard>
+
+                {/* Formulario de Pago si se seleccionó una comisión */}
+                {selectedCommissionToPay && (
+                  <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px', border: '2px solid #3b82f6' }}>
+                    <IonCardHeader>
+                      <IonCardTitle style={{ fontSize: '16px', fontWeight: 800, color: '#1d4ed8' }}>
+                        Procesar Pago para Comisión de ${selectedCommissionToPay.amountUSD.toFixed(2)} USD ({selectedCommissionToPay.type === 'ACTIVATION' ? 'Primera Activación $10' : 'Recurrente 10%'})
+                      </IonCardTitle>
+                    </IonCardHeader>
+                    <IonCardContent>
+                      <IonItem lines="full" style={{ marginBottom: '12px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700 }}>Método Utilizado para Enviar el Dinero</IonLabel>
+                        <IonSelect
+                          value={payoutPaymentMethod}
+                          onIonChange={(e) => setPayoutPaymentMethod(e.detail.value)}
+                        >
+                          <IonSelectOption value="PAGO_MOVIL">Pago Móvil (Bolívares)</IonSelectOption>
+                          <IonSelectOption value="BINANCE">Binance Pay (USDT)</IonSelectOption>
+                        </IonSelect>
+                      </IonItem>
+
+                      <IonItem lines="full" style={{ marginBottom: '16px' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700 }}>Número de Referencia o Comprobante</IonLabel>
+                        <IonInput
+                          placeholder="Ej: 98765432 o Order #8928374..."
+                          value={payoutReference}
+                          onIonInput={(e) => setPayoutReference(e.detail.value || '')}
+                        />
+                      </IonItem>
+
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <IonButton
+                          fill="outline"
+                          color="medium"
+                          style={{ flex: 1 }}
+                          onClick={() => setSelectedCommissionToPay(null)}
+                        >
+                          Cancelar
+                        </IonButton>
+                        <IonButton
+                          color="success"
+                          style={{ flex: 2, fontWeight: 700 }}
+                          disabled={isProcessingCommissionPayout}
+                          onClick={handlePayCommission}
+                        >
+                          {isProcessingCommissionPayout ? <IonSpinner name="dots" /> : 'Confirmar y Marcar como PAGADA'}
+                        </IonButton>
+                      </div>
+                    </IonCardContent>
+                  </IonCard>
+                )}
+
+                {/* Listado de todas las comisiones */}
+                <IonCard style={{ margin: 0, borderRadius: '12px' }}>
+                  <IonCardHeader>
+                    <IonCardTitle style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                      Historial y Desglose de Comisiones del Promotor
+                    </IonCardTitle>
+                  </IonCardHeader>
+                  <IonCardContent style={{ padding: 0 }}>
+                    {selectedPromoterForPayout.commissions.length === 0 ? (
+                      <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
+                        Este promotor aún no tiene comisiones generadas.
+                      </div>
+                    ) : (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                          <thead>
+                            <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '11px', textTransform: 'uppercase' }}>
+                              <th style={{ padding: '10px 14px' }}>Tipo</th>
+                              <th style={{ padding: '10px 14px' }}>Monto</th>
+                              <th style={{ padding: '10px 14px' }}>Fecha</th>
+                              <th style={{ padding: '10px 14px' }}>Estado</th>
+                              <th style={{ padding: '10px 14px' }}>Referencia</th>
+                              <th style={{ padding: '10px 14px', textAlign: 'right' }}>Acción</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedPromoterForPayout.commissions.map((comm) => (
+                              <tr key={comm.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td style={{ padding: '10px 14px' }}>
+                                  {comm.type === 'ACTIVATION' ? (
+                                    <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, fontSize: '11px' }}>
+                                      ⭐ PRIMERA ACTIVACIÓN ($10)
+                                    </span>
+                                  ) : (
+                                    <span style={{ background: '#f0fdf4', color: '#16a34a', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, fontSize: '11px' }}>
+                                      🔄 RECURRENTE (10%)
+                                    </span>
+                                  )}
+                                </td>
+                                <td style={{ padding: '10px 14px', fontWeight: 800, fontSize: '14px', color: '#0f172a' }}>
+                                  ${comm.amountUSD.toFixed(2)} USD
+                                </td>
+                                <td style={{ padding: '10px 14px', color: '#64748b' }}>
+                                  {new Date(comm.createdAt).toLocaleDateString('es-VE')}
+                                </td>
+                                <td style={{ padding: '10px 14px' }}>
+                                  {comm.status === PromoterCommissionStatus.PAID ? (
+                                    <IonBadge color="success">PAGADA</IonBadge>
+                                  ) : comm.status === PromoterCommissionStatus.PENDING ? (
+                                    <IonBadge color="warning">PENDIENTE</IonBadge>
+                                  ) : (
+                                    <IonBadge color="medium">{comm.status}</IonBadge>
+                                  )}
+                                </td>
+                                <td style={{ padding: '10px 14px', color: '#475569', fontSize: '12px' }}>
+                                  {comm.paymentReference || '—'}
+                                </td>
+                                <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                                  {comm.status === PromoterCommissionStatus.PENDING ? (
+                                    <IonButton
+                                      size="small"
+                                      color="success"
+                                      style={{ fontWeight: 700 }}
+                                      onClick={() => {
+                                        setSelectedCommissionToPay(comm);
+                                        setPayoutReference('');
+                                      }}
+                                    >
+                                      Pagar
+                                    </IonButton>
+                                  ) : (
+                                    <span style={{ color: '#10b981', fontWeight: 700, fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                      <IonIcon icon={checkmarkDoneOutline} /> Pagado
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </IonCardContent>
+                </IonCard>
+              </div>
+            )}
           </IonContent>
         </IonModal>
       </IonContent>

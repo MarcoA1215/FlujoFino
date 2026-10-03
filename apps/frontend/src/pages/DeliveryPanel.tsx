@@ -23,6 +23,8 @@ interface DeliveryOrder {
   deliveryZone: string;
   deliveryFeeUSD: number;
   deliveryFeeBS: number;
+  cashToCollectUSD?: number;
+  cashToCollectBS?: number;
   totalAmount: number;
   paymentStatus: string;
   paymentMethod?: string;
@@ -39,6 +41,8 @@ interface ActiveDeliveryOrder {
   deliveryZone: string;
   deliveryFeeUSD: number;
   deliveryFeeBS: number;
+  cashToCollectUSD?: number;
+  cashToCollectBS?: number;
   totalAmount: number;
   paymentStatus: string;
   paymentMethod?: string;
@@ -51,6 +55,8 @@ interface MyDeliveryHistory {
   activeCount?: number;
   totalFletesUSD: number;
   totalFletesBS: number;
+  totalCashToCollectUSD?: number;
+  totalCashToCollectBS?: number;
   exchangeRate: number;
   activeOrders?: ActiveDeliveryOrder[];
   orders: DeliveryOrder[];
@@ -77,6 +83,34 @@ const DeliveryPanel: React.FC = () => {
     }
   };
 
+  const handleStartRoute = async (orderId: string) => {
+    try {
+      await apiClient.patch(`/deliveries/${orderId}/start`);
+      presentToast({ message: '🛵 ¡En ruta de entrega!', duration: 2500, color: 'success' });
+      fetchHistory();
+    } catch (e: any) {
+      presentToast({
+        message: 'Error al salir a ruta: ' + (e.response?.data?.message || e.message),
+        duration: 3000,
+        color: 'danger',
+      });
+    }
+  };
+
+  const handleMarkDelivered = async (orderId: string) => {
+    try {
+      await apiClient.patch(`/deliveries/${orderId}/complete`);
+      presentToast({ message: '✅ ¡Pedido entregado con éxito!', duration: 2500, color: 'success' });
+      fetchHistory();
+    } catch (e: any) {
+      presentToast({
+        message: 'Error al marcar entregado: ' + (e.response?.data?.message || e.message),
+        duration: 3000,
+        color: 'danger',
+      });
+    }
+  };
+
   useEffect(() => {
     fetchHistory();
   }, []);
@@ -89,44 +123,75 @@ const DeliveryPanel: React.FC = () => {
           {/* Tarjetas de Resumen */}
           <IonGrid style={{ padding: 0 }}>
             <IonRow>
-              <IonCol size="12" sizeMd="6">
+              <IonCol size="12" sizeMd="4">
                 <div
                   style={{
                     background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
                     borderRadius: '16px',
-                    padding: '20px',
+                    padding: '16px',
                     color: 'white',
                     marginBottom: '16px',
                     boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+                    minHeight: '136px',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8' }}>
+                    <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8' }}>
                       Ganancia en Fletes
                     </span>
                     <IonButton fill="clear" size="small" onClick={fetchHistory} disabled={loading} style={{ color: '#38BDF8' }}>
                       <IonIcon icon={refreshOutline} slot="icon-only" />
                     </IonButton>
                   </div>
-                  <div style={{ fontSize: '32px', fontWeight: 900, marginTop: '8px', color: '#38BDF8' }}>
+                  <div style={{ fontSize: '26px', fontWeight: 900, marginTop: '6px', color: '#38BDF8' }}>
                     ${history?.totalFletesUSD?.toFixed(2) || '0.00'} USD
                   </div>
-                  <div style={{ fontSize: '15px', color: '#CBD5E1', marginTop: '4px', fontWeight: 600 }}>
+                  <div style={{ fontSize: '13px', color: '#CBD5E1', marginTop: '2px', fontWeight: 600 }}>
                     Bs. {history?.totalFletesBS?.toLocaleString('es-VE', { minimumFractionDigits: 2 }) || '0,00'}
                   </div>
-                  <div style={{ marginTop: '12px', fontSize: '12px', color: '#94A3B8' }}>
-                    Tasa activa: Bs. {history?.exchangeRate?.toFixed(2) || '40.00'} / USD
+                  <div style={{ marginTop: '8px', fontSize: '11px', color: '#94A3B8' }}>
+                    Tasa: Bs. {history?.exchangeRate?.toFixed(2) || '40.00'}
                   </div>
                 </div>
               </IonCol>
 
-              <IonCol size="12" sizeMd="6">
+              <IonCol size="12" sizeMd="4">
+                <div
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #FCD34D',
+                    borderRadius: '16px',
+                    padding: '16px',
+                    marginBottom: '16px',
+                    boxShadow: '0 2px 6px rgba(245, 158, 11, 0.08)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    minHeight: '136px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#92400E', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase' }}>
+                    💵 Dinero a Rendir
+                  </div>
+                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#B45309', marginTop: '6px' }}>
+                    ${history?.totalCashToCollectUSD?.toFixed(2) || '0.00'} USD
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#78350F', marginTop: '2px', fontWeight: 600 }}>
+                    Bs. {history?.totalCashToCollectBS?.toLocaleString('es-VE', { minimumFractionDigits: 2 }) || '0,00'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#A16207', marginTop: '8px' }}>
+                    Efectivo cobrado en calle
+                  </div>
+                </div>
+              </IonCol>
+
+              <IonCol size="12" sizeMd="4">
                 <div
                   style={{
                     background: '#FFFFFF',
                     border: '1px solid #E2E8F0',
                     borderRadius: '16px',
-                    padding: '20px',
+                    padding: '16px',
                     marginBottom: '16px',
                     boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
                     display: 'flex',
@@ -135,15 +200,18 @@ const DeliveryPanel: React.FC = () => {
                     minHeight: '136px',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748B', fontSize: '13px', fontWeight: 600 }}>
-                    <IonIcon icon={checkmarkCircleOutline} style={{ color: '#10B981', fontSize: '20px' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748B', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>
+                    <IonIcon icon={checkmarkCircleOutline} style={{ color: '#10B981', fontSize: '18px' }} />
                     Entregas Realizadas
                   </div>
-                  <div style={{ fontSize: '32px', fontWeight: 900, color: '#0F172A', marginTop: '8px' }}>
+                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#0F172A', marginTop: '6px' }}>
                     {history?.completedCount || 0}
                   </div>
-                  <div style={{ fontSize: '13px', color: '#10B981', fontWeight: 600, marginTop: '4px' }}>
-                    {history?.completedCount ? '¡Excelente trabajo en ruta!' : 'Listo para recibir entregas'}
+                  <div style={{ fontSize: '12px', color: '#10B981', fontWeight: 600, marginTop: '2px' }}>
+                    {history?.completedCount ? '¡Excelente trabajo en ruta!' : 'Listo para entregas'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '8px' }}>
+                    {history?.activeOrders?.length || 0} en curso
                   </div>
                 </div>
               </IonCol>
@@ -227,17 +295,66 @@ const DeliveryPanel: React.FC = () => {
                       </div>
                     )}
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid #F1F5F9', marginTop: '8px' }}>
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid #F1F5F9', marginTop: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <IonBadge color={order.paymentStatus === 'PAID' ? 'success' : 'warning'}>
                           {order.paymentStatus === 'PAID' ? 'PAGADO' : 'COBRAR AL ENTREGAR'}
                         </IonBadge>
                         <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
                           Total: ${order.totalAmount.toFixed(2)}
                         </span>
+                        {order.cashToCollectUSD !== undefined && order.cashToCollectUSD > 0 && (
+                          <span style={{ fontSize: '11px', fontWeight: 800, color: '#B45309', background: '#FEF3C7', padding: '2px 8px', borderRadius: '6px' }}>
+                            💵 Cobrar en efectivo: ${order.cashToCollectUSD.toFixed(2)} USD (Bs. {order.cashToCollectBS?.toLocaleString('es-VE', { minimumFractionDigits: 2 })})
+                          </span>
+                        )}
                       </div>
 
-                      <div style={{ display: 'flex', gap: '6px' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {order.status === 'PREPARING' && (
+                          <button
+                            type="button"
+                            onClick={() => handleStartRoute(order.id)}
+                            style={{
+                              background: '#0284C7',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              padding: '8px 14px',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            🛵 Salir a Ruta
+                          </button>
+                        )}
+
+                        {order.status === 'IN_TRANSIT' && (
+                          <button
+                            type="button"
+                            onClick={() => handleMarkDelivered(order.id)}
+                            style={{
+                              background: '#10B981',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              padding: '8px 14px',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            ✅ Marcar Entregado
+                          </button>
+                        )}
+
                         {order.customerPhone && (
                           <a
                             href={`tel:${order.customerPhone}`}
@@ -255,7 +372,7 @@ const DeliveryPanel: React.FC = () => {
                             }}
                           >
                             <IonIcon icon={callOutline} />
-                            Llamar ({order.customerPhone})
+                            Llamar
                           </a>
                         )}
                       </div>

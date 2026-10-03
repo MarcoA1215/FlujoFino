@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { refreshOutline, cubeOutline, buildOutline, cutOutline, closeOutline, searchOutline } from 'ionicons/icons';
+import { refreshOutline, cubeOutline, buildOutline, cutOutline, closeOutline, searchOutline, archiveOutline } from 'ionicons/icons';
 import { IonList, IonItem, IonLabel, IonBadge } from '@ionic/react';
 import React, { useEffect, useState, useMemo } from 'react';
 import { IonToggle, IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonActionSheet, useIonToast, IonIcon } from '@ionic/react';
@@ -21,6 +21,34 @@ const Products: React.FC = () => {
   const [isClientMode, setIsClientMode] = useState(false);
   const [presentToast] = useIonToast();
   const [settings, setSettings] = useState<any>({});
+  const [showArchivedPanel, setShowArchivedPanel] = useState(false);
+  const [archivedProducts, setArchivedProducts] = useState<Product[]>([]);
+  const [loadingArchived, setLoadingArchived] = useState(false);
+
+  const fetchArchivedProducts = async () => {
+    setLoadingArchived(true);
+    try {
+      const res = await apiClient.get<Product[]>('/products/archived');
+      setArchivedProducts(res.data || []);
+    } catch (e) {
+      console.error(e);
+      presentToast({ message: 'Error cargando productos archivados', duration: 3000, color: 'danger' });
+    } finally {
+      setLoadingArchived(false);
+    }
+  };
+
+  const restoreProduct = async (p: Product) => {
+    try {
+      await apiClient.patch(`/products/${p.id}/restore`);
+      presentToast({ message: `Producto "${p.name}" restaurado con éxito`, duration: 2500, color: 'success' });
+      fetchData();
+      fetchArchivedProducts();
+    } catch (e: any) {
+      console.error(e);
+      presentToast({ message: 'Error al restaurar producto', duration: 3000, color: 'danger' });
+    }
+  };
 
   const [selectedProductForRecipe, setSelectedProductForRecipe] = useState<Product | null>(null);
   const [showProductModal, setShowProductModal] = useState(false);
@@ -289,6 +317,7 @@ const Products: React.FC = () => {
             try {
               await apiClient.delete('/products/' + p.id);
               fetchData();
+              if (showArchivedPanel) fetchArchivedProducts();
               presentToast({ message: 'Eliminado', duration: 2000, color: 'success' });
             } catch (e) {
               presentToast({ message: 'Error', duration: 3000, color: 'danger' });
@@ -337,11 +366,162 @@ const Products: React.FC = () => {
               )}
             </div>
 
+            <button
+              type="button"
+              onClick={() => {
+                if (!showArchivedPanel) fetchArchivedProducts();
+                setShowArchivedPanel(!showArchivedPanel);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: showArchivedPanel ? '#0F172A' : '#ffffff',
+                color: showArchivedPanel ? '#ffffff' : '#334155',
+                padding: '8px 14px',
+                borderRadius: '999px',
+                border: '1px solid #CBD5E1',
+                boxShadow: 'var(--ff-shadow-sm)',
+                fontSize: '12px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <IonIcon icon={archiveOutline} style={{ fontSize: '15px' }} />
+              <span>Archivados {archivedProducts.length > 0 ? `(${archivedProducts.length})` : ''}</span>
+            </button>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', padding: '6px 12px', borderRadius: '999px', border: '1px solid #E2E8F0', boxShadow: 'var(--ff-shadow-sm)' }}>
               <span style={{ fontSize: '12px', fontWeight: '700', color: '#0F172A' }}>Modo Cliente</span>
               <IonToggle checked={isClientMode} onIonChange={e => setIsClientMode(e.detail.checked)} color="success" />
             </div>
           </div>
+
+          {/* Cajón / Panel Retráctil de Productos Archivados */}
+          {showArchivedPanel && (
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: '16px',
+                border: '1.5px solid #CBD5E1',
+                boxShadow: '0 8px 24px rgba(15, 23, 42, 0.08)',
+                overflow: 'hidden',
+                marginBottom: '16px',
+              }}
+            >
+              <div
+                style={{
+                  background: '#0F172A',
+                  color: '#FFFFFF',
+                  padding: '12px 18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <IonIcon icon={archiveOutline} style={{ fontSize: '1.25rem', color: '#94A3B8' }} />
+                  <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>
+                    Productos Archivados / Eliminados ({archivedProducts.length})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowArchivedPanel(false)}
+                  style={{
+                    background: '#334155',
+                    border: 'none',
+                    color: '#F8FAFC',
+                    borderRadius: '8px',
+                    padding: '4px 10px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <IonIcon icon={closeOutline} />
+                  <span>Cerrar</span>
+                </button>
+              </div>
+
+              <div style={{ padding: '16px' }}>
+                {loadingArchived ? (
+                  <div style={{ padding: '24px', textAlign: 'center', color: '#64748B' }}>
+                    Cargando productos archivados...
+                  </div>
+                ) : archivedProducts.length === 0 ? (
+                  <div style={{ padding: '24px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>
+                    No hay productos archivados en este momento.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {archivedProducts.map((archived) => (
+                      <div
+                        key={archived.id}
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '12px 16px',
+                          background: '#F8FAFC',
+                          borderRadius: '12px',
+                          border: '1px solid #E2E8F0',
+                          gap: '12px',
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: '180px' }}>
+                          <div style={{ fontWeight: 700, fontSize: '15px', color: '#1E293B' }}>
+                            {archived.name}
+                          </div>
+                          <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                            <span>
+                              Precio: <strong style={{ color: '#334155' }}>${Number(archived.salePrice || 0).toFixed(2)}</strong>
+                            </span>
+                            {archived.category && (
+                              <span>
+                                Categoría: <strong style={{ color: '#334155' }}>{archived.category}</strong>
+                              </span>
+                            )}
+                            <span>
+                              Stock al archivar: <strong style={{ color: '#334155' }}>{archived.stockQuantity ?? 0}</strong>
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            className="ff-btn-primary"
+                            onClick={() => restoreProduct(archived)}
+                            style={{
+                              fontSize: '12px',
+                              padding: '6px 14px',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              cursor: 'pointer',
+                              background: 'var(--theme-primary)',
+                              color: 'var(--theme-primary-contrast, #ffffff)',
+                              border: 'none',
+                            }}
+                          >
+                            <IonIcon icon={refreshOutline} />
+                            <span>Restaurar</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         <IonGrid>
           {!isClientMode && (
             <IonRow className="ion-margin-bottom">

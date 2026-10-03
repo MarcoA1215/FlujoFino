@@ -12,6 +12,7 @@ import { Public } from '../auth/public.decorator';
 import { OrderItem } from '../entities/order-item.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { CustomersService } from '../customers/customers.service';
+import { isTenantSuspendedOrExpired } from '../utils/tenant-status';
 
 @Public()
 @Controller('public/reservations')
@@ -35,6 +36,17 @@ export class PublicReservationsController {
 
     const settingsRepo = this.tenantRepo.manager.getRepository(Settings);
     const settings = await settingsRepo.findOne({ where: { tenantId: id } });
+
+    if (isTenantSuspendedOrExpired(tenant)) {
+      return {
+        id: token,
+        name: tenant.name,
+        isSuspended: true,
+        settings: { companyPhone: settings?.companyPhone || '' },
+        services: [],
+        staff: []
+      };
+    }
 
     const productRepo = this.tenantRepo.manager.getRepository(Product);
     const products = await productRepo.find({
@@ -81,6 +93,12 @@ export class PublicReservationsController {
 
     const hasStore = ((settings?.featureBuySell || settings?.featureRecipes) && settings?.featureShowCatalog !== false) ?? false;
 
+    let rate = Number(settings?.exchangeRateBs || 0);
+    if (!rate || rate === 40.0) {
+      const globalSettings = await settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+      rate = Number(globalSettings?.exchangeRateBs || 40.0);
+    }
+
     return { 
       id: token, 
       name: tenant.name,
@@ -95,7 +113,7 @@ export class PublicReservationsController {
       featureCustomerSchedules: settings?.featureCustomerSchedules ?? false,
       hasStore: Boolean(hasStore),
       staff: staff,
-      exchangeRateBs: Number(settings?.exchangeRateBs || 40.0),
+      exchangeRateBs: rate,
       minDepositPercentage: Number(settings?.minDepositPercentage || 0),
       allowPartialPayments: settings?.allowPartialPayments ?? true,
       bankInfo: settings?.companyBank || '',
@@ -136,6 +154,10 @@ export class PublicReservationsController {
     }
     const tenant = await this.tenantRepo.findOne({ where: { id } });
     if (!tenant) throw new NotFoundException('Negocio no encontrado');
+
+    if (isTenantSuspendedOrExpired(tenant)) {
+      throw new BadRequestException('Este negocio se encuentra temporalmente en pausa y no está recibiendo citas.');
+    }
     
     // Check overlap using new logic
     const isAvailable = await this.checkSlotAvailability(id, dto.date, dto.time, dto.serviceId, undefined, dto.employeeId);
@@ -197,7 +219,11 @@ export class PublicReservationsController {
       if (resDb) {
         const rawPayAmt = Number(dto.paymentAmount || totalAmount);
         const payAmt = totalAmount > 0 ? Math.min(rawPayAmt, totalAmount) : rawPayAmt;
-        const rate = Number(settings?.exchangeRateBs || 40.0);
+        let rate = Number(settings?.exchangeRateBs || 0);
+        if (!rate || rate === 40.0) {
+          const globalSettings = await settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+          rate = Number(globalSettings?.exchangeRateBs || 40.0);
+        }
         const payAmtBs = dto.paymentAmountBs ? Number(dto.paymentAmountBs) : Math.round(payAmt * rate * 100) / 100;
 
         const paymentEntry = {
@@ -268,7 +294,11 @@ export class PublicReservationsController {
     const totalAmount = Number(reservation.totalAmount || serviceDetails?.price || 0);
     const abonosTotal = Number(reservation.abonosTotal || 0);
     const remainingAmount = Math.max(0, totalAmount - abonosTotal);
-    const exchangeRate = Number(settings?.exchangeRateBs || 40.0);
+    let exchangeRate = Number(settings?.exchangeRateBs || 0);
+    if (!exchangeRate || exchangeRate === 40.0) {
+      const globalSettings = await settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+      exchangeRate = Number(globalSettings?.exchangeRateBs || 40.0);
+    }
 
     return {
       id: reservation.id,

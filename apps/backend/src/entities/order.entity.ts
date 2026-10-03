@@ -178,4 +178,8 @@ export class Order {
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'deliveryUserId' })
   deliveryUser: User;
+
+  @Index()
+  @Column({ nullable: true })
+  linkedReservationId?: string;
 }

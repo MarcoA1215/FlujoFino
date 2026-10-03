@@ -1,51 +1,47 @@
-// @ts-nocheck
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useContext } from 'react';
 import {
   IonPage,
   IonContent,
-  IonGrid,
-  IonRow,
-  IonCol,
   IonIcon,
-  IonBadge,
   useIonToast,
   useIonAlert,
   useIonRouter,
   IonModal,
-  IonInput,
   IonSelect,
-  IonSelectOption
+  IonSelectOption,
 } from '@ionic/react';
 import {
-  refreshOutline,
-  copyOutline,
-  informationCircleOutline,
-  trashOutline,
-  createOutline,
   personOutline,
-  imageOutline,
   logoWhatsapp,
   searchOutline,
   closeOutline,
-  checkmarkCircleOutline,
-  cardOutline,
   cashOutline,
-  phonePortraitOutline,
   bicycleOutline,
   storefrontOutline,
-  timeOutline,
   cartOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
-import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';
+import { OrderStatus, PaymentStatus, DeliveryMethod, UserRole } from '@nutrideli/shared-types';
 import type { DeliveryZone } from '../types';
-import { useImageViewer } from '../context/ImageViewerContext';
+import { AuthContext } from '../context/AuthContext';
 import AppHeader from '../components/AppHeader';
 
 type OrderItem = {
   id: string;
-  productName: string;
+  productName?: string;
   quantity: number;
+  product?: {
+    id?: string;
+    name?: string;
+  };
+  unitPrice?: number;
+  hasModifications?: boolean;
+  removedIngredients?: string[];
+  addedExtras?: Array<{
+    name: string;
+    quantity?: number;
+    priceUSD?: number;
+  }>;
 };
 
 type Order = {
@@ -80,6 +76,15 @@ type Order = {
   deliveryMethod?: DeliveryMethod;
   deliveryZone?: DeliveryZone;
   deliveryFee?: number;
+  deliveryUserId?: string;
+  deliveryUser?: {
+    id: string;
+    username: string;
+    name?: string;
+  };
+  discountAmount?: number;
+  discountType?: string;
+  discountValue?: number;
   abonosTotal?: number;
   abonosHistory?: any[];
   requestedDeliveryDate?: string | Date;
@@ -94,25 +99,54 @@ type Order = {
 };
 
 const Orders: React.FC = () => {
+  const { user } = useContext(AuthContext);
+  const isKitchen = user?.role === UserRole.KITCHEN;
   const router = useIonRouter();
-  const { openImage } = useImageViewer();
   const [orders, setOrders] = useState<Order[]>([]);
+
+  const assignDeliveryDriver = async (orderId: string, deliveryUserId: string) => {
+    try {
+      await apiClient.patch(`/orders/${orderId}/assign-delivery`, { deliveryUserId });
+      presentToast({ message: 'Repartidor asignado con éxito', duration: 2000, color: 'success' });
+      fetchOrders();
+      if (selectedOrderForDetails && selectedOrderForDetails.id === orderId) {
+        const found = employees.find(e => e.id === deliveryUserId);
+        setSelectedOrderForDetails((prev: any) => ({
+          ...prev,
+          deliveryUserId,
+          deliveryUser: found ? { id: found.id, username: found.username, name: found.name } : null
+        }));
+      }
+    } catch (e: any) {
+      console.error(e);
+      presentToast({
+        message: 'Error al asignar repartidor: ' + (e.response?.data?.message || e.message),
+        duration: 3000,
+        color: 'danger',
+      });
+    }
+  };
   const [tab, setTab] = useState<'activos' | 'por_cobrar' | 'por_confirmar' | 'historial'>('activos');
   const [searchText, setSearchText] = useState('');
   const [exchangeRate, setExchangeRate] = useState<number>(40.0);
+  const [currencySymbol, setCurrencySymbol] = useState<string>('Bs.');
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<any>(null);
-  const [selectedOrderForPartial, setSelectedOrderForPartial] = useState<any>(null);
   const [selectedOrderForAbono, setSelectedOrderForAbono] = useState<any>(null);
-  const [partialDeliveries, setPartialDeliveries] = useState<{ [key: string]: number }>({});
   const [abonoAmount, setAbonoAmount] = useState<string>('');
   const [abonoCurrency, setAbonoCurrency] = useState<'USD' | 'VES'>('USD');
   const [abonoMethod, setAbonoMethod] = useState<string>('USD');
   const [abonoRef, setAbonoRef] = useState<string>('');
-  const [settings, setSettings] = useState<any>({});
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('');
+
+  const formatLocalAmount = (amount: number, symbol: string = currencySymbol) => {
+    if (symbol === 'COP') {
+      return `${Math.round(amount).toLocaleString('es-CO')} COP`;
+    }
+    return `${symbol} ${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
 
   const fetchOrders = async () => {
     try {
@@ -128,9 +162,11 @@ const Orders: React.FC = () => {
   const fetchSettings = async () => {
     try {
       const res = await apiClient.get<any>('/settings');
-      setSettings(res.data || {});
       if (res.data?.exchangeRateBs && Number(res.data.exchangeRateBs) > 0) {
         setExchangeRate(Number(res.data.exchangeRateBs));
+      }
+      if (res.data?.currencySymbol) {
+        setCurrencySymbol(res.data.currencySymbol);
       }
     } catch (e) {}
   };
@@ -148,6 +184,14 @@ const Orders: React.FC = () => {
     fetchOrders();
     fetchSettings();
     fetchEmployees();
+
+    const onSettingsUpdated = () => {
+      fetchSettings();
+    };
+    window.addEventListener('settings_updated', onSettingsUpdated);
+    return () => {
+      window.removeEventListener('settings_updated', onSettingsUpdated);
+    };
   }, []);
 
   const updateStatus = async (orderId: string, status: OrderStatus) => {
@@ -159,13 +203,6 @@ const Orders: React.FC = () => {
       console.error(e);
       presentToast({ message: 'Error al cambiar estado', duration: 3000, color: 'danger' });
     }
-  };
-
-  const cloneOrder = (orderId: string) => {
-    const target = orders.find(o => o.id === orderId);
-    if (!target) return;
-    router.push('/pos', 'root', 'replace');
-    window.location.href = `/pos?cloneId=${orderId}`;
   };
 
   const confirmSupplierOrder = async (order: Order) => {
@@ -445,13 +482,15 @@ const Orders: React.FC = () => {
               >
                 Activos ({counts.activos})
               </button>
-              <button
-                type="button"
-                className={`ff-chip ${tab === 'por_cobrar' ? 'active' : ''}`}
-                onClick={() => setTab('por_cobrar')}
-              >
-                Por Cobrar ({counts.porCobrar})
-              </button>
+              {!isKitchen && (
+                <button
+                  type="button"
+                  className={`ff-chip ${tab === 'por_cobrar' ? 'active' : ''}`}
+                  onClick={() => setTab('por_cobrar')}
+                >
+                  Por Cobrar ({counts.porCobrar})
+                </button>
+              )}
               <button
                 type="button"
                 className={`ff-chip ${tab === 'por_confirmar' ? 'active' : ''}`}
@@ -471,28 +510,33 @@ const Orders: React.FC = () => {
 
             {/* Employee Filter */}
             {employees.length > 0 && (
-              <select
+              <IonSelect
+                interface="popover"
                 value={selectedEmployeeFilter}
-                onChange={e => setSelectedEmployeeFilter(e.target.value)}
+                placeholder="Todos los empleados"
+                onIonChange={e => setSelectedEmployeeFilter(e.detail.value)}
                 style={{
                   background: '#ffffff',
                   border: '1px solid #E2E8F0',
                   borderRadius: '999px',
-                  padding: '7px 14px',
+                  padding: '2px 14px',
                   fontSize: '13px',
                   fontWeight: '600',
                   color: '#0F172A',
                   outline: 'none',
-                  boxShadow: 'var(--ff-shadow-sm)'
-                }}
+                  boxShadow: 'var(--ff-shadow-sm)',
+                  minHeight: '36px',
+                  '--padding-start': '0px',
+                  '--padding-end': '0px'
+                } as any}
               >
-                <option value="">Todos los empleados</option>
+                <IonSelectOption value="">Todos los empleados</IonSelectOption>
                 {employees.map(emp => (
-                  <option key={emp.id} value={emp.id}>
+                  <IonSelectOption key={emp.id} value={emp.id}>
                     {emp.username || emp.name} {emp.jobTitle ? `(${emp.jobTitle})` : ''}
-                  </option>
+                  </IonSelectOption>
                 ))}
-              </select>
+              </IonSelect>
             )}
           </div>
 
@@ -523,11 +567,16 @@ const Orders: React.FC = () => {
               })();
 
               const orderItems = Array.isArray(order.items) ? order.items : [];
+              const orderRate = Number(order.exchangeRate) > 0 ? Number(order.exchangeRate) : (Number(exchangeRate) || 40);
               const totalUsd = Number(order.totalAmount || 0);
-              const totalBs = (totalUsd * (Number(exchangeRate) || 40)).toFixed(2);
+              const orderAmountLocal = (order.amountBs !== undefined && order.amountBs !== null && Number(order.amountBs) > 0)
+                ? Number(order.amountBs)
+                : Number((totalUsd * orderRate).toFixed(2));
+              const totalLocalFormatted = formatLocalAmount(orderAmountLocal);
+
               const abonosTotal = Number(order.abonosTotal || 0);
               const remaining = Math.max(0, totalUsd - abonosTotal);
-              const remainingBs = (remaining * (Number(exchangeRate) || 40)).toFixed(2);
+              const remainingLocalFormatted = formatLocalAmount(remaining * orderRate);
 
               return (
                 <div
@@ -623,6 +672,41 @@ const Orders: React.FC = () => {
                       )}
                     </div>
 
+                    {order.deliveryMethod === DeliveryMethod.DELIVERY && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', background: '#F0F9FF', padding: '6px 10px', borderRadius: '10px', border: '1px solid #BAE6FD' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '800', color: '#0284C7' }}>🛵 Repartidor:</span>
+                        <IonSelect
+                          interface="popover"
+                          value={order.deliveryUserId || ''}
+                          placeholder="(Sin asignar)"
+                          onIonChange={(e) => assignDeliveryDriver(order.id, e.detail.value)}
+                          disabled={isKitchen}
+                          style={{
+                            flex: 1,
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            padding: '2px 8px',
+                            borderRadius: '8px',
+                            border: '1px solid #38BDF8',
+                            background: '#FFFFFF',
+                            color: '#0369A1',
+                            cursor: isKitchen ? 'default' : 'pointer',
+                            outline: 'none',
+                            minHeight: '32px',
+                            '--padding-start': '0px',
+                            '--padding-end': '0px'
+                          } as any}
+                        >
+                          <IonSelectOption value="">(Sin asignar)</IonSelectOption>
+                          {employees.filter(e => e.role === UserRole.DELIVERY).map(driver => (
+                            <IonSelectOption key={driver.id} value={driver.id}>
+                              {driver.username || driver.name}
+                            </IonSelectOption>
+                          ))}
+                        </IonSelect>
+                      </div>
+                    )}
+
                     {/* Items List */}
                     <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '10px 12px', marginBottom: '12px', border: '1px solid #E2E8F0' }}>
                       {orderItems.map((it, idx) => {
@@ -634,9 +718,11 @@ const Orders: React.FC = () => {
                           <div key={it.id || idx} style={{ fontSize: '13px', color: '#334155', padding: '4px 0', borderBottom: idx < orderItems.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <span style={{ fontWeight: '600' }}>{qty}x {pName}</span>
-                              <span style={{ fontWeight: '700', color: '#0F172A' }}>
-                                ${(uPrice * qty).toFixed(2)}
-                              </span>
+                              {!isKitchen && (
+                                <span style={{ fontWeight: '700', color: '#0F172A' }}>
+                                  ${(uPrice * qty).toFixed(2)}
+                                </span>
+                              )}
                             </div>
 
                             {it.hasModifications && (
@@ -653,7 +739,7 @@ const Orders: React.FC = () => {
                                   <div style={{ fontSize: '11px', color: '#16A34A', fontWeight: '700', marginTop: '1px' }}>
                                     {it.addedExtras.map((ex: any, eIdx: number) => (
                                       <div key={eIdx}>
-                                        EXTRA: {ex.quantity > 1 ? `${ex.quantity}x ` : ''}{ex.name} (+${(Number(ex.priceUSD) * Number(ex.quantity || 1)).toFixed(2)})
+                                        EXTRA: {ex.quantity > 1 ? `${ex.quantity}x ` : ''}{ex.name} {!isKitchen && `(+$${(Number(ex.priceUSD) * Number(ex.quantity || 1)).toFixed(2)})`}
                                       </div>
                                     ))}
                                   </div>
@@ -668,7 +754,7 @@ const Orders: React.FC = () => {
                           Sin desglose de items
                         </div>
                       )}
-                      {Number(order.discountAmount || 0) > 0 && (
+                      {!isKitchen && Number(order.discountAmount || 0) > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#DC2626', fontWeight: '700', padding: '4px 0', borderTop: '1px dashed #E2E8F0', marginTop: '4px' }}>
                           <span>🏷️ Descuento:</span>
                           <span>-${Number(order.discountAmount).toFixed(2)}</span>
@@ -677,56 +763,74 @@ const Orders: React.FC = () => {
                     </div>
 
                     {/* Price & Payment Status */}
-                    <div style={{ marginBottom: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontSize: '18px', fontWeight: '900', color: '#10B981' }}>
-                            ${totalUsd.toFixed(2)}
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#64748B' }}>
-                            Bs. {totalBs}
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: '700',
-                            padding: '4px 10px',
-                            borderRadius: '8px',
-                            background: isPaid ? '#ECFDF5' : (isPartial ? '#FFFBEB' : '#FEF2F2'),
-                            color: isPaid ? '#047857' : (isPartial ? '#92400E' : '#B91C1C')
-                          }}
-                        >
-                          {isPaid ? '✓ Pagado' : (isPartial ? '⏳ Abono Parcial' : '⏳ Por Cobrar')}
-                        </div>
+                    {isKitchen ? (
+                      <div style={{ marginBottom: '12px', padding: '10px 12px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '800', color: '#334155' }}>
+                          Estado de Preparación:
+                        </span>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: '800',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          background: isPreparing ? '#EFF6FF' : (isPending ? '#FEF3C7' : '#ECFDF5'),
+                          color: isPreparing ? '#1D4ED8' : (isPending ? '#92400E' : '#047857')
+                        }}>
+                          {isPreparing ? '👨‍🍳 EN PREPARACIÓN' : (isPending ? '⏳ PENDIENTE' : '✓ LISTO / ENTREGADO')}
+                        </span>
                       </div>
+                    ) : (
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: '18px', fontWeight: '900', color: '#10B981' }}>
+                              ${totalUsd.toFixed(2)}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#64748B' }}>
+                              {totalLocalFormatted}
+                            </div>
+                          </div>
 
-                      {/* Desglose de Abonos / Saldo Pendiente o Saldo a Favor */}
-                      {!isCanceled && (
-                        <>
-                          {!isPaid && (
-                            <div style={{ marginTop: '8px', padding: '8px 10px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', fontSize: '11px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: abonosTotal > 0 ? '4px' : '0' }}>
-                                <span style={{ color: '#64748B' }}>Abonado: <b style={{ color: '#059669' }}>${abonosTotal.toFixed(2)}</b></span>
-                                <span style={{ color: '#64748B' }}>Resta: <b style={{ color: '#D97706' }}>${remaining.toFixed(2)}</b> (Bs. {remainingBs})</span>
-                              </div>
-                              {abonosTotal > 0 && (
-                                <div style={{ width: '100%', height: '6px', background: '#E2E8F0', borderRadius: '999px', overflow: 'hidden' }}>
-                                  <div style={{ width: `${Math.min(100, (abonosTotal / (totalUsd || 1)) * 100)}%`, height: '100%', background: '#10B981' }} />
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              padding: '4px 10px',
+                              borderRadius: '8px',
+                              background: isPaid ? '#ECFDF5' : (isPartial ? '#FFFBEB' : '#FEF2F2'),
+                              color: isPaid ? '#047857' : (isPartial ? '#92400E' : '#B91C1C')
+                            }}
+                          >
+                            {isPaid ? '✓ Pagado' : (isPartial ? '⏳ Abono Parcial' : '⏳ Por Cobrar')}
+                          </div>
+                        </div>
+
+                        {/* Desglose de Abonos / Saldo Pendiente o Saldo a Favor */}
+                        {!isCanceled && (
+                          <>
+                            {!isPaid && (
+                              <div style={{ marginTop: '8px', padding: '8px 10px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', fontSize: '11px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: abonosTotal > 0 ? '4px' : '0' }}>
+                                  <span style={{ color: '#64748B' }}>Abonado: <b style={{ color: '#059669' }}>${abonosTotal.toFixed(2)}</b></span>
+                                  <span style={{ color: '#64748B' }}>Resta: <b style={{ color: '#D97706' }}>${remaining.toFixed(2)}</b> ({remainingLocalFormatted})</span>
                                 </div>
-                              )}
-                            </div>
-                          )}
-                          {abonosTotal > totalUsd && (
-                            <div style={{ marginTop: '8px', padding: '8px 10px', background: '#ECFDF5', borderRadius: '10px', border: '1px solid #A7F3D0', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ color: '#065F46' }}>Abonado: <b>${abonosTotal.toFixed(2)}</b></span>
-                              <span style={{ color: '#047857', fontWeight: '800' }}>Saldo a favor: +${(abonosTotal - totalUsd).toFixed(2)}</span>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
+                                {abonosTotal > 0 && (
+                                  <div style={{ width: '100%', height: '6px', background: '#E2E8F0', borderRadius: '999px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${Math.min(100, (abonosTotal / (totalUsd || 1)) * 100)}%`, height: '100%', background: '#10B981' }} />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {abonosTotal > totalUsd && (
+                              <div style={{ marginTop: '8px', padding: '8px 10px', background: '#ECFDF5', borderRadius: '10px', border: '1px solid #A7F3D0', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: '#065F46' }}>Abonado: <b>${abonosTotal.toFixed(2)}</b></span>
+                                <span style={{ color: '#047857', fontWeight: '800' }}>Saldo a favor: +${(abonosTotal - totalUsd).toFixed(2)}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions Footer */}
@@ -951,13 +1055,53 @@ const Orders: React.FC = () => {
                     <div style={{ fontSize: '13px', color: '#64748B' }}>
                       Atendido por: <b>{selectedOrderForDetails.employee?.username || selectedOrderForDetails.employee?.name || 'Sin asignar'}</b>
                     </div>
+
+                    {/* Selector de Repartidor en Modal si es DELIVERY */}
+                    {selectedOrderForDetails.deliveryMethod === DeliveryMethod.DELIVERY && (
+                      <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          🛵 Asignar Repartidor:
+                        </label>
+                        <IonSelect
+                          interface="popover"
+                          value={selectedOrderForDetails.deliveryUserId || ''}
+                          placeholder="-- Sin repartidor asignado --"
+                          onIonChange={(e) => {
+                            const val = e.detail.value;
+                            assignDeliveryDriver(selectedOrderForDetails.id, val);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '4px 10px',
+                            borderRadius: '10px',
+                            border: '1.5px solid #CBD5E1',
+                            background: '#FFFFFF',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            color: '#0F172A',
+                            outline: 'none',
+                            cursor: 'pointer',
+                            minHeight: '40px',
+                            '--padding-start': '0px',
+                            '--padding-end': '0px'
+                          } as any}
+                        >
+                          <IonSelectOption value="">-- Sin repartidor asignado --</IonSelectOption>
+                          {employees.filter(e => e.role === UserRole.DELIVERY).map((driver: any) => (
+                            <IonSelectOption key={driver.id} value={driver.id}>
+                              🛵 {driver.name || driver.username}
+                            </IonSelectOption>
+                          ))}
+                        </IonSelect>
+                      </div>
+                    )}
                   </div>
 
                   <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '800', color: '#0F172A' }}>
                     Productos y Servicios
                   </h4>
                   <div style={{ background: '#F8FAFC', borderRadius: '14px', padding: '12px', border: '1px solid #E2E8F0', marginBottom: '16px' }}>
-                    {Array.isArray(selectedOrderForDetails.items) && selectedOrderForDetails.items.map((it, idx) => {
+                    {Array.isArray(selectedOrderForDetails.items) && selectedOrderForDetails.items.map((it: any, idx: number) => {
                       if (!it) return null;
                       const pName = it.productName || it.product?.name || 'Producto';
                       const qty = Number(it.quantity) || 1;
@@ -973,9 +1117,11 @@ const Orders: React.FC = () => {
                                 </span>
                               )}
                             </span>
-                            <span style={{ fontWeight: '800', color: '#0F172A' }}>
-                              ${(uPrice * qty).toFixed(2)}
-                            </span>
+                            {!isKitchen && (
+                              <span style={{ fontWeight: '800', color: '#0F172A' }}>
+                                ${(uPrice * qty).toFixed(2)}
+                              </span>
+                            )}
                           </div>
 
                           {it.hasModifications && (
@@ -992,7 +1138,7 @@ const Orders: React.FC = () => {
                                 <div style={{ fontSize: '12px', color: '#16A34A', fontWeight: '800', marginTop: '2px' }}>
                                   {it.addedExtras.map((ex: any, eIdx: number) => (
                                     <div key={eIdx}>
-                                      EXTRA: {ex.quantity > 1 ? `${ex.quantity}x ` : ''}{ex.name} (+${(Number(ex.priceUSD) * Number(ex.quantity || 1)).toFixed(2)})
+                                      EXTRA: {ex.quantity > 1 ? `${ex.quantity}x ` : ''}{ex.name} {!isKitchen && `(+${(Number(ex.priceUSD) * Number(ex.quantity || 1)).toFixed(2)})`}
                                     </div>
                                   ))}
                                 </div>
@@ -1002,201 +1148,205 @@ const Orders: React.FC = () => {
                         </div>
                       );
                     })}
-                    {Number(selectedOrderForDetails.discountAmount || 0) > 0 && (
+                    {!isKitchen && Number(selectedOrderForDetails.discountAmount || 0) > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #EEF2F6', fontSize: '13px', color: '#DC2626', fontWeight: '700' }}>
                         <span>🏷️ Descuento Especial:</span>
                         <span>-${Number(selectedOrderForDetails.discountAmount).toFixed(2)}</span>
                       </div>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', paddingTop: '8px', borderTop: '2px dashed #E2E8F0', fontWeight: '800', fontSize: '16px', color: '#10B981' }}>
-                      <span>Total Final:</span>
-                      <span>${Number(selectedOrderForDetails.totalAmount || 0).toFixed(2)}</span>
-                    </div>
+                    {!isKitchen && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', paddingTop: '8px', borderTop: '2px dashed #E2E8F0', fontWeight: '800', fontSize: '16px', color: '#10B981' }}>
+                        <span>Total Final:</span>
+                        <span>${Number(selectedOrderForDetails.totalAmount || 0).toFixed(2)}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Desglose de Pago & Arqueo */}
-                  <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        💳 Información de Pago y Arqueo
-                      </h4>
-                      <span style={{
-                        fontSize: '11px',
-                        fontWeight: '800',
-                        padding: '4px 10px',
-                        borderRadius: '20px',
-                        background: selectedOrderForDetails.paymentStatus === PaymentStatus.PAID ? '#ECFDF5' : selectedOrderForDetails.paymentStatus === PaymentStatus.PARTIAL ? '#FEF3C7' : '#FEE2E2',
-                        color: selectedOrderForDetails.paymentStatus === PaymentStatus.PAID ? '#065F46' : selectedOrderForDetails.paymentStatus === PaymentStatus.PARTIAL ? '#92400E' : '#991B1B'
-                      }}>
-                        {selectedOrderForDetails.paymentStatus === PaymentStatus.PAID ? '✓ Pagado' : selectedOrderForDetails.paymentStatus === PaymentStatus.PARTIAL ? '⏳ Abono Parcial' : '⚠️ Pendiente'}
-                      </span>
-                    </div>
+                  {!isKitchen && (
+                    <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          💳 Información de Pago y Arqueo
+                        </h4>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: '800',
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          background: selectedOrderForDetails.paymentStatus === PaymentStatus.PAID ? '#ECFDF5' : selectedOrderForDetails.paymentStatus === PaymentStatus.PARTIAL ? '#FEF3C7' : '#FEE2E2',
+                          color: selectedOrderForDetails.paymentStatus === PaymentStatus.PAID ? '#065F46' : selectedOrderForDetails.paymentStatus === PaymentStatus.PARTIAL ? '#92400E' : '#991B1B'
+                        }}>
+                          {selectedOrderForDetails.paymentStatus === PaymentStatus.PAID ? '✓ Pagado' : selectedOrderForDetails.paymentStatus === PaymentStatus.PARTIAL ? '⏳ Abono Parcial' : '⚠️ Pendiente'}
+                        </span>
+                      </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '13px' }}>
-                      <div style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                        <div style={{ fontSize: '11px', color: '#64748B', fontWeight: '600', marginBottom: '2px' }}>Método de Cobro</div>
-                        <div style={{ fontWeight: '800', color: '#0F172A' }}>
-                          {selectedOrderForDetails.paymentMethod === 'USD' && '💵 Efectivo Divisas ($)'}
-                          {selectedOrderForDetails.paymentMethod === 'PAGO_MOVIL' && '📱 Pago Móvil (Bs.)'}
-                          {selectedOrderForDetails.paymentMethod === 'PUNTO' && '💳 Punto de Venta'}
-                          {selectedOrderForDetails.paymentMethod === 'BINANCE' && '🟡 Binance Pay'}
-                          {selectedOrderForDetails.paymentMethod === 'TRANSFER' && '🏦 Transferencia'}
-                          {selectedOrderForDetails.paymentMethod === 'PENDING' && '⏳ Cuenta Abierta'}
-                          {!['USD','PAGO_MOVIL','PUNTO','BINANCE','TRANSFER','PENDING'].includes(selectedOrderForDetails.paymentMethod) && (selectedOrderForDetails.paymentMethod || 'Efectivo')}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '13px' }}>
+                        <div style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: '600', marginBottom: '2px' }}>Método de Cobro</div>
+                          <div style={{ fontWeight: '800', color: '#0F172A' }}>
+                            {selectedOrderForDetails.paymentMethod === 'USD' && '💵 Efectivo Divisas ($)'}
+                            {selectedOrderForDetails.paymentMethod === 'PAGO_MOVIL' && '📱 Pago Móvil (Bs.)'}
+                            {selectedOrderForDetails.paymentMethod === 'PUNTO' && '💳 Punto de Venta'}
+                            {selectedOrderForDetails.paymentMethod === 'BINANCE' && '🟡 Binance Pay'}
+                            {selectedOrderForDetails.paymentMethod === 'TRANSFER' && '🏦 Transferencia'}
+                            {selectedOrderForDetails.paymentMethod === 'PENDING' && '⏳ Cuenta Abierta'}
+                            {!['USD','PAGO_MOVIL','PUNTO','BINANCE','TRANSFER','PENDING'].includes(selectedOrderForDetails.paymentMethod) && (selectedOrderForDetails.paymentMethod || 'Efectivo')}
+                          </div>
+                        </div>
+
+                        <div style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: '600', marginBottom: '2px' }}>Tasa Cambiaria</div>
+                          <div style={{ fontWeight: '800', color: '#10B981' }}>
+                            {formatLocalAmount(Number(selectedOrderForDetails.exchangeRate || exchangeRate))}
+                          </div>
                         </div>
                       </div>
 
-                      <div style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                        <div style={{ fontSize: '11px', color: '#64748B', fontWeight: '600', marginBottom: '2px' }}>Tasa Cambiaria</div>
-                        <div style={{ fontWeight: '800', color: '#10B981' }}>
-                          Bs. {Number(selectedOrderForDetails.exchangeRate || exchangeRate).toFixed(2)}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Si pagó con USD (Monto Recibido y Vuelto) */}
-                    {(selectedOrderForDetails.paymentMethod === 'USD' || selectedOrderForDetails.usdReceived) && (
-                      <div style={{ marginTop: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '14px', padding: '14px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '13px', color: '#166534', fontWeight: '700' }}>💵 Efectivo Recibido:</span>
-                          <span style={{ fontSize: '16px', fontWeight: '900', color: '#15803D' }}>
-                            ${Number(selectedOrderForDetails.usdReceived || selectedOrderForDetails.totalAmount).toFixed(2)} USD
-                          </span>
-                        </div>
-
-                        {Number(selectedOrderForDetails.changeAmount || 0) > 0 ? (
-                          <div style={{ paddingTop: '10px', borderTop: '1px dashed #86EFAC' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                              <span style={{ fontSize: '13px', color: '#166534', fontWeight: '700' }}>Vuelto Entregado:</span>
-                              <span style={{ fontSize: '16px', fontWeight: '900', color: '#047857' }}>
-                                ${Number(selectedOrderForDetails.changeAmount).toFixed(2)} USD
-                              </span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#15803D', marginBottom: '8px' }}>
-                              <span>Equivalente en Bs:</span>
-                              <span style={{ fontWeight: '800' }}>
-                                Bs. {Number(selectedOrderForDetails.changeAmountBs || (selectedOrderForDetails.changeAmount * (selectedOrderForDetails.exchangeRate || exchangeRate))).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                            </div>
-                            <div style={{ background: '#DCFCE7', padding: '8px 10px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#166534' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>Canal de Entrega:</span>
-                                <b>{selectedOrderForDetails.changeMethod === 'PAGO_MOVIL' ? '📱 Pago Móvil' : selectedOrderForDetails.changeMethod === 'CASH_BS' ? '🇻🇪 Efectivo Bolívares' : '💵 Efectivo Divisas'}</b>
-                              </div>
-                              {selectedOrderForDetails.changeRef && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span>N° Referencia Vuelto:</span>
-                                  <b style={{ color: '#0F172A' }}>{selectedOrderForDetails.changeRef}</b>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <div style={{ fontSize: '11px', color: '#15803D', fontStyle: 'italic', marginTop: '4px' }}>
-                            ✓ Cobro exacto sin vuelto
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Si fue Pago Móvil */}
-                    {(selectedOrderForDetails.paymentMethod === 'PAGO_MOVIL' || (selectedOrderForDetails.pagoMovilRef && selectedOrderForDetails.paymentMethod !== 'USD')) && (
-                      <div style={{ marginTop: '12px', background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: '14px', padding: '12px' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                          <div>
-                            <span style={{ color: '#6D28D9', display: 'block', fontSize: '11px', fontWeight: '600' }}>Referencia</span>
-                            <span style={{ fontWeight: '800', color: '#4C1D95' }}>{selectedOrderForDetails.pagoMovilRef || 'N/A'}</span>
-                          </div>
-                          <div>
-                            <span style={{ color: '#6D28D9', display: 'block', fontSize: '11px', fontWeight: '600' }}>Banco</span>
-                            <span style={{ fontWeight: '800', color: '#4C1D95' }}>{selectedOrderForDetails.pagoMovilBank || 'Pago Móvil'}</span>
-                          </div>
-                          <div style={{ gridColumn: 'span 2' }}>
-                            <span style={{ color: '#6D28D9', display: 'block', fontSize: '11px', fontWeight: '600' }}>Monto Bs.</span>
-                            <span style={{ fontWeight: '900', color: '#4C1D95', fontSize: '14px' }}>
-                              Bs. {Number(selectedOrderForDetails.amountBs || (selectedOrderForDetails.totalAmount * (selectedOrderForDetails.exchangeRate || exchangeRate))).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {/* Si pagó con USD (Monto Recibido y Vuelto) */}
+                      {(selectedOrderForDetails.paymentMethod === 'USD' || selectedOrderForDetails.usdReceived) && (
+                        <div style={{ marginTop: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '14px', padding: '14px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '13px', color: '#166534', fontWeight: '700' }}>💵 Efectivo Recibido:</span>
+                            <span style={{ fontSize: '16px', fontWeight: '900', color: '#15803D' }}>
+                              ${Number(selectedOrderForDetails.usdReceived || selectedOrderForDetails.totalAmount).toFixed(2)} USD
                             </span>
                           </div>
-                          {selectedOrderForDetails.pagoMovilPhone && (
-                            <div style={{ gridColumn: 'span 2' }}>
-                              <span style={{ color: '#6D28D9', fontSize: '11px', fontWeight: '600' }}>Teléfono/Cédula: </span>
-                              <span style={{ fontWeight: '700', color: '#4C1D95' }}>{selectedOrderForDetails.pagoMovilPhone}</span>
+
+                          {Number(selectedOrderForDetails.changeAmount || 0) > 0 ? (
+                            <div style={{ paddingTop: '10px', borderTop: '1px dashed #86EFAC' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                <span style={{ fontSize: '13px', color: '#166534', fontWeight: '700' }}>Vuelto Entregado:</span>
+                                <span style={{ fontSize: '16px', fontWeight: '900', color: '#047857' }}>
+                                  ${Number(selectedOrderForDetails.changeAmount).toFixed(2)} USD
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#15803D', marginBottom: '8px' }}>
+                                <span>Equivalente Local:</span>
+                                <span style={{ fontWeight: '800' }}>
+                                  {formatLocalAmount(Number(selectedOrderForDetails.changeAmountBs || (selectedOrderForDetails.changeAmount * (selectedOrderForDetails.exchangeRate || exchangeRate))))}
+                                </span>
+                              </div>
+                              <div style={{ background: '#DCFCE7', padding: '8px 10px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#166534' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span>Canal de Entrega:</span>
+                                  <b>{selectedOrderForDetails.changeMethod === 'PAGO_MOVIL' ? '📱 Pago Móvil' : selectedOrderForDetails.changeMethod === 'CASH_BS' ? '🇻🇪 Efectivo Bolívares' : '💵 Efectivo Divisas'}</b>
+                                </div>
+                                {selectedOrderForDetails.changeRef && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span>N° Referencia Vuelto:</span>
+                                    <b style={{ color: '#0F172A' }}>{selectedOrderForDetails.changeRef}</b>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '11px', color: '#15803D', fontStyle: 'italic', marginTop: '4px' }}>
+                              ✓ Cobro exacto sin vuelto
                             </div>
                           )}
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Si fue Punto de Venta */}
-                    {selectedOrderForDetails.paymentMethod === 'PUNTO' && (
-                      <div style={{ marginTop: '12px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '14px', padding: '12px' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                          <div>
-                            <span style={{ color: '#1D4ED8', display: 'block', fontSize: '11px', fontWeight: '600' }}>N° Voucher / Ref</span>
-                            <span style={{ fontWeight: '800', color: '#1E3A8A' }}>{selectedOrderForDetails.puntoRef || selectedOrderForDetails.pagoMovilRef || 'N/A'}</span>
+                      {/* Si fue Pago Móvil */}
+                      {(selectedOrderForDetails.paymentMethod === 'PAGO_MOVIL' || (selectedOrderForDetails.pagoMovilRef && selectedOrderForDetails.paymentMethod !== 'USD')) && (
+                        <div style={{ marginTop: '12px', background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: '14px', padding: '12px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                            <div>
+                              <span style={{ color: '#6D28D9', display: 'block', fontSize: '11px', fontWeight: '600' }}>Referencia</span>
+                              <span style={{ fontWeight: '800', color: '#4C1D95' }}>{selectedOrderForDetails.pagoMovilRef || 'N/A'}</span>
+                            </div>
+                            <div>
+                              <span style={{ color: '#6D28D9', display: 'block', fontSize: '11px', fontWeight: '600' }}>Banco</span>
+                              <span style={{ fontWeight: '800', color: '#4C1D95' }}>{selectedOrderForDetails.pagoMovilBank || 'Pago Móvil'}</span>
+                            </div>
+                            <div style={{ gridColumn: 'span 2' }}>
+                              <span style={{ color: '#6D28D9', display: 'block', fontSize: '11px', fontWeight: '600' }}>Monto Cobrado</span>
+                              <span style={{ fontWeight: '900', color: '#4C1D95', fontSize: '14px' }}>
+                                {formatLocalAmount(Number(selectedOrderForDetails.amountBs || (selectedOrderForDetails.totalAmount * (selectedOrderForDetails.exchangeRate || exchangeRate))))}
+                              </span>
+                            </div>
+                            {selectedOrderForDetails.pagoMovilPhone && (
+                              <div style={{ gridColumn: 'span 2' }}>
+                                <span style={{ color: '#6D28D9', fontSize: '11px', fontWeight: '600' }}>Teléfono/Cédula: </span>
+                                <span style={{ fontWeight: '700', color: '#4C1D95' }}>{selectedOrderForDetails.pagoMovilPhone}</span>
+                              </div>
+                            )}
                           </div>
-                          <div>
-                            <span style={{ color: '#1D4ED8', display: 'block', fontSize: '11px', fontWeight: '600' }}>Banco / Terminal</span>
-                            <span style={{ fontWeight: '800', color: '#1E3A8A' }}>{selectedOrderForDetails.puntoBank || selectedOrderForDetails.pagoMovilBank || 'Punto de Venta'}</span>
+                        </div>
+                      )}
+
+                      {/* Si fue Punto de Venta */}
+                      {selectedOrderForDetails.paymentMethod === 'PUNTO' && (
+                        <div style={{ marginTop: '12px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '14px', padding: '12px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                            <div>
+                              <span style={{ color: '#1D4ED8', display: 'block', fontSize: '11px', fontWeight: '600' }}>N° Voucher / Ref</span>
+                              <span style={{ fontWeight: '800', color: '#1E3A8A' }}>{selectedOrderForDetails.puntoRef || selectedOrderForDetails.pagoMovilRef || 'N/A'}</span>
+                            </div>
+                            <div>
+                              <span style={{ color: '#1D4ED8', display: 'block', fontSize: '11px', fontWeight: '600' }}>Banco / Terminal</span>
+                              <span style={{ fontWeight: '800', color: '#1E3A8A' }}>{selectedOrderForDetails.puntoBank || selectedOrderForDetails.pagoMovilBank || 'Punto de Venta'}</span>
+                            </div>
+                            <div style={{ gridColumn: 'span 2' }}>
+                              <span style={{ color: '#1D4ED8', display: 'block', fontSize: '11px', fontWeight: '600' }}>Monto Cobrado</span>
+                              <span style={{ fontWeight: '900', color: '#1E3A8A', fontSize: '14px' }}>
+                                {formatLocalAmount(Number(selectedOrderForDetails.amountBs || (selectedOrderForDetails.totalAmount * (selectedOrderForDetails.exchangeRate || exchangeRate))))}
+                              </span>
+                            </div>
                           </div>
-                          <div style={{ gridColumn: 'span 2' }}>
-                            <span style={{ color: '#1D4ED8', display: 'block', fontSize: '11px', fontWeight: '600' }}>Monto Cobrado Bs.</span>
-                            <span style={{ fontWeight: '900', color: '#1E3A8A', fontSize: '14px' }}>
-                              Bs. {Number(selectedOrderForDetails.amountBs || (selectedOrderForDetails.totalAmount * (selectedOrderForDetails.exchangeRate || exchangeRate))).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      )}
+
+                      {/* Si fue Binance o Transferencia */}
+                      {(selectedOrderForDetails.paymentMethod === 'BINANCE' || selectedOrderForDetails.paymentMethod === 'TRANSFER') && (
+                        <div style={{ marginTop: '12px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '12px', fontSize: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <span style={{ color: '#64748B', fontWeight: '600' }}>Referencia / ID:</span>
+                            <b style={{ color: '#0F172A' }}>{selectedOrderForDetails.binanceRef || selectedOrderForDetails.transferRef || selectedOrderForDetails.pagoMovilRef || 'N/A'}</b>
+                          </div>
+                          {selectedOrderForDetails.transferBank && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: '#64748B', fontWeight: '600' }}>Banco Emisor:</span>
+                              <b style={{ color: '#0F172A' }}>{selectedOrderForDetails.transferBank}</b>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Si fue Cuenta Abierta */}
+                      {selectedOrderForDetails.paymentMethod === 'PENDING' && (
+                        <div style={{ marginTop: '12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '14px', padding: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
+                            <span style={{ color: '#92400E', fontWeight: '600' }}>Total Abonado:</span>
+                            <span style={{ fontWeight: '800', color: '#10B981' }}>${Number(selectedOrderForDetails.abonosTotal || 0).toFixed(2)}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingTop: '4px', borderTop: '1px dashed #FCD34D' }}>
+                            <span style={{ color: '#92400E', fontWeight: '700' }}>
+                              {Number(selectedOrderForDetails.abonosTotal || 0) > Number(selectedOrderForDetails.totalAmount) ? 'Saldo a Favor del Cliente:' : 'Saldo Pendiente:'}
+                            </span>
+                            <span style={{ fontWeight: '900', color: Number(selectedOrderForDetails.abonosTotal || 0) > Number(selectedOrderForDetails.totalAmount) ? '#059669' : '#D97706' }}>
+                              {Number(selectedOrderForDetails.abonosTotal || 0) > Number(selectedOrderForDetails.totalAmount)
+                                ? `+$${(Number(selectedOrderForDetails.abonosTotal) - Number(selectedOrderForDetails.totalAmount)).toFixed(2)} USD`
+                                : `$${Math.max(0, Number(selectedOrderForDetails.totalAmount) - Number(selectedOrderForDetails.abonosTotal || 0)).toFixed(2)} USD`
+                              }
                             </span>
                           </div>
+                          {Array.isArray(selectedOrderForDetails.abonosHistory) && selectedOrderForDetails.abonosHistory.length > 0 && (
+                            <div style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px solid #FEF3C7', fontSize: '11px', color: '#92400E' }}>
+                              <div style={{ fontWeight: '700', marginBottom: '4px' }}>Historial de Abonos:</div>
+                              {selectedOrderForDetails.abonosHistory.map((ab: any, i: number) => (
+                                <div key={ab.id || i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                                  <span>Abono #{i + 1} ({new Date(ab.date).toLocaleDateString()})</span>
+                                  <b>${Number(ab.amount).toFixed(2)}</b>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
-
-                    {/* Si fue Binance o Transferencia */}
-                    {(selectedOrderForDetails.paymentMethod === 'BINANCE' || selectedOrderForDetails.paymentMethod === 'TRANSFER') && (
-                      <div style={{ marginTop: '12px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '12px', fontSize: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ color: '#64748B', fontWeight: '600' }}>Referencia / ID:</span>
-                          <b style={{ color: '#0F172A' }}>{selectedOrderForDetails.binanceRef || selectedOrderForDetails.transferRef || selectedOrderForDetails.pagoMovilRef || 'N/A'}</b>
-                        </div>
-                        {selectedOrderForDetails.transferBank && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: '#64748B', fontWeight: '600' }}>Banco Emisor:</span>
-                            <b style={{ color: '#0F172A' }}>{selectedOrderForDetails.transferBank}</b>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Si fue Cuenta Abierta */}
-                    {selectedOrderForDetails.paymentMethod === 'PENDING' && (
-                      <div style={{ marginTop: '12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '14px', padding: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
-                          <span style={{ color: '#92400E', fontWeight: '600' }}>Total Abonado:</span>
-                          <span style={{ fontWeight: '800', color: '#10B981' }}>${Number(selectedOrderForDetails.abonosTotal || 0).toFixed(2)}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingTop: '4px', borderTop: '1px dashed #FCD34D' }}>
-                          <span style={{ color: '#92400E', fontWeight: '700' }}>
-                            {Number(selectedOrderForDetails.abonosTotal || 0) > Number(selectedOrderForDetails.totalAmount) ? 'Saldo a Favor del Cliente:' : 'Saldo Pendiente:'}
-                          </span>
-                          <span style={{ fontWeight: '900', color: Number(selectedOrderForDetails.abonosTotal || 0) > Number(selectedOrderForDetails.totalAmount) ? '#059669' : '#D97706' }}>
-                            {Number(selectedOrderForDetails.abonosTotal || 0) > Number(selectedOrderForDetails.totalAmount)
-                              ? `+$${(Number(selectedOrderForDetails.abonosTotal) - Number(selectedOrderForDetails.totalAmount)).toFixed(2)} USD`
-                              : `$${Math.max(0, Number(selectedOrderForDetails.totalAmount) - Number(selectedOrderForDetails.abonosTotal || 0)).toFixed(2)} USD`
-                            }
-                          </span>
-                        </div>
-                        {Array.isArray(selectedOrderForDetails.abonosHistory) && selectedOrderForDetails.abonosHistory.length > 0 && (
-                          <div style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px solid #FEF3C7', fontSize: '11px', color: '#92400E' }}>
-                            <div style={{ fontWeight: '700', marginBottom: '4px' }}>Historial de Abonos:</div>
-                            {selectedOrderForDetails.abonosHistory.map((ab: any, i: number) => (
-                              <div key={ab.id || i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                                <span>Abono #{i + 1} ({new Date(ab.date).toLocaleDateString()})</span>
-                                <b>${Number(ab.amount).toFixed(2)}</b>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
 
                   {selectedOrderForDetails.notes && (
                     <div style={{ background: '#F1F5F9', borderRadius: '12px', padding: '12px', marginBottom: '16px', fontSize: '13px', color: '#475569' }}>
@@ -1206,121 +1356,191 @@ const Orders: React.FC = () => {
 
                   {/* Actions */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {selectedOrderForDetails.paymentStatus !== PaymentStatus.PAID && selectedOrderForDetails.status !== OrderStatus.CANCELED && (
+                    {isKitchen ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const ord = selectedOrderForDetails;
-                            setSelectedOrderForDetails(null);
-                            router.push(`/pos?editOrderId=${ord.id}`);
-                          }}
-                          style={{
-                            padding: '12px',
-                            borderRadius: '12px',
-                            border: '1px solid #93C5FD',
-                            background: '#EFF6FF',
-                            color: '#1D4ED8',
-                            fontWeight: '700',
-                            fontSize: '13px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px'
-                          }}
-                        >
-                          <IonIcon icon={cartOutline} />
-                          🛒 Agregar Productos a la Cuenta (Abrir en POS)
-                        </button>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        {selectedOrderForDetails.status === OrderStatus.PENDING && (
                           <button
                             type="button"
                             onClick={() => {
-                              const ord = selectedOrderForDetails;
-                              setSelectedOrderForDetails(null);
-                              setSelectedOrderForAbono(ord);
-                              setAbonoAmount('');
-                              setAbonoMethod('USD');
-                              setAbonoRef('');
+                              updateStatus(selectedOrderForDetails.id, OrderStatus.PREPARING);
+                              setSelectedOrderForDetails({
+                                ...selectedOrderForDetails,
+                                status: OrderStatus.PREPARING
+                              });
+                            }}
+                            style={{
+                              padding: '14px',
+                              borderRadius: '12px',
+                              border: 'none',
+                              background: '#F59E0B',
+                              color: '#FFFFFF',
+                              fontWeight: '800',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            👨‍🍳 Empezar a Preparar
+                          </button>
+                        )}
+                        {selectedOrderForDetails.status === OrderStatus.PREPARING && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextStatus = selectedOrderForDetails.deliveryMethod === DeliveryMethod.DELIVERY ? OrderStatus.IN_TRANSIT : OrderStatus.DELIVERED;
+                              updateStatus(selectedOrderForDetails.id, nextStatus);
+                              setSelectedOrderForDetails({
+                                ...selectedOrderForDetails,
+                                status: nextStatus
+                              });
+                            }}
+                            style={{
+                              padding: '14px',
+                              borderRadius: '12px',
+                              border: 'none',
+                              background: '#10B981',
+                              color: '#FFFFFF',
+                              fontWeight: '800',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ✅ Listo / Completar
+                          </button>
+                        )}
+                        {selectedOrderForDetails.status === OrderStatus.DELIVERED && (
+                          <div style={{
+                            padding: '12px',
+                            borderRadius: '12px',
+                            background: '#ECFDF5',
+                            border: '1px solid #A7F3D0',
+                            color: '#065F46',
+                            fontWeight: '800',
+                            fontSize: '13px',
+                            textAlign: 'center'
+                          }}>
+                            ✓ Pedido Completado y Listo
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        {selectedOrderForDetails.paymentStatus !== PaymentStatus.PAID && selectedOrderForDetails.status !== OrderStatus.CANCELED && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const ord = selectedOrderForDetails;
+                                setSelectedOrderForDetails(null);
+                                router.push(`/pos?editOrderId=${ord.id}`);
+                              }}
+                              style={{
+                                padding: '12px',
+                                borderRadius: '12px',
+                                border: '1px solid #93C5FD',
+                                background: '#EFF6FF',
+                                color: '#1D4ED8',
+                                fontWeight: '700',
+                                fontSize: '13px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              <IonIcon icon={cartOutline} />
+                              🛒 Agregar Productos a la Cuenta (Abrir en POS)
+                            </button>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const ord = selectedOrderForDetails;
+                                  setSelectedOrderForDetails(null);
+                                  setSelectedOrderForAbono(ord);
+                                  setAbonoAmount('');
+                                  setAbonoMethod('USD');
+                                  setAbonoRef('');
+                                }}
+                                style={{
+                                  padding: '12px',
+                                  borderRadius: '12px',
+                                  border: '1px solid #FCD34D',
+                                  background: '#FEF3C7',
+                                  color: '#92400E',
+                                  fontWeight: '700',
+                                  fontSize: '13px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                ➕ Registrar Abono
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const ord = selectedOrderForDetails;
+                                  setSelectedOrderForDetails(null);
+                                  openPaymentAlert(ord);
+                                }}
+                                className="ff-btn-primary"
+                                style={{ padding: '12px', fontSize: '13px', justifyContent: 'center' }}
+                              >
+                                💵 Cobrar Total
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedOrderForDetails.status === OrderStatus.DELIVERED && (
+                          <div style={{
+                            padding: '12px',
+                            borderRadius: '12px',
+                            background: '#ECFDF5',
+                            border: '1px solid #A7F3D0',
+                            color: '#065F46',
+                            fontWeight: '800',
+                            fontSize: '13px',
+                            textAlign: 'center'
+                          }}>
+                            ✓ Pedido Entregado y Finalizado
+                          </div>
+                        )}
+
+                        {selectedOrderForDetails.status !== OrderStatus.DELIVERED && selectedOrderForDetails.status !== OrderStatus.CANCELED && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              presentAlert({
+                                header: 'Confirmar Cancelación',
+                                message: '¿Estás seguro de cancelar este pedido? Se liberarán los productos reservados.',
+                                buttons: [
+                                  { text: 'Volver', role: 'cancel' },
+                                  {
+                                    text: 'Sí, Cancelar',
+                                    role: 'destructive',
+                                    handler: () => {
+                                      updateStatus(selectedOrderForDetails.id, OrderStatus.CANCELED);
+                                      setSelectedOrderForDetails(null);
+                                    }
+                                  }
+                                ]
+                              });
                             }}
                             style={{
                               padding: '12px',
                               borderRadius: '12px',
-                              border: '1px solid #FCD34D',
-                              background: '#FEF3C7',
-                              color: '#92400E',
+                              border: '1px solid #FCA5A5',
+                              background: '#FEF2F2',
+                              color: '#DC2626',
                               fontWeight: '700',
                               fontSize: '13px',
                               cursor: 'pointer'
                             }}
                           >
-                            ➕ Registrar Abono
+                            Cancelar Pedido
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const ord = selectedOrderForDetails;
-                              setSelectedOrderForDetails(null);
-                              openPaymentAlert(ord);
-                            }}
-                            className="ff-btn-primary"
-                            style={{ padding: '12px', fontSize: '13px', justifyContent: 'center' }}
-                          >
-                            💵 Cobrar Total
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedOrderForDetails.status === OrderStatus.DELIVERED && (
-                      <div style={{
-                        padding: '12px',
-                        borderRadius: '12px',
-                        background: '#ECFDF5',
-                        border: '1px solid #A7F3D0',
-                        color: '#065F46',
-                        fontWeight: '800',
-                        fontSize: '13px',
-                        textAlign: 'center'
-                      }}>
-                        ✓ Pedido Entregado y Finalizado
-                      </div>
-                    )}
-
-                    {selectedOrderForDetails.status !== OrderStatus.DELIVERED && selectedOrderForDetails.status !== OrderStatus.CANCELED && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          presentAlert({
-                            header: 'Confirmar Cancelación',
-                            message: '¿Estás seguro de cancelar este pedido? Se liberarán los productos reservados.',
-                            buttons: [
-                              { text: 'Volver', role: 'cancel' },
-                              {
-                                text: 'Sí, Cancelar',
-                                role: 'destructive',
-                                handler: () => {
-                                  updateStatus(selectedOrderForDetails.id, OrderStatus.CANCELED);
-                                  setSelectedOrderForDetails(null);
-                                }
-                              }
-                            ]
-                          });
-                        }}
-                        style={{
-                          padding: '12px',
-                          borderRadius: '12px',
-                          border: '1px solid #FCA5A5',
-                          background: '#FEF2F2',
-                          color: '#DC2626',
-                          fontWeight: '700',
-                          fontSize: '13px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Cancelar Pedido
-                      </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1335,9 +1555,10 @@ const Orders: React.FC = () => {
             const total = Number(selectedOrderForAbono.totalAmount || 0);
             const yaAbonado = Number(selectedOrderForAbono.abonosTotal || 0);
             const restante = Math.max(0, total - yaAbonado);
-            const restanteBs = restante * (Number(exchangeRate) || 40);
+            const effectiveOrderRate = Number(selectedOrderForAbono.exchangeRate) > 0 ? Number(selectedOrderForAbono.exchangeRate) : (Number(exchangeRate) || 40);
+            const restanteBs = restante * effectiveOrderRate;
             const parsedAmount = parseFloat(abonoAmount) || 0;
-            const effectiveUsd = abonoCurrency === 'VES' ? (parsedAmount / (Number(exchangeRate) || 40)) : parsedAmount;
+            const effectiveUsd = abonoCurrency === 'VES' ? (parsedAmount / effectiveOrderRate) : parsedAmount;
 
             const handleConfirmAbono = async () => {
               if (effectiveUsd <= 0) {
@@ -1412,7 +1633,7 @@ const Orders: React.FC = () => {
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', marginTop: '6px', fontSize: '11px', color: '#92400E', fontWeight: '700' }}>
-                      Resta en Bs: {restanteBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      Resta en {currencySymbol}: {formatLocalAmount(restanteBs)}
                     </div>
                   </div>
 
@@ -1426,7 +1647,7 @@ const Orders: React.FC = () => {
                         type="button"
                         onClick={() => {
                           if (abonoCurrency === 'VES' && abonoAmount) {
-                            setAbonoAmount((parseFloat(abonoAmount) / (Number(exchangeRate) || 40)).toFixed(2));
+                            setAbonoAmount((parseFloat(abonoAmount) / effectiveOrderRate).toFixed(2));
                           }
                           setAbonoCurrency('USD');
                         }}
@@ -1447,7 +1668,7 @@ const Orders: React.FC = () => {
                         type="button"
                         onClick={() => {
                           if (abonoCurrency === 'USD' && abonoAmount) {
-                            setAbonoAmount((parseFloat(abonoAmount) * (Number(exchangeRate) || 40)).toFixed(2));
+                            setAbonoAmount((parseFloat(abonoAmount) * effectiveOrderRate).toFixed(2));
                           }
                           setAbonoCurrency('VES');
                         }}
@@ -1462,7 +1683,7 @@ const Orders: React.FC = () => {
                           cursor: 'pointer'
                         }}
                       >
-                        🇻🇪 Bolívares (Bs. VES)
+                        {currencySymbol === 'COP' ? '🇨🇴 Pesos (COP)' : '🇻🇪 Bolívares (Bs.)'}
                       </button>
                     </div>
                   </div>
@@ -1483,7 +1704,7 @@ const Orders: React.FC = () => {
                     />
                     {effectiveUsd > 0 && (
                       <div style={{ fontSize: '12px', color: '#10B981', fontWeight: '700', marginTop: '4px' }}>
-                        {abonoCurrency === 'VES' ? `≈ $${effectiveUsd.toFixed(2)} USD` : `≈ Bs. ${(effectiveUsd * (Number(exchangeRate) || 40)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                        {abonoCurrency === 'VES' ? `≈ $${effectiveUsd.toFixed(2)} USD` : `≈ ${formatLocalAmount(effectiveUsd * effectiveOrderRate)}`}
                       </div>
                     )}
 
@@ -1495,7 +1716,7 @@ const Orders: React.FC = () => {
                           type="button"
                           onClick={() => {
                             if (abonoCurrency === 'USD') setAbonoAmount(n.toString());
-                            else setAbonoAmount((n * (Number(exchangeRate) || 40)).toFixed(2));
+                            else setAbonoAmount((n * effectiveOrderRate).toFixed(2));
                           }}
                           style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #E2E8F0', background: '#F8FAFC', fontSize: '11px', fontWeight: '700', color: '#475569', cursor: 'pointer' }}
                         >
