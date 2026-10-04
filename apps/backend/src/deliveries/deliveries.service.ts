@@ -157,7 +157,7 @@ export class DeliveriesService {
     const deliveryAccesses = allAccesses.filter(a => {
       if (a.role === UserRole.DELIVERY) return true;
       if (Array.isArray(a.roles) && a.roles.includes(UserRole.DELIVERY)) return true;
-      if (typeof a.roles === 'string' && a.roles.split(',').includes(UserRole.DELIVERY)) return true;
+      if (typeof (a.roles as any) === 'string' && (a.roles as any).split(',').includes(UserRole.DELIVERY)) return true;
       return false;
     });
 

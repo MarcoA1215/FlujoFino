@@ -556,3 +556,5 @@ export interface CreatePromoterDTO {
 
 
 
+
+export * from './banks';

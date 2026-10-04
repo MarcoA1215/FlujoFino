@@ -85,7 +85,7 @@ export class UsersService implements OnModuleInit {
     return users.map(u => ({
       id: u.id,
       username: u.username,
-      name: u.username,
+      name: u.name || u.username,
       role: u.role,
       roles: (u as any).roles && (u as any).roles.length > 0 ? (u as any).roles : [u.role],
       jobTitle: (u as any).jobTitle || undefined,
@@ -111,6 +111,7 @@ export class UsersService implements OnModuleInit {
 
         const user = transactionalEntityManager.create(User, {
           username: cleanName,
+          name: cleanName,
           email: generatedEmail,
           identification: data.identification || null,
           phone: data.phone || null,
@@ -177,6 +178,7 @@ export class UsersService implements OnModuleInit {
         const hash = await bcrypt.hash(data.password, 10);
         const user = transactionalEntityManager.create(User, {
           username: data.username,
+          name: (data.name || data.fullName || data.username || '').trim(),
           email: data.email,
           identification: data.identification || null,
           phone: data.phone || null,
@@ -277,8 +279,9 @@ export class UsersService implements OnModuleInit {
       access.salaryPeriod = data.salaryPeriod || null;
     }
 
-    if (data.identification !== undefined || data.phone !== undefined) {
+    if (data.identification !== undefined || data.phone !== undefined || data.name !== undefined) {
       await this.usersRepo.update(userId, {
+        ...(data.name !== undefined ? { name: (data.name || '').trim() || null } : {}),
         ...(data.identification !== undefined ? { identification: data.identification } : {}),
         ...(data.phone !== undefined ? { phone: data.phone } : {}),
       });

@@ -22,6 +22,7 @@ import {
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { OrderStatus, PaymentStatus, DeliveryMethod, UserRole } from '@finowork/shared-types';
+import { normalizeBankName } from '../constants/banks';
 import type { DeliveryZone } from '../types';
 import { AuthContext } from '../context/AuthContext';
 import AppHeader from '../components/AppHeader';
@@ -318,7 +319,7 @@ const Orders: React.FC = () => {
                 status: PaymentStatus.PAID,
                 paymentMethod: 'PAGO_MOVIL',
                 pagoMovilRef: data.pmRef,
-                pagoMovilBank: data.pmBank || 'Pago Móvil',
+                pagoMovilBank: normalizeBankName(data.pmBank) || 'Pago Móvil',
                 amountBs: parseFloat(totalBs),
                 exchangeRate
               });
@@ -357,7 +358,7 @@ const Orders: React.FC = () => {
                 status: PaymentStatus.PAID,
                 paymentMethod: 'PUNTO',
                 pagoMovilRef: data.puntoRef,
-                pagoMovilBank: data.puntoBank || 'Punto de Venta',
+                pagoMovilBank: normalizeBankName(data.puntoBank) || 'Punto de Venta',
                 amountBs: parseFloat(totalBs),
                 exchangeRate
               });

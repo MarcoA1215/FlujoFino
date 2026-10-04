@@ -8,6 +8,7 @@ import { useIonRouter } from '@ionic/react';
 const Register: React.FC = () => {
   const [step, setStep] = useState(1);
   const [tenantName, setTenantName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,6 +41,7 @@ const Register: React.FC = () => {
     try {
       const res = await apiClient.post('/auth/register', {
         tenantName,
+        fullName: fullName.trim() || undefined,
         username,
         email,
         password,
@@ -111,8 +113,12 @@ const Register: React.FC = () => {
                     <IonInput type="tel" value={phone} placeholder="Ej. 04141234567" onIonInput={e => setPhone(e.detail.value!)} />
                   </IonItem>
                   <IonItem lines="full" className="ion-margin-bottom">
-                    <IonLabel position="stacked">Usuario Administrador</IonLabel>
-                    <IonInput value={username} placeholder="Ej. admin" onIonInput={e => setUsername(e.detail.value!)} />
+                    <IonLabel position="stacked">Tu Nombre y Apellido (Visible para Clientes)</IonLabel>
+                    <IonInput value={fullName} placeholder="Ej. Juan Pérez" onIonInput={e => setFullName(e.detail.value!)} />
+                  </IonItem>
+                  <IonItem lines="full" className="ion-margin-bottom">
+                    <IonLabel position="stacked">Usuario para Iniciar Sesión</IonLabel>
+                    <IonInput value={username} placeholder="Ej. juan_admin" onIonInput={e => setUsername(e.detail.value!)} />
                   </IonItem>
                   <IonItem lines="full" className="ion-margin-bottom">
                     <IonLabel position="stacked">Contraseña</IonLabel>

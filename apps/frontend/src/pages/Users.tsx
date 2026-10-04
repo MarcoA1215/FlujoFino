@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -40,6 +40,7 @@ import SalaryAdvanceModal from '../components/SalaryAdvanceModal';
 interface UserData {
   id: string;
   username: string;
+  name?: string;
   email: string;
   role: string;
   roles?: UserRole[];
@@ -120,6 +121,7 @@ const Users: React.FC = () => {
       setEditRoles([...editRoles, r]);
     }
   };
+  const [name, setName] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [identification, setIdentification] = useState('');
   const [phone, setPhone] = useState('');
@@ -148,6 +150,7 @@ const Users: React.FC = () => {
   const [deductAdvances, setDeductAdvances] = useState(true);
 
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserData | null>(null);
+  const [editName, setEditName] = useState('');
   const [editJobTitle, setEditJobTitle] = useState('');
   const [editEntryTime, setEditEntryTime] = useState('');
   const [editExitTime, setEditExitTime] = useState('');
@@ -280,6 +283,7 @@ const Users: React.FC = () => {
   const resetForm = () => {
     setEmail('');
     setUsername('');
+    setName('');
     setPassword('');
     setJobTitle('');
     setIdentification('');
@@ -330,6 +334,7 @@ const Users: React.FC = () => {
     }
     try {
       await apiClient.post('/users', { 
+        name: name.trim() || undefined,
         username, email, password,
         roles: selectedRoles,
         role: selectedRoles[0] || UserRole.POS, 
@@ -423,6 +428,7 @@ const Users: React.FC = () => {
       ? u.roles
       : [(u.role as UserRole) || UserRole.POS];
     setEditRoles(userRoles);
+    setEditName(u.name || '');
     setEditJobTitle(u.jobTitle || '');
     setEditEntryTime(u.entryTime || '');
     setEditExitTime(u.exitTime || '');
@@ -436,6 +442,7 @@ const Users: React.FC = () => {
     if (!selectedUserForEdit) return;
     try {
       await apiClient.put(`/users/${selectedUserForEdit.id}`, {
+        name: editName.trim() || null,
         roles: selectedUserForEdit.role === UserRole.OPERATIVO ? [UserRole.OPERATIVO] : editRoles,
         role: selectedUserForEdit.role === UserRole.OPERATIVO ? UserRole.OPERATIVO : (editRoles[0] || UserRole.POS),
         jobTitle: editJobTitle.trim() || null,
@@ -711,9 +718,15 @@ const Users: React.FC = () => {
                             </div>
                           )}
                           <IonItem>
-                            <IonLabel position="stacked">Nombre de Usuario</IonLabel>
+                            <IonLabel position="stacked">Nombre de Usuario (Para Iniciar Sesión)</IonLabel>
                             <IonInput disabled={isExisting} value={username} onIonInput={e => setUsername(e.detail.value!)} placeholder="Ej. juan_cajero" />
                           </IonItem>
+                          {!isExisting && (
+                            <IonItem>
+                              <IonLabel position="stacked">Nombre Visible / Completo (Opcional - Para Clientes y Reservas)</IonLabel>
+                              <IonInput value={name} onIonInput={e => setName(e.detail.value!)} placeholder="Ej. Juan Pérez" />
+                            </IonItem>
+                          )}
                           {!isExisting && (
                             <IonItem>
                               <IonLabel position="stacked">Contraseña</IonLabel>
@@ -856,7 +869,10 @@ const Users: React.FC = () => {
                             return (
                               <tr key={u.id}>
                                 <td>
-                                  <div><strong>{u.username}</strong></div>
+                                  <div><strong>{u.name || u.username}</strong></div>
+                                  {u.name && u.name !== u.username && (
+                                    <div style={{ fontSize: '0.8em', color: '#64748b' }}>@{u.username}</div>
+                                  )}
                                   {u.jobTitle && (
                                     <div style={{ fontSize: '0.85em', color: '#92949c' }}>
                                       {u.jobTitle}
@@ -1216,6 +1232,15 @@ const Users: React.FC = () => {
                 </div>
               </div>
             )}
+
+            <IonItem lines="full" className="ion-margin-bottom">
+              <IonLabel position="stacked">Nombre Visible / Completo (Para Clientes y Reservas)</IonLabel>
+              <IonInput 
+                value={editName} 
+                onIonInput={e => setEditName(e.detail.value!)} 
+                placeholder="Ej. Eva Gómez (Se mostrará a clientes en reservas)" 
+              />
+            </IonItem>
 
             <IonItem>
               <IonLabel position="stacked">Cargo / Puesto (Opcional)</IonLabel>

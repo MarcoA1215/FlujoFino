@@ -17,6 +17,7 @@ import {
 } from 'ionicons/icons';
 import { useImageViewer } from '../context/ImageViewerContext';
 import { requestAndSubscribePush } from '../services/push-notification.service';
+import { BankSelect } from '../components/BankSelect';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -25,6 +26,11 @@ export const formatDateLocal = (d: Date): string => {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+const formatStaffName = (name?: string): string => {
+  if (!name) return '';
+  return name.replace(/[-_]?(admin|operativo|pos|delivery)$/i, '').replace(/[._]/g, ' ').trim() || name;
 };
 
 const PublicBooking: React.FC = () => {
@@ -115,6 +121,7 @@ const PublicBooking: React.FC = () => {
   const [bookingPaymentAmount, setBookingPaymentAmount] = useState<string>('');
   const [bookingPaymentRef, setBookingPaymentRef] = useState<string>('');
   const [bookingPaymentNotes, setBookingPaymentNotes] = useState<string>('');
+  const [bookingOriginBank, setBookingOriginBank] = useState<string>('');
 
   const rateBs = Number(tenantInfo?.exchangeRateBs || 40.0);
   const minDepositPercentage = Number(tenantInfo?.minDepositPercentage || 0);
@@ -346,7 +353,12 @@ const PublicBooking: React.FC = () => {
         paymentReference: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? bookingPaymentRef.trim() : undefined,
         paymentAmount: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? payAmtNum : undefined,
         paymentAmountBs: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? Math.round(payAmtNum * rateBs * 100) / 100 : undefined,
-        paymentNotes: totalServicePrice > 0 ? (bookingPaymentNotes.trim() || undefined) : undefined,
+        paymentNotes: totalServicePrice > 0 ? (
+          [
+            bookingOriginBank ? `Banco origen: ${bookingOriginBank}` : '',
+            bookingPaymentNotes.trim()
+          ].filter(Boolean).join(' | ') || undefined
+        ) : undefined,
       });
 
       // Persist customer profile locally for recurring visits
@@ -543,7 +555,7 @@ const PublicBooking: React.FC = () => {
                     </>
                   )}
                   {selectedStaff ? (
-                    <p><b>Especialista:</b> {selectedStaff.name}</p>
+                    <p><b>Especialista:</b> {formatStaffName(selectedStaff.name)}</p>
                   ) : selectedServices.length > 1 ? (
                     <p><b>Atención:</b> Equipo del Local (Coordinación continua)</p>
                   ) : null}
@@ -917,7 +929,7 @@ const PublicBooking: React.FC = () => {
                                 }}
                               >
                                 <IonIcon icon={personOutline} />
-                                {st.name} {st.jobTitle ? `(${st.jobTitle})` : ''}
+                                {formatStaffName(st.name)} {st.jobTitle ? `(${st.jobTitle})` : ''}
                               </div>
                             ))}
                           </div>
@@ -1026,7 +1038,7 @@ const PublicBooking: React.FC = () => {
                                 }}
                               >
                                 <IonIcon icon={personOutline} />
-                                {st.name} {st.jobTitle ? `(${st.jobTitle})` : ''}
+                                {formatStaffName(st.name)} {st.jobTitle ? `(${st.jobTitle})` : ''}
                               </div>
                             ))}
                           </div>
@@ -1052,7 +1064,7 @@ const PublicBooking: React.FC = () => {
                     <div style={{ backgroundColor: '#f1f5f9', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <b>{selectedServiceNames}</b> • ⏱️ {totalDurationMinutes} min
-                        {selectedStaff && <div><span style={{ color: '#64748b' }}>Especialista:</span> <b>{selectedStaff.name}</b></div>}
+                        {selectedStaff && <div><span style={{ color: '#64748b' }}>Especialista:</span> <b>{formatStaffName(selectedStaff.name)}</b></div>}
                       </div>
                       <div style={{ fontWeight: 'bold', color: 'var(--ion-color-primary)', fontSize: '15px' }}>
                         ${totalServicePrice.toFixed(2)}
@@ -1092,7 +1104,7 @@ const PublicBooking: React.FC = () => {
                   <h3 style={{fontWeight: 'bold', marginBottom: '6px', textAlign: 'center'}}>Horas Disponibles</h3>
                   <div style={{textAlign: 'center', marginBottom: '14px', color: '#64748b', fontSize: '13px'}}>
                     Para el <b>{selectedDate?.toLocaleDateString()}</b> {selectedServices.length > 0 ? `(${totalDurationMinutes} min)` : ''}
-                    {selectedStaff && ` con ${selectedStaff.name}`}
+                    {selectedStaff && ` con ${formatStaffName(selectedStaff.name)}`}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
                     {loadingSlots ? (
@@ -1142,7 +1154,7 @@ const PublicBooking: React.FC = () => {
                         </>
                       )}
                       {selectedStaff ? (
-                        <>👤 <b>Atendido por:</b> {selectedStaff.name} {selectedStaff.jobTitle ? `(${selectedStaff.jobTitle})` : ''}<br/></>
+                        <>👤 <b>Atendido por:</b> {formatStaffName(selectedStaff.name)} {selectedStaff.jobTitle ? `(${selectedStaff.jobTitle})` : ''}<br/></>
                       ) : selectedServices.length > 1 ? (
                         <>👥 <b>Atención:</b> Equipo del Local (Coordinación continua)<br/></>
                       ) : null}
@@ -1552,6 +1564,17 @@ const PublicBooking: React.FC = () => {
 
                       {bookingPaymentMethod !== 'CASH' && (
                         <>
+                          {(bookingPaymentMethod === 'PAGO_MOVIL' || bookingPaymentMethod === 'TRANSFER') && (
+                            <div style={{ marginBottom: '12px' }}>
+                              <BankSelect
+                                label="Banco Emisor / Origen (Desde donde pagas)"
+                                value={bookingOriginBank}
+                                onChange={val => setBookingOriginBank(val)}
+                                placeholder="Selecciona tu banco de origen..."
+                              />
+                            </div>
+                          )}
+
                           {/* Reference Number - MANDATORY */}
                           <div style={{ marginBottom: '12px' }}>
                             <IonLabel style={{ fontWeight: 'bold', fontSize: '12px', color: '#334155', display: 'block', marginBottom: '4px' }}>

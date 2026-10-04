@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   IonModal,
   IonHeader,
@@ -19,6 +19,7 @@ import { copyOutline, checkmarkCircleOutline, closeOutline } from 'ionicons/icon
 import { SaaSPaymentMethod } from '@finowork/shared-types';
 import { apiClient } from '../api/client';
 import { SubscriptionContext } from '../context/SubscriptionContext';
+import { BankSelect } from './BankSelect';
 
 interface ReportPaymentModalProps {
   isOpen: boolean;
@@ -45,6 +46,7 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
   );
   const [reportMethod, setReportMethod] = useState<SaaSPaymentMethod>(SaaSPaymentMethod.PAGO_MOVIL);
   const [reportReference, setReportReference] = useState<string>('');
+  const [reportBank, setReportBank] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   useEffect(() => {
@@ -53,6 +55,7 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
       setReportAmountUsd(fee);
       setReportAmountBs(Math.round(fee * exchangeRate * 100) / 100);
       setReportReference('');
+      setReportBank('');
     }
   }, [isOpen, initialAmountUsd, subscription?.finalFee, exchangeRate]);
 
@@ -89,12 +92,15 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
     try {
       setIsSubmitting(true);
       const isBs = reportMethod === SaaSPaymentMethod.PAGO_MOVIL || reportMethod === SaaSPaymentMethod.CASH;
+      const fullRef = reportBank
+        ? `${reportReference.trim()} (${reportBank})`
+        : reportReference.trim();
       await apiClient.post('/superadmin/payments/report', {
         amount: Number(reportAmountUsd),
         amount_bs: isBs ? Number(reportAmountBs) : undefined,
         exchange_rate: isBs ? Number(exchangeRate) : undefined,
         payment_method: reportMethod,
-        reference: reportReference.trim(),
+        reference: fullRef,
       });
 
       presentToast({
@@ -443,6 +449,17 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                 />
               </div>
             </div>
+
+            {(reportMethod === SaaSPaymentMethod.PAGO_MOVIL || reportMethod === SaaSPaymentMethod.CASH) && (
+              <div style={{ marginBottom: '14px' }}>
+                <BankSelect
+                  label="Banco Emisor / Origen (Desde donde pagaste)"
+                  value={reportBank}
+                  onChange={(val) => setReportBank(val)}
+                  placeholder="Selecciona tu banco de origen..."
+                />
+              </div>
+            )}
 
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>

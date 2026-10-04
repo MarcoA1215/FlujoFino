@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -41,6 +41,7 @@ import {
   PromoterRank,
   TenantStatus,
 } from '@finowork/shared-types';
+import { BankSelect } from '../components/BankSelect';
 
 const PromoterDashboard: React.FC = () => {
   const { user } = useContext(AuthContext);
@@ -556,14 +557,14 @@ const PromoterDashboard: React.FC = () => {
                     📱 Pago Móvil (Venezuela)
                   </h3>
 
-                  <IonItem lines="full" style={{ marginBottom: '10px' }}>
-                    <IonLabel position="stacked">Banco Receptor</IonLabel>
-                    <IonInput
-                      placeholder="Ej: Banesco, Mercantil, Venezuela..."
+                  <div style={{ marginBottom: '12px' }}>
+                    <BankSelect
+                      label="Banco Receptor"
                       value={pagoMovilBank}
-                      onIonInput={(e) => setPagoMovilBank(e.detail.value || '')}
+                      onChange={(val) => setPagoMovilBank(val)}
+                      placeholder="Selecciona tu banco..."
                     />
-                  </IonItem>
+                  </div>
 
                   <IonItem lines="full" style={{ marginBottom: '10px' }}>
                     <IonLabel position="stacked">Número de Teléfono</IonLabel>

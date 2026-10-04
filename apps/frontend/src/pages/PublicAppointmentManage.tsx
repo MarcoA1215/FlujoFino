@@ -39,6 +39,7 @@ import {
   closeOutline
 } from 'ionicons/icons';
 import axios from 'axios';
+import { BankSelect } from '../components/BankSelect';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -68,6 +69,7 @@ const PublicAppointmentManage: React.FC = () => {
   const [paymentType, setPaymentType] = useState<'FULL' | 'PARTIAL'>('FULL');
   const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('PAGO_MOVIL');
+  const [paymentOriginBank, setPaymentOriginBank] = useState<string>('');
   const [paymentRef, setPaymentRef] = useState<string>('');
   const [paymentNotes, setPaymentNotes] = useState<string>('');
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
@@ -164,12 +166,17 @@ const PublicAppointmentManage: React.FC = () => {
     try {
       const rate = Number(appointment?.exchangeRateBs || 1);
       const amtBs = Math.round(amt * rate * 100) / 100;
+      const combinedNotes = [
+        paymentOriginBank ? `Banco origen: ${paymentOriginBank}` : '',
+        paymentNotes.trim()
+      ].filter(Boolean).join(' | ');
+
       await axios.post(`${apiBase}/public/reservations/appointment/${id}/payment`, {
         amount: amt,
         amountBs: amtBs,
         method: paymentMethod,
         reference: paymentRef.trim(),
-        notes: paymentNotes.trim() || undefined
+        notes: combinedNotes || undefined
       });
 
       presentToast({ 
@@ -180,6 +187,7 @@ const PublicAppointmentManage: React.FC = () => {
       setShowPaymentModal(false);
       setPaymentRef('');
       setPaymentNotes('');
+      setPaymentOriginBank('');
       await fetchAppointment();
     } catch (e: any) {
       presentToast({ 
@@ -781,6 +789,18 @@ const PublicAppointmentManage: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Bank Select for Pago Movil or Transfer */}
+                {(paymentMethod === 'PAGO_MOVIL' || paymentMethod === 'TRANSFER') && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <BankSelect
+                      label="Banco Emisor / Origen (Desde donde pagaste)"
+                      value={paymentOriginBank}
+                      onChange={val => setPaymentOriginBank(val)}
+                      placeholder="Selecciona tu banco de origen..."
+                    />
+                  </div>
+                )}
 
                 {/* Reference Input */}
                 <div style={{ marginBottom: '16px' }}>

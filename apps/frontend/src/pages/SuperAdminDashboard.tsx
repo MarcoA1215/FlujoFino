@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   IonPage,
@@ -64,6 +64,7 @@ import {
   type CreatePromoterDTO,
   PromoterCommissionStatus,
 } from '@finowork/shared-types';
+import { BankSelect } from '../components/BankSelect';
 
 const SuperAdminDashboard: React.FC = () => {
   const [presentToast] = useIonToast();
@@ -1028,14 +1029,14 @@ const SuperAdminDashboard: React.FC = () => {
                       </IonCardTitle>
                     </IonCardHeader>
                     <IonCardContent>
-                      <IonItem lines="none" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '10px' }}>
-                        <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Banco Receptor</IonLabel>
-                        <IonInput
-                          placeholder="Ej: Banesco (0134)"
+                      <div style={{ marginBottom: '10px' }}>
+                        <BankSelect
+                          label="Banco Receptor"
                           value={platformConfig.companyBank || ''}
-                          onIonInput={(e) => setPlatformConfig({ ...platformConfig, companyBank: e.detail.value || '' })}
+                          onChange={(val) => setPlatformConfig({ ...platformConfig, companyBank: val })}
+                          placeholder="Selecciona banco receptor..."
                         />
-                      </IonItem>
+                      </div>
 
                       <IonItem lines="none" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '10px' }}>
                         <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Cédula / RIF</IonLabel>
@@ -1709,16 +1710,14 @@ const SuperAdminDashboard: React.FC = () => {
                     </IonCol>
 
                     <IonCol size="12" sizeMd="6">
-                      <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '12px' }}>
-                        <IonLabel position="stacked" style={{ fontWeight: 700, color: '#475569' }}>
-                          Pago Móvil - Banco
-                        </IonLabel>
-                        <IonInput
-                          placeholder="Ej: Banesco (0134)"
+                      <div style={{ marginBottom: '12px' }}>
+                        <BankSelect
+                          label="Pago Móvil - Banco"
                           value={newPromoterPagoMovilBank}
-                          onIonInput={(e) => setNewPromoterPagoMovilBank(e.detail.value || '')}
+                          onChange={(val) => setNewPromoterPagoMovilBank(val)}
+                          placeholder="Selecciona banco del promotor..."
                         />
-                      </IonItem>
+                      </div>
                     </IonCol>
 
                     <IonCol size="12" sizeMd="6">

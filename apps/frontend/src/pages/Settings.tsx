@@ -55,6 +55,7 @@ import {
 } from '@finowork/shared-types';
 import { BookingSettings } from '../components/BookingSettings';
 import { AppHeader } from '../components/AppHeader';
+import { BankSelect } from '../components/BankSelect';
 
 interface Settings {
   exchangeRateBs?: number;
@@ -558,9 +559,13 @@ const SettingsPage: React.FC = () => {
                 </IonCardHeader>
                 <IonCardContent>
                   <p style={{marginBottom: '15px'}}>Estos datos se usarán para autocompletar recibos y textos copiados para WhatsApp.</p>
-                  <IonItem>
-                    <IonLabel position="stacked">Banco Receptor</IonLabel>
-                    <IonInput value={settings.companyBank || ''} onIonInput={e => setSettings({...settings, companyBank: e.detail.value!})} placeholder="Ej. Banesco" />
+                  <IonItem lines="none" style={{ '--background': 'transparent', marginBottom: '8px' }}>
+                    <BankSelect
+                      label="Banco Receptor"
+                      value={settings.companyBank || ''}
+                      onChange={val => setSettings({...settings, companyBank: val})}
+                      placeholder="Selecciona banco receptor..."
+                    />
                   </IonItem>
                   <IonItem>
                     <IonLabel position="stacked">Cédula / RIF</IonLabel>

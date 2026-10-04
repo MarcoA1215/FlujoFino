@@ -1,4 +1,4 @@
-﻿import { UserTenantAccess } from './user-tenant-access.entity';
+import { UserTenantAccess } from './user-tenant-access.entity';
 import { Entity, PrimaryGeneratedColumn, OneToMany, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { UserRole } from '@finowork/shared-types';
 
@@ -9,6 +9,9 @@ export class User {
 
   @Column({ unique: true })
   username: string;
+
+  @Column({ nullable: true })
+  name: string;
 
   @Column({ unique: true })
   email: string;

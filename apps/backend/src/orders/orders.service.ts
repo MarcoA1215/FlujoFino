@@ -361,8 +361,8 @@ export class OrdersService {
         const userRoles: string[] = [];
         if (dAccess?.role) userRoles.push(dAccess.role);
         if (Array.isArray(dAccess?.roles)) userRoles.push(...dAccess.roles);
-        else if (typeof dAccess?.roles === 'string' && dAccess.roles.trim() !== '') {
-          userRoles.push(...dAccess.roles.split(',').map((r: string) => r.trim()));
+        else if (typeof (dAccess?.roles as any) === 'string' && ((dAccess?.roles as any) || '').trim() !== '') {
+          userRoles.push(...((dAccess?.roles as any) || '').split(',').map((r: string) => r.trim()));
         }
         const allowedRoles = [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO];
         if (!dAccess || !userRoles.some(r => allowedRoles.includes(r as UserRole))) {
@@ -1186,8 +1186,8 @@ export class OrdersService {
           const userRoles: string[] = [];
           if (dAccess?.role) userRoles.push(dAccess.role);
           if (Array.isArray(dAccess?.roles)) userRoles.push(...dAccess.roles);
-          else if (typeof dAccess?.roles === 'string' && dAccess.roles.trim() !== '') {
-            userRoles.push(...dAccess.roles.split(',').map((r: string) => r.trim()));
+          else if (typeof (dAccess?.roles as any) === 'string' && ((dAccess?.roles as any) || '').trim() !== '') {
+            userRoles.push(...((dAccess?.roles as any) || '').split(',').map((r: string) => r.trim()));
           }
           const allowedRoles = [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO];
           if (!dAccess || !userRoles.some(r => allowedRoles.includes(r as UserRole))) {
@@ -1641,8 +1641,8 @@ export class OrdersService {
       const userRoles: string[] = [];
       if (dAccess?.role) userRoles.push(dAccess.role);
       if (Array.isArray(dAccess?.roles)) userRoles.push(...dAccess.roles);
-      else if (typeof dAccess?.roles === 'string' && dAccess.roles.trim() !== '') {
-        userRoles.push(...dAccess.roles.split(',').map((r: string) => r.trim()));
+      else if (typeof (dAccess?.roles as any) === 'string' && ((dAccess?.roles as any) || '').trim() !== '') {
+        userRoles.push(...((dAccess?.roles as any) || '').split(',').map((r: string) => r.trim()));
       }
       const allowedRoles = [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO];
       if (!dAccess || !userRoles.some(r => allowedRoles.includes(r as UserRole))) {

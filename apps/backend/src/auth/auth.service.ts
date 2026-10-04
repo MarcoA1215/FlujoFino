@@ -300,6 +300,7 @@ export class AuthService {
     const payload = {
       id: user.id || user.sub,
       username: user.username,
+      name: user.name || user.username,
       email: user.email,
       identification: user.identification,
       phone: user.phone,
@@ -436,6 +437,7 @@ export class AuthService {
       const hashedPassword = await bcrypt.hash(body.password, 10);
       const user = queryRunner.manager.create(User, {
         username: body.username,
+        name: (body.fullName || body.name || body.username || '').trim(),
         email: body.email,
         identification: body.identification || null,
         phone: body.phone || null,

@@ -1,4 +1,4 @@
-﻿import { Controller, Post, Body, Param, Get, NotFoundException, BadRequestException, Put, Query } from '@nestjs/common';
+import { Controller, Post, Body, Param, Get, NotFoundException, BadRequestException, Put, Query } from '@nestjs/common';
 import { ReservationsService } from './reservations.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual, In } from 'typeorm';
@@ -84,11 +84,19 @@ export class PublicReservationsController {
       });
       staff = accesses
         .filter(a => !!a.user)
-        .map(a => ({
-          id: a.user.id,
-          name: a.user.username,
-          jobTitle: a.jobTitle || undefined
-        }));
+        .map(a => {
+          const rawName = (a.user.name && a.user.name.trim()) ? a.user.name.trim() : '';
+          const cleanUsername = (a.user.username || '')
+            .replace(/[-_]?(admin|operativo|pos|delivery)$/i, '')
+            .replace(/[._]/g, ' ')
+            .trim();
+          const displayName = rawName || cleanUsername || a.user.username;
+          return {
+            id: a.user.id,
+            name: displayName,
+            jobTitle: a.jobTitle || undefined
+          };
+        });
     }
 
     const hasStore = ((settings?.featureBuySell || settings?.featureRecipes) && settings?.featureShowCatalog !== false) ?? false;

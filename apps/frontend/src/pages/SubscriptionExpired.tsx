@@ -1,4 +1,4 @@
-﻿import React, { useState, useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   IonPage,
   IonContent,
@@ -28,6 +28,7 @@ import { apiClient } from '../api/client';
 import { SubscriptionContext } from '../context/SubscriptionContext';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { BankSelect } from '../components/BankSelect';
 
 const SubscriptionExpired: React.FC = () => {
   const [presentToast] = useIonToast();
@@ -47,6 +48,7 @@ const SubscriptionExpired: React.FC = () => {
   );
   const [reportMethod, setReportMethod] = useState<SaaSPaymentMethod>(SaaSPaymentMethod.PAGO_MOVIL);
   const [reportReference, setReportReference] = useState<string>('');
+  const [reportBank, setReportBank] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const handleAmountUsdChange = (val: number) => {
@@ -86,12 +88,15 @@ const SubscriptionExpired: React.FC = () => {
     try {
       setIsSubmitting(true);
       const isBs = reportMethod === SaaSPaymentMethod.PAGO_MOVIL || reportMethod === SaaSPaymentMethod.CASH;
+      const fullRef = reportBank
+        ? `${reportReference.trim()} (${reportBank})`
+        : reportReference.trim();
       await apiClient.post('/superadmin/payments/report', {
         amount: Number(reportAmountUsd),
         amount_bs: isBs ? Number(reportAmountBs) : undefined,
         exchange_rate: isBs ? Number(exchangeRate) : undefined,
         payment_method: reportMethod,
-        reference: reportReference.trim(),
+        reference: fullRef,
       });
 
       presentToast({
@@ -101,6 +106,7 @@ const SubscriptionExpired: React.FC = () => {
       });
 
       setReportReference('');
+      setReportBank('');
       await refreshSubscription();
     } catch (e: any) {
       const msg = e.response?.data?.message || 'Error al enviar reporte de pago';
@@ -523,6 +529,17 @@ const SubscriptionExpired: React.FC = () => {
                 />
               </div>
             </div>
+
+            {(reportMethod === SaaSPaymentMethod.PAGO_MOVIL || reportMethod === SaaSPaymentMethod.CASH) && (
+              <div style={{ marginBottom: '14px' }}>
+                <BankSelect
+                  label="Banco Emisor / Origen (Desde donde pagaste)"
+                  value={reportBank}
+                  onChange={(val) => setReportBank(val)}
+                  placeholder="Selecciona tu banco de origen..."
+                />
+              </div>
+            )}
 
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>

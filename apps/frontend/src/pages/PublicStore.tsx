@@ -44,6 +44,7 @@ import axios from 'axios';
 import { useImageViewer } from '../context/ImageViewerContext';
 import { requestAndSubscribePush } from '../services/push-notification.service';
 import { playNotificationSound } from '../utils/audio';
+import { BankSelect } from '../components/BankSelect';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -106,6 +107,7 @@ const PublicStore: React.FC = () => {
   const [paymentOption, setPaymentOption] = useState<'PAGO_MOVIL' | 'USD' | 'TRANSFER' | 'BINANCE' | 'WHATSAPP'>('PAGO_MOVIL');
   const [pagoMovilRef, setPagoMovilRef] = useState('');
   const [transferRef, setTransferRef] = useState('');
+  const [originBank, setOriginBank] = useState('');
   const [binanceRef, setBinanceRef] = useState('');
   const [cashReceivedAmount, setCashReceivedAmount] = useState<string>('');
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -442,6 +444,8 @@ const PublicStore: React.FC = () => {
                       paymentOption === 'PAGO_MOVIL' ? pagoMovilRef.trim() : 
                       paymentOption === 'TRANSFER' ? transferRef.trim() : 
                       paymentOption === 'BINANCE' ? binanceRef.trim() : undefined),
+        pagoMovilBank: originBank || undefined,
+        transferBank: (paymentOption === 'TRANSFER' && originBank) ? originBank : undefined,
         exchangeRate,
         amountBs: grandTotalBs,
         items: cart.map((i) => ({
@@ -534,9 +538,9 @@ const PublicStore: React.FC = () => {
     );
 
     if (paymentOption === 'PAGO_MOVIL' && pagoMovilRef) {
-      lines.push(`📱 *Ref. Pago Móvil:* ${pagoMovilRef}`);
+      lines.push(`📱 *Ref. Pago Móvil:* ${pagoMovilRef}${originBank ? ` (${originBank})` : ''}`);
     } else if (paymentOption === 'TRANSFER' && transferRef) {
-      lines.push(`🏦 *Ref. Transferencia:* ${transferRef}`);
+      lines.push(`🏦 *Ref. Transferencia:* ${transferRef}${originBank ? ` (${originBank})` : ''}`);
     } else if (paymentOption === 'BINANCE' && binanceRef) {
       lines.push(`🟡 *ID Binance Pay:* ${binanceRef}`);
     } else if (paymentOption === 'USD') {
@@ -1609,6 +1613,14 @@ const PublicStore: React.FC = () => {
                           </IonButton>
                         </div>
                       )}
+                      <div style={{ marginTop: '10px' }}>
+                        <BankSelect
+                          label="Banco Emisor (Desde donde transferiste)"
+                          value={originBank}
+                          onChange={(val) => setOriginBank(val)}
+                          placeholder="Selecciona tu banco de origen..."
+                        />
+                      </div>
                       <IonItem lines="none" style={{ '--background': '#fff', borderRadius: '6px', marginTop: '8px' }}>
                         <IonLabel position="stacked">Referencia de Pago Móvil (Últimos 4 o 6 dígitos)</IonLabel>
                         <IonInput
@@ -1717,6 +1729,14 @@ const PublicStore: React.FC = () => {
                           </IonButton>
                         </div>
                       )}
+                      <div style={{ marginTop: '10px' }}>
+                        <BankSelect
+                          label="Banco Emisor (Desde donde transferiste)"
+                          value={originBank}
+                          onChange={(val) => setOriginBank(val)}
+                          placeholder="Selecciona tu banco de origen..."
+                        />
+                      </div>
                       <IonItem lines="none" style={{ '--background': '#fff', borderRadius: '6px', marginTop: '10px' }}>
                         <IonLabel position="stacked">N° de Referencia de Transferencia *</IonLabel>
                         <IonInput

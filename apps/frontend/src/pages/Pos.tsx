@@ -46,6 +46,7 @@ import { DeliveryMethod, PaymentStatus, UserRole } from '@finowork/shared-types'
 import type { DeliveryZone } from '../types';
 import AppHeader from '../components/AppHeader';
 import { SalaryAdvanceModal } from '../components/SalaryAdvanceModal';
+import { BankSelect } from '../components/BankSelect';
 
 type Product = {
   id: string;
@@ -1811,15 +1812,11 @@ const Pos: React.FC = () => {
                         />
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                          Banco
-                        </label>
-                        <input
-                          type="text"
+                        <BankSelect
+                          label="Banco"
                           value={pagoMovilBank}
-                          onChange={e => setPagoMovilBank(e.target.value)}
-                          placeholder="Banesco, BDV..."
-                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                          onChange={val => setPagoMovilBank(val)}
+                          placeholder="Selecciona banco..."
                         />
                       </div>
                     </div>
@@ -1948,15 +1945,12 @@ const Pos: React.FC = () => {
                                     />
                                   </div>
                                   <div>
-                                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '2px' }}>
-                                      Banco
-                                    </label>
-                                    <input
-                                      type="text"
+                                    <BankSelect
+                                      size="small"
+                                      label="Banco"
                                       value={changeBank}
-                                      onChange={e => setChangeBank(e.target.value)}
-                                      placeholder="Banesco, BDV..."
-                                      style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                                      onChange={val => setChangeBank(val)}
+                                      placeholder="Selecciona banco..."
                                     />
                                   </div>
                                 </div>
@@ -2030,15 +2024,11 @@ const Pos: React.FC = () => {
                         />
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                          Banco Emisor
-                        </label>
-                        <input
-                          type="text"
+                        <BankSelect
+                          label="Banco Emisor"
                           value={transferBank}
-                          onChange={e => setTransferBank(e.target.value)}
-                          placeholder="Banesco, Mercantil..."
-                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                          onChange={val => setTransferBank(val)}
+                          placeholder="Selecciona banco emisor..."
                         />
                       </div>
                     </div>
