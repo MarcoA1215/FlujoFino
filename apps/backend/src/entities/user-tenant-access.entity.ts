@@ -27,6 +27,9 @@ export class UserTenantAccess {
   @Column({ type: 'varchar', default: 'USER' })
   role: UserRole;
 
+  @Column({ type: 'simple-array', nullable: true, default: '' })
+  roles: UserRole[];
+
   @Column({ default: true })
   isActive: boolean;
 

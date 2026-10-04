@@ -22,9 +22,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       phone: payload.phone,
       isEmailVerified: !!payload.isEmailVerified,
       role: payload.role,
+      roles: payload.roles,
       tenantId: payload.tenantId,
       tenantName: payload.tenantName,
     };
   }
 }
-

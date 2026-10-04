@@ -28,6 +28,7 @@ import {
   IonSegment,
   IonSegmentButton,
   IonToggle,
+  IonCheckbox,
 } from '@ionic/react';
 import { refreshOutline, walletOutline, carOutline, peopleOutline, timeOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
@@ -41,6 +42,7 @@ interface UserData {
   username: string;
   email: string;
   role: string;
+  roles?: UserRole[];
   jobTitle?: string;
   entryTime?: string;
   exitTime?: string;
@@ -50,6 +52,31 @@ interface UserData {
   createdAt: string;
 }
 
+interface RoleOption {
+  role: UserRole;
+  label: string;
+}
+
+const AVAILABLE_ROLES: RoleOption[] = [
+  { role: UserRole.POS, label: 'Caja / Punto de Venta (POS)' },
+  { role: UserRole.INVENTORY, label: 'Control de Inventario / Insumos (INVENTORY)' },
+  { role: UserRole.DELIVERY, label: 'Repartidor / Delivery (DELIVERY)' },
+  { role: UserRole.KITCHEN, label: 'Cocina / Preparación (KITCHEN)' },
+  { role: UserRole.ADMIN, label: 'Administrador de Sucursal (ADMIN)' },
+];
+
+const getRoleBadgeInfo = (r: string) => {
+  switch (r) {
+    case UserRole.ADMIN: return { label: 'Admin', color: 'danger' };
+    case UserRole.POS: return { label: 'Caja', color: 'primary' };
+    case UserRole.INVENTORY: return { label: 'Inventario', color: 'warning' };
+    case UserRole.DELIVERY: return { label: 'Reparto', color: 'tertiary' };
+    case UserRole.KITCHEN: return { label: 'Cocina', color: 'secondary' };
+    case UserRole.OPERATIVO: return { label: 'Operativo', color: 'medium' };
+    default: return { label: r, color: 'medium' };
+  }
+};
+
 export const formatDateLocal = (d: Date): string => {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -57,17 +84,6 @@ export const formatDateLocal = (d: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-const getRoleLabel = (r: string) => {
-  switch (r) {
-    case UserRole.ADMIN: return 'Administrador';
-    case UserRole.POS: return 'Caja / POS';
-    case UserRole.KITCHEN: return 'Servicio / Preparación';
-    case UserRole.DELIVERY: return 'Reparto / Envíos';
-    case UserRole.INVENTORY: return 'Inventario / Stock';
-    case UserRole.OPERATIVO: return '🧹 Personal Operativo';
-    default: return r;
-  }
-};
 
 const Users: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'delivery' | 'requests'>('users');
@@ -75,7 +91,33 @@ const Users: React.FC = () => {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>(UserRole.POS);
+    const [role, setRole] = useState<UserRole>(UserRole.POS);
+  const [selectedRoles, setSelectedRoles] = useState<UserRole[]>([UserRole.POS]);
+  const [editRoles, setEditRoles] = useState<UserRole[]>([UserRole.POS]);
+
+  const toggleRole = (r: UserRole) => {
+    if (selectedRoles.includes(r)) {
+      if (selectedRoles.length === 1) {
+        presentToast({ message: 'El usuario debe tener al menos un rol asignado', duration: 2000, color: 'warning' });
+        return;
+      }
+      setSelectedRoles(selectedRoles.filter(role => role !== r));
+    } else {
+      setSelectedRoles([...selectedRoles, r]);
+    }
+  };
+
+  const toggleEditRole = (r: UserRole) => {
+    if (editRoles.includes(r)) {
+      if (editRoles.length === 1) {
+        presentToast({ message: 'El usuario debe tener al menos un rol asignado', duration: 2000, color: 'warning' });
+        return;
+      }
+      setEditRoles(editRoles.filter(role => role !== r));
+    } else {
+      setEditRoles([...editRoles, r]);
+    }
+  };
   const [jobTitle, setJobTitle] = useState('');
   const [identification, setIdentification] = useState('');
   const [phone, setPhone] = useState('');
@@ -102,7 +144,6 @@ const Users: React.FC = () => {
   const [deductAdvances, setDeductAdvances] = useState(true);
 
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserData | null>(null);
-  const [editRole, setEditRole] = useState<UserRole>(UserRole.POS);
   const [editJobTitle, setEditJobTitle] = useState('');
   const [editEntryTime, setEditEntryTime] = useState('');
   const [editExitTime, setEditExitTime] = useState('');
@@ -242,6 +283,7 @@ const Users: React.FC = () => {
     setSalaryAmount('');
     setSalaryPeriod('SEMANAL');
     setRole(UserRole.POS);
+    setSelectedRoles([UserRole.POS]);
     setIsChecked(false);
     setIsExisting(false);
   };
@@ -278,7 +320,9 @@ const Users: React.FC = () => {
     }
     try {
       await apiClient.post('/users', { 
-        username, email, password, role, 
+        username, email, password,
+        roles: selectedRoles,
+        role: selectedRoles[0] || UserRole.POS, 
         jobTitle: jobTitle.trim() || undefined,
         identification: identification.trim() || undefined,
         phone: phone.trim() || undefined,
@@ -363,7 +407,10 @@ const Users: React.FC = () => {
 
   const handleOpenEdit = (u: UserData) => {
     setSelectedUserForEdit(u);
-    setEditRole((u.role as UserRole) || UserRole.POS);
+    const userRoles: UserRole[] = (u.roles && u.roles.length > 0)
+      ? u.roles
+      : [(u.role as UserRole) || UserRole.POS];
+    setEditRoles(userRoles);
     setEditJobTitle(u.jobTitle || '');
     setEditEntryTime(u.entryTime || '');
     setEditExitTime(u.exitTime || '');
@@ -375,7 +422,8 @@ const Users: React.FC = () => {
     if (!selectedUserForEdit) return;
     try {
       await apiClient.put(`/users/${selectedUserForEdit.id}`, {
-        role: editRole,
+        roles: selectedUserForEdit.role === UserRole.OPERATIVO ? [UserRole.OPERATIVO] : editRoles,
+        role: selectedUserForEdit.role === UserRole.OPERATIVO ? UserRole.OPERATIVO : (editRoles[0] || UserRole.POS),
         jobTitle: editJobTitle.trim() || null,
         entryTime: editEntryTime || null,
         exitTime: editExitTime || null,
@@ -634,17 +682,34 @@ const Users: React.FC = () => {
                               <IonInput type="password" value={password} onIonInput={e => setPassword(e.detail.value!)} placeholder="***" />
                             </IonItem>
                           )}
-                          <IonItem>
-                            <IonLabel position="stacked">Rol / Permiso</IonLabel>
-                            <IonSelect value={role} onIonChange={e => setRole(e.detail.value)}>
-                              <IonSelectOption value={UserRole.ADMIN}>Administrador</IonSelectOption>
-                              <IonSelectOption value={UserRole.POS}>Cajero / Atención (POS)</IonSelectOption>
-                              <IonSelectOption value={UserRole.KITCHEN}>Especialista en Servicio / Preparación</IonSelectOption>
-                              <IonSelectOption value={UserRole.DELIVERY}>Repartidor / Entregas</IonSelectOption>
-                              <IonSelectOption value={UserRole.INVENTORY}>Control de Inventario / Insumos</IonSelectOption>
-                              <IonSelectOption value={UserRole.OPERATIVO}>🧹 Personal Operativo / Sin acceso al sistema (Limpieza, Vigilancia, etc.)</IonSelectOption>
-                            </IonSelect>
-                          </IonItem>
+                          <div style={{ margin: '14px 0 10px 0' }}>
+                            <IonLabel style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '8px' }}>
+                              Roles Autorizados (Modos de Trabajo) *
+                            </IonLabel>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                              {AVAILABLE_ROLES.map(opt => {
+                                const isCheckedRole = selectedRoles.includes(opt.role);
+                                return (
+                                  <div 
+                                    key={opt.role} 
+                                    style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '2px 0' }} 
+                                    onClick={() => toggleRole(opt.role)}
+                                  >
+                                    <IonCheckbox
+                                      checked={isCheckedRole}
+                                      onIonChange={e => {
+                                        e.stopPropagation();
+                                        toggleRole(opt.role);
+                                      }}
+                                    />
+                                    <span style={{ fontSize: '13px', color: '#1e293b', fontWeight: isCheckedRole ? 700 : 500 }}>
+                                      {opt.label}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
                           <IonItem>
                             <IonLabel position="stacked">Cargo / Puesto (Opcional)</IonLabel>
                             <IonInput 
@@ -741,9 +806,18 @@ const Users: React.FC = () => {
                                 <td>{u.email}</td>
                                 <td>
                                   {u.role === UserRole.OPERATIVO ? (
-                                    <IonBadge color="medium">🧹 OPERATIVO (Sin Acceso)</IonBadge>
+                                    <IonBadge color="medium">🧹 OPERATIVO</IonBadge>
                                   ) : (
-                                    <IonBadge color={u.role === UserRole.ADMIN ? 'danger' : 'primary'}>{getRoleLabel(u.role)}</IonBadge>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                      {(u.roles && u.roles.length > 0 ? u.roles : [u.role]).map((r: string) => {
+                                        const badgeInfo = getRoleBadgeInfo(r);
+                                        return (
+                                          <IonBadge key={r} color={badgeInfo.color} style={{ fontSize: '11px', padding: '3px 7px', fontWeight: 700 }}>
+                                            {badgeInfo.label}
+                                          </IonBadge>
+                                        );
+                                      })}
+                                    </div>
                                   )}
                                 </td>
                                 <td>
@@ -1032,17 +1106,42 @@ const Users: React.FC = () => {
               <IonInput disabled value={selectedUserForEdit.email} />
             </IonItem>
             
-            <IonItem>
-              <IonLabel position="stacked">Rol / Permiso</IonLabel>
-              <IonSelect value={editRole} onIonChange={e => setEditRole(e.detail.value)}>
-                <IonSelectOption value={UserRole.ADMIN}>Administrador</IonSelectOption>
-                <IonSelectOption value={UserRole.POS}>Cajero / Atención (POS)</IonSelectOption>
-                <IonSelectOption value={UserRole.KITCHEN}>Especialista en Servicio / Preparación</IonSelectOption>
-                <IonSelectOption value={UserRole.DELIVERY}>Repartidor / Entregas</IonSelectOption>
-                <IonSelectOption value={UserRole.INVENTORY}>Control de Inventario / Insumos</IonSelectOption>
-                <IonSelectOption value={UserRole.OPERATIVO}>🧹 Personal Operativo / Sin acceso al sistema (Limpieza, Vigilancia, etc.)</IonSelectOption>
-              </IonSelect>
-            </IonItem>
+            {selectedUserForEdit.role === UserRole.OPERATIVO ? (
+              <div style={{ margin: '14px 0 10px 0' }}>
+                <IonBadge color="medium" style={{ padding: '6px 12px', fontSize: '12px' }}>
+                  🧹 Personal Operativo / Sin acceso al sistema
+                </IonBadge>
+              </div>
+            ) : (
+              <div style={{ margin: '14px 0 10px 0' }}>
+                <IonLabel style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '8px' }}>
+                  Roles Autorizados (Modos de Trabajo) *
+                </IonLabel>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  {AVAILABLE_ROLES.map(opt => {
+                    const isCheckedRole = editRoles.includes(opt.role);
+                    return (
+                      <div 
+                        key={opt.role} 
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '2px 0' }} 
+                        onClick={() => toggleEditRole(opt.role)}
+                      >
+                        <IonCheckbox
+                          checked={isCheckedRole}
+                          onIonChange={e => {
+                            e.stopPropagation();
+                            toggleEditRole(opt.role);
+                          }}
+                        />
+                        <span style={{ fontSize: '13px', color: '#1e293b', fontWeight: isCheckedRole ? 700 : 500 }}>
+                          {opt.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <IonItem>
               <IonLabel position="stacked">Cargo / Puesto (Opcional)</IonLabel>

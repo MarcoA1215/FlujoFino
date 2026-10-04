@@ -64,6 +64,7 @@ export class UsersService implements OnModuleInit {
       const access = user.tenantAccess?.find(a => a.tenantId === tenantId);
       if (access) {
         user.role = access.role as UserRole;
+        (user as any).roles = (access.roles && access.roles.length > 0) ? access.roles : [access.role as UserRole];
         (user as any).status = access.status;
         (user as any).jobTitle = access.jobTitle;
         (user as any).entryTime = access.entryTime;
@@ -76,7 +77,7 @@ export class UsersService implements OnModuleInit {
     });
   }
 
-  async findActiveEmployees(tenantId?: string): Promise<{ id: string; username: string; name: string; role: UserRole; jobTitle?: string; entryTime?: string; exitTime?: string }[]> {
+  async findActiveEmployees(tenantId?: string): Promise<{ id: string; username: string; name: string; role: UserRole; roles?: UserRole[]; jobTitle?: string; entryTime?: string; exitTime?: string }[]> {
     if (!tenantId) return [];
 
     const accesses = await this.usersRepo.manager.find(UserTenantAccess, {
@@ -102,6 +103,7 @@ export class UsersService implements OnModuleInit {
         username: a.user.username,
         name: a.user.username,
         role: a.role,
+        roles: (a.roles && a.roles.length > 0) ? a.roles : [a.role],
         jobTitle: a.jobTitle || undefined,
         entryTime: a.entryTime || undefined,
         exitTime: a.exitTime || undefined,
@@ -136,6 +138,7 @@ export class UsersService implements OnModuleInit {
           user: savedUser,
           tenantId,
           role: UserRole.OPERATIVO,
+          roles: [UserRole.OPERATIVO],
           isActive: true,
           status: 'ACCEPTED',
           salaryAmount: data.salaryAmount ? Number(data.salaryAmount) : null,
@@ -147,6 +150,17 @@ export class UsersService implements OnModuleInit {
         await transactionalEntityManager.save(access);
         return savedUser;
       }
+
+      // Resolve roles list & primary role
+      let assignedRoles: UserRole[];
+      if (data.roles && Array.isArray(data.roles) && data.roles.length > 0) {
+        assignedRoles = data.roles;
+      } else if (data.role) {
+        assignedRoles = [data.role];
+      } else {
+        assignedRoles = [UserRole.POS];
+      }
+      const primaryRole = (data.role && assignedRoles.includes(data.role)) ? data.role : assignedRoles[0];
 
       // 1. Check if user already exists
       let existingUser = await transactionalEntityManager.findOne(User, {
@@ -179,20 +193,19 @@ export class UsersService implements OnModuleInit {
           identification: data.identification || null,
           phone: data.phone || null,
           passwordHash: hash,
-          role: data.role || UserRole.POS,
+          role: primaryRole,
           isEmailVerified: false,
         });
         savedUser = await transactionalEntityManager.save(user);
-        // We can auto-accept if the admin created them, but let's make them PENDING too for consistency, 
-        // OR ACCEPTED because they were created specifically for this store. 
-        status = 'ACCEPTED'; // Or PENDING, let's keep ACCEPTED for brand new users.
+        status = 'ACCEPTED';
       }
 
       // Create access link
       const access = transactionalEntityManager.create('UserTenantAccess', {
         user: savedUser,
         tenant: { id: tenantId },
-        role: data.role || UserRole.POS,
+        role: primaryRole,
+        roles: assignedRoles,
         isActive: true,
         status: status,
         salaryAmount: data.salaryAmount ? Number(data.salaryAmount) : null,
@@ -217,18 +230,40 @@ export class UsersService implements OnModuleInit {
     if (!access) {
       const user = await this.usersRepo.findOne({ where: { id: userId } });
       if (!user) throw new Error('Usuario no encontrado');
+      const fallbackRoles = (data.roles && Array.isArray(data.roles) && data.roles.length > 0)
+        ? data.roles
+        : (data.role ? [data.role] : [user.role || UserRole.POS]);
+
       access = this.usersRepo.manager.create(UserTenantAccess, {
         userId,
         tenantId,
         isActive: true,
         status: 'ACCEPTED',
-        role: data.role || user.role || UserRole.POS
+        role: data.role || fallbackRoles[0] || UserRole.POS,
+        roles: fallbackRoles,
       });
     }
 
-    if (data.role !== undefined) {
+    if (data.roles !== undefined) {
+      if (Array.isArray(data.roles) && data.roles.length > 0) {
+        access.roles = data.roles;
+        if (data.role && data.roles.includes(data.role)) {
+          access.role = data.role;
+        } else if (!data.roles.includes(access.role)) {
+          access.role = data.roles[0];
+        }
+      } else {
+        access.roles = data.role ? [data.role] : [access.role || UserRole.POS];
+      }
+    } else if (data.role !== undefined) {
       access.role = data.role;
+      if (!access.roles || access.roles.length === 0) {
+        access.roles = [data.role];
+      } else if (!access.roles.includes(data.role)) {
+        access.roles = [data.role, ...access.roles];
+      }
     }
+
     if (data.jobTitle !== undefined || data.job_title !== undefined) {
       access.jobTitle = (data.jobTitle !== undefined ? data.jobTitle : data.job_title) || null;
     }
@@ -322,6 +357,9 @@ export class UsersService implements OnModuleInit {
     const tenant = await this.usersRepo.manager.findOne(Tenant, { where: { id: tenantId } });
     const tenantName = tenant ? tenant.name : 'Flujo Fino';
 
+    const access = user?.tenantAccess?.find(a => a.tenantId === req.tenantId);
+    const authorizedRoles = (access?.roles && access.roles.length > 0) ? access.roles : [req.role];
+
     const payload = {
       id: user?.id || req.userId,
       username: req.userName,
@@ -331,6 +369,7 @@ export class UsersService implements OnModuleInit {
       isEmailVerified: !!user?.isEmailVerified,
       sub: req.userId,
       role: req.role,
+      roles: authorizedRoles,
       tenantId: req.tenantId,
       tenantName: tenantName,
     };
@@ -339,11 +378,13 @@ export class UsersService implements OnModuleInit {
       tenantId: a.tenantId,
       name: a.tenant?.name || 'Sucursal',
       role: a.role,
+      roles: (a.roles && a.roles.length > 0) ? a.roles : [a.role],
       status: a.status,
     })) || [{
       tenantId: req.tenantId,
       name: payload.tenantName,
       role: req.role,
+      roles: authorizedRoles,
       status: 'ACCEPTED',
     }];
 

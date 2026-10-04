@@ -44,15 +44,63 @@ import {
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 
+interface WorkModeOption {
+  role: UserRole;
+  name: string;
+  badgeLabel: string;
+  icon: string;
+  description: string;
+}
+
+const WORK_MODE_OPTIONS: WorkModeOption[] = [
+  {
+    role: UserRole.POS,
+    name: 'Modo Caja (POS)',
+    badgeLabel: '💻 Modo Caja / POS',
+    icon: '💻',
+    description: 'Punto de venta, pedidos y clientes.',
+  },
+  {
+    role: UserRole.INVENTORY,
+    name: 'Modo Inventario',
+    badgeLabel: '📦 Modo Inventario',
+    icon: '📦',
+    description: 'Materias primas, insumos y producción.',
+  },
+  {
+    role: UserRole.DELIVERY,
+    name: 'Modo Repartidor',
+    badgeLabel: '🛵 Modo Repartidor',
+    icon: '🛵',
+    description: 'Panel de delivery, rutas y pedidos asignados.',
+  },
+  {
+    role: UserRole.KITCHEN,
+    name: 'Modo Cocina / Preparación',
+    badgeLabel: '🍳 Modo Cocina',
+    icon: '🍳',
+    description: 'Comandas y preparación de órdenes.',
+  },
+  {
+    role: UserRole.ADMIN,
+    name: 'Modo Administrador',
+    badgeLabel: '⚙️ Modo Administrador',
+    icon: '⚙️',
+    description: 'Panel general y configuración.',
+  },
+];
+
 const Menu: React.FC = () => {
   const location = useLocation();
   const [presentAlert] = useIonAlert();
   const [presentToast] = useIonToast();
-  const { user, logout, switchWorkspace, isAuthenticated } = useContext(AuthContext);
+  const { user, logout, switchWorkspace, switchMode, isAuthenticated } = useContext(AuthContext);
   const [settings, setSettings] = useState<any>({});
   const [showBranchModal, setShowBranchModal] = useState(false);
+  const [showModeModal, setShowModeModal] = useState(false);
   const [workspaces, setWorkspaces] = useState<any[]>(user?.workspaces || []);
   const [isSwitching, setIsSwitching] = useState(false);
+  const [isSwitchingMode, setIsSwitchingMode] = useState(false);
 
   const loadWorkspaces = async () => {
     try {
@@ -120,6 +168,26 @@ const Menu: React.FC = () => {
       });
     }
   };
+
+  const handleSwitchMode = async (targetRole: UserRole) => {
+    if (targetRole === user?.role) {
+      setShowModeModal(false);
+      return;
+    }
+    try {
+      setIsSwitchingMode(true);
+      setShowModeModal(false);
+      presentToast({ message: `Cambiando a ${targetRole}...`, duration: 1500, color: 'primary' });
+      await switchMode(targetRole);
+    } catch (e: any) {
+      setIsSwitchingMode(false);
+      presentToast({
+        message: 'Error al cambiar de modo: ' + (e.response?.data?.message || e.message),
+        duration: 3000,
+        color: 'danger',
+      });
+    }
+  };
   
   interface NavItem {
     id: string;
@@ -147,7 +215,7 @@ const Menu: React.FC = () => {
     { id: 'delivery-panel', label: 'Panel Repartidor', path: '/delivery-panel', icon: mapOutline, isVisible: isDeliveryEnabled || user?.role === UserRole.DELIVERY },
     { id: 'reservations', label: 'Reservaciones', path: '/reservations', icon: calendarOutline, isVisible: isReservationsEnabled },
     { id: 'customers', label: 'Clientes', path: '/customers', icon: personCircleOutline, isVisible: true },
-    { id: 'delivery-zones', label: 'Zonas Delivery', path: '/delivery-zones', icon: mapOutline, isVisible: isDeliveryEnabled && (user?.role === UserRole.ADMIN || (user?.role as string) === 'ADMIN') },
+    { id: 'delivery-zones', label: 'Zonas Delivery', path: '/delivery-zones', icon: mapOutline, isVisible: isDeliveryEnabled },
     { id: 'users', label: 'Usuarios', path: '/users', icon: peopleOutline, isVisible: user?.role === UserRole.ADMIN },
     { id: 'feedback', label: 'Ayuda y Comentarios', path: '/feedback', icon: chatbubbleOutline, isVisible: true },
     { id: 'settings', label: 'Configuración', path: '/settings', icon: settingsOutline, isVisible: user?.role === UserRole.ADMIN }
@@ -160,13 +228,13 @@ const Menu: React.FC = () => {
   if (!user?.tenantId && !isSuperAdmin && !isPromotor) {
     visibleItems = [];
   } else if (user?.role === UserRole.POS) {
-    visibleItems = visibleItems.filter(i => ['/pos', '/orders', '/calculator', '/reservations', '/customers'].includes(i.path));
+    visibleItems = visibleItems.filter(i => ['/pos', '/orders', '/customers', '/calculator', '/reservations'].includes(i.path));
+  } else if (user?.role === UserRole.INVENTORY) {
+    visibleItems = visibleItems.filter(i => ['/raw-materials', '/products', '/production', '/calculator'].includes(i.path));
+  } else if (user?.role === UserRole.DELIVERY) {
+    visibleItems = visibleItems.filter(i => ['/delivery-panel', '/delivery-zones', '/orders'].includes(i.path));
   } else if (user?.role === UserRole.KITCHEN) {
     visibleItems = visibleItems.filter(i => isProductionEnabled ? ['/orders', '/production'].includes(i.path) : ['/orders'].includes(i.path));
-  } else if (user?.role === UserRole.DELIVERY) {
-    visibleItems = visibleItems.filter(i => ['/delivery-panel', '/orders'].includes(i.path));
-  } else if (user?.role === UserRole.INVENTORY) {
-    visibleItems = visibleItems.filter(i => ['/raw-materials', '/products'].includes(i.path));
   }
 
   if (isPromotor) {
@@ -186,6 +254,22 @@ const Menu: React.FC = () => {
   const displayWorkspaces = acceptedWorkspaces.length > 0 ? acceptedWorkspaces : [
     { tenantId: user?.tenantId || '', name: user?.tenantName || 'Flujo Fino', role: user?.role || '' }
   ];
+
+  const userRoles: UserRole[] = (user?.roles && user.roles.length > 0)
+    ? user.roles
+    : (user?.role ? [user.role] : []);
+
+  const isAdminUser = user?.role === UserRole.ADMIN || userRoles.includes(UserRole.ADMIN) || isSuperAdmin;
+
+  const availableModes = WORK_MODE_OPTIONS.filter(opt => {
+    if (isSuperAdmin) return true;
+    if (userRoles.includes(opt.role)) return true;
+    if (isAdminUser && opt.role !== UserRole.SUPERADMIN) return true;
+    return false;
+  });
+
+  const currentModeInfo = WORK_MODE_OPTIONS.find(m => m.role === user?.role);
+  const currentBadgeLabel = currentModeInfo ? currentModeInfo.badgeLabel : `Modo ${user?.role || 'Personal'}`;
 
   return (
     <IonMenu
@@ -216,7 +300,7 @@ const Menu: React.FC = () => {
               padding: '6px 14px', 
               display: 'inline-flex', 
               alignItems: 'center', 
-              justifyContent: 'center',
+              justifyContent: 'center', 
               gap: '6px', 
               cursor: 'pointer',
               maxWidth: '92%',
@@ -231,6 +315,35 @@ const Menu: React.FC = () => {
             </span>
             <IonIcon icon={chevronDownOutline} style={{ fontSize: '13px', color: '#64748b' }} />
           </button>
+
+          {/* Selector de Modo de Trabajo (Sombreros Dinámicos) */}
+          {user?.tenantId && !isSuperAdmin && !isPromotor && availableModes.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setShowModeModal(true)}
+              style={{
+                marginTop: '8px',
+                background: '#ffffff',
+                border: '1px solid #94a3b8',
+                borderRadius: '20px',
+                padding: '4px 12px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                cursor: 'pointer',
+                maxWidth: '92%',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                outline: 'none',
+                transition: 'all 0.15s ease'
+              }}
+              title="Cambiar Modo de Trabajo Activo"
+            >
+              <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#0f172a' }}>
+                [ {currentBadgeLabel} ▾ ]
+              </span>
+            </button>
+          )}
 
           <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#64748b' }}>
             @{user?.username} {user?.tenantId && user?.role ? <span style={{ opacity: 0.8 }}>({user.role === 'KITCHEN' ? 'Servicio' : user.role})</span> : ''}
@@ -270,6 +383,64 @@ const Menu: React.FC = () => {
           </IonItem>
         </IonToolbar>
       </IonFooter>
+
+      {/* Modal de Modos de Trabajo */}
+      <IonModal isOpen={showModeModal} onDidDismiss={() => setShowModeModal(false)}>
+        <IonHeader>
+          <IonToolbar color="primary">
+            <IonTitle>Modos de Trabajo</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowModeModal(false)}>Cerrar</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding" style={{ '--background': '#f8fafc' } as any}>
+          <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+            <p style={{ margin: '0 0 16px 0', color: '#64748b', fontSize: '14px', lineHeight: '1.4' }}>
+              Alterna instantáneamente entre los roles autorizados en este negocio. La interfaz y navegación se adaptarán a la función seleccionada:
+            </p>
+
+            <IonList style={{ background: 'transparent' }}>
+              {availableModes.map((opt) => {
+                const isActive = user?.role === opt.role;
+                return (
+                  <IonItem
+                    key={opt.role}
+                    button
+                    detail={false}
+                    disabled={isSwitchingMode}
+                    onClick={() => handleSwitchMode(opt.role)}
+                    style={{
+                      '--background': isActive ? '#ecfdf5' : '#ffffff',
+                      marginBottom: '10px',
+                      borderRadius: '12px',
+                      border: isActive ? '2px solid #10b981' : '1px solid #e2e8f0',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                    } as any}
+                  >
+                    <span style={{ fontSize: '22px', marginRight: '14px' }}>{opt.icon}</span>
+                    <IonLabel>
+                      <h2 style={{ fontWeight: 800, fontSize: '15px', color: isActive ? '#065f46' : '#1e293b' }}>
+                        {opt.name}
+                      </h2>
+                      <p style={{ fontSize: '12px', color: '#64748b' }}>
+                        {opt.description}
+                      </p>
+                    </IonLabel>
+                    {isActive && (
+                      <IonIcon
+                        slot="end"
+                        icon={checkmarkCircleOutline}
+                        style={{ color: '#10b981', fontSize: '24px' }}
+                      />
+                    )}
+                  </IonItem>
+                );
+              })}
+            </IonList>
+          </div>
+        </IonContent>
+      </IonModal>
 
       {/* Modal de Selección Rápida de Sucursal */}
       <IonModal isOpen={showBranchModal} onDidDismiss={() => setShowBranchModal(false)}>

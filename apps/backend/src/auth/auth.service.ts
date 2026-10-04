@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
@@ -8,6 +8,7 @@ import { AccessRequest, AccessRequestStatus } from '../entities/access-request.e
 import { UserRole } from '@nutrideli/shared-types';
 import { MailService } from '../mail/mail.service';
 import { User } from '../entities/user.entity';
+import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { PlatformConfig } from '../entities/platform-config.entity';
 import { Promoter } from '../entities/promoter.entity';
 
@@ -60,7 +61,7 @@ export class AuthService {
     private mailService: MailService,
   ) {}
 
-  async validateUser(username: string, pass: string, requestedTenantId?: string): Promise<{ user: any, tenantId: string | null, role: string, tenantName: string, workspaces: any[] } | null> {
+  async validateUser(username: string, pass: string, requestedTenantId?: string): Promise<{ user: any, tenantId: string | null, role: string, roles?: UserRole[], tenantName: string, workspaces: any[] } | null> {
     const user = await this.usersService.findByUsername(username);
     if (!user) return null;
 
@@ -77,6 +78,7 @@ export class AuthService {
       tenantId: a.tenantId,
       name: a.tenant?.name || 'Sucursal',
       role: a.role,
+      roles: (a.roles && a.roles.length > 0) ? a.roles : [a.role],
       status: a.status
     }));
 
@@ -88,6 +90,7 @@ export class AuthService {
         user: result,
         tenantId: requestedTenantId || (activeAccess?.tenantId || 'platform-admin'),
         role: UserRole.SUPERADMIN,
+        roles: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
         tenantName: activeAccess?.tenant?.name || 'Plataforma Global',
         workspaces
       };
@@ -104,20 +107,20 @@ export class AuthService {
     const pending = workspaces.filter(w => w.status === 'PENDING');
     if (!requestedTenantId && (workspaces.length > 1 || pending.length > 0)) {
       // Force user to select a workspace
-      return { user: result, tenantId: null, role: user.role, tenantName: '', workspaces };
+      return { user: result, tenantId: null, role: user.role, roles: [user.role], tenantName: '', workspaces };
     }
 
     if (!access && workspaces.length > 0) {
       // User has workspaces but none accepted or active.
-      return { user: result, tenantId: null, role: user.role, tenantName: '', workspaces };
+      return { user: result, tenantId: null, role: user.role, roles: [user.role], tenantName: '', workspaces };
     }
 
     if (!access) {
       if ((user.role as string) === 'ADMIN' || isSuperAdmin) {
-        return { user: result, tenantId: requestedTenantId || 'admin-system', role: user.role, tenantName: 'Sistema Central', workspaces };
+        return { user: result, tenantId: requestedTenantId || 'admin-system', role: user.role, roles: [user.role], tenantName: 'Sistema Central', workspaces };
       }
       if (user.role === UserRole.PROMOTOR || (user.role as string) === 'PROMOTOR') {
-        return { user: result, tenantId: requestedTenantId || 'promoter-space', role: UserRole.PROMOTOR, tenantName: 'Red de Promotores', workspaces };
+        return { user: result, tenantId: requestedTenantId || 'promoter-space', role: UserRole.PROMOTOR, roles: [UserRole.PROMOTOR], tenantName: 'Red de Promotores', workspaces };
       }
       throw new UnauthorizedException('El usuario no tiene acceso a ninguna sucursal');
     }
@@ -128,8 +131,9 @@ export class AuthService {
     }
 
     const effectiveRole = access.role || user.role;
+    const effectiveRoles = (access.roles && access.roles.length > 0) ? access.roles : [effectiveRole];
     const tenantName = access?.tenant?.name || 'Sistema Central';
-    return { user: result, tenantId: access?.tenantId || 'admin-system', role: effectiveRole, tenantName, workspaces };
+    return { user: result, tenantId: access?.tenantId || 'admin-system', role: effectiveRole, roles: effectiveRoles, tenantName, workspaces };
   }
 
   async checkEmployeeAccess(
@@ -257,6 +261,7 @@ export class AuthService {
       tenantId: a.tenantId,
       name: a.tenant?.name || 'Sucursal',
       role: a.role,
+      roles: (a.roles && a.roles.length > 0) ? a.roles : [a.role],
       status: a.status
     }));
 
@@ -271,6 +276,7 @@ export class AuthService {
         user: result,
         tenantId: requestedTenantId,
         role: UserRole.SUPERADMIN,
+        roles: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
         tenantName,
         workspaces
       };
@@ -284,10 +290,13 @@ export class AuthService {
       return approvalCheck;
     }
 
-    return { user: result, tenantId: access.tenantId, role: access.role, tenantName: access.tenant?.name || 'Sucursal', workspaces };
+    const authorizedRoles = (access.roles && access.roles.length > 0) ? access.roles : [access.role];
+
+    return { user: result, tenantId: access.tenantId, role: access.role, roles: authorizedRoles, tenantName: access.tenant?.name || 'Sucursal', workspaces };
   }
 
-  async login(user: any, tenantId: string, role: string, tenantName?: string) {
+  async login(user: any, tenantId: string, role: string, tenantName?: string, roles?: UserRole[]) {
+    const effectiveRoles = roles || (user.roles && user.roles.length > 0 ? user.roles : (role ? [role as UserRole] : []));
     const payload = {
       id: user.id || user.sub,
       username: user.username,
@@ -297,6 +306,7 @@ export class AuthService {
       isEmailVerified: !!user.isEmailVerified,
       sub: user.id || user.sub,
       role: role,
+      roles: effectiveRoles,
       tenantId: tenantId,
       tenantName: tenantName || 'Flujo Fino',
     };
@@ -304,6 +314,51 @@ export class AuthService {
       access_token: this.jwtService.sign(payload),
       user: payload,
     };
+  }
+
+  async switchMode(userId: string, tenantId: string, targetRole: UserRole, currentUser: any) {
+    const isSuperAdmin = currentUser?.role === UserRole.SUPERADMIN || (currentUser?.email && currentUser.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || 'superadmin@flujofino.com').toLowerCase());
+
+    const accessRepo = this.dataSource.getRepository(UserTenantAccess);
+    const access = await accessRepo.findOne({
+      where: { userId, tenantId },
+      relations: { tenant: true }
+    });
+
+    if (!access && !isSuperAdmin) {
+      throw new ForbiddenException('No tienes acceso a esta sucursal');
+    }
+
+    let authorizedRoles: UserRole[] = [];
+    if (isSuperAdmin) {
+      authorizedRoles = [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN];
+    } else if (access) {
+      authorizedRoles = (access.roles && access.roles.length > 0) ? access.roles : [access.role];
+      if (access.role === UserRole.ADMIN && !authorizedRoles.includes(UserRole.ADMIN)) {
+        authorizedRoles = [UserRole.ADMIN, ...authorizedRoles];
+      }
+    }
+
+    const isAdmin = isSuperAdmin || access?.role === UserRole.ADMIN || authorizedRoles.includes(UserRole.ADMIN);
+    const isAuthorized = isAdmin || authorizedRoles.includes(targetRole);
+
+    if (!isAuthorized) {
+      throw new ForbiddenException('Rol no autorizado para este usuario');
+    }
+
+    if (isAdmin && !authorizedRoles.includes(targetRole)) {
+      authorizedRoles = [...authorizedRoles, targetRole];
+    }
+
+    const tenantName = access?.tenant?.name || currentUser?.tenantName || 'Flujo Fino';
+
+    return this.login(
+      currentUser,
+      tenantId,
+      targetRole,
+      tenantName,
+      authorizedRoles,
+    );
   }
 
   async registerTenant(body: any) {
@@ -358,9 +413,8 @@ export class AuthService {
             promoterId = promoter.id;
           }
         } else {
-          const referrerTenant: any = await queryRunner.manager.createQueryBuilder('Tenant', 't')
-            .where('UPPER(t.referral_code) = :code', { code: inputCode })
-            .orWhere('CAST(t.id AS VARCHAR) = :codeId', { codeId: body.referralCode.trim() })
+          const referrerTenant = await queryRunner.manager.createQueryBuilder('Tenant', 't')
+            .where('t.referral_code = :code', { code: inputCode })
             .getOne();
           if (referrerTenant) {
             referredByTenantId = referrerTenant.id;
@@ -370,20 +424,16 @@ export class AuthService {
 
       const tenant = queryRunner.manager.create('Tenant', {
         name: body.tenantName,
-        isActive: true,
-        status: 'TRIAL',
-        plan_type: 'REGULAR',
-        trial_ends_at: trialEndsAt,
-        referred_by_tenant_id: referredByTenantId || body.referredByTenantId || null,
-        promoterId: promoterId || body.promoterId || null,
-        referral_code: myReferralCode,
-        base_price: basePrice,
+        trialEndsAt,
+        basePrice,
+        referralCode: myReferralCode,
+        referredByTenantId,
+        promoterId,
       });
       const savedTenant: any = await queryRunner.manager.save(tenant);
 
-      // 2. Create User
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(body.password, salt);
+      // 2. Create User as ADMIN
+      const hashedPassword = await bcrypt.hash(body.password, 10);
       const user = queryRunner.manager.create(User, {
         username: body.username,
         email: body.email,
@@ -396,10 +446,11 @@ export class AuthService {
       const savedUser: any = await queryRunner.manager.save(user);
 
       // 3. Link User to Tenant
-      const access = queryRunner.manager.create('UserTenantAccess', {
+      const access = queryRunner.manager.create(UserTenantAccess, {
         user: savedUser,
         tenant: savedTenant,
-        role: 'ADMIN', // Local role
+        role: UserRole.ADMIN, // Local role
+        roles: [UserRole.ADMIN],
         isActive: true,
       });
       await queryRunner.manager.save(access);
@@ -419,7 +470,7 @@ export class AuthService {
 
       // Return auto-login
       const { passwordHash, ...userResult } = savedUser;
-      const loginRes = await this.login(userResult, savedTenant.id, 'ADMIN', savedTenant.name);
+      const loginRes = await this.login(userResult, savedTenant.id, 'ADMIN', savedTenant.name, [UserRole.ADMIN]);
       return {
         ...loginRes,
         workspaces: [
@@ -427,6 +478,7 @@ export class AuthService {
             tenantId: savedTenant.id,
             name: savedTenant.name,
             role: 'ADMIN',
+            roles: [UserRole.ADMIN],
             status: 'ACCEPTED'
           }
         ]
@@ -451,6 +503,7 @@ export class AuthService {
         tenantId: t.id,
         name: t.name,
         role: 'SUPERADMIN',
+        roles: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
         status: 'ACCEPTED'
       }));
     }
@@ -460,6 +513,7 @@ export class AuthService {
       tenantId: a.tenantId,
       name: a.tenant?.name || 'Sucursal',
       role: a.role,
+      roles: (a.roles && a.roles.length > 0) ? a.roles : [a.role],
       status: a.status
     }));
   }

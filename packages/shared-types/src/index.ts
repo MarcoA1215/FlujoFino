@@ -172,6 +172,7 @@ export interface EmployeeDTO {
   username: string;
   name?: string;
   role: UserRole;
+  roles?: UserRole[];
   jobTitle?: string;
   entryTime?: string;
   exitTime?: string;
@@ -186,6 +187,10 @@ export enum UserRole {
   INVENTORY = 'INVENTORY',
   PROMOTOR = 'PROMOTOR',
   OPERATIVO = 'OPERATIVO',
+}
+
+export interface SwitchModeDTO {
+  targetRole: UserRole;
 }
 
 export enum ReservationStatus {

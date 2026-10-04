@@ -11,7 +11,13 @@ import {
   calendar,
   people,
   card,
-  cart
+  cart,
+  cubeOutline,
+  cube,
+  listOutline,
+  list,
+  constructOutline,
+  construct
 } from 'ionicons/icons';
 import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@nutrideli/shared-types';
@@ -51,6 +57,9 @@ const BottomNav: React.FC = () => {
     if ((user?.role === UserRole.POS || (user?.role as string) === 'POS') && location.pathname === '/dashboard') {
       navigate('/pos', { replace: true });
     }
+    if ((user?.role === UserRole.INVENTORY || (user?.role as string) === 'INVENTORY') && location.pathname === '/dashboard') {
+      navigate('/raw-materials', { replace: true });
+    }
   }, [user?.role, location.pathname, navigate]);
 
   if (!isAuthenticated || !user?.tenantId) return null;
@@ -84,32 +93,49 @@ const BottomNav: React.FC = () => {
 
   if (isPublicRoute) return null;
 
-  // Role check: kitchen, delivery or inventory have restricted views
+  // Specific role panels: Delivery and Kitchen don't use multi-tab bottom nav
   if (
     user.role === UserRole.KITCHEN ||
+    (user.role as string) === 'KITCHEN' ||
     user.role === UserRole.DELIVERY ||
-    user.role === UserRole.INVENTORY ||
-    (user.role as string) === 'INVENTORY'
+    (user.role as string) === 'DELIVERY'
   ) {
     return null;
   }
 
   const isReservationsEnabled = settings.enableReservations !== undefined ? Boolean(settings.enableReservations) : Boolean(settings.featureCustomerSchedules);
 
-  const navItems: BottomNavItem[] = [
-    {
-      id: 'home',
-      title: 'Inicio',
-      path: '/dashboard',
-      outlineIcon: homeOutline,
-      activeIcon: home,
-      isVisible: user.role !== UserRole.POS && (user.role as string) !== 'POS'
-    },
-    { id: 'agenda', title: 'Agenda', path: '/reservations', outlineIcon: calendarOutline, activeIcon: calendar, isVisible: isReservationsEnabled },
-    { id: 'orders', title: 'Pedidos', path: '/orders', outlineIcon: cartOutline, activeIcon: cart, isVisible: !isReservationsEnabled },
-    { id: 'customers', title: 'Clientes', path: '/customers', outlineIcon: peopleOutline, activeIcon: people, isVisible: true },
-    { id: 'pos', title: 'Caja', path: '/pos', outlineIcon: cardOutline, activeIcon: card, isVisible: true },
-  ];
+  let navItems: BottomNavItem[] = [];
+
+  if (user.role === UserRole.INVENTORY || (user.role as string) === 'INVENTORY') {
+    navItems = [
+      { id: 'raw-materials', title: 'Insumos', path: '/raw-materials', outlineIcon: cubeOutline, activeIcon: cube, isVisible: true },
+      { id: 'products', title: 'Productos', path: '/products', outlineIcon: listOutline, activeIcon: list, isVisible: true },
+      { id: 'production', title: 'Producción', path: '/production', outlineIcon: constructOutline, activeIcon: construct, isVisible: true },
+    ];
+  } else if (user.role === UserRole.POS || (user.role as string) === 'POS') {
+    navItems = [
+      { id: 'pos', title: 'Caja', path: '/pos', outlineIcon: cardOutline, activeIcon: card, isVisible: true },
+      { id: 'orders', title: 'Pedidos', path: '/orders', outlineIcon: cartOutline, activeIcon: cart, isVisible: true },
+      { id: 'customers', title: 'Clientes', path: '/customers', outlineIcon: peopleOutline, activeIcon: people, isVisible: true },
+    ];
+  } else {
+    // Admin / General default
+    navItems = [
+      {
+        id: 'home',
+        title: 'Inicio',
+        path: '/dashboard',
+        outlineIcon: homeOutline,
+        activeIcon: home,
+        isVisible: true
+      },
+      { id: 'agenda', title: 'Agenda', path: '/reservations', outlineIcon: calendarOutline, activeIcon: calendar, isVisible: isReservationsEnabled },
+      { id: 'orders', title: 'Pedidos', path: '/orders', outlineIcon: cartOutline, activeIcon: cart, isVisible: !isReservationsEnabled },
+      { id: 'customers', title: 'Clientes', path: '/customers', outlineIcon: peopleOutline, activeIcon: people, isVisible: true },
+      { id: 'pos', title: 'Caja', path: '/pos', outlineIcon: cardOutline, activeIcon: card, isVisible: true },
+    ];
+  }
 
   const visibleNavItems = navItems.filter((item) => item.isVisible);
 

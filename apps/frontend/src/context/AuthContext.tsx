@@ -12,6 +12,7 @@ interface User {
   phone?: string;
   isEmailVerified?: boolean;
   role: UserRole;
+  roles?: UserRole[];
   tenantId?: string;
   tenantName?: string;
   workspaces?: any[];
@@ -24,6 +25,7 @@ interface AuthContextType {
   updateUser: (updatedFields: Partial<User>) => Promise<void>;
   logout: () => Promise<void>;
   switchWorkspace: (tenantId: string) => Promise<void>;
+  switchMode: (targetRole: UserRole) => Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
@@ -89,6 +91,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     window.location.href = '/';
   };
 
+  const switchMode = async (targetRole: UserRole) => {
+    const res = await apiClient.post('/auth/switch-mode', { targetRole });
+    const newToken = res.data.access_token;
+    const updatedUser = res.data.user;
+    const fullUserData = { ...user, ...updatedUser };
+    setToken(newToken);
+    setUser(fullUserData);
+    await Preferences.set({ key: 'token', value: newToken });
+    await Preferences.set({ key: 'user', value: JSON.stringify(fullUserData) });
+    apiClient.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+
+    let targetPath = '/dashboard';
+    switch (targetRole) {
+      case UserRole.POS:
+        targetPath = '/pos';
+        break;
+      case UserRole.DELIVERY:
+        targetPath = '/delivery-panel';
+        break;
+      case UserRole.INVENTORY:
+        targetPath = '/raw-materials';
+        break;
+      case UserRole.KITCHEN:
+        targetPath = '/orders';
+        break;
+      case UserRole.PROMOTOR:
+        targetPath = '/promoter';
+        break;
+      case UserRole.ADMIN:
+      default:
+        targetPath = '/dashboard';
+        break;
+    }
+    window.location.href = targetPath;
+  };
+
   const logout = async () => {
     setToken(null);
     setUser(null);
@@ -101,7 +139,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, updateUser, logout, switchWorkspace, isAuthenticated: !!token, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, updateUser, logout, switchWorkspace, switchMode, isAuthenticated: !!token, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

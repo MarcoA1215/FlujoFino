@@ -2,6 +2,7 @@ import { Public } from './public.decorator';
 import { Controller, Post, Body, UnauthorizedException, Get, UseGuards, Request, Param, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { UserRole } from '@nutrideli/shared-types';
 
 @Controller('auth')
 export class AuthController {
@@ -17,7 +18,7 @@ export class AuthController {
     if ((result as any).requiresApproval) {
       return result;
     }
-    const tokenData = await this.authService.login(result.user, result.tenantId || '', result.role, result.tenantName);
+    const tokenData = await this.authService.login(result.user, result.tenantId || '', result.role, result.tenantName, result.roles);
     return { ...tokenData, workspaces: result.workspaces };
   }
 
@@ -105,7 +106,16 @@ export class AuthController {
     if (result.requiresApproval) {
       return result;
     }
-    const tokenData = await this.authService.login(result.user, result.tenantId, result.role, result.tenantName);
+    const tokenData = await this.authService.login(result.user, result.tenantId, result.role, result.tenantName, result.roles);
     return { ...tokenData, workspaces: result.workspaces };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('switch-mode')
+  async switchMode(@Request() req, @Body() body: { targetRole: UserRole }) {
+    if (!body?.targetRole) {
+      throw new BadRequestException('targetRole es requerido');
+    }
+    return this.authService.switchMode(req.user.id, req.user.tenantId, body.targetRole, req.user);
   }
 }
