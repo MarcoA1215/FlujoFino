@@ -323,6 +323,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const isDisconnected = !isOnline || isSimulatingOffline;
 
+  const canViewCashClose =
+    user?.role === UserRole.ADMIN ||
+    user?.role === UserRole.POS ||
+    user?.role === UserRole.SUPERADMIN ||
+    (user?.role as string) === 'ADMIN' ||
+    (user?.role as string) === 'POS' ||
+    (user?.role as string) === 'SUPERADMIN' ||
+    (user?.roles && (user.roles.includes(UserRole.ADMIN) || user.roles.includes(UserRole.POS) || user.roles.includes(UserRole.SUPERADMIN)));
+
   return (
     <>
       <IonHeader className="ion-no-border">
@@ -390,7 +399,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             )}
 
             {/* Cash Close Button */}
-            {showCashClose && (
+            {showCashClose && canViewCashClose && (
               <IonButton
                 fill="clear"
                 color="dark"
@@ -457,10 +466,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         )}
       </IonHeader>
 
-      <DailyCashCloseModal
-        isOpen={showCashCloseModal}
-        onClose={() => setShowCashCloseModal(false)}
-      />
+      {canViewCashClose && (
+        <DailyCashCloseModal
+          isOpen={showCashCloseModal}
+          onClose={() => setShowCashCloseModal(false)}
+        />
+      )}
 
       <EmailVerificationModal
         isOpen={showVerifyModal}

@@ -1,8 +1,10 @@
-﻿import { Controller, Request, Get, Post, Body, Param, Patch, Delete, Put, UseInterceptors, UploadedFile, BadRequestException, Query } from '@nestjs/common';
+import { Controller, Request, Get, Post, Body, Param, Patch, Delete, Put, UseInterceptors, UploadedFile, BadRequestException, Query, UseGuards } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { OrdersService, CreateOrderDto, UpdatePaymentDto } from './orders.service';
 import { StorageService } from '../storage/storage.service';
-import { OrderStatus } from '@finowork/shared-types';
+import { OrderStatus, UserRole } from '@finowork/shared-types';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('orders')
 export class OrdersController {
@@ -59,6 +61,8 @@ export class OrdersController {
   }
 
   @Get('daily-cash-summary')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.POS)
   getDailyCashSummary(@Request() req: any, @Query('date') date?: string) {
     return this.ordersService.getDailyCashSummary(req.user.tenantId, date);
   }
