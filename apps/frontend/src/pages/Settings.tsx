@@ -745,16 +745,19 @@ const SettingsPage: React.FC = () => {
                             padding: '14px 16px',
                             marginTop: '8px'
                           }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
                               <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e40af' }}>
-                                ⚡ Tasa Sincronizada Automáticamente en Tiempo Real:
+                                🔄 Sincronización Automática (2 veces al día):
                               </div>
                               {settings.availableRates?.updatedAt && (
                                 <div style={{ fontSize: '11px', color: '#64748b' }}>
-                                  Última actualización: {new Date(settings.availableRates.updatedAt).toLocaleTimeString('es-VE')}
+                                  Última actualización: {new Date(settings.availableRates.updatedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
                                 </div>
                               )}
                             </div>
+                            <p style={{ margin: '0 0 10px 0', fontSize: '11.5px', color: '#475569', lineHeight: '1.4' }}>
+                              Las tasas se actualizan automáticamente en la mañana (<strong>09:15 AM</strong>) y al final de la tarde (<strong>05:45 PM</strong> tras el reporte del BCV). Si necesitas una cotización distinta al instante, puedes seleccionar el modo <strong>Manual</strong>.
+                            </p>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
                               <div style={{
@@ -1209,23 +1212,39 @@ const SettingsPage: React.FC = () => {
             <IonCol size="12">
               <IonCard>
                 <IonCardHeader>
-                  <div className="flex items-center gap-2">
-                    <IonIcon icon={colorPaletteOutline} className="text-emerald-500 text-xl" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <IonIcon icon={colorPaletteOutline} style={{ color: '#10b981', fontSize: '22px' }} />
                     <IonCardTitle>Personalización de Marca y Colores</IonCardTitle>
                   </div>
                 </IonCardHeader>
                 <IonCardContent>
-                  <p className="text-slate-600 text-sm mb-4">
+                  <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '16px' }}>
                     Personaliza los colores de tu sucursal. Estos tonos se aplican al menú lateral, encabezados, botones y enlaces.
                   </p>
 
                   {/* Paleta rápida de colores recomendados */}
-                  <div className="mb-6 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
-                    <div className="flex items-center gap-1.5 mb-2.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      <IonIcon icon={sparklesOutline} className="text-amber-500 text-sm" />
+                  <div style={{
+                    marginBottom: '20px',
+                    padding: '14px',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '14px'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginBottom: '10px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: '#334155',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      <IonIcon icon={sparklesOutline} style={{ color: '#f59e0b', fontSize: '15px' }} />
                       <span>Colores Recomendados (Alto Contraste)</span>
                     </div>
-                    <div className="flex flex-wrap gap-2.5">
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                       {PRESET_THEME_COLORS.map(c => {
                         const isSelected = (settings.themePrimaryColor || '').toUpperCase() === c.hex.toUpperCase();
                         return (
@@ -1233,37 +1252,76 @@ const SettingsPage: React.FC = () => {
                             key={c.hex}
                             type="button"
                             onClick={() => setSettings({ ...settings, themePrimaryColor: c.hex })}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
-                              isSelected
-                                ? 'border-slate-900 bg-white shadow-xs font-bold text-slate-900 ring-2 ring-slate-900/10'
-                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                            }`}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '6px 12px',
+                              borderRadius: '10px',
+                              border: isSelected ? '2px solid #0f172a' : '1px solid #cbd5e1',
+                              backgroundColor: '#ffffff',
+                              color: isSelected ? '#0f172a' : '#475569',
+                              fontWeight: isSelected ? 700 : 500,
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                              transition: 'all 0.15s ease'
+                            }}
                           >
                             <span
-                              className="w-3.5 h-3.5 rounded-full inline-block shadow-2xs shrink-0"
-                              style={{ backgroundColor: c.hex }}
+                              style={{
+                                width: '14px',
+                                height: '14px',
+                                borderRadius: '50%',
+                                backgroundColor: c.hex,
+                                display: 'inline-block',
+                                border: '1px solid rgba(0,0,0,0.1)',
+                                flexShrink: 0
+                              }}
                             />
                             <span>{c.name}</span>
-                            {isSelected && <IonIcon icon={checkmarkOutline} className="text-xs text-slate-900 ml-0.5" />}
+                            {isSelected && <IonIcon icon={checkmarkOutline} style={{ fontSize: '14px', color: '#0f172a', marginLeft: '2px' }} />}
                           </button>
                         );
                       })}
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                    gap: '20px',
+                    paddingTop: '4px'
+                  }}>
                     {/* Selectores de color */}
-                    <div className="space-y-5">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                        <label style={{
+                          display: 'block',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          color: '#334155',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          marginBottom: '8px'
+                        }}>
                           Color Principal (Menú, Botones y Acciones)
                         </label>
-                        <div className="flex items-center gap-3">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <input
                             type="color"
                             value={/^#[0-9A-Fa-f]{6}$/.test(settings.themePrimaryColor || '') ? settings.themePrimaryColor : '#10b981'}
                             onChange={e => setSettings({ ...settings, themePrimaryColor: e.target.value.toUpperCase() })}
-                            className="w-11 h-11 rounded-xl cursor-pointer border border-slate-300 shadow-2xs overflow-hidden p-0 bg-transparent shrink-0"
+                            style={{
+                              width: '44px',
+                              height: '44px',
+                              borderRadius: '10px',
+                              border: '1px solid #cbd5e1',
+                              padding: 0,
+                              cursor: 'pointer',
+                              backgroundColor: 'transparent',
+                              flexShrink: 0
+                            }}
                           />
                           <input
                             type="text"
@@ -1271,17 +1329,40 @@ const SettingsPage: React.FC = () => {
                             value={settings.themePrimaryColor || ''}
                             placeholder="#10B981"
                             onChange={e => setSettings({ ...settings, themePrimaryColor: e.target.value.toUpperCase() })}
-                            className="w-36 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-mono text-sm uppercase focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-bold"
+                            style={{
+                              width: '130px',
+                              padding: '8px 12px',
+                              backgroundColor: '#f8fafc',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '10px',
+                              fontFamily: 'monospace',
+                              fontSize: '14px',
+                              fontWeight: 700,
+                              color: '#0f172a',
+                              textTransform: 'uppercase',
+                              outline: 'none'
+                            }}
                           />
                         </div>
 
                         {/* Advertencia de contraste si el color es muy claro */}
                         {isColorTooLight(settings.themePrimaryColor || '') && (
-                          <div className="mt-3 p-3 bg-amber-50/90 border border-amber-300 rounded-xl flex items-start gap-2.5 text-amber-900 text-xs shadow-2xs">
-                            <IonIcon icon={warningOutline} className="text-amber-600 text-base shrink-0 mt-0.5" />
+                          <div style={{
+                            marginTop: '10px',
+                            padding: '12px',
+                            backgroundColor: '#fffbeb',
+                            border: '1px solid #fcd34d',
+                            borderRadius: '10px',
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '10px',
+                            color: '#92400e',
+                            fontSize: '12px'
+                          }}>
+                            <IonIcon icon={warningOutline} style={{ color: '#d97706', fontSize: '18px', flexShrink: 0, marginTop: '2px' }} />
                             <div>
-                              <p className="font-bold text-amber-950">Advertencia: Color muy claro sobre fondos blancos</p>
-                              <p className="text-amber-800 mt-1 leading-relaxed">
+                              <p style={{ margin: 0, fontWeight: 700, color: '#78350f' }}>Advertencia: Color muy claro sobre fondos blancos</p>
+                              <p style={{ margin: '4px 0 0 0', color: '#92400e', lineHeight: 1.4 }}>
                                 Este color tiene poco contraste contra fondos blancos. Los botones de texto, modales y enlaces podrían verse difíciles de leer. FlujoFino protegerá automáticamente los diálogos críticos, pero te recomendamos elegir un tono más oscuro o saturado para una experiencia óptima.
                               </p>
                             </div>
@@ -1290,15 +1371,32 @@ const SettingsPage: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                        <label style={{
+                          display: 'block',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          color: '#334155',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          marginBottom: '8px'
+                        }}>
                           Color Encabezados (Barra Superior)
                         </label>
-                        <div className="flex items-center gap-3">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <input
                             type="color"
                             value={/^#[0-9A-Fa-f]{6}$/.test(settings.themeHeaderColor || '') ? settings.themeHeaderColor : '#ffffff'}
                             onChange={e => setSettings({ ...settings, themeHeaderColor: e.target.value.toUpperCase() })}
-                            className="w-11 h-11 rounded-xl cursor-pointer border border-slate-300 shadow-2xs overflow-hidden p-0 bg-transparent shrink-0"
+                            style={{
+                              width: '44px',
+                              height: '44px',
+                              borderRadius: '10px',
+                              border: '1px solid #cbd5e1',
+                              padding: 0,
+                              cursor: 'pointer',
+                              backgroundColor: 'transparent',
+                              flexShrink: 0
+                            }}
                           />
                           <input
                             type="text"
@@ -1306,21 +1404,51 @@ const SettingsPage: React.FC = () => {
                             value={settings.themeHeaderColor || ''}
                             placeholder="#FFFFFF"
                             onChange={e => setSettings({ ...settings, themeHeaderColor: e.target.value.toUpperCase() })}
-                            className="w-36 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-mono text-sm uppercase focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-bold"
+                            style={{
+                              width: '130px',
+                              padding: '8px 12px',
+                              backgroundColor: '#f8fafc',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '10px',
+                              fontFamily: 'monospace',
+                              fontSize: '14px',
+                              fontWeight: 700,
+                              color: '#0f172a',
+                              textTransform: 'uppercase',
+                              outline: 'none'
+                            }}
                           />
                         </div>
-                        <div className="flex gap-2 mt-2">
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
                           <button
                             type="button"
                             onClick={() => setSettings({ ...settings, themeHeaderColor: '#FFFFFF' })}
-                            className="text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer"
+                            style={{
+                              fontSize: '12px',
+                              color: '#475569',
+                              backgroundColor: '#f1f5f9',
+                              border: '1px solid #cbd5e1',
+                              padding: '5px 10px',
+                              borderRadius: '8px',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
                           >
                             Blanco Limpio (#FFFFFF)
                           </button>
                           <button
                             type="button"
                             onClick={() => setSettings({ ...settings, themeHeaderColor: settings.themePrimaryColor || '#10B981' })}
-                            className="text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer"
+                            style={{
+                              fontSize: '12px',
+                              color: '#475569',
+                              backgroundColor: '#f1f5f9',
+                              border: '1px solid #cbd5e1',
+                              padding: '5px 10px',
+                              borderRadius: '8px',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
                           >
                             Mismo que Principal
                           </button>
@@ -1329,41 +1457,65 @@ const SettingsPage: React.FC = () => {
                     </div>
 
                     {/* Simulador y Vista Previa en Vivo */}
-                    <div className="bg-slate-100/70 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between">
+                    <div style={{
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '14px',
+                      padding: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between'
+                    }}>
                       <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             Vista Previa en Tiempo Real
                           </span>
-                          <span className="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                          <span style={{ fontSize: '10px', color: '#64748b', backgroundColor: '#ffffff', padding: '2px 8px', borderRadius: '9999px', border: '1px solid #e2e8f0' }}>
                             Simulación de Interfaz
                           </span>
                         </div>
 
                         {/* Barra Superior Simulada */}
                         <div
-                          className="rounded-xl p-3 border border-slate-300 shadow-xs mb-3 flex items-center justify-between transition-colors"
                           style={{
+                            borderRadius: '10px',
+                            padding: '10px 14px',
+                            border: '1px solid #cbd5e1',
+                            marginBottom: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
                             backgroundColor: settings.themeHeaderColor || '#ffffff',
-                            color: getContrastColor(settings.themeHeaderColor || '#ffffff')
+                            color: getContrastColor(settings.themeHeaderColor || '#ffffff'),
+                            transition: 'background-color 0.15s ease'
                           }}
                         >
-                          <div className="flex items-center gap-2">
-                            <span className="w-4 h-0.5 bg-current rounded-full block relative before:content-[''] before:absolute before:-top-1.5 before:left-0 before:w-4 before:h-0.5 before:bg-current before:rounded-full after:content-[''] after:absolute after:top-1.5 after:left-0 after:w-4 after:h-0.5 after:bg-current after:rounded-full" />
-                            <span className="text-xs font-bold tracking-tight">FlujoFino POS</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 800 }}>☰</span>
+                            <span style={{ fontSize: '13px', fontWeight: 800 }}>FlujoFino POS</span>
                           </div>
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="opacity-80">Negocio</span>
-                          </div>
+                          <span style={{ fontSize: '12px', opacity: 0.85, fontWeight: 600 }}>Negocio</span>
                         </div>
 
                         {/* Superficie de Diálogo / Tarjeta Blanca */}
-                        <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-800">Prueba de Elementos</span>
+                        <div style={{
+                          backgroundColor: '#ffffff',
+                          borderRadius: '12px',
+                          padding: '14px',
+                          border: '1px solid #e2e8f0',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>Prueba de Elementos</span>
                             <span
-                              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                               style={{
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                padding: '2px 8px',
+                                borderRadius: '9999px',
                                 backgroundColor: (settings.themePrimaryColor || '#10b981') + '20',
                                 color: ensureReadableColor(settings.themePrimaryColor || '#10b981')
                               }}
@@ -1372,25 +1524,37 @@ const SettingsPage: React.FC = () => {
                             </span>
                           </div>
 
-                          <div className="flex gap-2">
+                          <div style={{ display: 'flex', gap: '8px' }}>
                             {/* Botón Sólido */}
                             <div
-                              className="flex-1 py-2 rounded-lg text-xs font-bold text-center shadow-xs cursor-default transition-colors"
                               style={{
+                                flex: 1,
+                                padding: '8px 10px',
+                                borderRadius: '8px',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                textAlign: 'center',
                                 backgroundColor: settings.themePrimaryColor || '#10b981',
-                                color: getContrastColor(settings.themePrimaryColor || '#10b981')
+                                color: getContrastColor(settings.themePrimaryColor || '#10b981'),
+                                cursor: 'default'
                               }}
                             >
                               Botón Sólido
                             </div>
 
-                            {/* Botón Contorno / Texto */}
+                            {/* Botón Contorno */}
                             <div
-                              className="flex-1 py-2 rounded-lg text-xs font-bold text-center border cursor-default transition-colors"
                               style={{
-                                borderColor: settings.themePrimaryColor || '#10b981',
+                                flex: 1,
+                                padding: '8px 10px',
+                                borderRadius: '8px',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                textAlign: 'center',
+                                border: `1px solid ${settings.themePrimaryColor || '#10b981'}`,
                                 color: ensureReadableColor(settings.themePrimaryColor || '#10b981'),
-                                backgroundColor: '#ffffff'
+                                backgroundColor: '#ffffff',
+                                cursor: 'default'
                               }}
                             >
                               Botón Borde
@@ -1398,24 +1562,23 @@ const SettingsPage: React.FC = () => {
                           </div>
 
                           {/* Diálogo de Confirmación Simulado */}
-                          <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5">
-                            <p className="text-[11px] font-bold text-slate-800">Cerrar Sesión (Diálogo)</p>
-                            <p className="text-[10px] text-slate-500">¿Estás seguro de que quieres salir?</p>
-                            <div className="flex justify-end gap-3 mt-2 text-[11px] font-bold">
-                              <span className="text-slate-500">CANCELAR</span>
-                              <span
-                                style={{
-                                  color: '#ef4444' // role destructive
-                                }}
-                              >
-                                SALIR
-                              </span>
+                          <div style={{
+                            backgroundColor: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            padding: '10px 12px'
+                          }}>
+                            <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#0f172a' }}>Cerrar Sesión (Diálogo)</p>
+                            <p style={{ margin: '2px 0 6px 0', fontSize: '11px', color: '#64748b' }}>¿Estás seguro de que quieres salir?</p>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', fontSize: '11px', fontWeight: 700 }}>
+                              <span style={{ color: '#64748b' }}>CANCELAR</span>
+                              <span style={{ color: '#ef4444' }}>SALIR</span>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="mt-3 text-[11px] text-slate-500 text-center">
+                      <div style={{ marginTop: '12px', fontSize: '11px', color: '#64748b', textAlign: 'center' }}>
                         Los cambios se aplicarán en todos tus dispositivos al guardar.
                       </div>
                     </div>

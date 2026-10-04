@@ -17,6 +17,8 @@ export class SettingsService implements OnModuleInit {
     private configService: ConfigService,
   ) {}
 
+  private lastSyncSlot = '';
+
   async onModuleInit() {
     const exists = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
     if (!exists) {
@@ -35,11 +37,56 @@ export class SettingsService implements OnModuleInit {
       });
     }
 
+    // Verificar si la caché existente está vacía o tiene más de 6 horas para hacer sync inicial sin quemar cuota en reinicios
+    const globalRecord = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+    const lastUpdatedAt = globalRecord?.ratesCache?.updatedAt;
+    const diffHours = lastUpdatedAt ? (Date.now() - new Date(lastUpdatedAt).getTime()) / (1000 * 60 * 60) : 999;
+
+    if (diffHours > 6) {
+      setTimeout(() => this.syncCotizave(), 5000);
+    } else {
+      this.logger.log(`Tasas en caché vigentes (hace ${diffHours.toFixed(1)}h). Próxima sincronización en el horario programado (09:15 AM / 05:45 PM Caracas).`);
+    }
+
+    // Verificar cada minuto si corresponde ejecutar la sincronización fija
     setInterval(() => {
-      this.syncCotizave();
-    }, 43200000);
-    
-    setTimeout(() => this.syncCotizave(), 5000);
+      this.checkAndTriggerSync();
+    }, 60000);
+  }
+
+  private checkAndTriggerSync() {
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Caracas',
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).formatToParts(new Date());
+
+      const getPart = (type: string) => parts.find((p) => p.type === type)?.value || '';
+      const dateKey = `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+      const hour = parseInt(getPart('hour'), 10);
+      const minute = parseInt(getPart('minute'), 10);
+
+      // Slot 1: Mañana a las 09:15 AM (reporte de mañana y apertura bancaria)
+      if (hour === 9 && minute >= 15 && this.lastSyncSlot !== `${dateKey}-morning`) {
+        this.lastSyncSlot = `${dateKey}-morning`;
+        this.logger.log(`[Scheduled Sync] Ejecutando sincronización matutina de tasas (${dateKey} 09:15 Caracas)...`);
+        this.syncCotizave();
+      }
+
+      // Slot 2: Tarde a las 17:45 (5:45 PM tras cierre de mesas de cambio del BCV)
+      if (hour === 17 && minute >= 45 && this.lastSyncSlot !== `${dateKey}-afternoon`) {
+        this.lastSyncSlot = `${dateKey}-afternoon`;
+        this.logger.log(`[Scheduled Sync] Ejecutando sincronización vespertina de tasas (${dateKey} 17:45 Caracas)...`);
+        this.syncCotizave();
+      }
+    } catch (e: any) {
+      this.logger.error(`Error en checkAndTriggerSync: ${e.message}`);
+    }
   }
 
   async getEffectiveRate(tenantId?: string): Promise<number> {

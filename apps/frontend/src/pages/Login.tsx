@@ -413,7 +413,8 @@ const Login: React.FC = () => {
                       type="button"
                       onClick={handleRequestResetCode}
                       disabled={isForgotLoading}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm mt-4"
+                      className="ff-btn-primary"
+                      style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', fontSize: '14px', fontWeight: 700, marginTop: '16px' }}
                     >
                       {isForgotLoading ? <IonSpinner name="crescent" style={{ width: '18px', height: '18px' }} /> : 'Solicitar Código'}
                     </button>
@@ -474,7 +475,8 @@ const Login: React.FC = () => {
                       type="button"
                       onClick={handleResetPassword}
                       disabled={isForgotLoading || forgotCode.length !== 6 || !newPassword}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm mt-2"
+                      className="ff-btn-primary"
+                      style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', fontSize: '14px', fontWeight: 700, marginTop: '8px' }}
                     >
                       {isForgotLoading ? <IonSpinner name="crescent" style={{ width: '18px', height: '18px' }} /> : 'Restablecer Contraseña'}
                     </button>
