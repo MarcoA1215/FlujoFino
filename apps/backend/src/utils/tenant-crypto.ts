@@ -17,7 +17,11 @@ export function encodeTenantId(tenantId: string): string {
   }
 }
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isValidUUID(id?: string | null): boolean {
+  return typeof id === 'string' && UUID_REGEX.test(id);
+}
 
 export function decodeTenantId(token: string): string {
   if (!token) return token;

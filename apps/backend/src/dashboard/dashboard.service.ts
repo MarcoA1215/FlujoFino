@@ -1,4 +1,4 @@
-﻿import { Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual, IsNull } from 'typeorm';
 import { RawMaterial } from '../entities/raw-material.entity';
@@ -25,6 +25,30 @@ export class DashboardService {
   ) {}
 
   async getSummary(tenantId: string) {
+    const { isValidUUID } = require('../utils/tenant-crypto');
+    if (!isValidUUID(tenantId)) {
+      return {
+        totalRawMaterialCapital: 0,
+        totalFinishedProductCapital: 0,
+        totalInventoryCapital: 0,
+        reinvestmentExpense: 0,
+        totalExternalInvestment: 0,
+        totalRegisteredReinvestment: 0,
+        totalConsolidatedReinvestment: 0,
+        totalConsolidatedInvestment: 0,
+        expectedRevenue: 0,
+        lowStockMaterials: [],
+        lowStockProducts: [],
+        totalLosses: 0,
+        historicalInvestment: 0,
+        historicalRevenue: 0,
+        historicalProfit: 0,
+        payrollExpenses: 0,
+        salesChart: [],
+        topProducts: []
+      };
+    }
+
     const rawMaterials = await this.rawMaterialRepo.find({
       where: [
         { tenantId, isActive: true },

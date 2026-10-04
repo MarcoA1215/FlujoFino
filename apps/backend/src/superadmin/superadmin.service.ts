@@ -121,6 +121,25 @@ export class SuperAdminService {
    * Returns current tenant's subscription details, referral metrics, and unique referral code
    */
   async getMySubscription(tenantId: string): Promise<MySubscriptionDTO> {
+    const { isValidUUID } = require('../utils/tenant-crypto');
+    if (!isValidUUID(tenantId)) {
+      return {
+        tenantId: tenantId || 'platform-admin',
+        tenantName: 'Plataforma Global',
+        status: TenantStatus.ACTIVE,
+        planType: TenantPlanType.REGULAR,
+        referralCode: 'PLATFORM',
+        basePrice: 0,
+        activeReferrals: 0,
+        totalReferrals: 0,
+        discountPercentage: 0,
+        finalFee: 0,
+        trialDaysLeft: 999,
+        daysLeft: 999,
+        isExpired: false,
+      };
+    }
+
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     if (!tenant) {
       throw new NotFoundException(`Tenant con id ${tenantId} no encontrado`);

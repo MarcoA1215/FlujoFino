@@ -47,7 +47,8 @@ export class SettingsService implements OnModuleInit {
     const globalCache = globalSettings?.ratesCache;
     const globalBcv = globalCache?.bcv ? Number(globalCache.bcv) : (globalSettings?.exchangeRateBs ? Number(globalSettings.exchangeRateBs) : 40.0);
 
-    if (!tenantId) {
+    const { isValidUUID } = require('../utils/tenant-crypto');
+    if (!tenantId || !isValidUUID(tenantId)) {
       return globalBcv;
     }
 
@@ -92,7 +93,8 @@ export class SettingsService implements OnModuleInit {
     const globalRate = globalSettings?.exchangeRateBs ? Number(globalSettings.exchangeRateBs) : 40.0;
     const availableRates = globalSettings?.ratesCache || null;
 
-    if (tenantId) {
+    const { isValidUUID } = require('../utils/tenant-crypto');
+    if (tenantId && isValidUUID(tenantId)) {
       const tenantSettings = await this.settingsRepo.findOne({ where: { tenantId } });
       if (tenantSettings) {
         const { encodeTenantId } = require('../utils/tenant-crypto');
@@ -125,7 +127,8 @@ export class SettingsService implements OnModuleInit {
 
   async updateSettings(tenantId: string | undefined, payload: Partial<Settings>) {
     let settings;
-    if (tenantId) {
+    const { isValidUUID } = require('../utils/tenant-crypto');
+    if (tenantId && isValidUUID(tenantId)) {
       settings = await this.settingsRepo.findOne({ where: { tenantId } });
       if (!settings) {
         const { randomUUID } = require('crypto');
@@ -230,7 +233,8 @@ export class SettingsService implements OnModuleInit {
   }
 
   async updateExchangeRate(rate?: number, tenantId?: string, mode?: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'MANUAL', manualRate?: number) {
-    if (tenantId) {
+    const { isValidUUID } = require('../utils/tenant-crypto');
+    if (tenantId && isValidUUID(tenantId)) {
       let tenantSettings = await this.settingsRepo.findOne({ where: { tenantId } });
       if (!tenantSettings) {
         const { randomUUID } = require('crypto');
