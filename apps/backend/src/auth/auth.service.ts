@@ -495,19 +495,6 @@ export class AuthService {
     const user = await this.usersService.findByUsername(username);
     if (!user) return [];
 
-    const isSuperAdmin = user.role === UserRole.SUPERADMIN || (user.role as string) === 'SUPERADMIN' || (user.email && user.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN_EMAIL).toLowerCase());
-    if (isSuperAdmin) {
-      const tenantRepo = this.dataSource.getRepository('Tenant');
-      const allTenants: any[] = await tenantRepo.find({ order: { name: 'ASC' } });
-      return allTenants.map(t => ({
-        tenantId: t.id,
-        name: t.name,
-        role: 'SUPERADMIN',
-        roles: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
-        status: 'ACCEPTED'
-      }));
-    }
-
     if (!user.tenantAccess) return [];
     return user.tenantAccess.map(a => ({
       tenantId: a.tenantId,

@@ -250,10 +250,12 @@ const Menu: React.FC = () => {
     ];
   }
 
-  const acceptedWorkspaces = workspaces.filter(w => !w.status || w.status === 'ACCEPTED');
-  const displayWorkspaces = acceptedWorkspaces.length > 0 ? acceptedWorkspaces : [
-    { tenantId: user?.tenantId || '', name: user?.tenantName || DEFAULT_TENANT_NAME, role: user?.role || '' }
-  ];
+  const acceptedWorkspaces = workspaces.filter(w => (!w.status || w.status === 'ACCEPTED') && w.tenantId !== 'platform-admin');
+  const displayWorkspaces = acceptedWorkspaces.length > 0 
+    ? acceptedWorkspaces 
+    : (isSuperAdmin 
+        ? [] 
+        : [{ tenantId: user?.tenantId || '', name: user?.tenantName || DEFAULT_TENANT_NAME, role: user?.role || '' }]);
 
   const userRoles: UserRole[] = (user?.roles && user.roles.length > 0)
     ? user.roles
