@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 
 function getSecret() {
-  return crypto.createHash('sha256').update(process.env.JWT_SECRET || 'flujofinosecret').digest();
+  return crypto.createHash('sha256').update(process.env.JWT_SECRET || 'finoworksecret').digest();
 }
 
 const IV = Buffer.alloc(16, 0);

@@ -1,8 +1,8 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+﻿import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Reservation } from '../entities/reservation.entity';
-import { ReservationStatus, PaymentStatus } from '@nutrideli/shared-types';
+import { ReservationStatus, PaymentStatus } from '@finowork/shared-types';
 import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
@@ -36,22 +36,33 @@ export class ReservationsService {
       throw new BadRequestException('El local está cerrado ese día.');
     }
 
-    const [sh, sm] = dayConfig.startTime.split(':').map(Number);
-    const [eh, em] = dayConfig.endTime.split(':').map(Number);
-    const startMins = sh * 60 + sm;
-    const endMins = eh * 60 + em;
-    
-    const [th, tm] = time.split(':').map(Number);
-    const reqMins = th * 60 + tm;
+    const toMins = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
 
-    if (reqMins < startMins || reqMins >= endMins) {
-      // Formatear a 12 horas para que se vea más amigable en el error
-      const formatTime = (h: number, m: number) => {
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        const h12 = h % 12 || 12;
-        return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
-      };
-      throw new BadRequestException(`El horario laboral es de ${formatTime(sh, sm)} a ${formatTime(eh, em)}. No puedes agendar a las ${formatTime(th, tm)}.`);
+    const reqMins = toMins(time);
+    const start1 = toMins(dayConfig.startTime || '08:00');
+    const end1 = toMins(dayConfig.endTime || '18:00');
+    const inShift1 = reqMins >= start1 && reqMins < end1;
+
+    let inShift2 = false;
+    if (dayConfig.hasSecondShift && dayConfig.secondStartTime && dayConfig.secondEndTime) {
+      const start2 = toMins(dayConfig.secondStartTime);
+      const end2 = toMins(dayConfig.secondEndTime);
+      inShift2 = reqMins >= start2 && reqMins < end2;
+    }
+
+    if (!inShift1 && !inShift2) {
+      if (dayConfig.hasSecondShift) {
+        throw new BadRequestException(
+          `El horario de atención es de ${dayConfig.startTime} a ${dayConfig.endTime} y de ${dayConfig.secondStartTime} a ${dayConfig.secondEndTime}. La hora ${time} está fuera de los turnos laborales.`
+        );
+      } else {
+        throw new BadRequestException(
+          `El horario laboral es de ${dayConfig.startTime} a ${dayConfig.endTime}. No puedes agendar a las ${time}.`
+        );
+      }
     }
   }
 
@@ -68,7 +79,6 @@ export class ReservationsService {
       qb.andWhere('(res.employeeId = :employeeId OR res.employeeId IS NULL)', { employeeId });
     }
     const existing = await qb.getMany();
-    if (existing.length === 0) return;
 
     const settingsRepo = this.repo.manager.getRepository('Settings');
     const settings: any = await settingsRepo.findOne({ where: { tenantId } });
@@ -102,6 +112,38 @@ export class ReservationsService {
     const [th, tm] = time.split(':').map(Number);
     const reqStart = th * 60 + tm;
     const reqEnd = reqStart + reqDuration;
+
+    if (employeeId) {
+      const accessRepo = this.repo.manager.getRepository('UserTenantAccess');
+      const access: any = await accessRepo.findOne({ where: { userId: employeeId, tenantId } });
+      if (access) {
+        const toMins = (t: string) => {
+          const [h, m] = t.split(':').map(Number);
+          return h * 60 + m;
+        };
+        if (access.lunchStart && access.lunchEnd) {
+          const lStart = toMins(access.lunchStart);
+          const lEnd = toMins(access.lunchEnd);
+          if (reqStart < lEnd && reqEnd > lStart) {
+            throw new BadRequestException(
+              `El especialista seleccionado se encuentra en su horario de almuerzo/receso (${access.lunchStart} a ${access.lunchEnd}).`
+            );
+          }
+        }
+        if (access.entryTime && reqStart < toMins(access.entryTime)) {
+          throw new BadRequestException(
+            `El especialista seleccionado ingresa a las ${access.entryTime}. La cita inicia antes de su jornada laboral.`
+          );
+        }
+        if (access.exitTime && reqEnd > toMins(access.exitTime)) {
+          throw new BadRequestException(
+            `El especialista seleccionado culmina a las ${access.exitTime}. La cita excede su jornada laboral.`
+          );
+        }
+      }
+    }
+
+    if (existing.length === 0) return;
 
     for (const res of existing) {
       const [rh, rm] = res.time.split(':').map(Number);

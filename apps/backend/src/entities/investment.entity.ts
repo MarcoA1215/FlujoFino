@@ -1,7 +1,7 @@
-import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
+﻿import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { Tenant } from './tenant.entity';
-import { InvestmentType } from '@nutrideli/shared-types';
+import { InvestmentType } from '@finowork/shared-types';
 
 @Entity('investments')
 @Index(['negocioId', 'date'])

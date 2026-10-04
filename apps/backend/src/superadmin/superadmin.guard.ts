@@ -1,5 +1,5 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { UserRole } from '@nutrideli/shared-types';
+﻿import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { UserRole } from '@finowork/shared-types';
 
 @Injectable()
 export class SuperAdminGuard implements CanActivate {
@@ -12,7 +12,7 @@ export class SuperAdminGuard implements CanActivate {
     }
 
     const isSuperAdminRole = user.role === UserRole.SUPERADMIN;
-    const masterEmail = (process.env.SUPERADMIN_EMAIL || 'superadmin@flujofino.com').toLowerCase();
+    const masterEmail = (process.env.SUPERADMIN_EMAIL || 'superadmin@finowork.com').toLowerCase();
     const isMasterEmail = user.email && user.email.toLowerCase() === masterEmail;
 
     if (isSuperAdminRole || isMasterEmail) {

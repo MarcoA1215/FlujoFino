@@ -1,3 +1,10 @@
+export const APP_NAME = 'FinoWork';
+export const DEFAULT_TENANT_NAME = 'FinoWork';
+export const DEFAULT_SUPERADMIN_EMAIL = 'superadmin@finowork.com';
+export const DEFAULT_NOREPLY_EMAIL = 'no-reply@finowork.com';
+export const DEFAULT_SUPPORT_PHONE = '584145652381';
+export const DEFAULT_EXCHANGE_RATE = 40.0;
+
 export enum OrderStatus {
   PENDING = 'PENDING',
   PREPARING = 'PREPARING',

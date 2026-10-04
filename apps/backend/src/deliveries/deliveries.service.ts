@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+﻿import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 import { Order } from '../entities/order.entity';
@@ -6,7 +6,7 @@ import { Product } from '../entities/product.entity';
 import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Settings } from '../entities/settings.entity';
-import { OrderStatus, DeliveryMethod, UserRole, PaymentStatus } from '@nutrideli/shared-types';
+import { OrderStatus, DeliveryMethod, UserRole, PaymentStatus } from '@finowork/shared-types';
 
 @Injectable()
 export class DeliveriesService {

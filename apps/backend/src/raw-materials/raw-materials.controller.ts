@@ -1,4 +1,4 @@
-import { Controller, Request, Get, Post, Put, Body, Param, Patch, UseGuards } from '@nestjs/common';
+﻿import { Controller, Request, Get, Post, Put, Body, Param, Patch, UseGuards } from '@nestjs/common';
 import { RawMaterialsService } from './raw-materials.service';
 import { CreateRawMaterialDto } from './dto/create-raw-material.dto';
 import { RestockRawMaterialDto } from './dto/restock-raw-material.dto';
@@ -8,7 +8,7 @@ import { UpdateMovementDto } from './dto/update-movement.dto';
 import { ArchiveRawMaterialDto } from './dto/archive-raw-material.dto';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 
 @Controller('raw-materials')
 export class RawMaterialsController {

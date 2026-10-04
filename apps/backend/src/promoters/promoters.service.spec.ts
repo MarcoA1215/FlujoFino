@@ -1,4 +1,4 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { PromotersService } from './promoters.service';
 import { Promoter } from '../entities/promoter.entity';
@@ -10,7 +10,7 @@ import {
   PromoterRank,
   TenantStatus,
   TenantPlanType,
-} from '@nutrideli/shared-types';
+} from '@finowork/shared-types';
 
 describe('PromotersService', () => {
   let service: PromotersService;

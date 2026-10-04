@@ -1,8 +1,8 @@
-import { Controller, Request, Get, Post, Body, Param, Patch, Delete, Put, UseInterceptors, UploadedFile, BadRequestException, Query } from '@nestjs/common';
+﻿import { Controller, Request, Get, Post, Body, Param, Patch, Delete, Put, UseInterceptors, UploadedFile, BadRequestException, Query } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { OrdersService, CreateOrderDto, UpdatePaymentDto } from './orders.service';
 import { StorageService } from '../storage/storage.service';
-import { OrderStatus } from '@nutrideli/shared-types';
+import { OrderStatus } from '@finowork/shared-types';
 
 @Controller('orders')
 export class OrdersController {

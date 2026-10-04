@@ -153,7 +153,7 @@ export async function registerPushNotifications(
         console.log('[Capacitor Native] Notificación recibida:', notification);
         playNotificationSound();
         if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(notification.title || 'Flujo Fino', {
+          new Notification(notification.title || 'FinoWork', {
             body: notification.body,
             icon: '/favicon.svg',
             data: notification.data,

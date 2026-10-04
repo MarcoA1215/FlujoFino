@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+﻿import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Promoter } from '../entities/promoter.entity';
@@ -11,7 +11,7 @@ import {
   PromoterStatsDTO,
   PromoterAffiliatedTenantDTO,
   PromoterCommissionDTO,
-} from '@nutrideli/shared-types';
+} from '@finowork/shared-types';
 
 @Injectable()
 export class PromotersService {

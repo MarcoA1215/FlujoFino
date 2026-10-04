@@ -5,7 +5,7 @@ import * as bcrypt from 'bcryptjs';
 import { DataSource } from 'typeorm';
 import { Settings } from '../entities/settings.entity';
 import { AccessRequest, AccessRequestStatus } from '../entities/access-request.entity';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole, DEFAULT_TENANT_NAME, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
 import { MailService } from '../mail/mail.service';
 import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
@@ -83,7 +83,7 @@ export class AuthService {
     }));
 
     // Check if user is SuperAdmin
-    const isSuperAdmin = user.role === UserRole.SUPERADMIN || (user.role as string) === 'SUPERADMIN' || (user.email && user.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || 'superadmin@flujofino.com').toLowerCase());
+    const isSuperAdmin = user.role === UserRole.SUPERADMIN || (user.role as string) === 'SUPERADMIN' || (user.email && user.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN_EMAIL).toLowerCase());
     if (isSuperAdmin) {
       let activeAccess = requestedTenantId ? user.tenantAccess?.find(a => a.tenantId === requestedTenantId) : user.tenantAccess?.[0];
       return {
@@ -255,7 +255,7 @@ export class AuthService {
     const user = await this.usersService.findByUsername(username);
     if (!user) throw new UnauthorizedException('Usuario no encontrado');
 
-    const isSuperAdmin = user.role === UserRole.SUPERADMIN || (user.role as string) === 'SUPERADMIN' || (user.email && user.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || 'superadmin@flujofino.com').toLowerCase());
+    const isSuperAdmin = user.role === UserRole.SUPERADMIN || (user.role as string) === 'SUPERADMIN' || (user.email && user.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN_EMAIL).toLowerCase());
     const { passwordHash, ...result } = user;
     const workspaces = (user.tenantAccess || []).map(a => ({
       tenantId: a.tenantId,
@@ -308,7 +308,7 @@ export class AuthService {
       role: role,
       roles: effectiveRoles,
       tenantId: tenantId,
-      tenantName: tenantName || 'Flujo Fino',
+      tenantName: tenantName || DEFAULT_TENANT_NAME,
     };
     return {
       access_token: this.jwtService.sign(payload),
@@ -317,7 +317,7 @@ export class AuthService {
   }
 
   async switchMode(userId: string, tenantId: string, targetRole: UserRole, currentUser: any) {
-    const isSuperAdmin = currentUser?.role === UserRole.SUPERADMIN || (currentUser?.email && currentUser.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || 'superadmin@flujofino.com').toLowerCase());
+    const isSuperAdmin = currentUser?.role === UserRole.SUPERADMIN || (currentUser?.email && currentUser.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN_EMAIL).toLowerCase());
 
     const accessRepo = this.dataSource.getRepository(UserTenantAccess);
     const access = await accessRepo.findOne({
@@ -350,7 +350,7 @@ export class AuthService {
       authorizedRoles = [...authorizedRoles, targetRole];
     }
 
-    const tenantName = access?.tenant?.name || currentUser?.tenantName || 'Flujo Fino';
+    const tenantName = access?.tenant?.name || currentUser?.tenantName || DEFAULT_TENANT_NAME;
 
     return this.login(
       currentUser,
@@ -495,7 +495,7 @@ export class AuthService {
     const user = await this.usersService.findByUsername(username);
     if (!user) return [];
 
-    const isSuperAdmin = user.role === UserRole.SUPERADMIN || (user.role as string) === 'SUPERADMIN' || (user.email && user.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || 'superadmin@flujofino.com').toLowerCase());
+    const isSuperAdmin = user.role === UserRole.SUPERADMIN || (user.role as string) === 'SUPERADMIN' || (user.email && user.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN_EMAIL).toLowerCase());
     if (isSuperAdmin) {
       const tenantRepo = this.dataSource.getRepository('Tenant');
       const allTenants: any[] = await tenantRepo.find({ order: { name: 'ASC' } });

@@ -1,4 +1,4 @@
-import { CreatePromoterDTO } from '@nutrideli/shared-types';
+﻿import { CreatePromoterDTO } from '@finowork/shared-types';
 
 export class CreatePromoterDto implements CreatePromoterDTO {
   username: string;

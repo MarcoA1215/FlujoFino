@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+﻿import React, { useState, useEffect, useContext } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -33,7 +33,7 @@ import {
 import { refreshOutline, walletOutline, carOutline, peopleOutline, timeOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 import { AppHeader } from '../components/AppHeader';
 import SalaryAdvanceModal from '../components/SalaryAdvanceModal';
 
@@ -46,6 +46,8 @@ interface UserData {
   jobTitle?: string;
   entryTime?: string;
   exitTime?: string;
+  lunchStart?: string;
+  lunchEnd?: string;
   salaryAmount?: number;
   salaryPeriod?: string;
   status?: string;
@@ -123,6 +125,8 @@ const Users: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [entryTime, setEntryTime] = useState('');
   const [exitTime, setExitTime] = useState('');
+  const [lunchStart, setLunchStart] = useState('');
+  const [lunchEnd, setLunchEnd] = useState('');
   const [settings, setSettings] = useState<any>({});
   const [salaryAmount, setSalaryAmount] = useState('');
   const [salaryPeriod, setSalaryPeriod] = useState('SEMANAL');
@@ -147,6 +151,8 @@ const Users: React.FC = () => {
   const [editJobTitle, setEditJobTitle] = useState('');
   const [editEntryTime, setEditEntryTime] = useState('');
   const [editExitTime, setEditExitTime] = useState('');
+  const [editLunchStart, setEditLunchStart] = useState('');
+  const [editLunchEnd, setEditLunchEnd] = useState('');
   const [editSalaryAmount, setEditSalaryAmount] = useState('');
   const [editSalaryPeriod, setEditSalaryPeriod] = useState('SEMANAL');
   
@@ -280,6 +286,8 @@ const Users: React.FC = () => {
     setPhone('');
     setEntryTime('');
     setExitTime('');
+    setLunchStart('');
+    setLunchEnd('');
     setSalaryAmount('');
     setSalaryPeriod('SEMANAL');
     setRole(UserRole.POS);
@@ -305,6 +313,8 @@ const Users: React.FC = () => {
           salaryPeriod,
           entryTime: entryTime || undefined,
           exitTime: exitTime || undefined,
+          lunchStart: lunchStart || undefined,
+          lunchEnd: lunchEnd || undefined,
         });
         presentToast({ message: 'Personal operativo registrado exitosamente', duration: 2000, color: 'success' });
         resetForm();
@@ -328,6 +338,8 @@ const Users: React.FC = () => {
         phone: phone.trim() || undefined,
         entryTime: entryTime || undefined,
         exitTime: exitTime || undefined,
+        lunchStart: lunchStart || undefined,
+        lunchEnd: lunchEnd || undefined,
         salaryAmount: salaryAmount ? Number(salaryAmount) : undefined, 
         salaryPeriod 
       });
@@ -414,6 +426,8 @@ const Users: React.FC = () => {
     setEditJobTitle(u.jobTitle || '');
     setEditEntryTime(u.entryTime || '');
     setEditExitTime(u.exitTime || '');
+    setEditLunchStart(u.lunchStart || '');
+    setEditLunchEnd(u.lunchEnd || '');
     setEditSalaryAmount(u.salaryAmount !== undefined && u.salaryAmount !== null ? String(u.salaryAmount) : '');
     setEditSalaryPeriod(u.salaryPeriod || 'SEMANAL');
   };
@@ -427,6 +441,8 @@ const Users: React.FC = () => {
         jobTitle: editJobTitle.trim() || null,
         entryTime: editEntryTime || null,
         exitTime: editExitTime || null,
+        lunchStart: editLunchStart || null,
+        lunchEnd: editLunchEnd || null,
         salaryAmount: editSalaryAmount ? Number(editSalaryAmount) : null,
         salaryPeriod: editSalaryPeriod || 'SEMANAL',
       });
@@ -632,6 +648,28 @@ const Users: React.FC = () => {
                               </IonItem>
                             </IonCol>
                           </IonRow>
+                          <IonRow style={{ padding: 0 }}>
+                            <IonCol size="6" style={{ paddingLeft: 0, paddingRight: '4px' }}>
+                              <IonItem>
+                                <IonLabel position="stacked">Inicio Almuerzo / Receso (Opcional)</IonLabel>
+                                <IonInput 
+                                  type="time" 
+                                  value={lunchStart} 
+                                  onIonInput={e => setLunchStart(e.detail.value!)} 
+                                />
+                              </IonItem>
+                            </IonCol>
+                            <IonCol size="6" style={{ paddingLeft: '4px', paddingRight: 0 }}>
+                              <IonItem>
+                                <IonLabel position="stacked">Fin Almuerzo / Receso (Opcional)</IonLabel>
+                                <IonInput 
+                                  type="time" 
+                                  value={lunchEnd} 
+                                  onIonInput={e => setLunchEnd(e.detail.value!)} 
+                                />
+                              </IonItem>
+                            </IonCol>
+                          </IonRow>
                           <IonItem>
                             <IonLabel position="stacked">Sueldo Acordado (USD)</IonLabel>
                             <IonInput type="number" min="0" placeholder="Ej: 50" value={salaryAmount} onIonInput={e => setSalaryAmount(e.detail.value!)} />
@@ -736,6 +774,28 @@ const Users: React.FC = () => {
                                   type="time" 
                                   value={exitTime} 
                                   onIonInput={e => setExitTime(e.detail.value!)} 
+                                />
+                              </IonItem>
+                            </IonCol>
+                          </IonRow>
+                          <IonRow style={{ padding: 0 }}>
+                            <IonCol size="6" style={{ paddingLeft: 0, paddingRight: '4px' }}>
+                              <IonItem>
+                                <IonLabel position="stacked">Inicio Almuerzo / Receso (Opcional)</IonLabel>
+                                <IonInput 
+                                  type="time" 
+                                  value={lunchStart} 
+                                  onIonInput={e => setLunchStart(e.detail.value!)} 
+                                />
+                              </IonItem>
+                            </IonCol>
+                            <IonCol size="6" style={{ paddingLeft: '4px', paddingRight: 0 }}>
+                              <IonItem>
+                                <IonLabel position="stacked">Fin Almuerzo / Receso (Opcional)</IonLabel>
+                                <IonInput 
+                                  type="time" 
+                                  value={lunchEnd} 
+                                  onIonInput={e => setLunchEnd(e.detail.value!)} 
                                 />
                               </IonItem>
                             </IonCol>
@@ -845,9 +905,23 @@ const Users: React.FC = () => {
                                 </td>
                                 <td>
                                   {u.entryTime && u.exitTime ? (
-                                    <span style={{ fontSize: '0.85rem' }}>{u.entryTime} - {u.exitTime}</span>
+                                    <div>
+                                      <span style={{ fontSize: '0.85rem' }}>{u.entryTime} - {u.exitTime}</span>
+                                      {u.lunchStart && u.lunchEnd && (
+                                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                                          🍽️ {u.lunchStart} - {u.lunchEnd}
+                                        </div>
+                                      )}
+                                    </div>
                                   ) : (
-                                    <span style={{ fontSize: '0.85rem', color: '#888' }}>Sin definir</span>
+                                    <div>
+                                      <span style={{ fontSize: '0.85rem', color: '#888' }}>Sin definir</span>
+                                      {u.lunchStart && u.lunchEnd && (
+                                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                                          🍽️ {u.lunchStart} - {u.lunchEnd}
+                                        </div>
+                                      )}
+                                    </div>
                                   )}
                                 </td>
                                 <td>
@@ -1170,6 +1244,29 @@ const Users: React.FC = () => {
                     type="time" 
                     value={editExitTime} 
                     onIonInput={e => setEditExitTime(e.detail.value!)} 
+                  />
+                </IonItem>
+              </IonCol>
+            </IonRow>
+
+            <IonRow style={{ padding: 0 }}>
+              <IonCol size="6" style={{ paddingLeft: 0, paddingRight: '4px' }}>
+                <IonItem>
+                  <IonLabel position="stacked">Inicio Almuerzo / Receso (Opcional)</IonLabel>
+                  <IonInput 
+                    type="time" 
+                    value={editLunchStart} 
+                    onIonInput={e => setEditLunchStart(e.detail.value!)} 
+                  />
+                </IonItem>
+              </IonCol>
+              <IonCol size="6" style={{ paddingLeft: '4px', paddingRight: 0 }}>
+                <IonItem>
+                  <IonLabel position="stacked">Fin Almuerzo / Receso (Opcional)</IonLabel>
+                  <IonInput 
+                    type="time" 
+                    value={editLunchEnd} 
+                    onIonInput={e => setEditLunchEnd(e.detail.value!)} 
                   />
                 </IonItem>
               </IonCol>

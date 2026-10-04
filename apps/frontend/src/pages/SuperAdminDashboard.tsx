@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   IonPage,
@@ -63,7 +63,7 @@ import {
   type PromoterCommissionDTO,
   type CreatePromoterDTO,
   PromoterCommissionStatus,
-} from '@nutrideli/shared-types';
+} from '@finowork/shared-types';
 
 const SuperAdminDashboard: React.FC = () => {
   const [presentToast] = useIonToast();
@@ -424,7 +424,7 @@ const SuperAdminDashboard: React.FC = () => {
           <IonTitle style={{ fontWeight: 700 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
               <IonIcon icon={shieldCheckmarkOutline} />
-              SuperAdmin • Plataforma SaaS Flujo Fino
+              SuperAdmin • Plataforma SaaS FinoWork
             </span>
           </IonTitle>
           <IonButtons slot="end">
@@ -1008,7 +1008,7 @@ const SuperAdminDashboard: React.FC = () => {
             <div style={{ background: '#fff', borderRadius: '12px', padding: '16px 20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
               <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <IonIcon icon={walletOutline} color="primary" />
-                Configuración de Cuentas Oficiales de Flujo Fino
+                Configuración de Cuentas Oficiales de FinoWork
               </h2>
               <p style={{ color: '#64748b', fontSize: '13px', margin: 0, lineHeight: '1.5' }}>
                 Estas son las cuentas bancarias, Pago Móvil y Binance a las que los negocios suscritos transferirán su cuota mensual de SaaS. 
@@ -1018,7 +1018,7 @@ const SuperAdminDashboard: React.FC = () => {
 
             <IonGrid style={{ padding: 0 }}>
               <IonRow>
-                {/* Pago Móvil Flujo Fino */}
+                {/* Pago Móvil FinoWork */}
                 <IonCol size="12" sizeMd="6">
                   <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px', borderLeft: '4px solid #10b981' }}>
                     <IonCardHeader style={{ paddingBottom: '8px' }}>
@@ -1081,7 +1081,7 @@ const SuperAdminDashboard: React.FC = () => {
                         <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Correo Registrado en Binance</IonLabel>
                         <IonInput
                           type="email"
-                          placeholder="Ej: pagos@flujofino.com"
+                          placeholder="Ej: pagos@finowork.com"
                           value={platformConfig.binanceEmail || ''}
                           onIonInput={(e) => setPlatformConfig({ ...platformConfig, binanceEmail: e.detail.value || '' })}
                         />
@@ -1115,7 +1115,7 @@ const SuperAdminDashboard: React.FC = () => {
                           <IonItem lines="none" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '10px' }}>
                             <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Titular de la Cuenta</IonLabel>
                             <IonInput
-                              placeholder="Ej: Flujo Fino SaaS C.A."
+                              placeholder="Ej: FinoWork SaaS C.A."
                               value={platformConfig.companyAccountHolder || ''}
                               onIonInput={(e) => setPlatformConfig({ ...platformConfig, companyAccountHolder: e.detail.value || '' })}
                             />

@@ -1,11 +1,11 @@
-import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
+﻿import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Tenant } from './tenant.entity';
 import { User } from './user.entity';
 import { Customer } from './customer.entity';
 import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { OrderItem } from './order-item.entity';
 import { DeliveryZone } from './delivery-zone.entity';
-import { OrderStatus, PaymentStatus, DeliveryMethod } from '@nutrideli/shared-types';
+import { OrderStatus, PaymentStatus, DeliveryMethod } from '@finowork/shared-types';
 
 @Entity()
 @Index(['tenantId', 'createdAt'])

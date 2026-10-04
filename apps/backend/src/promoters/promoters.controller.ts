@@ -1,8 +1,8 @@
-import { Controller, Get, Put, Body, Req, UseGuards } from '@nestjs/common';
+﻿import { Controller, Get, Put, Body, Req, UseGuards } from '@nestjs/common';
 import { PromotersService } from './promoters.service';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 
 @Controller('promoters')
 @UseGuards(RolesGuard)

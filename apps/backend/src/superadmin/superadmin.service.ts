@@ -26,7 +26,8 @@ import {
   SuperAdminPromoterDTO,
   PromoterCommissionDTO,
   CreatePromoterDTO,
-} from '@nutrideli/shared-types';
+  APP_NAME,
+} from '@finowork/shared-types';
 
 @Injectable()
 export class SuperAdminService {
@@ -557,9 +558,9 @@ export class SuperAdminService {
         companyCedula: 'J-12345678-0',
         companyPhone: '0414-1234567',
         companyAccountNumber: '01340000000000000000',
-        companyAccountHolder: 'Flujo Fino SaaS',
+        companyAccountHolder: `${APP_NAME} SaaS`,
         binancePayId: '123456789',
-        binanceEmail: 'pagos@flujofino.com',
+        binanceEmail: 'pagos@finowork.com',
         defaultMonthlyPrice: 20.0,
         defaultTrialDays: 15,
       });

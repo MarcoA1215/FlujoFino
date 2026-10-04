@@ -1,8 +1,8 @@
-import { Public } from './public.decorator';
+﻿import { Public } from './public.decorator';
 import { Controller, Post, Body, UnauthorizedException, Get, UseGuards, Request, Param, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 
 @Controller('auth')
 export class AuthController {

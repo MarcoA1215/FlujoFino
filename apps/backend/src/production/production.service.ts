@@ -1,10 +1,10 @@
-import { OrdersService } from '../orders/orders.service';
+﻿import { OrdersService } from '../orders/orders.service';
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Product } from '../entities/product.entity';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { ProductionBatch } from '../entities/production-batch.entity';
-import { MovementType } from '@nutrideli/shared-types';
+import { MovementType } from '@finowork/shared-types';
 import { StockMovement } from '../entities/stock-movement.entity';
 
 @Injectable()

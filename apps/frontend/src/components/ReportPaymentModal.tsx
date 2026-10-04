@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+﻿import React, { useState, useEffect, useContext } from 'react';
 import {
   IonModal,
   IonHeader,
@@ -9,7 +9,6 @@ import {
   IonContent,
   IonItem,
   IonLabel,
-  IonInput,
   IonSelect,
   IonSelectOption,
   IonSpinner,
@@ -17,7 +16,7 @@ import {
   IonIcon,
 } from '@ionic/react';
 import { copyOutline, checkmarkCircleOutline, closeOutline } from 'ionicons/icons';
-import { SaaSPaymentMethod } from '@nutrideli/shared-types';
+import { SaaSPaymentMethod } from '@finowork/shared-types';
 import { apiClient } from '../api/client';
 import { SubscriptionContext } from '../context/SubscriptionContext';
 
@@ -153,7 +152,7 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
               }}
             >
               <span style={{ fontSize: '13px', color: '#1e40af', fontWeight: 700 }}>
-                Cuota Mensual Flujo Fino:
+                Cuota Mensual FinoWork:
               </span>
               <span
                 style={{
@@ -396,43 +395,78 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
             </IonItem>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-              <IonItem lines="none" style={{ '--background': '#f8fafc', borderRadius: '8px' }}>
-                <IonLabel position="stacked" style={{ fontWeight: 700 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                   Monto USD ($)
-                </IonLabel>
-                <IonInput
+                </label>
+                <input
                   type="number"
+                  step="any"
                   value={reportAmountUsd}
-                  onIonInput={(e) => handleAmountUsdChange(Number(e.detail.value))}
-                  style={{ fontWeight: 700 }}
+                  onChange={(e) => handleAmountUsdChange(Number(e.target.value))}
+                  style={{
+                    width: '100%',
+                    padding: '11px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    background: '#f8fafc',
+                    color: '#0f172a',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
                 />
-              </IonItem>
+              </div>
 
-              <IonItem lines="none" style={{ '--background': '#f8fafc', borderRadius: '8px' }}>
-                <IonLabel position="stacked" style={{ fontWeight: 700 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                   Monto Bs
-                </IonLabel>
-                <IonInput
+                </label>
+                <input
                   type="number"
+                  step="any"
                   value={reportAmountBs}
-                  onIonInput={(e) => handleAmountBsChange(Number(e.detail.value))}
-                  style={{ fontWeight: 700 }}
+                  onChange={(e) => handleAmountBsChange(Number(e.target.value))}
+                  style={{
+                    width: '100%',
+                    padding: '11px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    background: '#f8fafc',
+                    color: '#0f172a',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
                 />
-              </IonItem>
+              </div>
             </div>
 
-            <IonItem lines="none" style={{ '--background': '#f8fafc', borderRadius: '8px', marginBottom: '16px' }}>
-              <IonLabel position="stacked" style={{ fontWeight: 700 }}>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                 Número de Referencia del Pago *
-              </IonLabel>
-              <IonInput
+              </label>
+              <input
                 type="text"
                 placeholder="Ej. 123456 (últimos dígitos o referencia)"
                 value={reportReference}
-                onIonInput={(e) => setReportReference(e.detail.value || '')}
-                style={{ fontWeight: 600 }}
+                onChange={(e) => setReportReference(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '11px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  background: '#f8fafc',
+                  color: '#0f172a',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                }}
               />
-            </IonItem>
+            </div>
 
             <IonButton
               expand="block"

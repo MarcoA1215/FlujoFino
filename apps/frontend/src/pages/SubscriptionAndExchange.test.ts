@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { TenantPlanType } from '@nutrideli/shared-types';
+﻿import { describe, it, expect } from 'vitest';
+import { TenantPlanType } from '@finowork/shared-types';
 
 describe('SaaS Subscription & Currency Exchange Engine (Frontend Logic)', () => {
   // Referral Engine math implementation tested in frontend

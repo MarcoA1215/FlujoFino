@@ -1,7 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+﻿import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Tenant } from './tenant.entity';
-import { SaaSPaymentMethod, SaaSPaymentStatus } from '@nutrideli/shared-types';
+import { SaaSPaymentMethod, SaaSPaymentStatus } from '@finowork/shared-types';
 
 @Entity('saas_payment_reports')
 export class SaaSPaymentReport {

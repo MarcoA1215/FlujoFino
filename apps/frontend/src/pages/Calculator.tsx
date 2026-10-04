@@ -96,7 +96,8 @@ const Calculator: React.FC = () => {
     if (cart.length === 0) {
       return presentToast({ message: 'El carrito está vacío', duration: 2000, color: 'warning' });
     }
-    let text = '*NutriDeli - Resumen de Pedido*\n--------------------------\n';
+    const businessName = user?.tenantName || 'FinoWork';
+    let text = `*${businessName} - Resumen de Pedido*\n--------------------------\n`;
     cart.forEach(item => { text += `- ${item.quantity}x ${item.product.name} (${item.product.salePrice.toFixed(2)})\n`; });
     text += '--------------------------\n';
     text += `Subtotal: ${cartSubtotal.toFixed(2)}\n`;

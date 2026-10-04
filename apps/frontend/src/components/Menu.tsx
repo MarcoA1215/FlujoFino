@@ -20,7 +20,7 @@ import {
 import { useLocation } from 'react-router-dom';
 import { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole, APP_NAME, DEFAULT_TENANT_NAME } from '@finowork/shared-types';
 import {
   calendarOutline,
   peopleOutline,
@@ -252,7 +252,7 @@ const Menu: React.FC = () => {
 
   const acceptedWorkspaces = workspaces.filter(w => !w.status || w.status === 'ACCEPTED');
   const displayWorkspaces = acceptedWorkspaces.length > 0 ? acceptedWorkspaces : [
-    { tenantId: user?.tenantId || '', name: user?.tenantName || 'Flujo Fino', role: user?.role || '' }
+    { tenantId: user?.tenantId || '', name: user?.tenantName || DEFAULT_TENANT_NAME, role: user?.role || '' }
   ];
 
   const userRoles: UserRole[] = (user?.roles && user.roles.length > 0)
@@ -282,7 +282,7 @@ const Menu: React.FC = () => {
         <div style={{ padding: '20px 16px 16px 16px', textAlign: 'center', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <img 
             src="/assets/logo.png" 
-            alt="Flujo Fino" 
+            alt={APP_NAME} 
             className="w-12 h-12 rounded-2xl object-cover shadow-sm" 
             style={{ width: '48px', height: '48px', borderRadius: '16px', objectFit: 'cover', marginBottom: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.12)' }}
           />
@@ -311,7 +311,7 @@ const Menu: React.FC = () => {
           >
             <IonIcon icon={isSuperAdmin ? shieldCheckmarkOutline : businessOutline} style={{ fontSize: '15px', color: isSuperAdmin ? '#3b82f6' : 'var(--ion-color-primary)' }} />
             <span style={{ fontSize: '14px', fontWeight: '700', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {isSuperAdmin ? 'Plataforma Flujo Fino' : (user?.tenantName || 'Flujo Fino')}
+              {isSuperAdmin ? ('Plataforma ' + APP_NAME) : (user?.tenantName || DEFAULT_TENANT_NAME)}
             </span>
             <IonIcon icon={chevronDownOutline} style={{ fontSize: '13px', color: '#64748b' }} />
           </button>

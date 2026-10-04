@@ -1,5 +1,5 @@
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
-import { InvestmentType } from '@nutrideli/shared-types';
+﻿import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { InvestmentType } from '@finowork/shared-types';
 
 export class CreateInvestmentDto {
   @IsEnum(InvestmentType)

@@ -155,14 +155,50 @@ const DeliveryZones: React.FC = () => {
             </IonToolbar>
           </IonHeader>
           <IonContent className="ion-padding">
-            <IonItem>
-              <IonLabel position="stacked">Nombre de la Zona (Ej. Centro)</IonLabel>
-              <IonInput value={name} onIonInput={e => setName(e.detail.value!)} />
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Tarifa de Envío (USD)</IonLabel>
-              <IonInput type="number" step="any" value={feePrice} onIonInput={e => setFeePrice(parseFloat(e.detail.value!) || 0)} />
-            </IonItem>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
+                Nombre de la Zona (Ej. Centro)
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Ej. Centro"
+                style={{
+                  width: '100%',
+                  padding: '11px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  background: '#f8fafc',
+                  color: '#0f172a',
+                  outline: 'none',
+                  fontSize: '14px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
+                Tarifa de Envío (USD)
+              </label>
+              <input
+                type="number"
+                step="any"
+                value={feePrice}
+                onChange={e => setFeePrice(parseFloat(e.target.value) || 0)}
+                style={{
+                  width: '100%',
+                  padding: '11px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  background: '#f8fafc',
+                  color: '#0f172a',
+                  outline: 'none',
+                  fontSize: '14px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
             <IonButton expand="block" className="ion-margin-top" onClick={saveZone}>
               Guardar Zona
             </IonButton>

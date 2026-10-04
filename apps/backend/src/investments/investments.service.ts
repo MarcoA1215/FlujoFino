@@ -1,9 +1,9 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Investment } from '../entities/investment.entity';
 import { Settings } from '../entities/settings.entity';
-import { InvestmentType } from '@nutrideli/shared-types';
+import { InvestmentType } from '@finowork/shared-types';
 import { CreateInvestmentDto } from './dto/create-investment.dto';
 
 @Injectable()

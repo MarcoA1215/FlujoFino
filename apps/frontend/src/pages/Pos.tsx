@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import React, { useEffect, useState, useContext, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
@@ -42,7 +42,7 @@ import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import { useImageViewer } from '../context/ImageViewerContext';
 import { offlineDb, type OfflineOrder } from '../services/offline-db';
-import { DeliveryMethod, PaymentStatus, UserRole } from '@nutrideli/shared-types';
+import { DeliveryMethod, PaymentStatus, UserRole } from '@finowork/shared-types';
 import type { DeliveryZone } from '../types';
 import AppHeader from '../components/AppHeader';
 import { SalaryAdvanceModal } from '../components/SalaryAdvanceModal';

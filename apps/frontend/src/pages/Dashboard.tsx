@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import React, { useEffect, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -26,7 +26,7 @@ import {
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 import type { DashboardSummary } from '../types';
 import AppHeader from '../components/AppHeader';
 import InvestmentModal from '../components/InvestmentModal';

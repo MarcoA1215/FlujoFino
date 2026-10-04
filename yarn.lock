@@ -1090,6 +1090,14 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@finowork/shared-types@workspace:*, @finowork/shared-types@workspace:packages/shared-types":
+  version: 0.0.0-use.local
+  resolution: "@finowork/shared-types@workspace:packages/shared-types"
+  dependencies:
+    typescript: "npm:^5.0.0"
+  languageName: unknown
+  linkType: soft
+
 "@fullcalendar/core@npm:6.1.15":
   version: 6.1.15
   resolution: "@fullcalendar/core@npm:6.1.15"
@@ -2476,14 +2484,6 @@ __metadata:
   checksum: 10c0/06a0b52c81a6fa7f04d67762e08b2c476a00285858150caeaaff4037356dd5e119f45b2a530f638b77a5eeca013168ec1b655db41bae3236cb2e9d511484fc77
   languageName: node
   linkType: hard
-
-"@nutrideli/shared-types@workspace:*, @nutrideli/shared-types@workspace:packages/shared-types":
-  version: 0.0.0-use.local
-  resolution: "@nutrideli/shared-types@workspace:packages/shared-types"
-  dependencies:
-    typescript: "npm:^5.0.0"
-  languageName: unknown
-  linkType: soft
 
 "@oxc-project/types@npm:=0.149.0":
   version: 0.149.0
@@ -6339,6 +6339,75 @@ __metadata:
   languageName: node
   linkType: hard
 
+"finowork-backend@workspace:apps/backend":
+  version: 0.0.0-use.local
+  resolution: "finowork-backend@workspace:apps/backend"
+  dependencies:
+    "@aws-sdk/client-s3": "npm:^3.1139.0"
+    "@aws-sdk/s3-request-presigner": "npm:^3.1139.0"
+    "@eslint/eslintrc": "npm:^3.2.0"
+    "@eslint/js": "npm:^9.18.0"
+    "@finowork/shared-types": "workspace:*"
+    "@nestjs/cli": "npm:^11.0.0"
+    "@nestjs/common": "npm:^11.0.1"
+    "@nestjs/config": "npm:^12.0.0"
+    "@nestjs/core": "npm:^11.0.1"
+    "@nestjs/jwt": "npm:^10.0.0"
+    "@nestjs/passport": "npm:^10.0.0"
+    "@nestjs/platform-express": "npm:^11.0.1"
+    "@nestjs/schematics": "npm:^11.0.0"
+    "@nestjs/testing": "npm:^11.0.1"
+    "@nestjs/throttler": "npm:^6.7.1"
+    "@nestjs/typeorm": "npm:^12.0.1"
+    "@types/bcryptjs": "npm:^2.4.0"
+    "@types/express": "npm:^5.0.0"
+    "@types/jest": "npm:^30.0.0"
+    "@types/multer": "npm:^2.2.0"
+    "@types/node": "npm:^22.10.7"
+    "@types/nodemailer": "npm:^8.0.2"
+    "@types/passport-jwt": "npm:^3.0.0"
+    "@types/pg": "npm:^8.23.1"
+    "@types/sharp": "npm:^0.32.0"
+    "@types/supertest": "npm:^6.0.2"
+    "@types/uuid": "npm:^11.0.0"
+    "@types/web-push": "npm:^3.6.4"
+    bcryptjs: "npm:^2.4.3"
+    class-transformer: "npm:^0.5.1"
+    class-validator: "npm:^0.15.1"
+    eslint: "npm:^9.18.0"
+    eslint-config-prettier: "npm:^10.0.1"
+    eslint-plugin-prettier: "npm:^5.2.2"
+    globals: "npm:^16.0.0"
+    helmet: "npm:^8.0.0"
+    jest: "npm:^30.0.0"
+    nodemailer: "npm:^10.0.12"
+    passport: "npm:^0.7.0"
+    passport-jwt: "npm:^4.0.0"
+    pg: "npm:^8.23.0"
+    prettier: "npm:^3.4.2"
+    reflect-metadata: "npm:^0.2.2"
+    rxjs: "npm:^7.8.1"
+    sharp: "npm:^0.35.4"
+    source-map-support: "npm:^0.5.21"
+    supertest: "npm:^7.0.0"
+    ts-jest: "npm:^29.2.5"
+    ts-loader: "npm:^9.5.2"
+    ts-node: "npm:^10.9.2"
+    tsconfig-paths: "npm:^4.2.0"
+    typeorm: "npm:^1.1.1"
+    typescript: "npm:^5.7.3"
+    typescript-eslint: "npm:^8.20.0"
+    uuid: "npm:^14.0.2"
+    web-push: "npm:^3.6.7"
+  languageName: unknown
+  linkType: soft
+
+"finowork-monorepo@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "finowork-monorepo@workspace:."
+  languageName: unknown
+  linkType: soft
+
 "flat-cache@npm:^4.0.0":
   version: 4.0.1
   resolution: "flat-cache@npm:4.0.1"
@@ -6449,6 +6518,7 @@ __metadata:
     "@capacitor/push-notifications": "npm:^8.1.2"
     "@capacitor/splash-screen": "npm:^8.0.2"
     "@capacitor/status-bar": "npm:^8.0.3"
+    "@finowork/shared-types": "workspace:*"
     "@fullcalendar/core": "npm:6.1.15"
     "@fullcalendar/daygrid": "npm:6.1.15"
     "@fullcalendar/interaction": "npm:6.1.15"
@@ -6457,7 +6527,6 @@ __metadata:
     "@fullcalendar/timegrid": "npm:6.1.15"
     "@ionic/react": "npm:^9.0.3"
     "@ionic/react-router": "npm:^9.0.3"
-    "@nutrideli/shared-types": "workspace:*"
     "@testing-library/dom": "npm:^10.4.2"
     "@testing-library/react": "npm:^16.3.3"
     "@types/jsdom": "npm:^30"
@@ -8491,75 +8560,6 @@ __metadata:
   checksum: 10c0/6f9353a95288f8455cf64cbeb707b28826a7f29690244c1e4bb61ec573256e021b6ad6651b394eb1ccfd00d6ec50147253aba2c5fe58a57ceb111fad62c519ac
   languageName: node
   linkType: hard
-
-"nutri-deli@workspace:apps/backend":
-  version: 0.0.0-use.local
-  resolution: "nutri-deli@workspace:apps/backend"
-  dependencies:
-    "@aws-sdk/client-s3": "npm:^3.1139.0"
-    "@aws-sdk/s3-request-presigner": "npm:^3.1139.0"
-    "@eslint/eslintrc": "npm:^3.2.0"
-    "@eslint/js": "npm:^9.18.0"
-    "@nestjs/cli": "npm:^11.0.0"
-    "@nestjs/common": "npm:^11.0.1"
-    "@nestjs/config": "npm:^12.0.0"
-    "@nestjs/core": "npm:^11.0.1"
-    "@nestjs/jwt": "npm:^10.0.0"
-    "@nestjs/passport": "npm:^10.0.0"
-    "@nestjs/platform-express": "npm:^11.0.1"
-    "@nestjs/schematics": "npm:^11.0.0"
-    "@nestjs/testing": "npm:^11.0.1"
-    "@nestjs/throttler": "npm:^6.7.1"
-    "@nestjs/typeorm": "npm:^12.0.1"
-    "@nutrideli/shared-types": "workspace:*"
-    "@types/bcryptjs": "npm:^2.4.0"
-    "@types/express": "npm:^5.0.0"
-    "@types/jest": "npm:^30.0.0"
-    "@types/multer": "npm:^2.2.0"
-    "@types/node": "npm:^22.10.7"
-    "@types/nodemailer": "npm:^8.0.2"
-    "@types/passport-jwt": "npm:^3.0.0"
-    "@types/pg": "npm:^8.23.1"
-    "@types/sharp": "npm:^0.32.0"
-    "@types/supertest": "npm:^6.0.2"
-    "@types/uuid": "npm:^11.0.0"
-    "@types/web-push": "npm:^3.6.4"
-    bcryptjs: "npm:^2.4.3"
-    class-transformer: "npm:^0.5.1"
-    class-validator: "npm:^0.15.1"
-    eslint: "npm:^9.18.0"
-    eslint-config-prettier: "npm:^10.0.1"
-    eslint-plugin-prettier: "npm:^5.2.2"
-    globals: "npm:^16.0.0"
-    helmet: "npm:^8.0.0"
-    jest: "npm:^30.0.0"
-    nodemailer: "npm:^10.0.12"
-    passport: "npm:^0.7.0"
-    passport-jwt: "npm:^4.0.0"
-    pg: "npm:^8.23.0"
-    prettier: "npm:^3.4.2"
-    reflect-metadata: "npm:^0.2.2"
-    rxjs: "npm:^7.8.1"
-    sharp: "npm:^0.35.4"
-    source-map-support: "npm:^0.5.21"
-    supertest: "npm:^7.0.0"
-    ts-jest: "npm:^29.2.5"
-    ts-loader: "npm:^9.5.2"
-    ts-node: "npm:^10.9.2"
-    tsconfig-paths: "npm:^4.2.0"
-    typeorm: "npm:^1.1.1"
-    typescript: "npm:^5.7.3"
-    typescript-eslint: "npm:^8.20.0"
-    uuid: "npm:^14.0.2"
-    web-push: "npm:^3.6.7"
-  languageName: unknown
-  linkType: soft
-
-"nutrideli-monorepo@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "nutrideli-monorepo@workspace:."
-  languageName: unknown
-  linkType: soft
 
 "object-assign@npm:^4":
   version: 4.1.1

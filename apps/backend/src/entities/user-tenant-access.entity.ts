@@ -1,8 +1,8 @@
-import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
+﻿import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { User } from './user.entity';
 import { Tenant } from './tenant.entity';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 import { WorkSchedule } from './work-schedule.entity';
 
 @Entity()
@@ -50,6 +50,12 @@ export class UserTenantAccess {
 
   @Column({ name: 'exit_time', type: 'varchar', nullable: true })
   exitTime: string | null;
+
+  @Column({ name: 'lunch_start', type: 'varchar', nullable: true })
+  lunchStart: string | null;
+
+  @Column({ name: 'lunch_end', type: 'varchar', nullable: true })
+  lunchEnd: string | null;
 
   @OneToMany(() => WorkSchedule, ws => ws.userTenantAccess)
   workSchedules: WorkSchedule[];

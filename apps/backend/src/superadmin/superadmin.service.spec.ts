@@ -1,4 +1,4 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { SuperAdminService } from './superadmin.service';
@@ -16,7 +16,7 @@ import {
   SaaSPaymentStatus,
   PromoterCommissionType,
   PromoterCommissionStatus,
-} from '@nutrideli/shared-types';
+} from '@finowork/shared-types';
 
 describe('SuperAdminService', () => {
   let service: SuperAdminService;

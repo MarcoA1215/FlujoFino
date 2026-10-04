@@ -1,4 +1,4 @@
-import { TenantPlanType, TenantStatus, UpdateTenantPlanDTO } from '@nutrideli/shared-types';
+﻿import { TenantPlanType, TenantStatus, UpdateTenantPlanDTO } from '@finowork/shared-types';
 
 export class UpdateTenantPlanDto implements UpdateTenantPlanDTO {
   planType?: TenantPlanType;

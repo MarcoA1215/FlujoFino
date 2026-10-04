@@ -1,4 +1,4 @@
-import { SaaSPaymentMethod } from '@nutrideli/shared-types';
+﻿import { SaaSPaymentMethod } from '@finowork/shared-types';
 
 export class ReportPaymentDto {
   amount: number;

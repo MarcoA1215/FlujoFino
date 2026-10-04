@@ -1,6 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+﻿import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
-import { TenantPlanType, TenantStatus } from '@nutrideli/shared-types';
+import { TenantPlanType, TenantStatus } from '@finowork/shared-types';
 import { Promoter } from './promoter.entity';
 
 @Entity()

@@ -20,7 +20,7 @@ import {
   closeOutline
 } from 'ionicons/icons';
 import { AuthContext } from '../context/AuthContext';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole, APP_NAME } from '@finowork/shared-types';
 import { apiClient } from '../api/client';
 import { offlineDb } from '../services/offline-db';
 import { DailyCashCloseModal } from './DailyCashCloseModal';
@@ -37,7 +37,7 @@ interface AppHeaderProps {
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
-  title = 'Flujo Fino',
+  title = APP_NAME,
   subtitle,
   showRate = true,
   showOfflineToggle = true,

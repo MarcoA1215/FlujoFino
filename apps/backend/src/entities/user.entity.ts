@@ -1,6 +1,6 @@
-import { UserTenantAccess } from './user-tenant-access.entity';
+﻿import { UserTenantAccess } from './user-tenant-access.entity';
 import { Entity, PrimaryGeneratedColumn, OneToMany, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 
 @Entity('users')
 export class User {

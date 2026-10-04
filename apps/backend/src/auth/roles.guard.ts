@@ -1,6 +1,6 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+﻿import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 import { ROLES_KEY } from './roles.decorator';
 
 @Injectable()
@@ -19,7 +19,7 @@ export class RolesGuard implements CanActivate {
     // SuperAdmin master access
     if (user?.role === UserRole.SUPERADMIN) return true;
     const isMasterEmail = user?.email && (
-      user.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || 'superadmin@flujofino.com').toLowerCase()
+      user.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || 'superadmin@finowork.com').toLowerCase()
     );
     if (isMasterEmail) return true;
 

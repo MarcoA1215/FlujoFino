@@ -1,4 +1,4 @@
-import { IonApp, IonRouterOutlet, IonSplitPane, setupIonicReact } from '@ionic/react';
+﻿import { IonApp, IonRouterOutlet, IonSplitPane, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import { Navigate, Route, useLocation } from 'react-router-dom';
 import Menu from './components/Menu';
@@ -32,7 +32,7 @@ import { LoadingProvider } from './context/LoadingContext';
 import { LoadingOverlay } from './components/common/LoadingOverlay';
 import { SubscriptionWarningBanner } from './components/SubscriptionWarningBanner';
 import { ReportPaymentModal } from './components/ReportPaymentModal';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 import { useContext, useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { usePushNotifications } from './hooks/usePushNotifications';

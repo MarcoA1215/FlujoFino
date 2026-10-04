@@ -1,11 +1,11 @@
-import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
+﻿import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Tenant } from '../entities/tenant.entity';
 import { AccessRequest, AccessRequestStatus } from '../entities/access-request.entity';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 
@@ -24,7 +24,7 @@ export class UsersService implements OnModuleInit {
       const hash = await bcrypt.hash('admin123', 10);
       const admin = this.usersRepo.create({
         username: 'admin',
-        email: 'admin@flujofino.com',
+        email: 'admin@finowork.com',
         passwordHash: hash,
         role: UserRole.ADMIN,
       });
@@ -69,6 +69,8 @@ export class UsersService implements OnModuleInit {
         (user as any).jobTitle = access.jobTitle;
         (user as any).entryTime = access.entryTime;
         (user as any).exitTime = access.exitTime;
+        (user as any).lunchStart = access.lunchStart;
+        (user as any).lunchEnd = access.lunchEnd;
         (user as any).salaryAmount = access.salaryAmount;
         (user as any).salaryPeriod = access.salaryPeriod;
       }
@@ -77,7 +79,7 @@ export class UsersService implements OnModuleInit {
     });
   }
 
-  async findActiveEmployees(tenantId?: string): Promise<{ id: string; username: string; name: string; role: UserRole; roles?: UserRole[]; jobTitle?: string; entryTime?: string; exitTime?: string }[]> {
+  async findActiveEmployees(tenantId?: string): Promise<{ id: string; username: string; name: string; role: UserRole; roles?: UserRole[]; jobTitle?: string; entryTime?: string; exitTime?: string; lunchStart?: string; lunchEnd?: string }[]> {
     if (!tenantId) return [];
 
     const accesses = await this.usersRepo.manager.find(UserTenantAccess, {
@@ -107,6 +109,8 @@ export class UsersService implements OnModuleInit {
         jobTitle: a.jobTitle || undefined,
         entryTime: a.entryTime || undefined,
         exitTime: a.exitTime || undefined,
+        lunchStart: a.lunchStart || undefined,
+        lunchEnd: a.lunchEnd || undefined,
       }));
   }
 
@@ -146,6 +150,8 @@ export class UsersService implements OnModuleInit {
           jobTitle: data.jobTitle || 'Personal Operativo (Limpieza / Mantenimiento)',
           entryTime: data.entryTime || null,
           exitTime: data.exitTime || null,
+          lunchStart: data.lunchStart || data.lunch_start || null,
+          lunchEnd: data.lunchEnd || data.lunch_end || null,
         });
         await transactionalEntityManager.save(access);
         return savedUser;
@@ -213,6 +219,8 @@ export class UsersService implements OnModuleInit {
         jobTitle: data.jobTitle || data.job_title || null,
         entryTime: data.entryTime || data.entry_time || null,
         exitTime: data.exitTime || data.exit_time || null,
+        lunchStart: data.lunchStart || data.lunch_start || null,
+        lunchEnd: data.lunchEnd || data.lunch_end || null,
       });
       await transactionalEntityManager.save(access);
 
@@ -272,6 +280,12 @@ export class UsersService implements OnModuleInit {
     }
     if (data.exitTime !== undefined || data.exit_time !== undefined) {
       access.exitTime = (data.exitTime !== undefined ? data.exitTime : data.exit_time) || null;
+    }
+    if (data.lunchStart !== undefined || data.lunch_start !== undefined) {
+      access.lunchStart = (data.lunchStart !== undefined ? data.lunchStart : data.lunch_start) || null;
+    }
+    if (data.lunchEnd !== undefined || data.lunch_end !== undefined) {
+      access.lunchEnd = (data.lunchEnd !== undefined ? data.lunchEnd : data.lunch_end) || null;
     }
     if (data.salaryAmount !== undefined) {
       access.salaryAmount = data.salaryAmount ? Number(data.salaryAmount) : null;
@@ -355,7 +369,7 @@ export class UsersService implements OnModuleInit {
     });
 
     const tenant = await this.usersRepo.manager.findOne(Tenant, { where: { id: tenantId } });
-    const tenantName = tenant ? tenant.name : 'Flujo Fino';
+    const tenantName = tenant ? tenant.name : 'FinoWork';
 
     const access = user?.tenantAccess?.find(a => a.tenantId === req.tenantId);
     const authorizedRoles = (access?.roles && access.roles.length > 0) ? access.roles : [req.role];

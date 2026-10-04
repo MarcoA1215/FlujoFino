@@ -7,9 +7,6 @@ import {
   IonButtons,
   IonButton,
   IonContent,
-  IonItem,
-  IonLabel,
-  IonInput,
   IonFooter,
   IonIcon,
   useIonToast
@@ -306,67 +303,78 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               <IonIcon icon={pricetagOutline} color="primary" /> {isResale ? 'Datos del Producto de Reventa' : isFormula ? 'Datos del Producto Armable' : isService ? 'Datos del Servicio' : 'Información Principal'}
             </h4>
 
-            <IonItem lines="none" style={{ marginBottom: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', '--background': '#ffffff' } as any}>
-              <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600' }}>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
                 {isService ? 'Nombre del Servicio *' : 'Nombre del Producto *'}
-              </IonLabel>
-              <IonInput 
+              </label>
+              <input 
+                type="text"
                 value={name} 
-                onIonInput={e => setName(e.detail.value!)} 
+                onChange={e => setName(e.target.value)} 
                 placeholder={isResale ? 'Ej. Vestido Casual, Pantalón Jean, Nutella 350g...' : isFormula ? 'Ej. Hamburguesa Especial, Tinte Rubio Mix, Torta...' : 'Ej. Uñas Acrílicas, Corte de Cabello, Masaje...'} 
+                style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
               />
-            </IonItem>
+            </div>
 
-            <IonItem lines="none" style={{ marginBottom: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', '--background': '#ffffff' } as any}>
-              <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600' }}>Categoría</IonLabel>
-              <IonInput 
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
+                Categoría
+              </label>
+              <input 
+                type="text"
                 value={category} 
-                onIonInput={e => setCategory(e.detail.value!)} 
+                onChange={e => setCategory(e.target.value)} 
                 placeholder={isResale ? 'Ej. Ropa, Snacks, Bodegón, Bebidas...' : isFormula ? 'Ej. Comida, Bebidas, Preparados...' : 'Ej. Servicios, Peluquería, Estética...'} 
+                style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
               />
-            </IonItem>
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: isService ? '1fr' : '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-              <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', '--background': '#ffffff' } as any}>
-                <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600' }}>Precio Venta ($) *</IonLabel>
-                <IonInput 
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
+                  Precio Venta ($) *
+                </label>
+                <input 
                   type="number" 
                   value={salePrice} 
-                  onIonInput={e => setSalePrice(e.detail.value!)} 
+                  onChange={e => setSalePrice(e.target.value)} 
                   placeholder="Ej. 25.00" 
                   step="0.01"
+                  style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
                 />
-              </IonItem>
+              </div>
 
               {!isService && (
-                <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', '--background': '#ffffff' } as any}>
-                  <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
                     {isResale ? 'Costo Unitario Compra ($)' : 'Costo Estimado Base ($)'}
-                  </IonLabel>
-                  <IonInput 
+                  </label>
+                  <input 
                     type="number" 
                     value={estimatedCost} 
-                    onIonInput={e => setEstimatedCost(e.detail.value!)} 
+                    onChange={e => setEstimatedCost(e.target.value)} 
                     placeholder={isResale ? 'Ej. 10.00' : 'Opcional (Ej. 5.00)'} 
                     step="0.01"
+                    style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
                   />
-                </IonItem>
+                </div>
               )}
             </div>
 
             {isResale && (
-              <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', '--background': '#ffffff' } as any}>
-                <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
                   {product ? 'Stock Actual' : 'Stock Inicial'}
-                </IonLabel>
-                <IonInput 
+                </label>
+                <input 
                   type="number" 
                   value={stock} 
-                  onIonInput={e => setStock(e.detail.value!)} 
+                  onChange={e => setStock(e.target.value)} 
                   placeholder="Ej. 15" 
                   min="0"
+                  style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
                 />
-              </IonItem>
+              </div>
             )}
 
             {isFormula && (
@@ -378,19 +386,20 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             {isService && (
               <>
                 {isReservationsEnabled ? (
-                  <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', '--background': '#ffffff' } as any}>
-                    <IonLabel position="stacked" style={{ color: '#475569', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
                       <IonIcon icon={timeOutline} /> Duración Estimada (Minutos)
-                    </IonLabel>
-                    <IonInput 
+                    </label>
+                    <input 
                       type="number" 
                       value={durationMinutes} 
-                      onIonInput={e => setDurationMinutes(e.detail.value!)} 
+                      onChange={e => setDurationMinutes(e.target.value)} 
                       placeholder="Ej. 30, 45, 60..." 
                       min="5"
                       step="5"
+                      style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
                     />
-                  </IonItem>
+                  </div>
                 ) : null}
                 <div style={{ padding: '10px 12px', backgroundColor: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe', color: '#1e40af', fontSize: '13px', marginTop: '10px' }}>
                   {isReservationsEnabled ? (

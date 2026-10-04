@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException } from '@nestjs/common';
+﻿import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OrdersService, CreateOrderDto } from './orders.service';
@@ -11,7 +11,7 @@ import { decodeTenantId } from '../utils/tenant-crypto';
 import { isTenantSuspendedOrExpired } from '../utils/tenant-status';
 import { Public } from '../auth/public.decorator';
 import { Throttle } from '@nestjs/throttler';
-import { PaymentStatus, OrderStatus } from '@nutrideli/shared-types';
+import { PaymentStatus, OrderStatus } from '@finowork/shared-types';
 
 import { NotificationsService } from '../notifications/notifications.service';
 

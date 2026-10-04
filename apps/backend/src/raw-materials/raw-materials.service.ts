@@ -1,10 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DataSource, Repository, IsNull, EntityManager } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
 import { RecipeItem } from '../entities/recipe-item.entity';
-import { MovementType } from '@nutrideli/shared-types';
+import { MovementType } from '@finowork/shared-types';
 import { CreateRawMaterialDto } from './dto/create-raw-material.dto';
 import { RestockRawMaterialDto } from './dto/restock-raw-material.dto';
 import { UpdateRawMaterialDto } from './dto/update-raw-material.dto';

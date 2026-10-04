@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+﻿import React, { useState, useEffect, useContext } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -32,7 +32,7 @@ import {
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 
 const FeedbackPage: React.FC = () => {
   const { user } = useContext(AuthContext);
@@ -120,7 +120,7 @@ const FeedbackPage: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div>
                 <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  Bandeja de Entrada • Flujo Fino
+                  Bandeja de Entrada • FinoWork
                 </h2>
                 <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
                   Comentarios, reportes y sugerencias que los negocios registrados te han enviado.
@@ -145,7 +145,7 @@ const FeedbackPage: React.FC = () => {
                   Aún no has recibido mensajes
                 </h3>
                 <p style={{ fontSize: '14px', marginTop: '6px', maxWidth: '400px', margin: '6px auto 0 auto' }}>
-                  Cuando algún negocio escriba una sugerencia o reporte desde su sección de Soporte en Flujo Fino, aparecerá en esta bandeja.
+                  Cuando algún negocio escriba una sugerencia o reporte desde su sección de Soporte en FinoWork, aparecerá en esta bandeja.
                 </p>
               </div>
             )}
@@ -191,7 +191,7 @@ const FeedbackPage: React.FC = () => {
               <IonLabel>De Mis Clientes</IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="soporte">
-              <IonLabel>Soporte FlujoFino</IonLabel>
+              <IonLabel>Soporte FinoWork</IonLabel>
             </IonSegmentButton>
           </IonSegment>
         </IonToolbar>
@@ -256,7 +256,7 @@ const FeedbackPage: React.FC = () => {
             
             <div style={{ marginTop: '30px' }}>
               <h3 style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '10px' }}>Guías de Ayuda</h3>
-              <p style={{ color: '#666', fontSize: '14px' }}>Próximamente agregaremos tutoriales y manuales para aprovechar al máximo FlujoFino.</p>
+              <p style={{ color: '#666', fontSize: '14px' }}>Próximamente agregaremos tutoriales y manuales para aprovechar al máximo FinoWork.</p>
             </div>
           </div>
         )}

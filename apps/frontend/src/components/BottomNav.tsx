@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from 'react';
+﻿import React, { useContext, useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { IonIcon } from '@ionic/react';
 import {
@@ -20,7 +20,7 @@ import {
   construct
 } from 'ionicons/icons';
 import { AuthContext } from '../context/AuthContext';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 import { apiClient } from '../api/client';
 
 interface BottomNavItem {

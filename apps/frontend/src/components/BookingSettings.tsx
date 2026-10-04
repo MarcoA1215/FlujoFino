@@ -23,6 +23,9 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
 
   const [bulkStart, setBulkStart] = useState('08:00');
   const [bulkEnd, setBulkEnd] = useState('18:00');
+  const [hasBulkSecondShift, setHasBulkSecondShift] = useState(false);
+  const [bulkSecondStart, setBulkSecondStart] = useState('14:00');
+  const [bulkSecondEnd, setBulkSecondEnd] = useState('19:00');
 
   const handleDayChange = (dayId: string, field: string, value: any) => {
     const newHours = { ...businessHours };
@@ -37,10 +40,22 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
     const newHours = { ...businessHours };
     DAYS_OF_WEEK.forEach(day => {
       if (!newHours[day.id]) {
-        newHours[day.id] = { isOpen: true, startTime: bulkStart, endTime: bulkEnd };
+        newHours[day.id] = {
+          isOpen: true,
+          startTime: bulkStart,
+          endTime: bulkEnd,
+          hasSecondShift: hasBulkSecondShift,
+          secondStartTime: hasBulkSecondShift ? bulkSecondStart : undefined,
+          secondEndTime: hasBulkSecondShift ? bulkSecondEnd : undefined,
+        };
       } else if (newHours[day.id].isOpen) {
         newHours[day.id].startTime = bulkStart;
         newHours[day.id].endTime = bulkEnd;
+        newHours[day.id].hasSecondShift = hasBulkSecondShift;
+        if (hasBulkSecondShift) {
+          newHours[day.id].secondStartTime = bulkSecondStart;
+          newHours[day.id].secondEndTime = bulkSecondEnd;
+        }
       }
     });
     setSettings({ ...settings, businessHours: newHours });
@@ -115,29 +130,63 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
               </p>
 
               {/* Ajuste masivo rápido */}
-              <div style={{ backgroundColor: '#f1f5f9', padding: '12px 16px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: '600', color: '#1e293b', marginBottom: '8px', fontSize: '13px' }}>
+              <div style={{ backgroundColor: '#f1f5f9', padding: '14px 16px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontWeight: '600', color: '#1e293b', marginBottom: '10px', fontSize: '13px' }}>
                   ⚡ Ajuste Rápido de Horario (Aplica a todos los días abiertos):
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '13px', color: '#475569' }}>Apertura:</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#0369a1' }}>T1 Abre:</span>
                     <IonInput 
                       type="time" 
                       value={bulkStart} 
                       onIonInput={e => setBulkStart(e.detail.value!)} 
-                      style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '145px' }} 
+                      style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '135px' }} 
                     />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '13px', color: '#475569' }}>Cierre:</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#0369a1' }}>T1 Cierra:</span>
                     <IonInput 
                       type="time" 
                       value={bulkEnd} 
                       onIonInput={e => setBulkEnd(e.detail.value!)} 
-                      style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '145px' }} 
+                      style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '135px' }} 
                     />
                   </div>
+
+                  <IonButton
+                    size="small"
+                    fill={hasBulkSecondShift ? 'solid' : 'outline'}
+                    color={hasBulkSecondShift ? 'warning' : 'medium'}
+                    onClick={() => setHasBulkSecondShift(!hasBulkSecondShift)}
+                    style={{ height: '32px', fontSize: '12px', textTransform: 'none' }}
+                  >
+                    {hasBulkSecondShift ? '✓ Con 2do Turno' : '+ Agregar 2do Turno'}
+                  </IonButton>
+
+                  {hasBulkSecondShift && (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#b45309' }}>T2 Abre:</span>
+                        <IonInput 
+                          type="time" 
+                          value={bulkSecondStart} 
+                          onIonInput={e => setBulkSecondStart(e.detail.value!)} 
+                          style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '135px' }} 
+                        />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#b45309' }}>T2 Cierra:</span>
+                        <IonInput 
+                          type="time" 
+                          value={bulkSecondEnd} 
+                          onIonInput={e => setBulkSecondEnd(e.detail.value!)} 
+                          style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '135px' }} 
+                        />
+                      </div>
+                    </>
+                  )}
+
                   <IonButton size="small" color="primary" fill="outline" onClick={handleApplyBulkHours}>
                     <IonIcon slot="start" icon={checkmarkCircleOutline} />
                     Aplicar a Días Activos
@@ -155,7 +204,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                 {DAYS_OF_WEEK.map(day => {
                   const dayData = businessHours[day.id] || { isOpen: false, startTime: '08:00', endTime: '18:00' };
                   return (
-                    <IonRow key={day.id} className="ion-align-items-center" style={{ borderBottom: '1px solid #f1f5f9', padding: '10px 0' }}>
+                    <IonRow key={day.id} className="ion-align-items-center" style={{ borderBottom: '1px solid #f1f5f9', padding: '12px 0' }}>
                       <IonCol size="12" sizeSm="4" sizeMd="3">
                         <IonToggle checked={dayData.isOpen} onIonChange={e => handleDayChange(day.id, 'isOpen', e.detail.checked)} justify="space-between">
                           <span slot="label" style={{ fontSize: '14px', fontWeight: dayData.isOpen ? '600' : 'normal', color: dayData.isOpen ? '#0f172a' : '#64748b' }}>
@@ -165,26 +214,82 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                       </IonCol>
                       <IonCol size="12" sizeSm="8" sizeMd="9">
                         {dayData.isOpen ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ fontSize: '12px', color: '#64748b' }}>Abre:</span>
-                              <IonInput 
-                                type="time" 
-                                value={dayData.startTime || '08:00'} 
-                                onIonInput={e => handleDayChange(day.id, 'startTime', e.detail.value)} 
-                                style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '145px' }} 
-                              />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {/* Turno 1 */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: '#0369a1', background: '#e0f2fe', padding: '2px 6px', borderRadius: '4px' }}>
+                                Turno 1
+                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '12px', color: '#64748b' }}>Abre:</span>
+                                <IonInput 
+                                  type="time" 
+                                  value={dayData.startTime || '08:00'} 
+                                  onIonInput={e => handleDayChange(day.id, 'startTime', e.detail.value)} 
+                                  style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '135px' }} 
+                                />
+                              </div>
+                              <span>-</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '12px', color: '#64748b' }}>Cierra:</span>
+                                <IonInput 
+                                  type="time" 
+                                  value={dayData.endTime || '12:00'} 
+                                  onIonInput={e => handleDayChange(day.id, 'endTime', e.detail.value)} 
+                                  style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '135px' }} 
+                                />
+                              </div>
+
+                              <IonButton 
+                                size="small" 
+                                fill={dayData.hasSecondShift ? 'solid' : 'outline'}
+                                color={dayData.hasSecondShift ? 'warning' : 'medium'}
+                                style={{ height: '28px', fontSize: '11px', textTransform: 'none' }}
+                                onClick={() => {
+                                  const nextVal = !dayData.hasSecondShift;
+                                  const newHours = { ...businessHours };
+                                  if (!newHours[day.id]) {
+                                    newHours[day.id] = { isOpen: true, startTime: '08:00', endTime: '12:00' };
+                                  }
+                                  newHours[day.id].hasSecondShift = nextVal;
+                                  if (nextVal) {
+                                    if (!newHours[day.id].secondStartTime) newHours[day.id].secondStartTime = '14:00';
+                                    if (!newHours[day.id].secondEndTime) newHours[day.id].secondEndTime = '18:00';
+                                  }
+                                  setSettings({ ...settings, businessHours: newHours });
+                                }}
+                              >
+                                {dayData.hasSecondShift ? '✓ 2do Turno Activo' : '+ 2do Turno (Tarde)'}
+                              </IonButton>
                             </div>
-                            <span>-</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ fontSize: '12px', color: '#64748b' }}>Cierra:</span>
-                              <IonInput 
-                                type="time" 
-                                value={dayData.endTime || '18:00'} 
-                                onIonInput={e => handleDayChange(day.id, 'endTime', e.detail.value)} 
-                                style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '145px' }} 
-                              />
-                            </div>
+
+                            {/* Turno 2 (opcional) */}
+                            {dayData.hasSecondShift && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', paddingLeft: '4px' }}>
+                                <span style={{ fontSize: '11px', fontWeight: 700, color: '#b45309', background: '#fef3c7', padding: '2px 6px', borderRadius: '4px' }}>
+                                  Turno 2
+                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <span style={{ fontSize: '12px', color: '#64748b' }}>Abre:</span>
+                                  <IonInput 
+                                    type="time" 
+                                    value={dayData.secondStartTime || '14:00'} 
+                                    onIonInput={e => handleDayChange(day.id, 'secondStartTime', e.detail.value)} 
+                                    style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '135px' }} 
+                                  />
+                                </div>
+                                <span>-</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <span style={{ fontSize: '12px', color: '#64748b' }}>Cierra:</span>
+                                  <IonInput 
+                                    type="time" 
+                                    value={dayData.secondEndTime || '18:00'} 
+                                    onIonInput={e => handleDayChange(day.id, 'secondEndTime', e.detail.value)} 
+                                    style={{ backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', maxWidth: '135px' }} 
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <span style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>

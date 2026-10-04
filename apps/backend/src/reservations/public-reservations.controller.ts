@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, Get, NotFoundException, BadRequestException, Put, Query } from '@nestjs/common';
+﻿import { Controller, Post, Body, Param, Get, NotFoundException, BadRequestException, Put, Query } from '@nestjs/common';
 import { ReservationsService } from './reservations.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual, In } from 'typeorm';
@@ -6,7 +6,7 @@ import { Tenant } from '../entities/tenant.entity';
 import { Settings } from '../entities/settings.entity';
 import { Reservation } from '../entities/reservation.entity';
 import { Product } from '../entities/product.entity';
-import { ReservationStatus, PaymentStatus } from '@nutrideli/shared-types';
+import { ReservationStatus, PaymentStatus } from '@finowork/shared-types';
 import { decodeTenantId } from '../utils/tenant-crypto';
 import { Public } from '../auth/public.decorator';
 import { OrderItem } from '../entities/order-item.entity';
@@ -612,9 +612,30 @@ export class PublicReservationsController {
 
     const interval = Number(settings?.slotInterval) || 30;
 
-    const [sh, sm] = dayConfig.startTime.split(':').map(Number);
-    const [eh, em] = dayConfig.endTime.split(':').map(Number);
-    const closeMinutes = eh * 60 + em;
+    const shifts: { start: number; end: number }[] = [];
+    const [sh, sm] = (dayConfig.startTime || '08:00').split(':').map(Number);
+    const [eh, em] = (dayConfig.endTime || '18:00').split(':').map(Number);
+    shifts.push({ start: sh * 60 + sm, end: eh * 60 + em });
+
+    if (dayConfig.hasSecondShift && dayConfig.secondStartTime && dayConfig.secondEndTime) {
+      const [s2h, s2m] = dayConfig.secondStartTime.split(':').map(Number);
+      const [e2h, e2m] = dayConfig.secondEndTime.split(':').map(Number);
+      shifts.push({ start: s2h * 60 + s2m, end: e2h * 60 + e2m });
+    }
+
+    // Fetch employee individual settings if employeeId provided
+    let empAccess: UserTenantAccess | null = null;
+    if (employeeId) {
+      const accessRepo = this.tenantRepo.manager.getRepository(UserTenantAccess);
+      empAccess = await accessRepo.findOne({
+        where: { userId: employeeId, tenantId, isActive: true, status: 'ACCEPTED' },
+      });
+    }
+
+    const toMins = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
 
     // Fetch existing reservations
     const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
@@ -689,29 +710,58 @@ export class PublicReservationsController {
     });
 
     const slots: string[] = [];
-    let currentMins = sh * 60 + sm;
     const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Caracas', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
     const [vzH, vzM] = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Caracas', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).split(':').map(Number);
     const currentRealMins = vzH * 60 + vzM;
 
-    while (currentMins + duration <= closeMinutes) {
-      // If it's today, filter out past slots
-      if (date === todayStr && currentMins <= currentRealMins) {
+    for (const shift of shifts) {
+      let currentMins = shift.start;
+      while (currentMins + duration <= shift.end) {
+        // If it's today, filter out past slots
+        if (date === todayStr && currentMins <= currentRealMins) {
+          currentMins += interval;
+          continue;
+        }
+
+        const slotEnd = currentMins + duration;
+
+        // Check employee constraints if employeeId provided
+        if (empAccess) {
+          // Lunch break exclusion: slotStart < toMins(lunchEnd) && slotEnd > toMins(lunchStart)
+          if (empAccess.lunchStart && empAccess.lunchEnd) {
+            const lStart = toMins(empAccess.lunchStart);
+            const lEnd = toMins(empAccess.lunchEnd);
+            if (currentMins < lEnd && slotEnd > lStart) {
+              currentMins += interval;
+              continue;
+            }
+          }
+
+          // Individual shift constraints:
+          if (empAccess.entryTime && currentMins < toMins(empAccess.entryTime)) {
+            currentMins += interval;
+            continue;
+          }
+          if (empAccess.exitTime && slotEnd > toMins(empAccess.exitTime)) {
+            currentMins += interval;
+            continue;
+          }
+        }
+
+        // Check overlap: new slot [currentMins, slotEnd) overlaps with [busy.start, busy.end)
+        const overlaps = busyIntervals.some(busy => {
+          return currentMins < busy.end && slotEnd > busy.start;
+        });
+
+        if (!overlaps) {
+          const timeStr = this.minutesToTime(currentMins).substring(0, 5);
+          if (!slots.includes(timeStr)) {
+            slots.push(timeStr);
+          }
+        }
+
         currentMins += interval;
-        continue;
       }
-
-      // Check overlap: new slot [currentMins, currentMins + duration) overlaps with [busy.start, busy.end)
-      const slotEnd = currentMins + duration;
-      const overlaps = busyIntervals.some(busy => {
-        return currentMins < busy.end && slotEnd > busy.start;
-      });
-
-      if (!overlaps) {
-        slots.push(this.minutesToTime(currentMins).substring(0, 5));
-      }
-
-      currentMins += interval;
     }
 
     return slots;

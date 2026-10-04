@@ -1,5 +1,5 @@
-import { Tenant } from '../entities/tenant.entity';
-import { TenantStatus, TenantPlanType } from '@nutrideli/shared-types';
+﻿import { Tenant } from '../entities/tenant.entity';
+import { TenantStatus, TenantPlanType } from '@finowork/shared-types';
 
 export function isTenantSuspendedOrExpired(tenant: Tenant): boolean {
   if (!tenant.isActive) return true;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent, IonList, IonItem, IonLabel, IonInput, IonText, IonIcon, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSearchbar, IonBadge, useIonToast } from '@ionic/react';
+import { IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent, IonList, IonItem, IonLabel, IonText, IonIcon, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSearchbar, IonBadge, useIonToast } from '@ionic/react';
 import { trashOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 
@@ -170,22 +170,96 @@ export const EditOrderModal: React.FC<Props> = ({ order, isOpen, onClose, onSucc
                   <IonCardTitle>Datos del Cliente</IonCardTitle>
                 </IonCardHeader>
                 <IonCardContent>
-                  <IonItem>
-                    <IonLabel position="stacked">Nombre</IonLabel>
-                    <IonInput value={customerName} onIonInput={e => setCustomerName(e.detail.value!)} />
-                  </IonItem>
-                  <IonItem>
-                    <IonLabel position="stacked">Teléfono</IonLabel>
-                    <IonInput value={customerPhone} onIonInput={e => setCustomerPhone(e.detail.value!)} />
-                  </IonItem>
-                  <IonItem>
-                    <IonLabel position="stacked">Mesa / Taburete</IonLabel>
-                    <IonInput value={tableNumber} onIonInput={e => setTableNumber(e.detail.value!)} />
-                  </IonItem>
-                  <IonItem>
-                    <IonLabel position="stacked">Dirección / Notas</IonLabel>
-                    <IonInput value={notes} onIonInput={e => setNotes(e.detail.value!)} />
-                  </IonItem>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                        Nombre
+                      </label>
+                      <input
+                        type="text"
+                        value={customerName}
+                        onChange={e => setCustomerName(e.target.value)}
+                        placeholder="Nombre del cliente"
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                          background: '#f8fafc',
+                          color: '#0f172a',
+                          outline: 'none',
+                          fontSize: '14px',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                        Teléfono
+                      </label>
+                      <input
+                        type="text"
+                        value={customerPhone}
+                        onChange={e => setCustomerPhone(e.target.value)}
+                        placeholder="Teléfono"
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                          background: '#f8fafc',
+                          color: '#0f172a',
+                          outline: 'none',
+                          fontSize: '14px',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                        Mesa / Taburete
+                      </label>
+                      <input
+                        type="text"
+                        value={tableNumber}
+                        onChange={e => setTableNumber(e.target.value)}
+                        placeholder="Mesa / Taburete"
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                          background: '#f8fafc',
+                          color: '#0f172a',
+                          outline: 'none',
+                          fontSize: '14px',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                        Dirección / Notas
+                      </label>
+                      <input
+                        type="text"
+                        value={notes}
+                        onChange={e => setNotes(e.target.value)}
+                        placeholder="Dirección o notas"
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                          background: '#f8fafc',
+                          color: '#0f172a',
+                          outline: 'none',
+                          fontSize: '14px',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                  </div>
                 </IonCardContent>
               </IonCard>
             </IonCol>

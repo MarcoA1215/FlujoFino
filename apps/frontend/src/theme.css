@@ -496,3 +496,61 @@ ion-badge, ion-button, th, td, ion-card-title, h1, h2, h3, p {
 .table-responsive tr:hover td {
   background: #F8FAFC;
 }
+
+/* ==========================================================================
+   IONIC FORM CONTROLS & MODALS - ANTI-COLLAPSE SAFEGUARDS
+   Evita que ion-input, ion-textarea y modales colapsen a 0px de altura
+   ========================================================================== */
+ion-input,
+.ion-input {
+  min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+ion-input input,
+ion-input .native-input,
+ion-input input.native-input {
+  min-height: 38px !important;
+  height: auto !important;
+  box-sizing: border-box !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+ion-item ion-input {
+  min-height: 44px !important;
+  width: 100% !important;
+}
+
+ion-item ion-textarea,
+ion-textarea {
+  min-height: 60px !important;
+}
+
+ion-item ion-label[position="stacked"],
+ion-item ion-label.label-stacked {
+  margin-bottom: 6px !important;
+  transform: none !important;
+  display: block !important;
+  min-height: 18px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+/* Evita que IonContent colapse dentro de modales con --height: auto */
+ion-modal[style*="--height: auto"] ion-content,
+ion-modal[style*="--height:auto"] ion-content,
+ion-modal[style*="height: auto"] ion-content,
+ion-modal[style*="height:auto"] ion-content {
+  min-height: 320px !important;
+  display: block !important;
+}
+
+ion-modal[style*="--height: auto"] .ion-page,
+ion-modal[style*="--height:auto"] .ion-page {
+  position: relative !important;
+}
+

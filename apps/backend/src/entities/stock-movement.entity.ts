@@ -1,8 +1,8 @@
-import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
+﻿import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Tenant } from './tenant.entity';
 import { Entity, Index, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
 import { RawMaterial } from './raw-material.entity';
-import { MovementType } from '@nutrideli/shared-types';
+import { MovementType } from '@finowork/shared-types';
 
 @Entity()
 @Index(['tenantId', 'createdAt'])

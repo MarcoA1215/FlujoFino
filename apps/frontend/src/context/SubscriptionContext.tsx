@@ -1,8 +1,8 @@
-import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+﻿import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { apiClient } from '../api/client';
 import { AuthContext } from './AuthContext';
-import type { MySubscriptionDTO, PlatformConfigDTO } from '@nutrideli/shared-types';
+import type { MySubscriptionDTO, PlatformConfigDTO } from '@finowork/shared-types';
 
 export interface SubscriptionContextType {
   subscription: MySubscriptionDTO | null;

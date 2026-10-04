@@ -6,9 +6,6 @@ import {
   IonCardHeader,
   IonCardTitle,
   IonCardContent,
-  IonItem,
-  IonLabel,
-  IonInput,
   IonButton,
   IonSpinner,
   useIonToast,
@@ -258,7 +255,7 @@ const Login: React.FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
                   <img 
                     src="/assets/logo.png" 
-                    alt="Flujo Fino" 
+                    alt="FinoWork" 
                     style={{
                       width: '72px',
                       height: '72px',
@@ -274,18 +271,56 @@ const Login: React.FC = () => {
                     }}
                   />
                 </div>
-                <IonCardTitle style={{ fontWeight: 'bold' }}>Flujo Fino</IonCardTitle>
+                <IonCardTitle style={{ fontWeight: 'bold' }}>FinoWork</IonCardTitle>
                 <p style={{ margin: '5px 0 0 0', color: 'gray' }}>Iniciar Sesión</p>
               </IonCardHeader>
               <IonCardContent>
-                <IonItem>
-                  <IonLabel position="stacked">Usuario o Correo</IonLabel>
-                  <IonInput value={username} onIonInput={e => setUsername(e.detail.value!)} onKeyPress={e => e.key === 'Enter' && handleLogin()} />
-                </IonItem>
-                <IonItem>
-                  <IonLabel position="stacked">Contraseña</IonLabel>
-                  <IonInput type="password" value={password} onIonInput={e => setPassword(e.detail.value!)} onKeyPress={e => e.key === 'Enter' && handleLogin()} />
-                </IonItem>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
+                    Usuario o Correo
+                  </label>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                    placeholder="Ej. admin o correo@ejemplo.com"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid #cbd5e1',
+                      background: '#f8fafc',
+                      color: '#0f172a',
+                      outline: 'none',
+                      fontSize: '14px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
+                    Contraseña
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                    placeholder="••••••••"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid #cbd5e1',
+                      background: '#f8fafc',
+                      color: '#0f172a',
+                      outline: 'none',
+                      fontSize: '14px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
 
                 <div style={{ textAlign: 'right', marginTop: '8px', marginBottom: '8px' }}>
                   <button
@@ -315,7 +350,7 @@ const Login: React.FC = () => {
 
                 <div style={{ marginTop: '16px', textAlign: 'center' }}>
                   <a
-                    href={`https://wa.me/${import.meta.env.VITE_SUPPORT_WHATSAPP || '584145652381'}?text=${encodeURIComponent('Hola, tengo problemas para acceder o mi correo es incorrecto en Flujo Fino. ¿Podrían asistirme?')}`}
+                    href={`https://wa.me/${import.meta.env.VITE_SUPPORT_WHATSAPP || '584145652381'}?text=${encodeURIComponent('Hola, tengo problemas para acceder o mi correo es incorrecto en FinoWork. ¿Podrían asistirme?')}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
@@ -359,22 +394,35 @@ const Login: React.FC = () => {
               </IonToolbar>
             </IonHeader>
 
-            <IonContent className="ion-padding" style={{ '--background': '#ffffff' } as any}>
+            <div className="ion-padding" style={{ background: '#ffffff', maxHeight: '85vh', overflowY: 'auto' }}>
               <div style={{ padding: '8px 4px' }}>
                 {forgotStep === 'EMAIL' ? (
                   <div>
                     <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px', lineHeight: '1.4' }}>
                       Ingresa el correo electrónico asociado a tu cuenta para enviarte un código de seguridad de 6 dígitos.
                     </p>
-                    <IonItem lines="full" className="ion-margin-bottom" style={{ '--background': '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' } as any}>
-                      <IonLabel position="stacked">Correo Electrónico</IonLabel>
-                      <IonInput
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '6px', textAlign: 'left' }}>
+                        Correo Electrónico
+                      </label>
+                      <input
                         type="email"
                         value={forgotEmail}
+                        onChange={e => setForgotEmail(e.target.value)}
                         placeholder="tu-correo@ejemplo.com"
-                        onIonInput={e => setForgotEmail(e.detail.value!)}
+                        style={{
+                          width: '100%',
+                          padding: '12px 14px',
+                          borderRadius: '12px',
+                          border: '1px solid #cbd5e1',
+                          background: '#f8fafc',
+                          color: '#0f172a',
+                          outline: 'none',
+                          fontSize: '14px',
+                          boxSizing: 'border-box'
+                        }}
                       />
-                    </IonItem>
+                    </div>
                     <button
                       type="button"
                       onClick={handleRequestResetCode}
@@ -454,7 +502,7 @@ const Login: React.FC = () => {
                   </div>
                 )}
               </div>
-            </IonContent>
+            </div>
           </IonModal>
         </div>
       </IonContent>

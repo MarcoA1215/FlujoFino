@@ -23,7 +23,7 @@ export class NotificationsService {
       'lj7fJ1UKpWb3uy0U03xQigJCxPAI4QU5gEOoTUH2mJg';
     const subject =
       this.configService.get<string>('VAPID_SUBJECT') ||
-      'mailto:admin@flujofino.com';
+      'mailto:admin@finowork.com';
 
     webpush.setVapidDetails(subject, this.vapidPublicKey, privateKey);
   }

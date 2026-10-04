@@ -1,11 +1,11 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+﻿import { Injectable, BadRequestException } from '@nestjs/common';
 import { DataSource, Between, In } from 'typeorm';
 import { IsOptional, IsArray, IsString, IsNumber, IsBoolean } from 'class-validator';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Product } from '../entities/product.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
-import { PaymentStatus, OrderStatus, MovementType, DeliveryMethod, UserRole, ReservationStatus } from '@nutrideli/shared-types';
+import { PaymentStatus, OrderStatus, MovementType, DeliveryMethod, UserRole, ReservationStatus } from '@finowork/shared-types';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { DeliveryZone } from '../entities/delivery-zone.entity';
 import { User } from '../entities/user.entity';

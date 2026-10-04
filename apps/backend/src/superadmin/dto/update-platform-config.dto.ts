@@ -1,4 +1,4 @@
-import { PlatformConfigDTO } from '@nutrideli/shared-types';
+﻿import { PlatformConfigDTO } from '@finowork/shared-types';
 import { IsOptional, IsString, IsNumber, MaxLength, Min, Max } from 'class-validator';
 
 export class UpdatePlatformConfigDto implements PlatformConfigDTO {

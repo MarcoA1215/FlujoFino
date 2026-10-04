@@ -1,6 +1,6 @@
-import { NestFactory } from '@nestjs/core';
+﻿import { NestFactory } from '@nestjs/core';
 import { AppModule } from './src/app.module';
-import { PaymentStatus, DeliveryMethod, OrderStatus } from '@nutrideli/shared-types';
+import { PaymentStatus, DeliveryMethod, OrderStatus } from '@finowork/shared-types';
 import * as assert from 'assert';
 import { DataSource } from 'typeorm';
 

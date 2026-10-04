@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import {
   IonPage,
@@ -28,7 +28,7 @@ import {
   callOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
-import type { CustomerDTO } from '@nutrideli/shared-types';
+import type { CustomerDTO } from '@finowork/shared-types';
 import { offlineDb } from '../services/offline-db';
 import { AuthContext } from '../context/AuthContext';
 import AppHeader from '../components/AppHeader';
@@ -193,7 +193,7 @@ const Customers: React.FC = () => {
     if (clean.startsWith('0')) {
       clean = `58${clean.slice(1)}`;
     }
-    const greeting = encodeURIComponent(`Hola ${customerNameStr}, te saludamos de ${user?.tenantName || 'Flujo Fino'}.`);
+    const greeting = encodeURIComponent(`Hola ${customerNameStr}, te saludamos de ${user?.tenantName || 'FinoWork'}.`);
     return `https://wa.me/${clean}?text=${greeting}`;
   };
 

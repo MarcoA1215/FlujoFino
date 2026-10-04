@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import { APP_NAME, DEFAULT_NOREPLY_EMAIL } from '@finowork/shared-types';
 
 @Injectable()
 export class MailService {
@@ -65,11 +66,11 @@ export class MailService {
   }
 
   async sendVerificationCode(to: string, code: string): Promise<boolean> {
-    const subject = 'Verifica tu correo electrónico - Flujo Fino';
+    const subject = `Verifica tu correo electrónico - ${APP_NAME}`;
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <h2 style="color: #0f172a; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Flujo Fino</h2>
+          <h2 style="color: #0f172a; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">${APP_NAME}</h2>
           <p style="color: #64748b; font-size: 14px; margin-top: 4px;">Confirmación de identidad</p>
         </div>
         <div style="background-color: #f8fafc; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px; border: 1px solid #e2e8f0;">
@@ -87,11 +88,11 @@ export class MailService {
   }
 
   async sendPasswordResetCode(to: string, code: string): Promise<boolean> {
-    const subject = 'Recuperación de contraseña - Flujo Fino';
+    const subject = `Recuperación de contraseña - ${APP_NAME}`;
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <h2 style="color: #0f172a; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Flujo Fino</h2>
+          <h2 style="color: #0f172a; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">${APP_NAME}</h2>
           <p style="color: #64748b; font-size: 14px; margin-top: 4px;">Recuperación de contraseña</p>
         </div>
         <div style="background-color: #f8fafc; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px; border: 1px solid #e2e8f0;">
@@ -115,7 +116,7 @@ export class MailService {
     if (resendKey) {
       try {
         this.lastError = null;
-        const fromAddress = (rawFrom && rawFrom.includes('@')) ? rawFrom : 'Flujo Fino <onboarding@resend.dev>';
+        const fromAddress = (rawFrom && rawFrom.includes('@')) ? rawFrom : `${APP_NAME} <onboarding@resend.dev>`;
         const response = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
@@ -146,8 +147,8 @@ export class MailService {
       }
     }
 
-    const user = this.configService.get<string>('MAIL_USER') || 'no-reply@flujofino.com';
-    const from = (rawFrom && rawFrom.includes('@')) ? rawFrom : `"Flujo Fino" <${user}>`;
+    const user = this.configService.get<string>('MAIL_USER') || DEFAULT_NOREPLY_EMAIL;
+    const from = (rawFrom && rawFrom.includes('@')) ? rawFrom : `"${APP_NAME}" <${user}>`;
 
     if (!this.transporter) {
       this.logger.log(`[SIMULATED MAIL] To: ${to} | Subject: ${subject}`);

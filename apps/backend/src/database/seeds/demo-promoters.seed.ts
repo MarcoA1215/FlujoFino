@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+﻿import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import * as dotenv from 'dotenv';
 import { randomUUID } from 'crypto';
@@ -38,7 +38,7 @@ import {
   PaymentStatus, 
   ReservationStatus, 
   DeliveryMethod 
-} from '@nutrideli/shared-types';
+} from '@finowork/shared-types';
 
 async function runSeed() {
   const databaseUrl = process.env.DATABASE_URL;

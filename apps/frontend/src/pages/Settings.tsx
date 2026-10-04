@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import React, { useState, useEffect, useContext } from 'react';
 import {
   IonPage,
@@ -48,7 +48,7 @@ import {
   SaaSPaymentMethod,
   type MySubscriptionDTO,
   type PlatformConfigDTO,
-} from '@nutrideli/shared-types';
+} from '@finowork/shared-types';
 import { BookingSettings } from '../components/BookingSettings';
 import { AppHeader } from '../components/AppHeader';
 
@@ -393,11 +393,11 @@ const SettingsPage: React.FC = () => {
                     <p style={{ color: '#475569', fontSize: '14px', lineHeight: '1.5', margin: '0 0 16px 0' }}>
                       {subscription.planType === TenantPlanType.PIONEER ? (
                         <>
-                          ¡Tu negocio forma parte de las cuentas <strong>Pioneras</strong> de Flujo Fino! Invita a <strong>2 negocios</strong> que activen su suscripción y tendrás el sistema <strong>100% GRATIS de por vida ($0/mes)</strong>.
+                          ¡Tu negocio forma parte de las cuentas <strong>Pioneras</strong> de FinoWork! Invita a <strong>2 negocios</strong> que activen su suscripción y tendrás el sistema <strong>100% GRATIS de por vida ($0/mes)</strong>.
                         </>
                       ) : (
                         <>
-                          Comparte Flujo Fino con otros negocios amigos. Obtén un <strong>10% de descuento mensual</strong> por cada referido activo que mantengas (¡hasta un <strong>50% de descuento</strong> recurrente!).
+                          Comparte FinoWork con otros negocios amigos. Obtén un <strong>10% de descuento mensual</strong> por cada referido activo que mantengas (¡hasta un <strong>50% de descuento</strong> recurrente!).
                         </>
                       )}
                     </p>
@@ -479,7 +479,7 @@ const SettingsPage: React.FC = () => {
                           }}
                           onClick={() => {
                             const link = `${getPublicBaseUrl()}/register?ref=${subscription.referralCode}`;
-                            const msg = `¡Hola! Te recomiendo Flujo Fino para administrar tu negocio (punto de venta, pedidos, inventario y delivery). Regístrate gratis con mi enlace de invitación: ${link}`;
+                            const msg = `¡Hola! Te recomiendo FinoWork para administrar tu negocio (punto de venta, pedidos, inventario y delivery). Regístrate gratis con mi enlace de invitación: ${link}`;
                             window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
                           }}
                         >
@@ -1287,7 +1287,7 @@ const SettingsPage: React.FC = () => {
               <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '14px', padding: '16px', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
                   <span style={{ fontSize: '13px', color: '#1e40af', fontWeight: 700 }}>
-                    Cuota Mensual Flujo Fino:
+                    Cuota Mensual FinoWork:
                   </span>
                   <span style={{ background: '#dbeafe', color: '#1e40af', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 800 }}>
                     💱 Tasa Oficial: Bs. {exchangeRate.toFixed(2)} / $
@@ -1331,9 +1331,9 @@ const SettingsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Cuentas Receptoras Oficiales Flujo Fino */}
+              {/* Cuentas Receptoras Oficiales FinoWork */}
               <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '12px' }}>
-                1. Cuentas oficiales para transferir a Flujo Fino:
+                1. Cuentas oficiales para transferir a FinoWork:
               </h3>
 
               {platformConfig ? (
@@ -1442,7 +1442,7 @@ const SettingsPage: React.FC = () => {
                           <IonIcon icon={copyOutline} slot="icon-only" />
                         </IonButton>
 
-                        <div><strong>Titular:</strong> {platformConfig.companyAccountHolder || 'Flujo Fino SaaS'}</div>
+                        <div><strong>Titular:</strong> {platformConfig.companyAccountHolder || 'FinoWork SaaS'}</div>
                         <IonButton size="small" fill="clear" onClick={() => copyField(platformConfig.companyAccountHolder, 'Titular')}>
                           <IonIcon icon={copyOutline} slot="icon-only" />
                         </IonButton>

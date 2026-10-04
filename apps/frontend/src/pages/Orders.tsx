@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useContext } from 'react';
+﻿import React, { useEffect, useState, useMemo, useContext } from 'react';
 import {
   IonPage,
   IonContent,
@@ -21,7 +21,7 @@ import {
   cartOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
-import { OrderStatus, PaymentStatus, DeliveryMethod, UserRole } from '@nutrideli/shared-types';
+import { OrderStatus, PaymentStatus, DeliveryMethod, UserRole } from '@finowork/shared-types';
 import type { DeliveryZone } from '../types';
 import { AuthContext } from '../context/AuthContext';
 import AppHeader from '../components/AppHeader';

@@ -1,4 +1,4 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { DeliveriesService } from './deliveries.service';
@@ -7,7 +7,7 @@ import { Product } from '../entities/product.entity';
 import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Settings } from '../entities/settings.entity';
-import { OrderStatus, DeliveryMethod, UserRole, PaymentStatus } from '@nutrideli/shared-types';
+import { OrderStatus, DeliveryMethod, UserRole, PaymentStatus } from '@finowork/shared-types';
 
 describe('DeliveriesService', () => {
   let service: DeliveriesService;

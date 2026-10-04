@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   IonModal,
   IonHeader,
@@ -14,7 +14,7 @@ import {
 } from '@ionic/react';
 import { closeOutline, addCircleOutline, alertCircleOutline, trendingUpOutline, walletOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
-import { InvestmentType } from '@nutrideli/shared-types';
+import { InvestmentType } from '@finowork/shared-types';
 
 interface InvestmentSummary {
   totalExternalUSD: number;

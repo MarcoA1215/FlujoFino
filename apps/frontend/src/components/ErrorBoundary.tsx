@@ -20,7 +20,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('FlujoFino ErrorBoundary caught an error:', error, errorInfo);
+    console.error('FinoWork ErrorBoundary caught an error:', error, errorInfo);
   }
 
   public render() {

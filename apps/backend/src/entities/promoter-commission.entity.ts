@@ -1,4 +1,4 @@
-import {
+﻿import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
@@ -10,7 +10,7 @@ import { ColumnNumericTransformer } from '../common/transformers/column-numeric.
 import { Promoter } from './promoter.entity';
 import { Tenant } from './tenant.entity';
 import { SaaSPaymentReport } from './saas-payment-report.entity';
-import { PromoterCommissionType, PromoterCommissionStatus } from '@nutrideli/shared-types';
+import { PromoterCommissionType, PromoterCommissionStatus } from '@finowork/shared-types';
 
 @Entity('promoter_commissions')
 export class PromoterCommission {

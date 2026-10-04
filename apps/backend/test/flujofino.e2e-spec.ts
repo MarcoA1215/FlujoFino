@@ -1,8 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
-import { PaymentStatus, DeliveryMethod, OrderStatus } from '@nutrideli/shared-types';
+import { PaymentStatus, DeliveryMethod, OrderStatus } from '@finowork/shared-types';
 
 describe('FlujoFino ERP & POS - E2E System Tests', () => {
   let app: INestApplication;

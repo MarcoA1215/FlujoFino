@@ -1,5 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { UserRole } from '@nutrideli/shared-types';
+﻿import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { UserRole } from '@finowork/shared-types';
 
 export enum AccessRequestStatus {
   PENDING = 'PENDING',

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual, IsNull } from 'typeorm';
 import { RawMaterial } from '../entities/raw-material.entity';
@@ -9,7 +9,7 @@ import { OrderItem } from '../entities/order-item.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
 import { Investment } from '../entities/investment.entity';
 import { Reservation } from '../entities/reservation.entity';
-import { MovementType, OrderStatus, InvestmentType, ReservationStatus, PaymentStatus } from '@nutrideli/shared-types';
+import { MovementType, OrderStatus, InvestmentType, ReservationStatus, PaymentStatus } from '@finowork/shared-types';
 
 @Injectable()
 export class DashboardService {

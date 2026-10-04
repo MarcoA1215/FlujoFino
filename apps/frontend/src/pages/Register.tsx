@@ -72,7 +72,7 @@ const Register: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
                 <img
                   src="/assets/logo.png"
-                  alt="Flujo Fino"
+                  alt="FinoWork"
                   style={{
                     width: '72px',
                     height: '72px',

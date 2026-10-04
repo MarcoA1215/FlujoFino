@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+﻿import React, { useState, useEffect, useContext } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -40,7 +40,7 @@ import {
   type PromoterStatsDTO,
   PromoterRank,
   TenantStatus,
-} from '@nutrideli/shared-types';
+} from '@finowork/shared-types';
 
 const PromoterDashboard: React.FC = () => {
   const { user } = useContext(AuthContext);
@@ -100,7 +100,7 @@ const PromoterDashboard: React.FC = () => {
   };
 
   const handleShareWhatsApp = () => {
-    const message = `¡Hola! Te invito a digitalizar tu negocio con Flujo Fino SaaS (POS, Inventario, Reportes y Catálogo Digital). Regístrate usando mi enlace de promotor oficial para activar tu período de prueba gratuito: ${affiliateLink}`;
+    const message = `¡Hola! Te invito a digitalizar tu negocio con FinoWork SaaS (POS, Inventario, Reportes y Catálogo Digital). Regístrate usando mi enlace de promotor oficial para activar tu período de prueba gratuito: ${affiliateLink}`;
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
@@ -205,7 +205,7 @@ const PromoterDashboard: React.FC = () => {
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em'
                 }}>
-                  Embajador Oficial Flujo Fino
+                  Embajador Oficial FinoWork
                 </span>
                 <h1 style={{ fontSize: '26px', fontWeight: 800, margin: '8px 0 4px 0' }}>
                   ¡Hola, {user?.username}! 👋
@@ -547,7 +547,7 @@ const PromoterDashboard: React.FC = () => {
           <IonContent className="ion-padding" style={{ '--background': '#f8fafc' } as any}>
             <div style={{ maxWidth: '500px', margin: '0 auto' }}>
               <p style={{ color: '#475569', fontSize: '13px', marginBottom: '16px' }}>
-                Ingresa tus datos donde el SuperAdmin de Flujo Fino liquidará tus comisiones por Pago Móvil o Binance Pay.
+                Ingresa tus datos donde el SuperAdmin de FinoWork liquidará tus comisiones por Pago Móvil o Binance Pay.
               </p>
 
               <IonCard style={{ margin: 0, borderRadius: '12px' }}>

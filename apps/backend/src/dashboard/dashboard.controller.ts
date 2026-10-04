@@ -1,8 +1,8 @@
-import { Controller, Get, Request, UseGuards } from '@nestjs/common';
+﻿import { Controller, Get, Request, UseGuards } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 
 @Controller('dashboard')
 export class DashboardController {

@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import {
   IonPage,
@@ -39,7 +39,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
 import { apiClient } from '../api/client';
-import { ReservationStatus } from '@nutrideli/shared-types';
+import { ReservationStatus } from '@finowork/shared-types';
 import { offlineDb } from '../services/offline-db';
 import { AuthContext } from '../context/AuthContext';
 import { useImageViewer } from '../context/ImageViewerContext';
@@ -441,7 +441,7 @@ const Reservations: React.FC = () => {
   }, [reservations]);
 
   const tenantInitials = useMemo(() => {
-    const name = user?.tenantName || 'Flujo Fino';
+    const name = user?.tenantName || 'FinoWork';
     return name
       .split(' ')
       .slice(0, 2)
@@ -464,14 +464,14 @@ const Reservations: React.FC = () => {
                 Agenda
               </h1>
               <div style={{ fontSize: '13px', fontWeight: '500', color: '#64748B', marginTop: '2px' }}>
-                {user?.tenantName || 'Flujo Fino • Barbería & Estética'}
+                {user?.tenantName || 'FinoWork • Barbería & Estética'}
               </div>
             </div>
 
             {/* Tenant Logo Badge */}
             <img 
               src="/assets/logo.png" 
-              alt="Flujo Fino" 
+              alt="FinoWork" 
               className="w-12 h-12 rounded-2xl object-cover shadow-sm" 
               style={{ width: '42px', height: '42px', borderRadius: '12px', objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
             />
@@ -734,7 +734,7 @@ const Reservations: React.FC = () => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 const cleanPhone = res.customerPhone.replace(/\D/g, '');
-                                const text = encodeURIComponent(`Hola ${res.customerName}, te escribimos de ${user?.tenantName || 'Flujo Fino'} respecto a tu cita para ${res.serviceName || 'nuestro servicio'} el ${res.date} a las ${res.time}.`);
+                                const text = encodeURIComponent(`Hola ${res.customerName}, te escribimos de ${user?.tenantName || 'FinoWork'} respecto a tu cita para ${res.serviceName || 'nuestro servicio'} el ${res.date} a las ${res.time}.`);
                                 window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
                               }}
                               style={{

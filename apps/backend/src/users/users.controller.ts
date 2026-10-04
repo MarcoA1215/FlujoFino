@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Put, Patch, Body, Param, Delete, UseGuards, Request } from '@nestjs/common';
+﻿import { Controller, Get, Post, Put, Patch, Body, Param, Delete, UseGuards, Request } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)

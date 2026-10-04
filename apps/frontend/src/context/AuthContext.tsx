@@ -1,7 +1,7 @@
-import React, { createContext, useState, useEffect } from 'react';
+﻿import React, { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { apiClient } from '../api/client';
-import { UserRole } from '@nutrideli/shared-types';
+import { UserRole } from '@finowork/shared-types';
 import { Preferences } from '@capacitor/preferences';
 
 interface User {

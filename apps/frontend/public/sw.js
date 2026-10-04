@@ -8,7 +8,7 @@ self.addEventListener('push', (event) => {
     }
   }
 
-  const title = data.title || 'Flujo Fino';
+  const title = data.title || 'FinoWork';
   const options = {
     body: data.body || 'Tienes una nueva notificación.',
     icon: data.icon || '/favicon.svg',

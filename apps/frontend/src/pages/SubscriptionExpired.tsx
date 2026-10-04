@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+﻿import React, { useState, useContext } from 'react';
 import {
   IonPage,
   IonContent,
@@ -9,7 +9,6 @@ import {
   IonIcon,
   IonItem,
   IonLabel,
-  IonInput,
   IonSelect,
   IonSelectOption,
   IonSpinner,
@@ -24,7 +23,7 @@ import {
   logOutOutline,
   businessOutline,
 } from 'ionicons/icons';
-import { SaaSPaymentMethod } from '@nutrideli/shared-types';
+import { SaaSPaymentMethod } from '@finowork/shared-types';
 import { apiClient } from '../api/client';
 import { SubscriptionContext } from '../context/SubscriptionContext';
 import { AuthContext } from '../context/AuthContext';
@@ -121,7 +120,7 @@ const SubscriptionExpired: React.FC = () => {
     : cleanPhone || '584120000000';
 
   const waMessage = encodeURIComponent(
-    `Hola Soporte Flujo Fino, me comunico respecto al vencimiento de suscripción de mi negocio: "${user?.tenantName || 'Mi Negocio'}". Deseo reactivar el servicio.`
+    `Hola Soporte FinoWork, me comunico respecto al vencimiento de suscripción de mi negocio: "${user?.tenantName || 'Mi Negocio'}". Deseo reactivar el servicio.`
   );
   const waUrl = `https://wa.me/${supportPhone}?text=${waMessage}`;
 
@@ -130,7 +129,7 @@ const SubscriptionExpired: React.FC = () => {
       <IonHeader>
         <IonToolbar color="danger">
           <IonTitle style={{ fontWeight: 800, fontSize: '1.1rem' }}>
-            Suscripción Requerida - Flujo Fino
+            Suscripción Requerida - FinoWork
           </IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={() => logout()} title="Cerrar sesión">
@@ -232,7 +231,7 @@ const SubscriptionExpired: React.FC = () => {
               }}
             >
               <span style={{ fontSize: '13px', color: '#1e40af', fontWeight: 800, textTransform: 'uppercase' }}>
-                Plan Mensual Flujo Fino
+                Plan Mensual FinoWork
               </span>
               <span
                 style={{
@@ -476,43 +475,78 @@ const SubscriptionExpired: React.FC = () => {
             </IonItem>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-              <IonItem lines="none" style={{ '--background': '#f8fafc', borderRadius: '8px' }}>
-                <IonLabel position="stacked" style={{ fontWeight: 700 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                   Monto USD ($)
-                </IonLabel>
-                <IonInput
+                </label>
+                <input
                   type="number"
+                  step="any"
                   value={reportAmountUsd}
-                  onIonInput={(e) => handleAmountUsdChange(Number(e.detail.value))}
-                  style={{ fontWeight: 700 }}
+                  onChange={(e) => handleAmountUsdChange(Number(e.target.value))}
+                  style={{
+                    width: '100%',
+                    padding: '11px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    background: '#f8fafc',
+                    color: '#0f172a',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
                 />
-              </IonItem>
+              </div>
 
-              <IonItem lines="none" style={{ '--background': '#f8fafc', borderRadius: '8px' }}>
-                <IonLabel position="stacked" style={{ fontWeight: 700 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                   Monto Bs
-                </IonLabel>
-                <IonInput
+                </label>
+                <input
                   type="number"
+                  step="any"
                   value={reportAmountBs}
-                  onIonInput={(e) => handleAmountBsChange(Number(e.detail.value))}
-                  style={{ fontWeight: 700 }}
+                  onChange={(e) => handleAmountBsChange(Number(e.target.value))}
+                  style={{
+                    width: '100%',
+                    padding: '11px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    background: '#f8fafc',
+                    color: '#0f172a',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
                 />
-              </IonItem>
+              </div>
             </div>
 
-            <IonItem lines="none" style={{ '--background': '#f8fafc', borderRadius: '8px', marginBottom: '16px' }}>
-              <IonLabel position="stacked" style={{ fontWeight: 700 }}>
-                Número de Referencia *
-              </IonLabel>
-              <IonInput
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                Número de Referencia del Pago *
+              </label>
+              <input
                 type="text"
-                placeholder="Número de comprobante o referencia bancaria"
+                placeholder="Ej. 123456 (últimos dígitos o referencia)"
                 value={reportReference}
-                onIonInput={(e) => setReportReference(e.detail.value || '')}
-                style={{ fontWeight: 600 }}
+                onChange={(e) => setReportReference(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '11px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  background: '#f8fafc',
+                  color: '#0f172a',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                }}
               />
-            </IonItem>
+            </div>
 
             <IonButton
               expand="block"
