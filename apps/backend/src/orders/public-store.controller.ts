@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OrdersService, CreateOrderDto } from './orders.service';
@@ -95,6 +95,8 @@ export class PublicStoreController {
           if (possible < minAvail) minAvail = possible;
         }
         availableStock = minAvail === Infinity ? 0 : Math.max(0, minAvail);
+      } else if (p.physicalStock !== undefined && p.physicalStock !== null && availableStock > p.physicalStock) {
+        availableStock = Math.max(0, Number(p.physicalStock));
       }
       const isUnderDemand = p.availabilityType === 'BAJO_ENCARGO' || Boolean(p.isSupplierPreorder);
 
@@ -244,6 +246,8 @@ export class PublicStoreController {
             if (possible < minAvail) minAvail = possible;
           }
           availableStock = minAvail === Infinity ? 0 : Math.max(0, minAvail);
+        } else if (product.physicalStock !== undefined && product.physicalStock !== null && availableStock > product.physicalStock) {
+          availableStock = Math.max(0, Number(product.physicalStock));
         }
         if (availableStock <= 0) {
           throw new BadRequestException(

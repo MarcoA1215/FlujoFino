@@ -1,4 +1,4 @@
-﻿import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from '../entities/product.entity';
@@ -31,6 +31,15 @@ export class ProductsService {
       }
     });
 
+    const needsHealing = products.filter(p => !p.is_service && p.category !== 'Servicios' && !p.isCombo && p.physicalStock !== undefined && p.physicalStock !== null && p.stockQuantity > p.physicalStock);
+    if (needsHealing.length > 0) {
+      Promise.all(needsHealing.map(p => {
+        p.stockQuantity = Math.max(0, p.physicalStock);
+        p.stock = p.stockQuantity;
+        return this.productRepo.save(p);
+      })).catch(err => console.error('Error auto-healing inconsistent product stock:', err));
+    }
+
     return products.map(p => {
       let finalStock = p.stockQuantity;
       let finalPhysical = p.physicalStock;
@@ -46,6 +55,11 @@ export class ProductsService {
         }
         finalStock = minAvail === Infinity ? 0 : minAvail;
         finalPhysical = minPhys === Infinity ? 0 : minPhys;
+      } else if (!p.is_service && p.category !== 'Servicios') {
+        // En productos tangibles, el stock disponible para venta nunca puede exceder el stock físico real
+        if (finalPhysical !== undefined && finalPhysical !== null && finalStock > finalPhysical) {
+          finalStock = Math.max(0, finalPhysical);
+        }
       }
 
       const cleanedComboItems = p.comboItems?.map(ci => ({
