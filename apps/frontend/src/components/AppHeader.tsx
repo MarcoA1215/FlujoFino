@@ -329,8 +329,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     user?.role === UserRole.SUPERADMIN ||
     (user?.role as string) === 'ADMIN' ||
     (user?.role as string) === 'POS' ||
-    (user?.role as string) === 'SUPERADMIN' ||
-    (user?.roles && (user.roles.includes(UserRole.ADMIN) || user.roles.includes(UserRole.POS) || user.roles.includes(UserRole.SUPERADMIN)));
+    (user?.role as string) === 'SUPERADMIN';
 
   return (
     <>
