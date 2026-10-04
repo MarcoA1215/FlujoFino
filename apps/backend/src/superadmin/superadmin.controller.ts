@@ -14,6 +14,7 @@ import { SuperAdminGuard } from './superadmin.guard';
 import { UpdateTenantPlanDto } from './dto/update-tenant-plan.dto';
 import { ReportPaymentDto } from './dto/report-payment.dto';
 import { UpdatePlatformConfigDto } from './dto/update-platform-config.dto';
+import { CreatePromoterDto } from './dto/create-promoter.dto';
 
 @Controller('superadmin')
 export class SuperAdminController {
@@ -101,6 +102,12 @@ export class SuperAdminController {
     return await this.superadminService.getPromotersOverview();
   }
 
+  @Post('promoters')
+  @UseGuards(SuperAdminGuard)
+  async createPromoter(@Body() body: CreatePromoterDto) {
+    return await this.superadminService.createPromoter(body);
+  }
+
   @Post('promoters/commissions/:id/pay')
   @UseGuards(SuperAdminGuard)
   async payCommission(
@@ -110,3 +117,4 @@ export class SuperAdminController {
     return await this.superadminService.payPromoterCommission(id, paymentReference);
   }
 }
+
