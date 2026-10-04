@@ -141,6 +141,13 @@ const Orders: React.FC = () => {
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('');
 
+  const isDeliveryDriver = (emp: any) => {
+    if (!emp) return false;
+    if (emp.role === UserRole.DELIVERY) return true;
+    if (Array.isArray(emp.roles) && emp.roles.includes(UserRole.DELIVERY)) return true;
+    return false;
+  };
+
   const formatLocalAmount = (amount: number, symbol: string = currencySymbol) => {
     if (symbol === 'COP') {
       return `${Math.round(amount).toLocaleString('es-CO')} COP`;
@@ -698,19 +705,18 @@ const Orders: React.FC = () => {
                           } as any}
                         >
                           <IonSelectOption value="">(Sin asignar)</IonSelectOption>
-                          {employees.map(driver => {
-                            const roleName = driver.jobTitle || (
-                              driver.role === UserRole.DELIVERY ? 'Repartidor' :
-                              driver.role === UserRole.POS ? 'Cajero / Delivery' :
-                              driver.role === UserRole.ADMIN ? 'Admin' :
-                              driver.role === UserRole.OPERATIVO ? 'Operativo' : (driver.role || 'Empleado')
-                            );
-                            return (
-                              <IonSelectOption key={driver.id} value={driver.id}>
-                                🛵 {driver.username || driver.name} ({roleName})
-                              </IonSelectOption>
-                            );
-                          })}
+                          {employees
+                            .filter(driver => driver.id === order.deliveryUserId || isDeliveryDriver(driver))
+                            .map(driver => {
+                              const roleName = driver.jobTitle || (
+                                isDeliveryDriver(driver) ? 'Repartidor' : (driver.role || 'Empleado')
+                              );
+                              return (
+                                <IonSelectOption key={driver.id} value={driver.id}>
+                                  🛵 {driver.username || driver.name} ({roleName})
+                                </IonSelectOption>
+                              );
+                            })}
                         </IonSelect>
                       </div>
                     )}
@@ -1095,19 +1101,18 @@ const Orders: React.FC = () => {
                           } as any}
                         >
                           <IonSelectOption value="">-- Sin repartidor asignado --</IonSelectOption>
-                          {employees.map((driver: any) => {
-                            const roleName = driver.jobTitle || (
-                              driver.role === UserRole.DELIVERY ? 'Repartidor' :
-                              driver.role === UserRole.POS ? 'Cajero / Delivery' :
-                              driver.role === UserRole.ADMIN ? 'Admin' :
-                              driver.role === UserRole.OPERATIVO ? 'Operativo' : (driver.role || 'Empleado')
-                            );
-                            return (
-                              <IonSelectOption key={driver.id} value={driver.id}>
-                                🛵 {driver.name || driver.username} ({roleName})
-                              </IonSelectOption>
-                            );
-                          })}
+                          {employees
+                            .filter((driver: any) => driver.id === selectedOrderForDetails.deliveryUserId || isDeliveryDriver(driver))
+                            .map((driver: any) => {
+                              const roleName = driver.jobTitle || (
+                                isDeliveryDriver(driver) ? 'Repartidor' : (driver.role || 'Empleado')
+                              );
+                              return (
+                                <IonSelectOption key={driver.id} value={driver.id}>
+                                  🛵 {driver.name || driver.username} ({roleName})
+                                </IonSelectOption>
+                              );
+                            })}
                         </IonSelect>
                       </div>
                     )}

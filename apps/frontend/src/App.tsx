@@ -1,4 +1,4 @@
-﻿import { IonApp, IonRouterOutlet, IonSplitPane, setupIonicReact } from '@ionic/react';
+import { IonApp, IonRouterOutlet, IonSplitPane, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import { Navigate, Route, useLocation } from 'react-router-dom';
 import Menu from './components/Menu';
@@ -37,7 +37,7 @@ import { useContext, useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { apiClient } from './api/client';
-import { getContrastColor } from './utils/colors';
+import { getContrastColor, ensureReadableColor } from './utils/colors';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -257,9 +257,14 @@ const MainLayout: React.FC = () => {
     const primary = settings?.themePrimaryColor || '#10b981';
     const header = settings?.themeHeaderColor || '#ffffff';
     const contrastText = getContrastColor(primary);
+    const headerContrastText = getContrastColor(header);
+    const readablePrimary = ensureReadableColor(primary);
+
     document.documentElement.style.setProperty('--theme-primary', primary);
     document.documentElement.style.setProperty('--theme-primary-contrast', contrastText);
+    document.documentElement.style.setProperty('--theme-primary-readable', readablePrimary);
     document.documentElement.style.setProperty('--theme-header', header);
+    document.documentElement.style.setProperty('--theme-header-contrast', headerContrastText);
     document.documentElement.style.setProperty('--ion-color-primary', primary);
     document.documentElement.style.setProperty('--ion-color-primary-contrast', contrastText);
   }, [settings?.themePrimaryColor, settings?.themeHeaderColor]);

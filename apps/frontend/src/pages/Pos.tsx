@@ -173,8 +173,15 @@ const Pos: React.FC = () => {
   const [linkedReservationId, setLinkedReservationId] = useState<string | null>(null);
 
   // Employees
-  const [employees, setEmployees] = useState<{ id: string; username: string; name?: string; role?: string; jobTitle?: string }[]>([]);
+  const [employees, setEmployees] = useState<{ id: string; username: string; name?: string; role?: string; roles?: string[]; jobTitle?: string }[]>([]);
   const [employeeId, setEmployeeId] = useState<string>('');
+
+  const isDeliveryDriver = (emp: any) => {
+    if (!emp) return false;
+    if (emp.role === UserRole.DELIVERY) return true;
+    if (Array.isArray(emp.roles) && emp.roles.includes(UserRole.DELIVERY)) return true;
+    return false;
+  };
 
   // Fetching Products
   const fetchProducts = async () => {
@@ -277,6 +284,15 @@ const Pos: React.FC = () => {
       fetchEmployees();
     }
   }, [deliveryMethod]);
+
+  useEffect(() => {
+    if (deliveryUserId && employees.length > 0) {
+      const isValid = employees.some(d => d.id === deliveryUserId && isDeliveryDriver(d));
+      if (!isValid) {
+        setDeliveryUserId('');
+      }
+    }
+  }, [employees, deliveryUserId]);
 
   const fetchRawMaterials = async () => {
     try {
@@ -1495,19 +1511,16 @@ const Pos: React.FC = () => {
                           style={{ '--padding-start': '6px', '--padding-end': '6px', minHeight: '42px', width: '100%', maxWidth: '100%' }}
                         >
                           <IonSelectOption value="">Sin asignar / A convenir</IonSelectOption>
-                          {employees.map(d => {
-                            const roleName = d.jobTitle || (
-                              d.role === UserRole.DELIVERY ? 'Repartidor' :
-                              d.role === UserRole.POS ? 'Cajero / Delivery' :
-                              d.role === UserRole.ADMIN ? 'Admin' :
-                              d.role === UserRole.OPERATIVO ? 'Operativo' : (d.role || 'Empleado')
-                            );
-                            return (
-                              <IonSelectOption key={d.id} value={d.id}>
-                                🛵 {d.username || d.name} ({roleName})
-                              </IonSelectOption>
-                            );
-                          })}
+                          {employees
+                            .filter(d => isDeliveryDriver(d))
+                            .map(d => {
+                              const roleName = d.jobTitle || 'Repartidor';
+                              return (
+                                <IonSelectOption key={d.id} value={d.id}>
+                                  🛵 {d.username || d.name} ({roleName})
+                                </IonSelectOption>
+                              );
+                            })}
                         </IonSelect>
                       </div>
                     </div>

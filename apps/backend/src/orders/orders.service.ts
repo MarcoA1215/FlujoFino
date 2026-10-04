@@ -1,4 +1,4 @@
-﻿import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { DataSource, Between, In } from 'typeorm';
 import { IsOptional, IsArray, IsString, IsNumber, IsBoolean } from 'class-validator';
 import { Order } from '../entities/order.entity';
@@ -358,8 +358,14 @@ export class OrdersService {
         const dAccess = await manager.findOne(UserTenantAccess, {
           where: { userId: dto.deliveryUserId, tenantId, isActive: true }
         });
+        const userRoles: string[] = [];
+        if (dAccess?.role) userRoles.push(dAccess.role);
+        if (Array.isArray(dAccess?.roles)) userRoles.push(...dAccess.roles);
+        else if (typeof dAccess?.roles === 'string' && dAccess.roles.trim() !== '') {
+          userRoles.push(...dAccess.roles.split(',').map((r: string) => r.trim()));
+        }
         const allowedRoles = [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO];
-        if (!dAccess || !allowedRoles.includes(dAccess.role as UserRole)) {
+        if (!dAccess || !userRoles.some(r => allowedRoles.includes(r as UserRole))) {
           throw new BadRequestException('El repartidor asignado debe ser un miembro activo del equipo de trabajo');
         }
         deliveryUserIdToSave = dto.deliveryUserId;
@@ -1177,8 +1183,14 @@ export class OrdersService {
           const dAccess = await manager.findOne(UserTenantAccess, {
             where: { userId: dto.deliveryUserId, tenantId, isActive: true }
           });
+          const userRoles: string[] = [];
+          if (dAccess?.role) userRoles.push(dAccess.role);
+          if (Array.isArray(dAccess?.roles)) userRoles.push(...dAccess.roles);
+          else if (typeof dAccess?.roles === 'string' && dAccess.roles.trim() !== '') {
+            userRoles.push(...dAccess.roles.split(',').map((r: string) => r.trim()));
+          }
           const allowedRoles = [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO];
-          if (!dAccess || !allowedRoles.includes(dAccess.role as UserRole)) {
+          if (!dAccess || !userRoles.some(r => allowedRoles.includes(r as UserRole))) {
             throw new BadRequestException('El repartidor asignado debe ser un miembro activo del equipo de trabajo');
           }
           order.deliveryUserId = dto.deliveryUserId;
@@ -1626,8 +1638,14 @@ export class OrdersService {
       const dAccess = await this.dataSource.manager.findOne(UserTenantAccess, {
         where: { userId: deliveryUserId, tenantId, isActive: true },
       });
+      const userRoles: string[] = [];
+      if (dAccess?.role) userRoles.push(dAccess.role);
+      if (Array.isArray(dAccess?.roles)) userRoles.push(...dAccess.roles);
+      else if (typeof dAccess?.roles === 'string' && dAccess.roles.trim() !== '') {
+        userRoles.push(...dAccess.roles.split(',').map((r: string) => r.trim()));
+      }
       const allowedRoles = [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO];
-      if (!dAccess || !allowedRoles.includes(dAccess.role as UserRole)) {
+      if (!dAccess || !userRoles.some(r => allowedRoles.includes(r as UserRole))) {
         throw new BadRequestException('El repartidor asignado debe ser un miembro activo del equipo de trabajo');
       }
       order.deliveryUserId = deliveryUserId;

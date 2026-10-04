@@ -490,10 +490,12 @@ packages/
 .gitattributes
 .gitignore
 .yarnrc.yml
+app-debug.apk
 build-front.ps1
 build-types.ps1
 build.ps1
 CLAUDE.md
+FinoWork.apk
 GEMINI.md
 install-app.ps1
 package.json
@@ -7086,7 +7088,15 @@ export const apiClient = axios.create({
 const MUTATION_METHODS = ['post', 'put', 'delete', 'patch'];
 
 apiClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    // Garantizar que toda petición lleve el token actual aunque defaults aún no haya sincronizado
+    if (!config.headers.Authorization) {
+      const { value: token } = await Preferences.get({ key: 'token' });
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+
     const method = config.method?.toLowerCase() || '';
     if (MUTATION_METHODS.includes(method) && !config.skipGlobalLoading) {
       getGlobalLoadingHandler()?.show(config.loadingMessage || 'Procesando...');
@@ -7111,17 +7121,6 @@ apiClient.interceptors.response.use(
       const method = error.config.method?.toLowerCase() || '';
       if (MUTATION_METHODS.includes(method) && !error.config.skipGlobalLoading) {
         getGlobalLoadingHandler()?.hide();
-      }
-    }
-
-    if (error.response && error.response.status === 401) {
-      // Evitar loop infinito si ya estamos en /login
-      if (!window.location.pathname.includes('/login')) {
-        await Preferences.remove({ key: 'token' });
-        await Preferences.remove({ key: 'user' });
-        delete apiClient.defaults.headers.common['Authorization'];
-        // Limpieza total del estado local (forzamos unmount completo)
-        window.location.href = '/login?expired=true';
       }
     }
     return Promise.reject(error);
@@ -10483,6 +10482,301 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+</file>
+
+<file path="apps/frontend/src/components/products/ProductCard.tsx">
+import { pencilOutline, trashOutline, buildOutline, cubeOutline, swapHorizontalOutline, cutOutline, warningOutline, closeOutline } from 'ionicons/icons';
+import React from 'react';
+import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
+import type { Product } from '../../types';
+import { useImageViewer } from '../../context/ImageViewerContext';
+
+interface ProductCardProps {
+  product: Product;
+  onEdit: (p: Product) => void;
+  onDelete: (p: Product) => void;
+  onConfigure: (p: Product) => void;
+  onAdjustStock: (p: Product) => void;
+  onAddStock?: (p: Product) => void;
+  onRegisterLoss: (p: Product) => void;
+  onToggleKitting?: (p: Product) => void;
+  onUnpackKit?: (p: Product) => void;
+  onConvertType?: (p: Product, targetType: 'REVENTA' | 'FORMULA' | 'SERVICIO') => void;
+  isClientMode?: boolean;
+  featureRecipes?: boolean;
+  featureProduction?: boolean;
+  featureBuySell?: boolean;
+  featureCustomerSchedules?: boolean;
+}
+
+export const ProductCard: React.FC<ProductCardProps> = ({
+  product: p,
+  onEdit,
+  onDelete,
+  onConfigure,
+  onAdjustStock,
+  onAddStock,
+  onRegisterLoss,
+  onToggleKitting,
+  onUnpackKit,
+  onConvertType,
+  isClientMode,
+  featureRecipes,
+  featureProduction,
+  featureBuySell,
+  featureCustomerSchedules
+}) => {
+  const { openImage } = useImageViewer();
+  const [present] = useIonActionSheet();
+
+  const openOptions = () => {
+    const currentType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = 
+      p.product_type || 
+      (p.is_service === true || p.category === 'Servicios' ? 'SERVICIO' : 
+      ((p.recipe && p.recipe.length > 0) || p.isCombo ? 'FORMULA' : 'REVENTA'));
+    const isService = currentType === 'SERVICIO';
+    const isFormula = currentType === 'FORMULA';
+    const isResale = currentType === 'REVENTA';
+
+    const buttons: any[] = [
+      { text: 'Editar Info / Precio', icon: pencilOutline, cssClass: 'action-sheet-editar', handler: () => onEdit(p) }
+    ];
+
+    // Opciones según arquetipo del producto
+    if (isResale) {
+      if (onAddStock) {
+        buttons.push({ text: 'Cargar Stock', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAddStock(p) });
+      }
+    } else if (isFormula || p.isCombo) {
+      if (p.isCombo) {
+        buttons.push({ text: 'Configurar Combo', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
+      } else if (featureRecipes) {
+        buttons.push({ text: 'Configurar Fórmula / Receta', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
+      }
+
+      if (featureProduction !== false && (p.isCombo || (p.recipe && p.recipe.length > 0)) && onToggleKitting && (p.isCombo || featureRecipes)) {
+        buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Hecho al Instante' : 'Pre-Fabricado'}`, icon: swapHorizontalOutline, cssClass: 'action-sheet-cambiar', handler: () => onToggleKitting(p) });
+      }
+
+      if (featureProduction !== false && p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) {
+        buttons.push({ text: 'Desarmar 1 Und', icon: cutOutline, cssClass: 'action-sheet-desarmar', handler: () => onUnpackKit(p) });
+      }
+
+      if (p.isPreAssembled && onAdjustStock) {
+        buttons.push({ text: 'Ajustar Stock Ensamblado', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) });
+      }
+    } else if (isService) {
+      if (featureRecipes) {
+        buttons.push({ 
+          text: 'Configurar Insumos del Servicio', 
+          icon: buildOutline, 
+          cssClass: 'action-sheet-editar', 
+          handler: () => onConfigure(p) 
+        });
+      }
+    }
+
+    if (onConvertType) {
+      if (currentType !== 'REVENTA' && featureBuySell) {
+        buttons.push({
+          text: 'Convertir a Reventa Directa',
+          icon: cubeOutline,
+          cssClass: 'action-sheet-cambiar',
+          handler: () => onConvertType(p, 'REVENTA')
+        });
+      }
+      if (currentType !== 'FORMULA' && featureRecipes) {
+        buttons.push({
+          text: 'Convertir a Producto Armable / Fórmula',
+          icon: buildOutline,
+          cssClass: 'action-sheet-cambiar',
+          handler: () => onConvertType(p, 'FORMULA')
+        });
+      }
+      if (currentType !== 'SERVICIO' && featureCustomerSchedules) {
+        buttons.push({
+          text: 'Convertir a Servicio / Cita',
+          icon: cutOutline,
+          cssClass: 'action-sheet-cambiar',
+          handler: () => onConvertType(p, 'SERVICIO')
+        });
+      }
+    }
+
+    if (!isService) {
+      buttons.push({ text: 'Registrar Pérdida', icon: warningOutline, cssClass: 'action-sheet-eliminar', handler: () => onRegisterLoss(p) });
+    }
+
+    buttons.push({ text: 'Subir Imagen', icon: 'image-outline', handler: () => document.getElementById(`upload-${p.id}`)?.click() });
+    buttons.push({ text: isService ? 'Eliminar Servicio' : 'Eliminar Producto', icon: trashOutline, role: 'destructive', handler: () => onDelete(p) });
+    buttons.push({ text: 'Cancelar', icon: closeOutline, role: 'cancel' });
+
+    present({
+      header: 'Opciones de Producto',
+      buttons
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const { apiClient } = await import('../../api/client');
+        await apiClient.post(`/products/${p.id}/image`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        alert('Imagen subida con éxito');
+        window.location.reload(); // Quick refresh to show it, or trigger a fetch
+      } catch (err) {
+        alert('Error al subir la imagen');
+      }
+    }
+  };
+  
+  const getProductImage = () => {
+    if (!p.images) return null;
+    if (Array.isArray(p.images) && p.images.length > 0) {
+      return p.images[p.images.length - 1];
+    }
+    if (typeof p.images === 'string' && (p.images as string).trim().length > 0) {
+      const parts = (p.images as string).split(',');
+      return parts[parts.length - 1].trim();
+    }
+    return null;
+  };
+  const imageUrl = getProductImage();
+  const currentType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = 
+    p.product_type || 
+    (p.is_service === true || p.category === 'Servicios' ? 'SERVICIO' : 
+    ((p.recipe && p.recipe.length > 0) || p.isCombo ? 'FORMULA' : 'REVENTA'));
+  const isService = currentType === 'SERVICIO';
+  const isFormula = currentType === 'FORMULA';
+  const isResale = currentType === 'REVENTA';
+  const costValue = p.cost !== undefined && p.cost !== null && Number(p.cost) > 0 ? Number(p.cost) : (p.estimatedCost ? Number(p.estimatedCost) : 0);
+  const currentStock = p.stock !== undefined && p.stock !== null ? p.stock : p.stockQuantity;
+
+  return (
+    <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3" style={{ display: 'flex' }}>
+      <input type="file" id={`upload-${p.id}`} style={{ display: 'none' }} accept="image/*" onChange={handleFileChange} />
+      <IonCard style={{ margin: '5px', width: '100%', display: 'flex', flexDirection: 'column' }}>
+        <IonCardContent style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '15px' }}>
+          
+          <div style={{ flex: 1 }}>
+            {imageUrl && (
+              <img 
+                src={imageUrl} 
+                alt={p.name} 
+                onClick={(e) => { e.stopPropagation(); openImage(imageUrl, p.name); }}
+                title="Toca para ver en grande"
+                style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '10px', cursor: 'zoom-in' }} 
+              />
+            )}
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 5px 0', lineHeight: '1.3' }}>{p.name}</h2>
+            
+            {!isClientMode && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0 0 8px 0', flexWrap: 'wrap' }}>
+                <span style={{ color: '#64748b', fontSize: '0.85rem' }}>{p.category || 'Sin categoría'}</span>
+                <span style={{
+                  fontSize: '0.72rem',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  fontWeight: 'bold',
+                  backgroundColor: isResale ? '#dcfce7' : isFormula ? '#fef3c7' : '#e0e7ff',
+                  color: isResale ? '#166534' : isFormula ? '#92400e' : '#3730a3',
+                }}>
+                  {isResale ? '📦 Reventa' : isFormula ? '🧪 Armable / Fórmula' : '💆 Servicio'}
+                </span>
+              </div>
+            )}
+            
+            <p style={{ margin: '0 0 12px 0', fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--ion-color-dark)' }}>
+              Precio: ${p.salePrice.toFixed(2)}
+            </p>
+
+            {costValue > 0 && !isClientMode && (
+              <p style={{ margin: '-8px 0 10px 0', fontSize: '0.82rem', color: '#10b981', fontWeight: 600 }}>
+                {isResale ? 'Costo:' : 'Costo Est.:'} ${costValue.toFixed(2)} &bull; Margen: ${(p.salePrice - costValue).toFixed(2)}
+              </p>
+            )}
+
+            {isClientMode && (
+              <p style={{ margin: '0 0 12px 0', color: (isService || currentStock > 0) ? 'var(--ion-color-success)' : 'var(--ion-color-danger)', fontWeight: '500', fontSize: '0.9rem' }}>
+                {isService ? 'Disponible' : (currentStock > 0 ? `Disponible: ${currentStock}` : 'Agotado')}
+              </p>
+            )}
+
+            {!isClientMode && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+                {isResale ? (
+                  <IonBadge color={currentStock <= 0 ? 'danger' : 'success'} style={{ padding: '6px 8px', fontSize: '0.82rem', fontWeight: 'bold' }}>
+                    Stock: {currentStock}
+                  </IonBadge>
+                ) : !isService && (!p.isCombo || p.isPreAssembled) ? (
+                  <>
+                    {Boolean(featureProduction) && (
+                      <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                        Físico: {p.physicalStock}
+                      </IonBadge>
+                    )}
+                    <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                      Disp: {p.stockQuantity}
+                    </IonBadge>
+                  </>
+                ) : null}
+                {!isService && (p.isCombo && !p.isPreAssembled) && (
+                  <IonBadge color="tertiary" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                    Combo (Virtual)
+                  </IonBadge>
+                )}
+                {!isService && Boolean(featureProduction) && (p.recipe && p.recipe.length > 0 && !p.isCombo) && (
+                  <IonBadge color={p.isPreAssembled ? 'dark' : 'warning'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                    {p.isPreAssembled ? 'Pre-Fabricado' : 'Hecho al Instante'}
+                  </IonBadge>
+                )}
+                {isService && (
+                  <IonBadge color="success" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                    Disponible
+                  </IonBadge>
+                )}
+                {isService && p.recipe && p.recipe.length > 0 && (
+                  <IonBadge color="tertiary" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                    🧪 {p.recipe.length} insumos
+                  </IonBadge>
+                )}
+                {p.durationMinutes ? (
+                  <IonBadge color="light" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal', border: '1px solid #ddd' }}>
+                    ⏱️ {p.durationMinutes} min
+                  </IonBadge>
+                ) : null}
+                {p.assignedStaffIds && (Array.isArray(p.assignedStaffIds) ? p.assignedStaffIds.length > 0 : String(p.assignedStaffIds).trim().length > 0) && (
+                  <IonBadge color="secondary" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                    👤 {(Array.isArray(p.assignedStaffIds) ? p.assignedStaffIds.length : String(p.assignedStaffIds).split(',').filter(Boolean).length)} especial.
+                  </IonBadge>
+                )}
+              </div>
+            )}
+          </div>
+          
+          {!isClientMode && (
+            <div style={{ marginTop: 'auto', paddingTop: '10px', display: 'flex', gap: '8px' }}>
+              {isResale && onAddStock && (
+                <IonButton expand="block" size="small" color="success" onClick={() => onAddStock(p)} style={{ flex: 1, margin: 0, fontWeight: '700' }}>
+                  + Cargar Stock
+                </IonButton>
+              )}
+              <IonButton expand={isResale && onAddStock ? undefined : "block"} size="small" fill="outline" color="primary" onClick={openOptions} style={{ margin: 0, fontWeight: '600' }}>
+                Opciones
+              </IonButton>
+            </div>
+          )}
+          
+        </IonCardContent>
+      </IonCard>
+    </IonCol>
+  );
+};
 </file>
 
 <file path="apps/frontend/src/components/BookingSettings.tsx">
@@ -14364,301 +14658,6 @@ try {
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
 }
-</file>
-
-<file path="apps/frontend/src/components/products/ProductCard.tsx">
-import { pencilOutline, trashOutline, buildOutline, cubeOutline, swapHorizontalOutline, cutOutline, warningOutline, closeOutline } from 'ionicons/icons';
-import React from 'react';
-import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
-import type { Product } from '../../types';
-import { useImageViewer } from '../../context/ImageViewerContext';
-
-interface ProductCardProps {
-  product: Product;
-  onEdit: (p: Product) => void;
-  onDelete: (p: Product) => void;
-  onConfigure: (p: Product) => void;
-  onAdjustStock: (p: Product) => void;
-  onAddStock?: (p: Product) => void;
-  onRegisterLoss: (p: Product) => void;
-  onToggleKitting?: (p: Product) => void;
-  onUnpackKit?: (p: Product) => void;
-  onConvertType?: (p: Product, targetType: 'REVENTA' | 'FORMULA' | 'SERVICIO') => void;
-  isClientMode?: boolean;
-  featureRecipes?: boolean;
-  featureProduction?: boolean;
-  featureBuySell?: boolean;
-  featureCustomerSchedules?: boolean;
-}
-
-export const ProductCard: React.FC<ProductCardProps> = ({
-  product: p,
-  onEdit,
-  onDelete,
-  onConfigure,
-  onAdjustStock,
-  onAddStock,
-  onRegisterLoss,
-  onToggleKitting,
-  onUnpackKit,
-  onConvertType,
-  isClientMode,
-  featureRecipes,
-  featureProduction,
-  featureBuySell,
-  featureCustomerSchedules
-}) => {
-  const { openImage } = useImageViewer();
-  const [present] = useIonActionSheet();
-
-  const openOptions = () => {
-    const currentType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = 
-      p.product_type || 
-      (p.is_service === true || p.category === 'Servicios' ? 'SERVICIO' : 
-      ((p.recipe && p.recipe.length > 0) || p.isCombo ? 'FORMULA' : 'REVENTA'));
-    const isService = currentType === 'SERVICIO';
-    const isFormula = currentType === 'FORMULA';
-    const isResale = currentType === 'REVENTA';
-
-    const buttons: any[] = [
-      { text: 'Editar Info / Precio', icon: pencilOutline, cssClass: 'action-sheet-editar', handler: () => onEdit(p) }
-    ];
-
-    // Opciones según arquetipo del producto
-    if (isResale) {
-      if (onAddStock) {
-        buttons.push({ text: 'Cargar Stock', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAddStock(p) });
-      }
-    } else if (isFormula || p.isCombo) {
-      if (p.isCombo) {
-        buttons.push({ text: 'Configurar Combo', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
-      } else if (featureRecipes) {
-        buttons.push({ text: 'Configurar Fórmula / Receta', icon: buildOutline, cssClass: 'action-sheet-editar', handler: () => onConfigure(p) });
-      }
-
-      if (featureProduction !== false && (p.isCombo || (p.recipe && p.recipe.length > 0)) && onToggleKitting && (p.isCombo || featureRecipes)) {
-        buttons.push({ text: `Convertir a ${p.isPreAssembled ? 'Hecho al Instante' : 'Pre-Fabricado'}`, icon: swapHorizontalOutline, cssClass: 'action-sheet-cambiar', handler: () => onToggleKitting(p) });
-      }
-
-      if (featureProduction !== false && p.isCombo && p.isPreAssembled && onUnpackKit && (p.physicalStock || 0) > 0) {
-        buttons.push({ text: 'Desarmar 1 Und', icon: cutOutline, cssClass: 'action-sheet-desarmar', handler: () => onUnpackKit(p) });
-      }
-
-      if (p.isPreAssembled && onAdjustStock) {
-        buttons.push({ text: 'Ajustar Stock Ensamblado', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) });
-      }
-    } else if (isService) {
-      if (featureRecipes) {
-        buttons.push({ 
-          text: 'Configurar Insumos del Servicio', 
-          icon: buildOutline, 
-          cssClass: 'action-sheet-editar', 
-          handler: () => onConfigure(p) 
-        });
-      }
-    }
-
-    if (onConvertType) {
-      if (currentType !== 'REVENTA' && featureBuySell) {
-        buttons.push({
-          text: 'Convertir a Reventa Directa',
-          icon: cubeOutline,
-          cssClass: 'action-sheet-cambiar',
-          handler: () => onConvertType(p, 'REVENTA')
-        });
-      }
-      if (currentType !== 'FORMULA' && featureRecipes) {
-        buttons.push({
-          text: 'Convertir a Producto Armable / Fórmula',
-          icon: buildOutline,
-          cssClass: 'action-sheet-cambiar',
-          handler: () => onConvertType(p, 'FORMULA')
-        });
-      }
-      if (currentType !== 'SERVICIO' && featureCustomerSchedules) {
-        buttons.push({
-          text: 'Convertir a Servicio / Cita',
-          icon: cutOutline,
-          cssClass: 'action-sheet-cambiar',
-          handler: () => onConvertType(p, 'SERVICIO')
-        });
-      }
-    }
-
-    if (!isService) {
-      buttons.push({ text: 'Registrar Pérdida', icon: warningOutline, cssClass: 'action-sheet-eliminar', handler: () => onRegisterLoss(p) });
-    }
-
-    buttons.push({ text: 'Subir Imagen', icon: 'image-outline', handler: () => document.getElementById(`upload-${p.id}`)?.click() });
-    buttons.push({ text: isService ? 'Eliminar Servicio' : 'Eliminar Producto', icon: trashOutline, role: 'destructive', handler: () => onDelete(p) });
-    buttons.push({ text: 'Cancelar', icon: closeOutline, role: 'cancel' });
-
-    present({
-      header: 'Opciones de Producto',
-      buttons
-    });
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const formData = new FormData();
-      formData.append('file', file);
-      try {
-        const { apiClient } = await import('../../api/client');
-        await apiClient.post(`/products/${p.id}/image`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        alert('Imagen subida con éxito');
-        window.location.reload(); // Quick refresh to show it, or trigger a fetch
-      } catch (err) {
-        alert('Error al subir la imagen');
-      }
-    }
-  };
-  
-  const getProductImage = () => {
-    if (!p.images) return null;
-    if (Array.isArray(p.images) && p.images.length > 0) {
-      return p.images[p.images.length - 1];
-    }
-    if (typeof p.images === 'string' && (p.images as string).trim().length > 0) {
-      const parts = (p.images as string).split(',');
-      return parts[parts.length - 1].trim();
-    }
-    return null;
-  };
-  const imageUrl = getProductImage();
-  const currentType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = 
-    p.product_type || 
-    (p.is_service === true || p.category === 'Servicios' ? 'SERVICIO' : 
-    ((p.recipe && p.recipe.length > 0) || p.isCombo ? 'FORMULA' : 'REVENTA'));
-  const isService = currentType === 'SERVICIO';
-  const isFormula = currentType === 'FORMULA';
-  const isResale = currentType === 'REVENTA';
-  const costValue = p.cost !== undefined && p.cost !== null && Number(p.cost) > 0 ? Number(p.cost) : (p.estimatedCost ? Number(p.estimatedCost) : 0);
-  const currentStock = p.stock !== undefined && p.stock !== null ? p.stock : p.stockQuantity;
-
-  return (
-    <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3" style={{ display: 'flex' }}>
-      <input type="file" id={`upload-${p.id}`} style={{ display: 'none' }} accept="image/*" onChange={handleFileChange} />
-      <IonCard style={{ margin: '5px', width: '100%', display: 'flex', flexDirection: 'column' }}>
-        <IonCardContent style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '15px' }}>
-          
-          <div style={{ flex: 1 }}>
-            {imageUrl && (
-              <img 
-                src={imageUrl} 
-                alt={p.name} 
-                onClick={(e) => { e.stopPropagation(); openImage(imageUrl, p.name); }}
-                title="Toca para ver en grande"
-                style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '10px', cursor: 'zoom-in' }} 
-              />
-            )}
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 5px 0', lineHeight: '1.3' }}>{p.name}</h2>
-            
-            {!isClientMode && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0 0 8px 0', flexWrap: 'wrap' }}>
-                <span style={{ color: '#64748b', fontSize: '0.85rem' }}>{p.category || 'Sin categoría'}</span>
-                <span style={{
-                  fontSize: '0.72rem',
-                  padding: '2px 8px',
-                  borderRadius: '10px',
-                  fontWeight: 'bold',
-                  backgroundColor: isResale ? '#dcfce7' : isFormula ? '#fef3c7' : '#e0e7ff',
-                  color: isResale ? '#166534' : isFormula ? '#92400e' : '#3730a3',
-                }}>
-                  {isResale ? '📦 Reventa' : isFormula ? '🧪 Armable / Fórmula' : '💆 Servicio'}
-                </span>
-              </div>
-            )}
-            
-            <p style={{ margin: '0 0 12px 0', fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--ion-color-dark)' }}>
-              Precio: ${p.salePrice.toFixed(2)}
-            </p>
-
-            {costValue > 0 && !isClientMode && (
-              <p style={{ margin: '-8px 0 10px 0', fontSize: '0.82rem', color: '#10b981', fontWeight: 600 }}>
-                {isResale ? 'Costo:' : 'Costo Est.:'} ${costValue.toFixed(2)} &bull; Margen: ${(p.salePrice - costValue).toFixed(2)}
-              </p>
-            )}
-
-            {isClientMode && (
-              <p style={{ margin: '0 0 12px 0', color: (isService || currentStock > 0) ? 'var(--ion-color-success)' : 'var(--ion-color-danger)', fontWeight: '500', fontSize: '0.9rem' }}>
-                {isService ? 'Disponible' : (currentStock > 0 ? `Disponible: ${currentStock}` : 'Agotado')}
-              </p>
-            )}
-
-            {!isClientMode && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
-                {isResale ? (
-                  <IonBadge color={currentStock <= 0 ? 'danger' : 'success'} style={{ padding: '6px 8px', fontSize: '0.82rem', fontWeight: 'bold' }}>
-                    Stock: {currentStock}
-                  </IonBadge>
-                ) : !isService && (!p.isCombo || p.isPreAssembled) ? (
-                  <>
-                    {Boolean(featureProduction) && (
-                      <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
-                        Físico: {p.physicalStock}
-                      </IonBadge>
-                    )}
-                    <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
-                      Disp: {p.stockQuantity}
-                    </IonBadge>
-                  </>
-                ) : null}
-                {!isService && (p.isCombo && !p.isPreAssembled) && (
-                  <IonBadge color="tertiary" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
-                    Combo (Virtual)
-                  </IonBadge>
-                )}
-                {!isService && Boolean(featureProduction) && (p.recipe && p.recipe.length > 0 && !p.isCombo) && (
-                  <IonBadge color={p.isPreAssembled ? 'dark' : 'warning'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
-                    {p.isPreAssembled ? 'Pre-Fabricado' : 'Hecho al Instante'}
-                  </IonBadge>
-                )}
-                {isService && (
-                  <IonBadge color="success" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
-                    Disponible
-                  </IonBadge>
-                )}
-                {isService && p.recipe && p.recipe.length > 0 && (
-                  <IonBadge color="tertiary" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
-                    🧪 {p.recipe.length} insumos
-                  </IonBadge>
-                )}
-                {p.durationMinutes ? (
-                  <IonBadge color="light" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal', border: '1px solid #ddd' }}>
-                    ⏱️ {p.durationMinutes} min
-                  </IonBadge>
-                ) : null}
-                {p.assignedStaffIds && (Array.isArray(p.assignedStaffIds) ? p.assignedStaffIds.length > 0 : String(p.assignedStaffIds).trim().length > 0) && (
-                  <IonBadge color="secondary" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
-                    👤 {(Array.isArray(p.assignedStaffIds) ? p.assignedStaffIds.length : String(p.assignedStaffIds).split(',').filter(Boolean).length)} especial.
-                  </IonBadge>
-                )}
-              </div>
-            )}
-          </div>
-          
-          {!isClientMode && (
-            <div style={{ marginTop: 'auto', paddingTop: '10px', display: 'flex', gap: '8px' }}>
-              {isResale && onAddStock && (
-                <IonButton expand="block" size="small" color="success" onClick={() => onAddStock(p)} style={{ flex: 1, margin: 0, fontWeight: '700' }}>
-                  + Cargar Stock
-                </IonButton>
-              )}
-              <IonButton expand={isResale && onAddStock ? undefined : "block"} size="small" fill="outline" color="primary" onClick={openOptions} style={{ margin: 0, fontWeight: '600' }}>
-                Opciones
-              </IonButton>
-            </div>
-          )}
-          
-        </IonCardContent>
-      </IonCard>
-    </IonCol>
-  );
-};
 </file>
 
 <file path="apps/frontend/src/components/products/RecipeModal.tsx">
@@ -20376,6 +20375,504 @@ describe('OrdersService', () => {
 });
 </file>
 
+<file path="apps/backend/src/products/products.service.ts">
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { DataSource, Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Product } from '../entities/product.entity';
+import { RecipeItem } from '../entities/recipe-item.entity';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateRecipeDto } from './dto/update-recipe.dto';
+import { RegisterLossDto } from '../raw-materials/dto/register-loss.dto';
+import { MovementType } from '@finowork/shared-types';
+import { RawMaterial } from '../entities/raw-material.entity';
+
+import { ComboItem } from '../entities/combo-item.entity';
+import { ConvertProductTypeDto, ProductArchetype } from './dto/convert-product-type.dto';
+
+@Injectable()
+export class ProductsService {
+  constructor(
+    @InjectRepository(Product)
+    private productRepo: Repository<Product>,
+    @InjectRepository(RecipeItem)
+    private recipeItemRepo: Repository<RecipeItem>,
+    @InjectRepository(ComboItem)
+    private comboItemRepo: Repository<ComboItem>,
+    private dataSource: DataSource,
+  ) {}
+
+  async findAll(tenantId: string) {
+    const products = await this.productRepo.find({ where: { tenantId }, relations: {
+        comboItems: { component: { recipe: { rawMaterial: true } } },
+        recipe: { rawMaterial: true }
+      }
+    });
+
+    const needsHealing = products.filter(p => !p.is_service && p.category !== 'Servicios' && !p.isCombo && p.physicalStock !== undefined && p.physicalStock !== null && p.stockQuantity > p.physicalStock);
+    if (needsHealing.length > 0) {
+      Promise.all(needsHealing.map(p => {
+        p.stockQuantity = Math.max(0, p.physicalStock);
+        p.stock = p.stockQuantity;
+        return this.productRepo.save(p);
+      })).catch(err => console.error('Error auto-healing inconsistent product stock:', err));
+    }
+
+    return products.map(p => {
+      let finalStock = p.stockQuantity;
+      let finalPhysical = p.physicalStock;
+
+      if (p.comboItems && p.comboItems.length > 0 && !p.isPreAssembled) {
+        let minAvail = Infinity;
+        let minPhys = Infinity;
+        for (const ci of p.comboItems) {
+          const availFromComp = Math.floor((ci.component?.stockQuantity || 0) / ci.quantity);
+          const physFromComp = Math.floor((ci.component?.physicalStock || 0) / ci.quantity);
+          if (availFromComp < minAvail) minAvail = availFromComp;
+          if (physFromComp < minPhys) minPhys = physFromComp;
+        }
+        finalStock = minAvail === Infinity ? 0 : minAvail;
+        finalPhysical = minPhys === Infinity ? 0 : minPhys;
+      } else if (!p.is_service && p.category !== 'Servicios') {
+        // En productos tangibles, el stock disponible para venta nunca puede exceder el stock físico real
+        if (finalPhysical !== undefined && finalPhysical !== null && finalStock > finalPhysical) {
+          finalStock = Math.max(0, finalPhysical);
+        }
+      }
+
+      const cleanedComboItems = p.comboItems?.map(ci => ({
+        id: ci.id,
+        componentId: ci.componentId,
+        quantity: ci.quantity
+      })) || [];
+
+      let baseCost = 0;
+      if (p.isCombo && !p.isPreAssembled && p.comboItems) {
+        for (const ci of p.comboItems) {
+           if (ci.component && ci.component.recipe) {
+             for (const ri of ci.component.recipe) {
+               if (ri.rawMaterial) baseCost += ri.quantity * ri.rawMaterial.costPerUnit * ci.quantity;
+             }
+           }
+        }
+      }
+      if (!p.is_service && p.recipe && p.recipe.length > 0) {
+        for (const ri of p.recipe) {
+           if (ri.rawMaterial) baseCost += ri.quantity * ri.rawMaterial.costPerUnit;
+        }
+      } else if (p.estimatedCost) {
+        baseCost = Number(p.estimatedCost);
+      }
+
+      const isService = p.is_service === true || p.category === 'Servicios' || Boolean(p.durationMinutes);
+      const isFormula = (p.recipe && p.recipe.length > 0) || (p.isCombo && p.isPreAssembled);
+      const computedType = isService ? 'SERVICIO' : (p.product_type === 'FORMULA' || isFormula ? 'FORMULA' : (p.product_type || 'REVENTA'));
+
+      return {
+        ...p,
+        product_type: computedType,
+        cost: p.cost !== undefined && p.cost !== null ? Number(p.cost) : (p.estimatedCost ? Number(p.estimatedCost) : 0),
+        stock: finalStock,
+        is_service: isService,
+        baseCost,
+        stockQuantity: finalStock,
+        physicalStock: finalPhysical,
+        comboItems: cleanedComboItems
+      };
+    });
+  }
+
+  async findOne(tenantId: string, id: string) {
+    const product = await this.productRepo.findOne({ where: { tenantId, id } });
+    if (!product) throw new NotFoundException('Producto no encontrado');
+    return product;
+  }
+
+  async create(tenantId: string, dto: CreateProductDto) {
+    const stockVal = dto.stock !== undefined ? dto.stock : (dto.stockQuantity || 0);
+    const costVal = dto.cost !== undefined ? dto.cost : (dto.estimatedCost || 0);
+    const isServiceVal = dto.product_type === 'SERVICIO' || dto.is_service === true;
+    const finalType = dto.product_type || (isServiceVal ? 'SERVICIO' : (dto.category === 'Servicios' ? 'SERVICIO' : 'REVENTA'));
+    const product = this.productRepo.create({
+      ...dto,
+      stock: isServiceVal ? 0 : stockVal,
+      stockQuantity: isServiceVal ? 0 : stockVal,
+      physicalStock: isServiceVal ? 0 : stockVal,
+      cost: costVal,
+      estimatedCost: costVal,
+      is_service: isServiceVal,
+      product_type: finalType,
+      tenantId
+    });
+    return this.productRepo.save(product);
+  }
+
+  async update(tenantId: string, id: string, dto: any) {
+    return this.dataSource.transaction(async (manager) => {
+      const oldProduct = await manager.findOne(Product, { where: { tenantId, id }, relations: { comboItems: { component: true } } });
+      const product = await manager.findOne(Product, { where: { tenantId, id } });
+      if (!product) throw new NotFoundException('Producto no encontrado');
+
+      // Check if transitioning from PreAssembled to Virtual
+      if (oldProduct && oldProduct.isPreAssembled && dto.isPreAssembled === false) {
+        if (oldProduct.physicalStock > 0 || oldProduct.stockQuantity > 0) {
+          // Unpack the inventory back to components
+          if (oldProduct.comboItems && oldProduct.comboItems.length > 0) {
+            for (const ci of oldProduct.comboItems) {
+              if (ci.component) {
+                if (oldProduct.physicalStock > 0) {
+                  ci.component.physicalStock += ci.quantity * oldProduct.physicalStock;
+                }
+                if (oldProduct.stockQuantity > 0) {
+                  ci.component.stockQuantity += ci.quantity * oldProduct.stockQuantity;
+                }
+                await manager.save(Product, ci.component);
+              }
+            }
+          }
+          product.physicalStock = 0;
+          product.stockQuantity = 0;
+        }
+      }
+
+      if (dto.stock !== undefined) {
+        product.stock = dto.stock;
+        product.stockQuantity = dto.stock;
+        product.physicalStock = dto.stock;
+      }
+      if (dto.cost !== undefined) {
+        product.cost = dto.cost;
+        product.estimatedCost = dto.cost;
+      }
+      if (dto.is_service !== undefined) {
+        product.is_service = dto.is_service;
+      }
+      if (dto.product_type !== undefined) {
+        product.product_type = dto.product_type;
+      }
+
+      Object.assign(product, dto);
+
+      if (product.product_type === 'SERVICIO' || product.is_service === true) {
+        product.stock = 0;
+        product.stockQuantity = 0;
+        product.physicalStock = 0;
+        product.cost = 0;
+        product.is_service = true;
+        product.product_type = 'SERVICIO';
+      }
+
+      return manager.save(Product, product);
+    });
+  }
+
+  async remove(tenantId: string, id: string) {
+    await this.findOne(tenantId, id); // verifica que exista
+    await this.productRepo.softDelete({ tenantId, id });
+    return { success: true };
+  }
+
+  async findArchived(tenantId: string) {
+    const products = await this.productRepo.find({
+      where: { tenantId },
+      withDeleted: true,
+      order: { deletedAt: 'DESC' },
+    });
+    return products.filter((p) => p.deletedAt !== null);
+  }
+
+  async restore(tenantId: string, id: string) {
+    const product = await this.productRepo.findOne({
+      where: { tenantId, id },
+      withDeleted: true,
+    });
+    if (!product) throw new NotFoundException('Producto archivado no encontrado');
+    await this.productRepo.restore({ tenantId, id });
+    return { success: true };
+  }
+
+  
+  async unpackKit(tenantId: string, id: string) {
+    return this.dataSource.transaction(async (manager) => {
+      const product = await manager.findOne(Product, { 
+        where: { tenantId, id },
+        relations: { comboItems: { component: true } }
+      });
+      
+      if (!product) throw new NotFoundException('Producto no encontrado');
+      if (!product.isCombo || !product.isPreAssembled) {
+        throw new BadRequestException('Solo se pueden desarmar combos físicos (pre-ensamblados)');
+      }
+      if (product.physicalStock < 1 || product.stockQuantity < 1) {
+        throw new BadRequestException('No hay stock físico de este kit para desarmar');
+      }
+
+      // Restar 1 al combo
+      product.physicalStock -= 1;
+      product.stockQuantity -= 1;
+      await manager.save(Product, product);
+
+      // Devolver componentes
+      if (product.comboItems && product.comboItems.length > 0) {
+        for (const ci of product.comboItems) {
+          if (ci.component) {
+            ci.component.physicalStock += ci.quantity;
+            ci.component.stockQuantity += ci.quantity;
+            await manager.save(Product, ci.component);
+          }
+        }
+      }
+
+      return { success: true, message: 'Kit desarmado correctamente' };
+    });
+  }
+
+  async getRecipeAndCost(tenantId: string, id: string) {
+    const items = await this.recipeItemRepo.find({
+      where: { product: { tenantId, id } },
+      relations: { rawMaterial: true }
+    });
+    
+    const comboItems = await this.comboItemRepo.find({
+      where: { combo: { tenantId, id } },
+      relations: { component: true }
+    });
+
+    let totalCost = 0;
+    const formattedRecipeItems = items.map(item => {
+      const itemCost = item.quantity * (item.rawMaterial?.costPerUnit || 0);
+      totalCost += itemCost;
+      return {
+        id: item.id,
+        rawMaterialId: item.rawMaterial.id,
+        rawMaterialName: item.rawMaterial.name,
+        unit: item.rawMaterial.unit,
+        quantity: item.quantity,
+        costPerUnit: item.rawMaterial.costPerUnit,
+        totalItemCost: itemCost
+      };
+    });
+    
+    // Calcular los costos de los sub-productos (recursivo)
+    const formattedComboItems = await Promise.all(comboItems.map(async item => {
+      // Obtenemos el costo base del componente
+      const componentData = await this.getRecipeAndCost(tenantId, item.componentId);
+      const itemCost = item.quantity * componentData.totalRecipeCost;
+      totalCost += itemCost;
+
+      return {
+        id: item.id,
+        componentId: item.componentId,
+        componentName: item.component?.name,
+        quantity: item.quantity,
+        unitCost: componentData.totalRecipeCost,
+        totalItemCost: itemCost
+      };
+    }));
+
+    return {
+      items: formattedRecipeItems,
+      comboItems: formattedComboItems,
+      totalRecipeCost: totalCost
+    };
+  }
+
+  async updateCombo(tenantId: string, id: string, dto: any) {
+    return this.dataSource.transaction(async (manager) => {
+      const oldProduct = await manager.findOne(Product, { where: { tenantId, id }, relations: { comboItems: { component: true } } });
+      const product = await manager.findOne(Product, { where: { tenantId, id } });
+      if (!product) throw new NotFoundException('Producto no encontrado');
+
+      // Validaciones de seguridad
+      for (const item of dto.comboItems) {
+        if (item.componentId === id) {
+          throw new BadRequestException('Un producto no puede ser componente de sí mismo');
+        }
+        const component = await manager.findOne(Product, { where: { tenantId, id: item.componentId } });
+        if (component?.isCombo) {
+          throw new BadRequestException('No se pueden agregar combos dentro de otros combos');
+        }
+      }
+
+      // Eliminar combo viejo
+      await manager.delete(ComboItem, { comboId: id });
+
+      // Insertar combo nuevo
+      const newItems = dto.comboItems.map((item: any) => {
+        return manager.create(ComboItem, { tenantId,
+          combo: product,
+          component: { id: item.componentId } as Product,
+          quantity: item.quantity
+        });
+      });
+
+      if (newItems.length > 0) {
+        await manager.save(ComboItem, newItems);
+      }
+      return { success: true };
+    });
+  }
+
+  async updateRecipe(tenantId: string, id: string, dto: UpdateRecipeDto) {
+    return this.dataSource.transaction(async (manager) => {
+      const product = await manager.findOne(Product, { where: { tenantId, id } });
+      if (!product) throw new NotFoundException('Producto no encontrado');
+
+      // Eliminar receta vieja
+      await manager.delete(RecipeItem, { product: { id } });
+
+      // Insertar receta nueva
+      const newItems = dto.items.map(item => {
+        return manager.create(RecipeItem, { tenantId,
+          product: product,
+          rawMaterial: { id: item.rawMaterialId } as RawMaterial,
+          quantity: item.quantity
+        });
+      });
+
+      if (newItems.length > 0) {
+        await manager.save(RecipeItem, newItems);
+      }
+      return { success: true };
+    });
+  }
+
+  async registerLoss(tenantId: string, id: string, dto: RegisterLossDto) {
+    // Para simplificar, en Producto podemos restar directo el stock y opcionalmente guardar en una tabla 'ProductStockMovement'.
+    // Como Fase 2, descontamos stock. 
+    return this.dataSource.transaction(async (manager) => {
+      const product = await manager.findOne(Product, { where: { tenantId, id } });
+      if (!product) throw new NotFoundException('Producto no encontrado');
+
+      if (product.stockQuantity < dto.quantity) {
+        throw new BadRequestException('Stock insuficiente para la merma solicitada');
+      }
+
+      product.stockQuantity -= dto.quantity;
+      await manager.save(Product, product);
+
+      // Si hubiéramos creado una tabla de ProductStockMovement la registraríamos aquí.
+      // Por ahora la pérdida se anota actualizando el stock.
+
+    });
+  }
+
+  async adjustStock(tenantId: string, id: string, quantity: number) {
+    const product = await this.findOne(tenantId, id);
+    const qty = Number(quantity) || 0;
+    product.stockQuantity = (Number(product.stockQuantity) || 0) + qty;
+    product.stock = (Number(product.stock) || 0) + qty;
+    product.physicalStock = (Number(product.physicalStock) || 0) + qty;
+    return this.productRepo.save(product);
+  }
+
+  async addStock(tenantId: string, id: string, dto: { additionalStock: number; newCost?: number }) {
+    const product = await this.findOne(tenantId, id);
+    const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
+    const added = Number(dto.additionalStock) || 0;
+    const newStock = currentStock + added;
+
+    product.stock = newStock;
+    product.stockQuantity = newStock;
+    product.physicalStock = (Number(product.physicalStock) || 0) + added;
+
+    if (dto.newCost !== undefined && dto.newCost !== null && !isNaN(Number(dto.newCost))) {
+      product.cost = Number(dto.newCost);
+      product.estimatedCost = Number(dto.newCost);
+    }
+    return this.productRepo.save(product);
+  }
+
+  async migratePhysicalStock(tenantId: string) {
+    const reservedDirect = await this.dataSource.query(`
+      SELECT i."productId", SUM(i.quantity) as reserved
+      FROM order_item i
+      JOIN "order" o ON o.id = i."orderId"
+      WHERE o.status IN ('PENDING', 'PREPARING') AND o."tenantId" = $1
+      GROUP BY i."productId"
+    `, [tenantId]);
+    
+    const reservedCombos = await this.dataSource.query(`
+      SELECT ci."componentId" as "productId", SUM(i.quantity * ci.quantity) as reserved
+      FROM order_item i
+      JOIN "order" o ON o.id = i."orderId"
+      JOIN combo_item ci ON ci."comboId" = i."productId"
+      WHERE o.status IN ('PENDING', 'PREPARING') AND o."tenantId" = $1
+      GROUP BY ci."componentId"
+    `, [tenantId]);
+
+    const reservedMap: Record<string, number> = {};
+    for (const row of reservedDirect) {
+      reservedMap[row.productId] = (reservedMap[row.productId] || 0) + Number(row.reserved);
+    }
+    for (const row of reservedCombos) {
+      reservedMap[row.productId] = (reservedMap[row.productId] || 0) + Number(row.reserved);
+    }
+
+    const products = await this.productRepo.find({ where: { tenantId } });
+    for (const p of products) {
+      const reserved = reservedMap[p.id] || 0;
+      p.physicalStock = p.stockQuantity + reserved;
+      await this.productRepo.save(p);
+    }
+    return { success: true, migratedCount: products.length };
+  }
+
+  async convertProductType(tenantId: string, id: string, dto: ConvertProductTypeDto) {
+    const product = await this.productRepo.findOne({
+      where: { tenantId, id },
+      relations: { recipe: true, comboItems: true }
+    });
+    if (!product) throw new NotFoundException('Producto no encontrado');
+
+    switch (dto.targetType) {
+      case ProductArchetype.SERVICIO:
+        product.product_type = 'SERVICIO';
+        product.is_service = true;
+        product.category = dto.newCategory || (product.category === 'General' ? 'Servicios' : (product.category || 'Servicios'));
+        product.durationMinutes = dto.durationMinutes || product.durationMinutes || 30;
+        // Non-destructive: Preserve recipe items in database without deleting them.
+        // Clean out dead/ghost stock to protect financial valuation & inventory reports:
+        product.stock = 0;
+        product.stockQuantity = 0;
+        product.physicalStock = 0;
+        break;
+
+      case ProductArchetype.REVENTA:
+        product.product_type = 'REVENTA';
+        product.is_service = false;
+        product.durationMinutes = null;
+        if (product.category === 'Servicios') {
+          product.category = dto.newCategory || 'General';
+        }
+        // If initial stock is provided when converting from service to resale:
+        if (dto.initialStock !== undefined && dto.initialStock !== null && !isNaN(Number(dto.initialStock))) {
+          const initStock = Math.max(0, Number(dto.initialStock));
+          product.stock = initStock;
+          product.stockQuantity = initStock;
+          product.physicalStock = initStock;
+        }
+        break;
+
+      case ProductArchetype.FORMULA:
+        product.product_type = 'FORMULA';
+        product.is_service = false;
+        product.durationMinutes = null;
+        if (product.category === 'Servicios') {
+          product.category = dto.newCategory || 'General';
+        }
+        break;
+
+      default:
+        throw new BadRequestException('Tipo de producto no reconocido');
+    }
+
+    return this.productRepo.save(product);
+  }
+
+}
+</file>
+
 <file path="apps/backend/src/settings/settings.controller.ts">
 import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
 import { SettingsService } from './settings.service';
@@ -23359,504 +23856,6 @@ export class ProductionService {
 }
 </file>
 
-<file path="apps/backend/src/products/products.service.ts">
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Product } from '../entities/product.entity';
-import { RecipeItem } from '../entities/recipe-item.entity';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateRecipeDto } from './dto/update-recipe.dto';
-import { RegisterLossDto } from '../raw-materials/dto/register-loss.dto';
-import { MovementType } from '@finowork/shared-types';
-import { RawMaterial } from '../entities/raw-material.entity';
-
-import { ComboItem } from '../entities/combo-item.entity';
-import { ConvertProductTypeDto, ProductArchetype } from './dto/convert-product-type.dto';
-
-@Injectable()
-export class ProductsService {
-  constructor(
-    @InjectRepository(Product)
-    private productRepo: Repository<Product>,
-    @InjectRepository(RecipeItem)
-    private recipeItemRepo: Repository<RecipeItem>,
-    @InjectRepository(ComboItem)
-    private comboItemRepo: Repository<ComboItem>,
-    private dataSource: DataSource,
-  ) {}
-
-  async findAll(tenantId: string) {
-    const products = await this.productRepo.find({ where: { tenantId }, relations: {
-        comboItems: { component: { recipe: { rawMaterial: true } } },
-        recipe: { rawMaterial: true }
-      }
-    });
-
-    const needsHealing = products.filter(p => !p.is_service && p.category !== 'Servicios' && !p.isCombo && p.physicalStock !== undefined && p.physicalStock !== null && p.stockQuantity > p.physicalStock);
-    if (needsHealing.length > 0) {
-      Promise.all(needsHealing.map(p => {
-        p.stockQuantity = Math.max(0, p.physicalStock);
-        p.stock = p.stockQuantity;
-        return this.productRepo.save(p);
-      })).catch(err => console.error('Error auto-healing inconsistent product stock:', err));
-    }
-
-    return products.map(p => {
-      let finalStock = p.stockQuantity;
-      let finalPhysical = p.physicalStock;
-
-      if (p.comboItems && p.comboItems.length > 0 && !p.isPreAssembled) {
-        let minAvail = Infinity;
-        let minPhys = Infinity;
-        for (const ci of p.comboItems) {
-          const availFromComp = Math.floor((ci.component?.stockQuantity || 0) / ci.quantity);
-          const physFromComp = Math.floor((ci.component?.physicalStock || 0) / ci.quantity);
-          if (availFromComp < minAvail) minAvail = availFromComp;
-          if (physFromComp < minPhys) minPhys = physFromComp;
-        }
-        finalStock = minAvail === Infinity ? 0 : minAvail;
-        finalPhysical = minPhys === Infinity ? 0 : minPhys;
-      } else if (!p.is_service && p.category !== 'Servicios') {
-        // En productos tangibles, el stock disponible para venta nunca puede exceder el stock físico real
-        if (finalPhysical !== undefined && finalPhysical !== null && finalStock > finalPhysical) {
-          finalStock = Math.max(0, finalPhysical);
-        }
-      }
-
-      const cleanedComboItems = p.comboItems?.map(ci => ({
-        id: ci.id,
-        componentId: ci.componentId,
-        quantity: ci.quantity
-      })) || [];
-
-      let baseCost = 0;
-      if (p.isCombo && !p.isPreAssembled && p.comboItems) {
-        for (const ci of p.comboItems) {
-           if (ci.component && ci.component.recipe) {
-             for (const ri of ci.component.recipe) {
-               if (ri.rawMaterial) baseCost += ri.quantity * ri.rawMaterial.costPerUnit * ci.quantity;
-             }
-           }
-        }
-      }
-      if (!p.is_service && p.recipe && p.recipe.length > 0) {
-        for (const ri of p.recipe) {
-           if (ri.rawMaterial) baseCost += ri.quantity * ri.rawMaterial.costPerUnit;
-        }
-      } else if (p.estimatedCost) {
-        baseCost = Number(p.estimatedCost);
-      }
-
-      const isService = p.is_service === true || p.category === 'Servicios' || Boolean(p.durationMinutes);
-      const isFormula = (p.recipe && p.recipe.length > 0) || (p.isCombo && p.isPreAssembled);
-      const computedType = isService ? 'SERVICIO' : (p.product_type === 'FORMULA' || isFormula ? 'FORMULA' : (p.product_type || 'REVENTA'));
-
-      return {
-        ...p,
-        product_type: computedType,
-        cost: p.cost !== undefined && p.cost !== null ? Number(p.cost) : (p.estimatedCost ? Number(p.estimatedCost) : 0),
-        stock: finalStock,
-        is_service: isService,
-        baseCost,
-        stockQuantity: finalStock,
-        physicalStock: finalPhysical,
-        comboItems: cleanedComboItems
-      };
-    });
-  }
-
-  async findOne(tenantId: string, id: string) {
-    const product = await this.productRepo.findOne({ where: { tenantId, id } });
-    if (!product) throw new NotFoundException('Producto no encontrado');
-    return product;
-  }
-
-  async create(tenantId: string, dto: CreateProductDto) {
-    const stockVal = dto.stock !== undefined ? dto.stock : (dto.stockQuantity || 0);
-    const costVal = dto.cost !== undefined ? dto.cost : (dto.estimatedCost || 0);
-    const isServiceVal = dto.product_type === 'SERVICIO' || dto.is_service === true;
-    const finalType = dto.product_type || (isServiceVal ? 'SERVICIO' : (dto.category === 'Servicios' ? 'SERVICIO' : 'REVENTA'));
-    const product = this.productRepo.create({
-      ...dto,
-      stock: isServiceVal ? 0 : stockVal,
-      stockQuantity: isServiceVal ? 0 : stockVal,
-      physicalStock: isServiceVal ? 0 : stockVal,
-      cost: costVal,
-      estimatedCost: costVal,
-      is_service: isServiceVal,
-      product_type: finalType,
-      tenantId
-    });
-    return this.productRepo.save(product);
-  }
-
-  async update(tenantId: string, id: string, dto: any) {
-    return this.dataSource.transaction(async (manager) => {
-      const oldProduct = await manager.findOne(Product, { where: { tenantId, id }, relations: { comboItems: { component: true } } });
-      const product = await manager.findOne(Product, { where: { tenantId, id } });
-      if (!product) throw new NotFoundException('Producto no encontrado');
-
-      // Check if transitioning from PreAssembled to Virtual
-      if (oldProduct && oldProduct.isPreAssembled && dto.isPreAssembled === false) {
-        if (oldProduct.physicalStock > 0 || oldProduct.stockQuantity > 0) {
-          // Unpack the inventory back to components
-          if (oldProduct.comboItems && oldProduct.comboItems.length > 0) {
-            for (const ci of oldProduct.comboItems) {
-              if (ci.component) {
-                if (oldProduct.physicalStock > 0) {
-                  ci.component.physicalStock += ci.quantity * oldProduct.physicalStock;
-                }
-                if (oldProduct.stockQuantity > 0) {
-                  ci.component.stockQuantity += ci.quantity * oldProduct.stockQuantity;
-                }
-                await manager.save(Product, ci.component);
-              }
-            }
-          }
-          product.physicalStock = 0;
-          product.stockQuantity = 0;
-        }
-      }
-
-      if (dto.stock !== undefined) {
-        product.stock = dto.stock;
-        product.stockQuantity = dto.stock;
-        product.physicalStock = dto.stock;
-      }
-      if (dto.cost !== undefined) {
-        product.cost = dto.cost;
-        product.estimatedCost = dto.cost;
-      }
-      if (dto.is_service !== undefined) {
-        product.is_service = dto.is_service;
-      }
-      if (dto.product_type !== undefined) {
-        product.product_type = dto.product_type;
-      }
-
-      Object.assign(product, dto);
-
-      if (product.product_type === 'SERVICIO' || product.is_service === true) {
-        product.stock = 0;
-        product.stockQuantity = 0;
-        product.physicalStock = 0;
-        product.cost = 0;
-        product.is_service = true;
-        product.product_type = 'SERVICIO';
-      }
-
-      return manager.save(Product, product);
-    });
-  }
-
-  async remove(tenantId: string, id: string) {
-    await this.findOne(tenantId, id); // verifica que exista
-    await this.productRepo.softDelete({ tenantId, id });
-    return { success: true };
-  }
-
-  async findArchived(tenantId: string) {
-    const products = await this.productRepo.find({
-      where: { tenantId },
-      withDeleted: true,
-      order: { deletedAt: 'DESC' },
-    });
-    return products.filter((p) => p.deletedAt !== null);
-  }
-
-  async restore(tenantId: string, id: string) {
-    const product = await this.productRepo.findOne({
-      where: { tenantId, id },
-      withDeleted: true,
-    });
-    if (!product) throw new NotFoundException('Producto archivado no encontrado');
-    await this.productRepo.restore({ tenantId, id });
-    return { success: true };
-  }
-
-  
-  async unpackKit(tenantId: string, id: string) {
-    return this.dataSource.transaction(async (manager) => {
-      const product = await manager.findOne(Product, { 
-        where: { tenantId, id },
-        relations: { comboItems: { component: true } }
-      });
-      
-      if (!product) throw new NotFoundException('Producto no encontrado');
-      if (!product.isCombo || !product.isPreAssembled) {
-        throw new BadRequestException('Solo se pueden desarmar combos físicos (pre-ensamblados)');
-      }
-      if (product.physicalStock < 1 || product.stockQuantity < 1) {
-        throw new BadRequestException('No hay stock físico de este kit para desarmar');
-      }
-
-      // Restar 1 al combo
-      product.physicalStock -= 1;
-      product.stockQuantity -= 1;
-      await manager.save(Product, product);
-
-      // Devolver componentes
-      if (product.comboItems && product.comboItems.length > 0) {
-        for (const ci of product.comboItems) {
-          if (ci.component) {
-            ci.component.physicalStock += ci.quantity;
-            ci.component.stockQuantity += ci.quantity;
-            await manager.save(Product, ci.component);
-          }
-        }
-      }
-
-      return { success: true, message: 'Kit desarmado correctamente' };
-    });
-  }
-
-  async getRecipeAndCost(tenantId: string, id: string) {
-    const items = await this.recipeItemRepo.find({
-      where: { product: { tenantId, id } },
-      relations: { rawMaterial: true }
-    });
-    
-    const comboItems = await this.comboItemRepo.find({
-      where: { combo: { tenantId, id } },
-      relations: { component: true }
-    });
-
-    let totalCost = 0;
-    const formattedRecipeItems = items.map(item => {
-      const itemCost = item.quantity * (item.rawMaterial?.costPerUnit || 0);
-      totalCost += itemCost;
-      return {
-        id: item.id,
-        rawMaterialId: item.rawMaterial.id,
-        rawMaterialName: item.rawMaterial.name,
-        unit: item.rawMaterial.unit,
-        quantity: item.quantity,
-        costPerUnit: item.rawMaterial.costPerUnit,
-        totalItemCost: itemCost
-      };
-    });
-    
-    // Calcular los costos de los sub-productos (recursivo)
-    const formattedComboItems = await Promise.all(comboItems.map(async item => {
-      // Obtenemos el costo base del componente
-      const componentData = await this.getRecipeAndCost(tenantId, item.componentId);
-      const itemCost = item.quantity * componentData.totalRecipeCost;
-      totalCost += itemCost;
-
-      return {
-        id: item.id,
-        componentId: item.componentId,
-        componentName: item.component?.name,
-        quantity: item.quantity,
-        unitCost: componentData.totalRecipeCost,
-        totalItemCost: itemCost
-      };
-    }));
-
-    return {
-      items: formattedRecipeItems,
-      comboItems: formattedComboItems,
-      totalRecipeCost: totalCost
-    };
-  }
-
-  async updateCombo(tenantId: string, id: string, dto: any) {
-    return this.dataSource.transaction(async (manager) => {
-      const oldProduct = await manager.findOne(Product, { where: { tenantId, id }, relations: { comboItems: { component: true } } });
-      const product = await manager.findOne(Product, { where: { tenantId, id } });
-      if (!product) throw new NotFoundException('Producto no encontrado');
-
-      // Validaciones de seguridad
-      for (const item of dto.comboItems) {
-        if (item.componentId === id) {
-          throw new BadRequestException('Un producto no puede ser componente de sí mismo');
-        }
-        const component = await manager.findOne(Product, { where: { tenantId, id: item.componentId } });
-        if (component?.isCombo) {
-          throw new BadRequestException('No se pueden agregar combos dentro de otros combos');
-        }
-      }
-
-      // Eliminar combo viejo
-      await manager.delete(ComboItem, { comboId: id });
-
-      // Insertar combo nuevo
-      const newItems = dto.comboItems.map((item: any) => {
-        return manager.create(ComboItem, { tenantId,
-          combo: product,
-          component: { id: item.componentId } as Product,
-          quantity: item.quantity
-        });
-      });
-
-      if (newItems.length > 0) {
-        await manager.save(ComboItem, newItems);
-      }
-      return { success: true };
-    });
-  }
-
-  async updateRecipe(tenantId: string, id: string, dto: UpdateRecipeDto) {
-    return this.dataSource.transaction(async (manager) => {
-      const product = await manager.findOne(Product, { where: { tenantId, id } });
-      if (!product) throw new NotFoundException('Producto no encontrado');
-
-      // Eliminar receta vieja
-      await manager.delete(RecipeItem, { product: { id } });
-
-      // Insertar receta nueva
-      const newItems = dto.items.map(item => {
-        return manager.create(RecipeItem, { tenantId,
-          product: product,
-          rawMaterial: { id: item.rawMaterialId } as RawMaterial,
-          quantity: item.quantity
-        });
-      });
-
-      if (newItems.length > 0) {
-        await manager.save(RecipeItem, newItems);
-      }
-      return { success: true };
-    });
-  }
-
-  async registerLoss(tenantId: string, id: string, dto: RegisterLossDto) {
-    // Para simplificar, en Producto podemos restar directo el stock y opcionalmente guardar en una tabla 'ProductStockMovement'.
-    // Como Fase 2, descontamos stock. 
-    return this.dataSource.transaction(async (manager) => {
-      const product = await manager.findOne(Product, { where: { tenantId, id } });
-      if (!product) throw new NotFoundException('Producto no encontrado');
-
-      if (product.stockQuantity < dto.quantity) {
-        throw new BadRequestException('Stock insuficiente para la merma solicitada');
-      }
-
-      product.stockQuantity -= dto.quantity;
-      await manager.save(Product, product);
-
-      // Si hubiéramos creado una tabla de ProductStockMovement la registraríamos aquí.
-      // Por ahora la pérdida se anota actualizando el stock.
-
-    });
-  }
-
-  async adjustStock(tenantId: string, id: string, quantity: number) {
-    const product = await this.findOne(tenantId, id);
-    const qty = Number(quantity) || 0;
-    product.stockQuantity = (Number(product.stockQuantity) || 0) + qty;
-    product.stock = (Number(product.stock) || 0) + qty;
-    product.physicalStock = (Number(product.physicalStock) || 0) + qty;
-    return this.productRepo.save(product);
-  }
-
-  async addStock(tenantId: string, id: string, dto: { additionalStock: number; newCost?: number }) {
-    const product = await this.findOne(tenantId, id);
-    const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
-    const added = Number(dto.additionalStock) || 0;
-    const newStock = currentStock + added;
-
-    product.stock = newStock;
-    product.stockQuantity = newStock;
-    product.physicalStock = (Number(product.physicalStock) || 0) + added;
-
-    if (dto.newCost !== undefined && dto.newCost !== null && !isNaN(Number(dto.newCost))) {
-      product.cost = Number(dto.newCost);
-      product.estimatedCost = Number(dto.newCost);
-    }
-    return this.productRepo.save(product);
-  }
-
-  async migratePhysicalStock(tenantId: string) {
-    const reservedDirect = await this.dataSource.query(`
-      SELECT i."productId", SUM(i.quantity) as reserved
-      FROM order_item i
-      JOIN "order" o ON o.id = i."orderId"
-      WHERE o.status IN ('PENDING', 'PREPARING') AND o."tenantId" = $1
-      GROUP BY i."productId"
-    `, [tenantId]);
-    
-    const reservedCombos = await this.dataSource.query(`
-      SELECT ci."componentId" as "productId", SUM(i.quantity * ci.quantity) as reserved
-      FROM order_item i
-      JOIN "order" o ON o.id = i."orderId"
-      JOIN combo_item ci ON ci."comboId" = i."productId"
-      WHERE o.status IN ('PENDING', 'PREPARING') AND o."tenantId" = $1
-      GROUP BY ci."componentId"
-    `, [tenantId]);
-
-    const reservedMap: Record<string, number> = {};
-    for (const row of reservedDirect) {
-      reservedMap[row.productId] = (reservedMap[row.productId] || 0) + Number(row.reserved);
-    }
-    for (const row of reservedCombos) {
-      reservedMap[row.productId] = (reservedMap[row.productId] || 0) + Number(row.reserved);
-    }
-
-    const products = await this.productRepo.find({ where: { tenantId } });
-    for (const p of products) {
-      const reserved = reservedMap[p.id] || 0;
-      p.physicalStock = p.stockQuantity + reserved;
-      await this.productRepo.save(p);
-    }
-    return { success: true, migratedCount: products.length };
-  }
-
-  async convertProductType(tenantId: string, id: string, dto: ConvertProductTypeDto) {
-    const product = await this.productRepo.findOne({
-      where: { tenantId, id },
-      relations: { recipe: true, comboItems: true }
-    });
-    if (!product) throw new NotFoundException('Producto no encontrado');
-
-    switch (dto.targetType) {
-      case ProductArchetype.SERVICIO:
-        product.product_type = 'SERVICIO';
-        product.is_service = true;
-        product.category = dto.newCategory || (product.category === 'General' ? 'Servicios' : (product.category || 'Servicios'));
-        product.durationMinutes = dto.durationMinutes || product.durationMinutes || 30;
-        // Non-destructive: Preserve recipe items in database without deleting them.
-        // Clean out dead/ghost stock to protect financial valuation & inventory reports:
-        product.stock = 0;
-        product.stockQuantity = 0;
-        product.physicalStock = 0;
-        break;
-
-      case ProductArchetype.REVENTA:
-        product.product_type = 'REVENTA';
-        product.is_service = false;
-        product.durationMinutes = null;
-        if (product.category === 'Servicios') {
-          product.category = dto.newCategory || 'General';
-        }
-        // If initial stock is provided when converting from service to resale:
-        if (dto.initialStock !== undefined && dto.initialStock !== null && !isNaN(Number(dto.initialStock))) {
-          const initStock = Math.max(0, Number(dto.initialStock));
-          product.stock = initStock;
-          product.stockQuantity = initStock;
-          product.physicalStock = initStock;
-        }
-        break;
-
-      case ProductArchetype.FORMULA:
-        product.product_type = 'FORMULA';
-        product.is_service = false;
-        product.durationMinutes = null;
-        if (product.category === 'Servicios') {
-          product.category = dto.newCategory || 'General';
-        }
-        break;
-
-      default:
-        throw new BadRequestException('Tipo de producto no reconocido');
-    }
-
-    return this.productRepo.save(product);
-  }
-
-}
-</file>
-
 <file path="apps/backend/src/reservations/reservations.service.ts">
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -25192,433 +25191,6 @@ export class SuperAdminService {
 }
 </file>
 
-<file path="apps/backend/src/users/users.service.ts">
-import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from '../entities/user.entity';
-import { UserTenantAccess } from '../entities/user-tenant-access.entity';
-import { Tenant } from '../entities/tenant.entity';
-import { AccessRequest, AccessRequestStatus } from '../entities/access-request.entity';
-import { UserRole } from '@finowork/shared-types';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcryptjs';
-
-@Injectable()
-export class UsersService implements OnModuleInit {
-  constructor(
-    @InjectRepository(User)
-    private usersRepo: Repository<User>,
-    private jwtService: JwtService,
-  ) {}
-
-  async onModuleInit() {
-    // Create default admin if no users exist
-    const count = await this.usersRepo.count();
-    if (count === 0) {
-      const hash = await bcrypt.hash('admin123', 10);
-      const admin = this.usersRepo.create({
-        username: 'admin',
-        email: 'admin@finowork.com',
-        passwordHash: hash,
-        role: UserRole.ADMIN,
-      });
-      await this.usersRepo.save(admin);
-      console.log('Default admin user created: admin / admin123');
-    }
-  }
-
-  async findByUsername(identifier: string): Promise<User | undefined> {
-    const user = await this.usersRepo.findOne({
-      where: [
-        { username: identifier },
-        { email: identifier }
-      ],
-      relations: {
-        tenantAccess: {
-          tenant: true,
-          workSchedules: true,
-        },
-      },
-    });
-    return user || undefined;
-  }
-
-  async findAll(tenantId?: string): Promise<User[]> {
-    if (!tenantId) return [];
-    
-    // Find users that have a UserTenantAccess record for this tenantId
-    const users = await this.usersRepo.createQueryBuilder('user')
-      .innerJoinAndSelect('user.tenantAccess', 'access')
-      .where('access.tenantId = :tenantId', { tenantId })
-      .orderBy('user.createdAt', 'DESC')
-      .getMany();
-      
-    // Because a user can have different roles in different tenants, map the tenant's specific role to the user object
-    return users.map(user => {
-      const access = user.tenantAccess?.find(a => a.tenantId === tenantId);
-      if (access) {
-        user.role = access.role as UserRole;
-        (user as any).roles = (access.roles && access.roles.length > 0) ? access.roles : [access.role as UserRole];
-        (user as any).status = access.status;
-        (user as any).jobTitle = access.jobTitle;
-        (user as any).entryTime = access.entryTime;
-        (user as any).exitTime = access.exitTime;
-        (user as any).lunchStart = access.lunchStart;
-        (user as any).lunchEnd = access.lunchEnd;
-        (user as any).salaryAmount = access.salaryAmount;
-        (user as any).salaryPeriod = access.salaryPeriod;
-      }
-      delete (user as any).passwordHash;
-      return user;
-    });
-  }
-
-  async findActiveEmployees(tenantId?: string): Promise<{ id: string; username: string; name: string; role: UserRole; roles?: UserRole[]; jobTitle?: string; entryTime?: string; exitTime?: string; lunchStart?: string; lunchEnd?: string }[]> {
-    if (!tenantId) return [];
-
-    const accesses = await this.usersRepo.manager.find(UserTenantAccess, {
-      where: {
-        tenantId,
-        isActive: true,
-        status: 'ACCEPTED',
-      },
-      relations: {
-        user: true,
-      },
-      order: {
-        user: {
-          username: 'ASC',
-        },
-      },
-    });
-
-    return accesses
-      .filter(a => !!a.user)
-      .map(a => ({
-        id: a.user.id,
-        username: a.user.username,
-        name: a.user.username,
-        role: a.role,
-        roles: (a.roles && a.roles.length > 0) ? a.roles : [a.role],
-        jobTitle: a.jobTitle || undefined,
-        entryTime: a.entryTime || undefined,
-        exitTime: a.exitTime || undefined,
-        lunchStart: a.lunchStart || undefined,
-        lunchEnd: a.lunchEnd || undefined,
-      }));
-  }
-
-  async create(tenantId: string, data: any): Promise<User> {
-    if (!tenantId) throw new Error('Se requiere tenantId para crear un usuario');
-    
-    return await this.usersRepo.manager.transaction(async transactionalEntityManager => {
-      if (data.role === UserRole.OPERATIVO) {
-        const cleanName = data.name || data.username || 'Personal Operativo';
-        const generatedUsername = (data.username || `operativo_${Date.now()}`).trim();
-        const generatedEmail = (data.email && data.email.trim())
-          ? data.email.trim().toLowerCase()
-          : `${generatedUsername.toLowerCase()}@no-access.local`;
-
-        const randomHash = await bcrypt.hash(`no_login_${Date.now()}_${Math.random()}`, 10);
-
-        const user = transactionalEntityManager.create(User, {
-          username: cleanName,
-          email: generatedEmail,
-          identification: data.identification || null,
-          phone: data.phone || null,
-          passwordHash: randomHash,
-          role: UserRole.OPERATIVO,
-          isEmailVerified: false,
-        });
-        const savedUser = await transactionalEntityManager.save(user);
-
-        const access = transactionalEntityManager.create(UserTenantAccess, {
-          user: savedUser,
-          tenantId,
-          role: UserRole.OPERATIVO,
-          roles: [UserRole.OPERATIVO],
-          isActive: true,
-          status: 'ACCEPTED',
-          salaryAmount: data.salaryAmount ? Number(data.salaryAmount) : null,
-          salaryPeriod: data.salaryPeriod || 'SEMANAL',
-          jobTitle: data.jobTitle || 'Personal Operativo (Limpieza / Mantenimiento)',
-          entryTime: data.entryTime || null,
-          exitTime: data.exitTime || null,
-          lunchStart: data.lunchStart || data.lunch_start || null,
-          lunchEnd: data.lunchEnd || data.lunch_end || null,
-        });
-        await transactionalEntityManager.save(access);
-        return savedUser;
-      }
-
-      // Resolve roles list & primary role
-      let assignedRoles: UserRole[];
-      if (data.roles && Array.isArray(data.roles) && data.roles.length > 0) {
-        assignedRoles = data.roles;
-      } else if (data.role) {
-        assignedRoles = [data.role];
-      } else {
-        assignedRoles = [UserRole.POS];
-      }
-      const primaryRole = (data.role && assignedRoles.includes(data.role)) ? data.role : assignedRoles[0];
-
-      // 1. Check if user already exists
-      let existingUser = await transactionalEntityManager.findOne(User, {
-        where: [
-          { username: data.username },
-          { email: data.email }
-        ],
-        relations: { tenantAccess: true }
-      });
-
-      let savedUser;
-      let status = 'ACCEPTED';
-
-      if (existingUser) {
-        // User exists, send an invitation instead of creating a new user
-        savedUser = existingUser;
-        status = 'PENDING';
-        
-        // Check if they already have access to this tenant
-        const alreadyHasAccess = savedUser.tenantAccess?.some(a => a.tenantId === tenantId);
-        if (alreadyHasAccess) {
-          throw new Error('El usuario ya pertenece a esta sucursal o tiene una invitación pendiente');
-        }
-      } else {
-        // Create new user
-        const hash = await bcrypt.hash(data.password, 10);
-        const user = transactionalEntityManager.create(User, {
-          username: data.username,
-          email: data.email,
-          identification: data.identification || null,
-          phone: data.phone || null,
-          passwordHash: hash,
-          role: primaryRole,
-          isEmailVerified: false,
-        });
-        savedUser = await transactionalEntityManager.save(user);
-        status = 'ACCEPTED';
-      }
-
-      // Create access link
-      const access = transactionalEntityManager.create('UserTenantAccess', {
-        user: savedUser,
-        tenant: { id: tenantId },
-        role: primaryRole,
-        roles: assignedRoles,
-        isActive: true,
-        status: status,
-        salaryAmount: data.salaryAmount ? Number(data.salaryAmount) : null,
-        salaryPeriod: data.salaryPeriod || null,
-        jobTitle: data.jobTitle || data.job_title || null,
-        entryTime: data.entryTime || data.entry_time || null,
-        exitTime: data.exitTime || data.exit_time || null,
-        lunchStart: data.lunchStart || data.lunch_start || null,
-        lunchEnd: data.lunchEnd || data.lunch_end || null,
-      });
-      await transactionalEntityManager.save(access);
-
-      return savedUser;
-    });
-  }
-
-  async update(tenantId: string, userId: string, data: any): Promise<any> {
-    if (!tenantId) throw new Error('Tenant ID required');
-
-    let access = await this.usersRepo.manager.findOne(UserTenantAccess, {
-      where: { userId, tenantId }
-    });
-
-    if (!access) {
-      const user = await this.usersRepo.findOne({ where: { id: userId } });
-      if (!user) throw new Error('Usuario no encontrado');
-      const fallbackRoles = (data.roles && Array.isArray(data.roles) && data.roles.length > 0)
-        ? data.roles
-        : (data.role ? [data.role] : [user.role || UserRole.POS]);
-
-      access = this.usersRepo.manager.create(UserTenantAccess, {
-        userId,
-        tenantId,
-        isActive: true,
-        status: 'ACCEPTED',
-        role: data.role || fallbackRoles[0] || UserRole.POS,
-        roles: fallbackRoles,
-      });
-    }
-
-    if (data.roles !== undefined) {
-      if (Array.isArray(data.roles) && data.roles.length > 0) {
-        access.roles = data.roles;
-        if (data.role && data.roles.includes(data.role)) {
-          access.role = data.role;
-        } else if (!data.roles.includes(access.role)) {
-          access.role = data.roles[0];
-        }
-      } else {
-        access.roles = data.role ? [data.role] : [access.role || UserRole.POS];
-      }
-    } else if (data.role !== undefined) {
-      access.role = data.role;
-      if (!access.roles || access.roles.length === 0) {
-        access.roles = [data.role];
-      } else if (!access.roles.includes(data.role)) {
-        access.roles = [data.role, ...access.roles];
-      }
-    }
-
-    if (data.jobTitle !== undefined || data.job_title !== undefined) {
-      access.jobTitle = (data.jobTitle !== undefined ? data.jobTitle : data.job_title) || null;
-    }
-    if (data.entryTime !== undefined || data.entry_time !== undefined) {
-      access.entryTime = (data.entryTime !== undefined ? data.entryTime : data.entry_time) || null;
-    }
-    if (data.exitTime !== undefined || data.exit_time !== undefined) {
-      access.exitTime = (data.exitTime !== undefined ? data.exitTime : data.exit_time) || null;
-    }
-    if (data.lunchStart !== undefined || data.lunch_start !== undefined) {
-      access.lunchStart = (data.lunchStart !== undefined ? data.lunchStart : data.lunch_start) || null;
-    }
-    if (data.lunchEnd !== undefined || data.lunch_end !== undefined) {
-      access.lunchEnd = (data.lunchEnd !== undefined ? data.lunchEnd : data.lunch_end) || null;
-    }
-    if (data.salaryAmount !== undefined) {
-      access.salaryAmount = data.salaryAmount ? Number(data.salaryAmount) : null;
-    }
-    if (data.salaryPeriod !== undefined) {
-      access.salaryPeriod = data.salaryPeriod || null;
-    }
-
-    if (data.identification !== undefined || data.phone !== undefined) {
-      await this.usersRepo.update(userId, {
-        ...(data.identification !== undefined ? { identification: data.identification } : {}),
-        ...(data.phone !== undefined ? { phone: data.phone } : {}),
-      });
-    }
-
-    await this.usersRepo.manager.save(access);
-    return { success: true, access };
-  }
-
-  async delete(tenantId: string, id: string): Promise<void> {
-    if (!tenantId) return;
-    
-    await this.usersRepo.manager.query(
-      `DELETE FROM "user_tenant_access" WHERE "userId" = $1 AND "tenantId" = $2`,
-      [id, tenantId]
-    );
-  }
-
-  async paySalary(tenantId: string, userId: string, data: any): Promise<void> {
-    if (!tenantId) throw new Error('Tenant ID required');
-    
-    await this.usersRepo.manager.transaction(async manager => {
-      // Create expense
-      const expense = manager.create('OperatingExpense', {
-        tenantId,
-        description: `Pago de Nómina - Empleado ${data.username || userId}`,
-        amount: Number(data.amount),
-        paymentMethod: data.method || 'CASH',
-        category: 'PAYROLL',
-        createdAt: data.date ? new Date(data.date) : new Date()
-      });
-      await manager.save(expense);
-    });
-  }
-
-  async acceptInvite(userId: string, tenantId: string): Promise<void> {
-    const access = await this.usersRepo.manager.findOne(UserTenantAccess, {
-      where: { userId, tenantId, status: 'PENDING' }
-    });
-    if (!access) throw new Error('Invitación no encontrada o ya procesada');
-    access.status = 'ACCEPTED';
-    await this.usersRepo.manager.save(access);
-  }
-
-  async rejectInvite(userId: string, tenantId: string): Promise<void> {
-    const access = await this.usersRepo.manager.findOne(UserTenantAccess, {
-      where: { userId, tenantId, status: 'PENDING' }
-    });
-    if (!access) throw new Error('Invitación no encontrada o ya procesada');
-    access.status = 'REJECTED';
-    await this.usersRepo.manager.save(access);
-  }
-
-  async getAccessRequests(tenantId: string): Promise<AccessRequest[]> {
-    if (!tenantId) return [];
-    const accessReqRepo = this.usersRepo.manager.getRepository(AccessRequest);
-    return accessReqRepo.find({
-      where: { tenantId, status: AccessRequestStatus.PENDING },
-      order: { createdAt: 'DESC' },
-    });
-  }
-
-  async approveAccessRequest(tenantId: string, requestId: string): Promise<AccessRequest> {
-    const accessReqRepo = this.usersRepo.manager.getRepository(AccessRequest);
-    const req = await accessReqRepo.findOne({ where: { id: requestId, tenantId } });
-    if (!req) throw new NotFoundException('Solicitud no encontrada');
-
-    const user = await this.usersRepo.findOne({
-      where: { id: req.userId },
-      relations: { tenantAccess: { tenant: true } },
-    });
-
-    const tenant = await this.usersRepo.manager.findOne(Tenant, { where: { id: tenantId } });
-    const tenantName = tenant ? tenant.name : 'FinoWork';
-
-    const access = user?.tenantAccess?.find(a => a.tenantId === req.tenantId);
-    const authorizedRoles = (access?.roles && access.roles.length > 0) ? access.roles : [req.role];
-
-    const payload = {
-      id: user?.id || req.userId,
-      username: req.userName,
-      email: user?.email,
-      identification: user?.identification,
-      phone: user?.phone,
-      isEmailVerified: !!user?.isEmailVerified,
-      sub: req.userId,
-      role: req.role,
-      roles: authorizedRoles,
-      tenantId: req.tenantId,
-      tenantName: tenantName,
-    };
-
-    const allWorkspaces = user?.tenantAccess?.map(a => ({
-      tenantId: a.tenantId,
-      name: a.tenant?.name || 'Sucursal',
-      role: a.role,
-      roles: (a.roles && a.roles.length > 0) ? a.roles : [a.role],
-      status: a.status,
-    })) || [{
-      tenantId: req.tenantId,
-      name: payload.tenantName,
-      role: req.role,
-      roles: authorizedRoles,
-      status: 'ACCEPTED',
-    }];
-
-    const token = this.jwtService.sign(payload);
-    req.status = AccessRequestStatus.APPROVED;
-    req.approvedToken = token;
-    req.approvedPayload = JSON.stringify({
-      user: payload,
-      workspaces: allWorkspaces,
-    });
-
-    return accessReqRepo.save(req);
-  }
-
-  async rejectAccessRequest(tenantId: string, requestId: string): Promise<AccessRequest> {
-    const accessReqRepo = this.usersRepo.manager.getRepository(AccessRequest);
-    const req = await accessReqRepo.findOne({ where: { id: requestId, tenantId } });
-    if (!req) throw new NotFoundException('Solicitud no encontrada');
-
-    req.status = AccessRequestStatus.REJECTED;
-    return accessReqRepo.save(req);
-  }
-}
-</file>
-
 <file path="apps/backend/src/main.ts">
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
@@ -25794,6 +25366,616 @@ bootstrap();
     "testEnvironment": "node"
   }
 }
+</file>
+
+<file path="apps/frontend/src/components/products/ProductFormModal.tsx">
+import React, { useState, useEffect } from 'react';
+import {
+  IonModal,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonButtons,
+  IonButton,
+  IonContent,
+  IonFooter,
+  IonIcon,
+  useIonToast
+} from '@ionic/react';
+import { closeOutline, checkmarkCircle, personOutline, timeOutline, pricetagOutline } from 'ionicons/icons';
+import { apiClient } from '../../api/client';
+import type { Product } from '../../types';
+
+interface ProductFormModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+  product: Product | null;
+  isCombo?: boolean;
+  archetype?: 'REVENTA' | 'FORMULA' | 'SERVICIO';
+  isResaleOnly?: boolean;
+  users: any[];
+}
+
+export const ProductFormModal: React.FC<ProductFormModalProps> = ({
+  isOpen,
+  onClose,
+  onSaved,
+  product,
+  isCombo = false,
+  archetype,
+  isResaleOnly = false,
+  users
+}) => {
+  const [presentToast] = useIonToast();
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('');
+  const [salePrice, setSalePrice] = useState('');
+  const [estimatedCost, setEstimatedCost] = useState('');
+  const [stock, setStock] = useState('0');
+  const [durationMinutes, setDurationMinutes] = useState('30');
+  const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [selectedType, setSelectedType] = useState<'REVENTA' | 'FORMULA' | 'SERVICIO'>(archetype || 'REVENTA');
+  const [availabilityType, setAvailabilityType] = useState<'INMEDIATO' | 'BAJO_ENCARGO'>('INMEDIATO');
+  const [isSupplierPreorder, setIsSupplierPreorder] = useState(false);
+
+  const [settings, setSettings] = useState<any>(() => {
+    try {
+      const cached = localStorage.getItem('flujofino_cached_settings');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return {};
+  });
+
+  useEffect(() => {
+    apiClient.get('/settings').then(res => {
+      if (res.data) setSettings(res.data);
+    }).catch(() => {});
+  }, []);
+
+  const isProductionEnabled = settings.enableProduction !== undefined ? Boolean(settings.enableProduction) : (settings.featureProduction !== false);
+  const isRetailEnabled = settings.enableRetail !== undefined ? Boolean(settings.enableRetail) : (settings.featureBuySell !== false);
+  const isReservationsEnabled = settings.enableReservations !== undefined ? Boolean(settings.enableReservations) : Boolean(settings.featureCustomerSchedules);
+
+  const availableTypes: ('REVENTA' | 'FORMULA' | 'SERVICIO')[] = [];
+  if (isRetailEnabled) availableTypes.push('REVENTA');
+  if (isProductionEnabled) availableTypes.push('FORMULA');
+  availableTypes.push('SERVICIO');
+
+  const isResale = selectedType === 'REVENTA';
+  const isFormula = selectedType === 'FORMULA';
+  const isService = selectedType === 'SERVICIO';
+
+  useEffect(() => {
+    if (product) {
+      const pType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = 
+        product.product_type || 
+        (product.is_service === true || product.category === 'Servicios' ? 'SERVICIO' : 
+        ((product.recipe && product.recipe.length > 0) || product.isCombo ? 'FORMULA' : 'REVENTA'));
+      setSelectedType(pType);
+      setName(product.name || '');
+      setCategory(product.category || '');
+      setSalePrice(product.salePrice !== undefined ? String(product.salePrice) : '');
+      const existingCost = product.cost !== undefined && product.cost !== null ? product.cost : product.estimatedCost;
+      setEstimatedCost(existingCost !== undefined && existingCost !== null ? String(existingCost) : '');
+      setStock(product.stock !== undefined && product.stock !== null ? String(product.stock) : String(product.stockQuantity || '0'));
+      setDurationMinutes(product.durationMinutes ? String(product.durationMinutes) : '30');
+      setAvailabilityType(product.availabilityType || 'INMEDIATO');
+      setIsSupplierPreorder(!!product.isSupplierPreorder);
+      
+      let staffIds: string[] = [];
+      if (Array.isArray(product.assignedStaffIds)) {
+        staffIds = product.assignedStaffIds;
+      } else if (typeof product.assignedStaffIds === 'string' && (product.assignedStaffIds as string).trim()) {
+        staffIds = (product.assignedStaffIds as string).split(',').map(s => s.trim()).filter(Boolean);
+      }
+      setSelectedStaffIds(staffIds);
+    } else {
+      let defaultType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = archetype || (isResaleOnly ? 'REVENTA' : 'REVENTA');
+      if (!availableTypes.includes(defaultType)) {
+        defaultType = availableTypes[0] || 'SERVICIO';
+      }
+      setSelectedType(defaultType);
+      setName('');
+      setCategory(isCombo ? 'Combos' : defaultType === 'SERVICIO' ? 'Servicios' : 'General');
+      setSalePrice('');
+      setEstimatedCost('');
+      setStock('0');
+      setDurationMinutes('30');
+      setAvailabilityType('INMEDIATO');
+      setIsSupplierPreorder(false);
+      setSelectedStaffIds([]);
+    }
+  }, [product, isCombo, archetype, isResaleOnly, isOpen, isProductionEnabled, isRetailEnabled]);
+
+  useEffect(() => {
+    if (!product && !availableTypes.includes(selectedType) && availableTypes.length > 0) {
+      setSelectedType(availableTypes[0]);
+    }
+  }, [availableTypes, product, selectedType]);
+
+  const toggleStaff = (userId: string) => {
+    setSelectedStaffIds(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId) 
+        : [...prev, userId]
+    );
+  };
+
+  const handleSelectAllStaff = () => {
+    if (selectedStaffIds.length === users.length) {
+      setSelectedStaffIds([]);
+    } else {
+      setSelectedStaffIds(users.map(u => u.id));
+    }
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      presentToast({ message: 'El nombre es obligatorio', duration: 2500, color: 'warning' });
+      return;
+    }
+    const priceNum = parseFloat(salePrice);
+    if (isNaN(priceNum) || priceNum < 0) {
+      presentToast({ message: 'Ingresa un precio de venta válido', duration: 2500, color: 'warning' });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const costNum = estimatedCost ? parseFloat(estimatedCost) : 0;
+      const stockNum = isResale ? (stock ? parseFloat(stock) : 0) : 0;
+      const payload: any = {
+        name: name.trim(),
+        category: category.trim() || (isService ? 'Servicios' : 'General'),
+        salePrice: priceNum,
+        cost: isService ? 0 : costNum,
+        estimatedCost: costNum,
+        stock: isResale ? stockNum : 0,
+        stockQuantity: isResale ? stockNum : 0,
+        physicalStock: isResale ? stockNum : 0,
+        durationMinutes: isService ? (durationMinutes ? parseInt(durationMinutes, 10) : 30) : null,
+        assignedStaffIds: isService ? selectedStaffIds : [],
+        is_service: isService,
+        product_type: selectedType,
+        availabilityType: isService ? 'INMEDIATO' : availabilityType,
+        isSupplierPreorder: isService ? false : isSupplierPreorder
+      };
+
+      if (product) {
+        await apiClient.put(`/products/${product.id}`, payload);
+        presentToast({ message: 'Producto/Servicio actualizado con éxito', duration: 2500, color: 'success' });
+      } else {
+        payload.isCombo = isCombo;
+        payload.isPreAssembled = false;
+        await apiClient.post('/products', payload);
+        const successMsg = isCombo ? 'Combo creado con éxito' : isResale ? 'Producto de reventa creado con éxito' : isFormula ? 'Producto armable creado con éxito' : 'Servicio creado con éxito';
+        presentToast({ message: successMsg, duration: 2500, color: 'success' });
+      }
+
+      onSaved();
+      onClose();
+    } catch (e: any) {
+      console.error(e);
+      presentToast({
+        message: 'Error al guardar: ' + (e.response?.data?.message || e.message),
+        duration: 3500,
+        color: 'danger'
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <IonModal isOpen={isOpen} onDidDismiss={onClose}>
+      <IonHeader>
+        <IonToolbar color="primary">
+          <IonTitle>
+            {product ? `Editar: ${product.name}` : isCombo ? 'Nuevo Combo' : isResale ? 'Nuevo Producto para Reventa' : isFormula ? 'Nuevo Producto Armable' : 'Nuevo Servicio / Cita'}
+          </IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={onClose}>
+              <IonIcon icon={closeOutline} />
+            </IonButton>
+          </IonButtons>
+        </IonToolbar>
+      </IonHeader>
+
+      <IonContent className="ion-padding" style={{ '--background': '#f8fafc' } as any}>
+        <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+          {/* Selector de Arquetipo */}
+          {!isCombo && (
+            <div style={{
+              display: 'flex',
+              gap: '6px',
+              backgroundColor: '#e2e8f0',
+              padding: '4px',
+              borderRadius: '10px',
+              marginBottom: '16px'
+            }}>
+              {isRetailEnabled && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedType('REVENTA');
+                    if (category === 'Servicios') setCategory('General');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '9px 6px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: selectedType === 'REVENTA' ? '700' : '500',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    backgroundColor: selectedType === 'REVENTA' ? '#ffffff' : 'transparent',
+                    color: selectedType === 'REVENTA' ? '#166534' : '#475569',
+                    boxShadow: selectedType === 'REVENTA' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  📦 Reventa Directa
+                </button>
+              )}
+              {isProductionEnabled && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedType('FORMULA');
+                    if (category === 'Servicios') setCategory('General');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '9px 6px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: selectedType === 'FORMULA' ? '700' : '500',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    backgroundColor: selectedType === 'FORMULA' ? '#ffffff' : 'transparent',
+                    color: selectedType === 'FORMULA' ? '#92400e' : '#475569',
+                    boxShadow: selectedType === 'FORMULA' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  🧪 Con Fórmula
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedType('SERVICIO');
+                  if (!category || category === 'General') setCategory('Servicios');
+                }}
+                style={{
+                  flex: 1,
+                  padding: '9px 6px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontWeight: selectedType === 'SERVICIO' ? '700' : '500',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  backgroundColor: selectedType === 'SERVICIO' ? '#ffffff' : 'transparent',
+                  color: selectedType === 'SERVICIO' ? '#1e40af' : '#475569',
+                  boxShadow: selectedType === 'SERVICIO' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {isReservationsEnabled ? '💆 Servicio / Cita' : '💆 Servicio'}
+              </button>
+            </div>
+          )}
+
+          {/* Main Info Card */}
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <h4 style={{ margin: '0 0 14px 0', fontSize: '15px', fontWeight: '700', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <IonIcon icon={pricetagOutline} color="primary" /> {isResale ? 'Datos del Producto de Reventa' : isFormula ? 'Datos del Producto Armable' : isService ? 'Datos del Servicio' : 'Información Principal'}
+            </h4>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
+                {isService ? 'Nombre del Servicio *' : 'Nombre del Producto *'}
+              </label>
+              <input 
+                type="text"
+                value={name} 
+                onChange={e => setName(e.target.value)} 
+                placeholder={isResale ? 'Ej. Vestido Casual, Pantalón Jean, Nutella 350g...' : isFormula ? 'Ej. Hamburguesa Especial, Tinte Rubio Mix, Torta...' : 'Ej. Uñas Acrílicas, Corte de Cabello, Masaje...'} 
+                style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
+                Categoría
+              </label>
+              <input 
+                type="text"
+                value={category} 
+                onChange={e => setCategory(e.target.value)} 
+                placeholder={isResale ? 'Ej. Ropa, Snacks, Bodegón, Bebidas...' : isFormula ? 'Ej. Comida, Bebidas, Preparados...' : 'Ej. Servicios, Peluquería, Estética...'} 
+                style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: isService ? '1fr' : '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
+                  Precio Venta ($) *
+                </label>
+                <input 
+                  type="number" 
+                  value={salePrice} 
+                  onChange={e => setSalePrice(e.target.value)} 
+                  placeholder="Ej. 25.00" 
+                  step="0.01"
+                  style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+                />
+              </div>
+
+              {!isService && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
+                    {isResale ? 'Costo Unitario Compra ($)' : 'Costo Estimado Base ($)'}
+                  </label>
+                  <input 
+                    type="number" 
+                    value={estimatedCost} 
+                    onChange={e => setEstimatedCost(e.target.value)} 
+                    placeholder={isResale ? 'Ej. 10.00' : 'Opcional (Ej. 5.00)'} 
+                    step="0.01"
+                    style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {isResale && (
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
+                  {product ? 'Stock Actual' : 'Stock Inicial'}
+                </label>
+                <input 
+                  type="number" 
+                  value={stock} 
+                  onChange={e => setStock(e.target.value)} 
+                  placeholder="Ej. 15" 
+                  min="0"
+                  style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+                />
+              </div>
+            )}
+
+            {isFormula && (
+              <div style={{ padding: '12px 14px', backgroundColor: '#fef3c7', borderRadius: '8px', border: '1px solid #fde68a', color: '#92400e', fontSize: '13px', marginTop: '6px' }}>
+                🧪 <b>Producto Armable / Con Fórmula:</b> Este producto se elabora a partir de insumos. Una vez guardado, podrás ingresar su receta y materias primas desde el menú del producto.
+              </div>
+            )}
+
+            {isService && (
+              <>
+                {isReservationsEnabled ? (
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
+                      <IonIcon icon={timeOutline} /> Duración Estimada (Minutos)
+                    </label>
+                    <input 
+                      type="number" 
+                      value={durationMinutes} 
+                      onChange={e => setDurationMinutes(e.target.value)} 
+                      placeholder="Ej. 30, 45, 60..." 
+                      min="5"
+                      step="5"
+                      style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+                    />
+                  </div>
+                ) : null}
+                <div style={{ padding: '10px 12px', backgroundColor: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe', color: '#1e40af', fontSize: '13px', marginTop: '10px' }}>
+                  {isReservationsEnabled ? (
+                    <>💆 <b>Servicio / Cita:</b> No maneja stock físico. Si para realizar este servicio consumes insumos o materiales de trabajo (ej. tintes, desinfectante, etc.), podrás vincularlos en "Configurar Insumos del Servicio" desde la tarjeta.</>
+                  ) : (
+                    <>💆 <b>Servicio Directo:</b> No maneja stock físico. Diseñado para facturar mano de obra, trabajos o atenciones directamente en Caja (POS).</>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Modalidad y Disponibilidad (Productos y Fórmulas) */}
+          {!isService && (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: '700', color: '#1e293b' }}>
+                Disponibilidad y Tipo de Entrega
+              </h4>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setAvailabilityType('INMEDIATO')}
+                  style={{
+                    padding: '10px 8px',
+                    borderRadius: '8px',
+                    border: `2px solid ${availabilityType === 'INMEDIATO' ? '#2563eb' : '#e2e8f0'}`,
+                    backgroundColor: availabilityType === 'INMEDIATO' ? '#eff6ff' : '#ffffff',
+                    color: availabilityType === 'INMEDIATO' ? '#1d4ed8' : '#475569',
+                    fontWeight: availabilityType === 'INMEDIATO' ? '700' : '500',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    textAlign: 'center'
+                  }}
+                >
+                  ⚡ Entrega Inmediata
+                  <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>Stock físico o salida rápida</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAvailabilityType('BAJO_ENCARGO')}
+                  style={{
+                    padding: '10px 8px',
+                    borderRadius: '8px',
+                    border: `2px solid ${availabilityType === 'BAJO_ENCARGO' ? '#d97706' : '#e2e8f0'}`,
+                    backgroundColor: availabilityType === 'BAJO_ENCARGO' ? '#fffbeb' : '#ffffff',
+                    color: availabilityType === 'BAJO_ENCARGO' ? '#b45309' : '#475569',
+                    fontWeight: availabilityType === 'BAJO_ENCARGO' ? '700' : '500',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    textAlign: 'center'
+                  }}
+                >
+                  🎂 Bajo Encargo
+                  <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>Cocina / Repostería / A pedido</div>
+                </button>
+              </div>
+
+              {/* Preorden por Proveedor (Catálogo) */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: isSupplierPreorder ? '1.5px solid #a855f7' : '1px solid #e2e8f0',
+                  background: isSupplierPreorder ? '#faf5ff' : '#f8fafc',
+                  cursor: 'pointer'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isSupplierPreorder}
+                  onChange={e => setIsSupplierPreorder(e.target.checked)}
+                  style={{ marginTop: '2px', accentColor: '#9333ea', width: '16px', height: '16px' }}
+                />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: isSupplierPreorder ? '#7e22ce' : '#1e293b' }}>
+                    📦 Preorden por Catálogo (Sujeto a Proveedor)
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                    Ideal para ropa, calzado o mercancía por encargo. En la tienda pública el cliente enviará una solicitud sin pagar de inmediato hasta que verifiques disponibilidad.
+                  </div>
+                </div>
+              </label>
+            </div>
+          )}
+
+          {/* Assigned Staff Card - Solo para Servicios con módulo de citas activo */}
+          {isService && isReservationsEnabled && (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <IonIcon icon={personOutline} color="primary" /> Especialistas / Personal que realiza este trabajo
+                </h4>
+              {users.length > 0 && (
+                <button 
+                  type="button"
+                  onClick={handleSelectAllStaff}
+                  style={{ background: 'none', border: 'none', color: 'var(--ion-color-primary)', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  {selectedStaffIds.length === users.length ? 'Deseleccionar Todos' : 'Seleccionar Todos'}
+                </button>
+              )}
+            </div>
+
+            <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: '#64748b', lineHeight: '1.4' }}>
+              Elige qué trabajadoras o especialistas están capacitadas para brindar este servicio. 
+              {selectedStaffIds.length === 0 ? (
+                <span style={{ color: '#0284c7', display: 'block', marginTop: '4px', fontWeight: '500' }}>
+                  ℹ️ Al no seleccionar ninguna, cualquier trabajadora disponible podrá atenderlo por defecto.
+                </span>
+              ) : (
+                <span style={{ color: '#059669', display: 'block', marginTop: '4px', fontWeight: '500' }}>
+                  ✓ Solo las {selectedStaffIds.length} personas seleccionadas podrán ser elegidas para este servicio en la reserva.
+                </span>
+              )}
+            </p>
+
+            {users.length === 0 ? (
+              <div style={{ padding: '12px', backgroundColor: '#f1f5f9', borderRadius: '8px', fontSize: '13px', color: '#64748b', textAlign: 'center' }}>
+                No hay otros miembros registrados en el equipo. Puedes agregar usuarios desde la sección <b>Usuarios</b>.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
+                {users.map(u => {
+                  const isChecked = selectedStaffIds.includes(u.id);
+                  return (
+                    <div 
+                      key={u.id}
+                      onClick={() => toggleStaff(u.id)}
+                      style={{
+                        padding: '12px',
+                        borderRadius: '10px',
+                        border: isChecked ? '2px solid var(--ion-color-primary)' : '1px solid #cbd5e1',
+                        backgroundColor: isChecked ? '#eff6ff' : '#ffffff',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        transition: 'all 0.15s ease',
+                        boxShadow: isChecked ? '0 2px 4px rgba(0,0,0,0.06)' : 'none'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          backgroundColor: isChecked ? 'var(--ion-color-primary)' : '#e2e8f0',
+                          color: isChecked ? '#ffffff' : '#475569',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 'bold',
+                          fontSize: '13px',
+                          flexShrink: 0
+                        }}>
+                          {u.username.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontWeight: '600', fontSize: '13px', color: '#1e293b' }}>
+                            {u.username}
+                          </div>
+                          {u.jobTitle && (
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>
+                              {u.jobTitle}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div style={{ flexShrink: 0, marginLeft: '6px' }}>
+                        {isChecked ? (
+                          <IonIcon icon={checkmarkCircle} color="primary" style={{ fontSize: '20px' }} />
+                        ) : (
+                          <div style={{ width: '18px', height: '18px', borderRadius: '50%', border: '2px solid #94a3b8' }} />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          )}
+
+        </div>
+      </IonContent>
+
+      <IonFooter className="ion-no-border" style={{ backgroundColor: '#ffffff', borderTop: '1px solid #e2e8f0', padding: '10px 16px' }}>
+        <div style={{ maxWidth: '640px', margin: '0 auto', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+          <IonButton fill="outline" color="medium" onClick={onClose} disabled={saving}>
+            Cancelar
+          </IonButton>
+          <IonButton color="primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Guardando...' : (product ? 'Guardar Cambios' : 'Crear')}
+          </IonButton>
+        </div>
+      </IonFooter>
+    </IonModal>
+  );
+};
 </file>
 
 <file path="apps/frontend/src/components/raw-materials/StockOperationModal.tsx">
@@ -26846,614 +27028,414 @@ export class SettingsService implements OnModuleInit {
 }
 </file>
 
-<file path="apps/frontend/src/components/products/ProductFormModal.tsx">
-import React, { useState, useEffect } from 'react';
-import {
-  IonModal,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonButtons,
-  IonButton,
-  IonContent,
-  IonFooter,
-  IonIcon,
-  useIonToast
-} from '@ionic/react';
-import { closeOutline, checkmarkCircle, personOutline, timeOutline, pricetagOutline } from 'ionicons/icons';
-import { apiClient } from '../../api/client';
-import type { Product } from '../../types';
+<file path="apps/backend/src/users/users.service.ts">
+import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '../entities/user.entity';
+import { UserTenantAccess } from '../entities/user-tenant-access.entity';
+import { Tenant } from '../entities/tenant.entity';
+import { AccessRequest, AccessRequestStatus } from '../entities/access-request.entity';
+import { UserRole } from '@finowork/shared-types';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcryptjs';
 
-interface ProductFormModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSaved: () => void;
-  product: Product | null;
-  isCombo?: boolean;
-  archetype?: 'REVENTA' | 'FORMULA' | 'SERVICIO';
-  isResaleOnly?: boolean;
-  users: any[];
-}
+@Injectable()
+export class UsersService implements OnModuleInit {
+  constructor(
+    @InjectRepository(User)
+    private usersRepo: Repository<User>,
+    private jwtService: JwtService,
+  ) {}
 
-export const ProductFormModal: React.FC<ProductFormModalProps> = ({
-  isOpen,
-  onClose,
-  onSaved,
-  product,
-  isCombo = false,
-  archetype,
-  isResaleOnly = false,
-  users
-}) => {
-  const [presentToast] = useIonToast();
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
-  const [salePrice, setSalePrice] = useState('');
-  const [estimatedCost, setEstimatedCost] = useState('');
-  const [stock, setStock] = useState('0');
-  const [durationMinutes, setDurationMinutes] = useState('30');
-  const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [selectedType, setSelectedType] = useState<'REVENTA' | 'FORMULA' | 'SERVICIO'>(archetype || 'REVENTA');
-  const [availabilityType, setAvailabilityType] = useState<'INMEDIATO' | 'BAJO_ENCARGO'>('INMEDIATO');
-  const [isSupplierPreorder, setIsSupplierPreorder] = useState(false);
-
-  const [settings, setSettings] = useState<any>(() => {
-    try {
-      const cached = localStorage.getItem('flujofino_cached_settings');
-      if (cached) return JSON.parse(cached);
-    } catch {}
-    return {};
-  });
-
-  useEffect(() => {
-    apiClient.get('/settings').then(res => {
-      if (res.data) setSettings(res.data);
-    }).catch(() => {});
-  }, []);
-
-  const isProductionEnabled = settings.enableProduction !== undefined ? Boolean(settings.enableProduction) : (settings.featureProduction !== false);
-  const isRetailEnabled = settings.enableRetail !== undefined ? Boolean(settings.enableRetail) : (settings.featureBuySell !== false);
-  const isReservationsEnabled = settings.enableReservations !== undefined ? Boolean(settings.enableReservations) : Boolean(settings.featureCustomerSchedules);
-
-  const availableTypes: ('REVENTA' | 'FORMULA' | 'SERVICIO')[] = [];
-  if (isRetailEnabled) availableTypes.push('REVENTA');
-  if (isProductionEnabled) availableTypes.push('FORMULA');
-  availableTypes.push('SERVICIO');
-
-  const isResale = selectedType === 'REVENTA';
-  const isFormula = selectedType === 'FORMULA';
-  const isService = selectedType === 'SERVICIO';
-
-  useEffect(() => {
-    if (product) {
-      const pType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = 
-        product.product_type || 
-        (product.is_service === true || product.category === 'Servicios' ? 'SERVICIO' : 
-        ((product.recipe && product.recipe.length > 0) || product.isCombo ? 'FORMULA' : 'REVENTA'));
-      setSelectedType(pType);
-      setName(product.name || '');
-      setCategory(product.category || '');
-      setSalePrice(product.salePrice !== undefined ? String(product.salePrice) : '');
-      const existingCost = product.cost !== undefined && product.cost !== null ? product.cost : product.estimatedCost;
-      setEstimatedCost(existingCost !== undefined && existingCost !== null ? String(existingCost) : '');
-      setStock(product.stock !== undefined && product.stock !== null ? String(product.stock) : String(product.stockQuantity || '0'));
-      setDurationMinutes(product.durationMinutes ? String(product.durationMinutes) : '30');
-      setAvailabilityType(product.availabilityType || 'INMEDIATO');
-      setIsSupplierPreorder(!!product.isSupplierPreorder);
-      
-      let staffIds: string[] = [];
-      if (Array.isArray(product.assignedStaffIds)) {
-        staffIds = product.assignedStaffIds;
-      } else if (typeof product.assignedStaffIds === 'string' && (product.assignedStaffIds as string).trim()) {
-        staffIds = (product.assignedStaffIds as string).split(',').map(s => s.trim()).filter(Boolean);
-      }
-      setSelectedStaffIds(staffIds);
-    } else {
-      let defaultType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = archetype || (isResaleOnly ? 'REVENTA' : 'REVENTA');
-      if (!availableTypes.includes(defaultType)) {
-        defaultType = availableTypes[0] || 'SERVICIO';
-      }
-      setSelectedType(defaultType);
-      setName('');
-      setCategory(isCombo ? 'Combos' : defaultType === 'SERVICIO' ? 'Servicios' : 'General');
-      setSalePrice('');
-      setEstimatedCost('');
-      setStock('0');
-      setDurationMinutes('30');
-      setAvailabilityType('INMEDIATO');
-      setIsSupplierPreorder(false);
-      setSelectedStaffIds([]);
-    }
-  }, [product, isCombo, archetype, isResaleOnly, isOpen, isProductionEnabled, isRetailEnabled]);
-
-  useEffect(() => {
-    if (!product && !availableTypes.includes(selectedType) && availableTypes.length > 0) {
-      setSelectedType(availableTypes[0]);
-    }
-  }, [availableTypes, product, selectedType]);
-
-  const toggleStaff = (userId: string) => {
-    setSelectedStaffIds(prev => 
-      prev.includes(userId) 
-        ? prev.filter(id => id !== userId) 
-        : [...prev, userId]
-    );
-  };
-
-  const handleSelectAllStaff = () => {
-    if (selectedStaffIds.length === users.length) {
-      setSelectedStaffIds([]);
-    } else {
-      setSelectedStaffIds(users.map(u => u.id));
-    }
-  };
-
-  const handleSave = async () => {
-    if (!name.trim()) {
-      presentToast({ message: 'El nombre es obligatorio', duration: 2500, color: 'warning' });
-      return;
-    }
-    const priceNum = parseFloat(salePrice);
-    if (isNaN(priceNum) || priceNum < 0) {
-      presentToast({ message: 'Ingresa un precio de venta válido', duration: 2500, color: 'warning' });
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const costNum = estimatedCost ? parseFloat(estimatedCost) : 0;
-      const stockNum = isResale ? (stock ? parseFloat(stock) : 0) : 0;
-      const payload: any = {
-        name: name.trim(),
-        category: category.trim() || (isService ? 'Servicios' : 'General'),
-        salePrice: priceNum,
-        cost: isService ? 0 : costNum,
-        estimatedCost: costNum,
-        stock: isResale ? stockNum : 0,
-        stockQuantity: isResale ? stockNum : 0,
-        physicalStock: isResale ? stockNum : 0,
-        durationMinutes: isService ? (durationMinutes ? parseInt(durationMinutes, 10) : 30) : null,
-        assignedStaffIds: isService ? selectedStaffIds : [],
-        is_service: isService,
-        product_type: selectedType,
-        availabilityType: isService ? 'INMEDIATO' : availabilityType,
-        isSupplierPreorder: isService ? false : isSupplierPreorder
-      };
-
-      if (product) {
-        await apiClient.put(`/products/${product.id}`, payload);
-        presentToast({ message: 'Producto/Servicio actualizado con éxito', duration: 2500, color: 'success' });
-      } else {
-        payload.isCombo = isCombo;
-        payload.isPreAssembled = false;
-        await apiClient.post('/products', payload);
-        const successMsg = isCombo ? 'Combo creado con éxito' : isResale ? 'Producto de reventa creado con éxito' : isFormula ? 'Producto armable creado con éxito' : 'Servicio creado con éxito';
-        presentToast({ message: successMsg, duration: 2500, color: 'success' });
-      }
-
-      onSaved();
-      onClose();
-    } catch (e: any) {
-      console.error(e);
-      presentToast({
-        message: 'Error al guardar: ' + (e.response?.data?.message || e.message),
-        duration: 3500,
-        color: 'danger'
+  async onModuleInit() {
+    // Create default admin if no users exist
+    const count = await this.usersRepo.count();
+    if (count === 0) {
+      const hash = await bcrypt.hash('admin123', 10);
+      const admin = this.usersRepo.create({
+        username: 'admin',
+        email: 'admin@finowork.com',
+        passwordHash: hash,
+        role: UserRole.ADMIN,
       });
-    } finally {
-      setSaving(false);
+      await this.usersRepo.save(admin);
+      console.log('Default admin user created: admin / admin123');
     }
-  };
+  }
 
-  return (
-    <IonModal isOpen={isOpen} onDidDismiss={onClose}>
-      <IonHeader>
-        <IonToolbar color="primary">
-          <IonTitle>
-            {product ? `Editar: ${product.name}` : isCombo ? 'Nuevo Combo' : isResale ? 'Nuevo Producto para Reventa' : isFormula ? 'Nuevo Producto Armable' : 'Nuevo Servicio / Cita'}
-          </IonTitle>
-          <IonButtons slot="end">
-            <IonButton onClick={onClose}>
-              <IonIcon icon={closeOutline} />
-            </IonButton>
-          </IonButtons>
-        </IonToolbar>
-      </IonHeader>
+  async findByUsername(identifier: string): Promise<User | undefined> {
+    const user = await this.usersRepo.findOne({
+      where: [
+        { username: identifier },
+        { email: identifier }
+      ],
+      relations: {
+        tenantAccess: {
+          tenant: true,
+          workSchedules: true,
+        },
+      },
+    });
+    return user || undefined;
+  }
 
-      <IonContent className="ion-padding" style={{ '--background': '#f8fafc' } as any}>
-        <div style={{ maxWidth: '640px', margin: '0 auto' }}>
-          {/* Selector de Arquetipo */}
-          {!isCombo && (
-            <div style={{
-              display: 'flex',
-              gap: '6px',
-              backgroundColor: '#e2e8f0',
-              padding: '4px',
-              borderRadius: '10px',
-              marginBottom: '16px'
-            }}>
-              {isRetailEnabled && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedType('REVENTA');
-                    if (category === 'Servicios') setCategory('General');
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '9px 6px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    fontWeight: selectedType === 'REVENTA' ? '700' : '500',
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    backgroundColor: selectedType === 'REVENTA' ? '#ffffff' : 'transparent',
-                    color: selectedType === 'REVENTA' ? '#166534' : '#475569',
-                    boxShadow: selectedType === 'REVENTA' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  📦 Reventa Directa
-                </button>
-              )}
-              {isProductionEnabled && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedType('FORMULA');
-                    if (category === 'Servicios') setCategory('General');
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '9px 6px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    fontWeight: selectedType === 'FORMULA' ? '700' : '500',
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    backgroundColor: selectedType === 'FORMULA' ? '#ffffff' : 'transparent',
-                    color: selectedType === 'FORMULA' ? '#92400e' : '#475569',
-                    boxShadow: selectedType === 'FORMULA' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  🧪 Con Fórmula
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedType('SERVICIO');
-                  if (!category || category === 'General') setCategory('Servicios');
-                }}
-                style={{
-                  flex: 1,
-                  padding: '9px 6px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  fontWeight: selectedType === 'SERVICIO' ? '700' : '500',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  backgroundColor: selectedType === 'SERVICIO' ? '#ffffff' : 'transparent',
-                  color: selectedType === 'SERVICIO' ? '#1e40af' : '#475569',
-                  boxShadow: selectedType === 'SERVICIO' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {isReservationsEnabled ? '💆 Servicio / Cita' : '💆 Servicio'}
-              </button>
-            </div>
-          )}
+  async findAll(tenantId?: string): Promise<User[]> {
+    if (!tenantId) return [];
+    
+    // Find users that have a UserTenantAccess record for this tenantId
+    const users = await this.usersRepo.createQueryBuilder('user')
+      .innerJoinAndSelect('user.tenantAccess', 'access')
+      .where('access.tenantId = :tenantId', { tenantId })
+      .orderBy('user.createdAt', 'DESC')
+      .getMany();
+      
+    // Because a user can have different roles in different tenants, map the tenant's specific role to the user object
+    return users.map(user => {
+      const access = user.tenantAccess?.find(a => a.tenantId === tenantId);
+      if (access) {
+        user.role = access.role as UserRole;
+        (user as any).roles = (access.roles && access.roles.length > 0) ? access.roles : [access.role as UserRole];
+        (user as any).status = access.status;
+        (user as any).jobTitle = access.jobTitle;
+        (user as any).entryTime = access.entryTime;
+        (user as any).exitTime = access.exitTime;
+        (user as any).lunchStart = access.lunchStart;
+        (user as any).lunchEnd = access.lunchEnd;
+        (user as any).salaryAmount = access.salaryAmount;
+        (user as any).salaryPeriod = access.salaryPeriod;
+      }
+      delete (user as any).passwordHash;
+      return user;
+    });
+  }
 
-          {/* Main Info Card */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <h4 style={{ margin: '0 0 14px 0', fontSize: '15px', fontWeight: '700', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <IonIcon icon={pricetagOutline} color="primary" /> {isResale ? 'Datos del Producto de Reventa' : isFormula ? 'Datos del Producto Armable' : isService ? 'Datos del Servicio' : 'Información Principal'}
-            </h4>
+  async findActiveEmployees(tenantId?: string): Promise<{ id: string; username: string; name: string; role: UserRole; roles?: UserRole[]; jobTitle?: string; entryTime?: string; exitTime?: string; lunchStart?: string; lunchEnd?: string }[]> {
+    if (!tenantId) return [];
+    const users = await this.findAll(tenantId);
+    return users.map(u => ({
+      id: u.id,
+      username: u.username,
+      name: u.username,
+      role: u.role,
+      roles: (u as any).roles && (u as any).roles.length > 0 ? (u as any).roles : [u.role],
+      jobTitle: (u as any).jobTitle || undefined,
+      entryTime: (u as any).entryTime || undefined,
+      exitTime: (u as any).exitTime || undefined,
+      lunchStart: (u as any).lunchStart || undefined,
+      lunchEnd: (u as any).lunchEnd || undefined,
+    }));
+  }
 
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                {isService ? 'Nombre del Servicio *' : 'Nombre del Producto *'}
-              </label>
-              <input 
-                type="text"
-                value={name} 
-                onChange={e => setName(e.target.value)} 
-                placeholder={isResale ? 'Ej. Vestido Casual, Pantalón Jean, Nutella 350g...' : isFormula ? 'Ej. Hamburguesa Especial, Tinte Rubio Mix, Torta...' : 'Ej. Uñas Acrílicas, Corte de Cabello, Masaje...'} 
-                style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
-              />
-            </div>
+  async create(tenantId: string, data: any): Promise<User> {
+    if (!tenantId) throw new Error('Se requiere tenantId para crear un usuario');
+    
+    return await this.usersRepo.manager.transaction(async transactionalEntityManager => {
+      if (data.role === UserRole.OPERATIVO) {
+        const cleanName = data.name || data.username || 'Personal Operativo';
+        const generatedUsername = (data.username || `operativo_${Date.now()}`).trim();
+        const generatedEmail = (data.email && data.email.trim())
+          ? data.email.trim().toLowerCase()
+          : `${generatedUsername.toLowerCase()}@no-access.local`;
 
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                Categoría
-              </label>
-              <input 
-                type="text"
-                value={category} 
-                onChange={e => setCategory(e.target.value)} 
-                placeholder={isResale ? 'Ej. Ropa, Snacks, Bodegón, Bebidas...' : isFormula ? 'Ej. Comida, Bebidas, Preparados...' : 'Ej. Servicios, Peluquería, Estética...'} 
-                style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
-              />
-            </div>
+        const randomHash = await bcrypt.hash(`no_login_${Date.now()}_${Math.random()}`, 10);
 
-            <div style={{ display: 'grid', gridTemplateColumns: isService ? '1fr' : '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                  Precio Venta ($) *
-                </label>
-                <input 
-                  type="number" 
-                  value={salePrice} 
-                  onChange={e => setSalePrice(e.target.value)} 
-                  placeholder="Ej. 25.00" 
-                  step="0.01"
-                  style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
-                />
-              </div>
+        const user = transactionalEntityManager.create(User, {
+          username: cleanName,
+          email: generatedEmail,
+          identification: data.identification || null,
+          phone: data.phone || null,
+          passwordHash: randomHash,
+          role: UserRole.OPERATIVO,
+          isEmailVerified: false,
+        });
+        const savedUser = await transactionalEntityManager.save(user);
 
-              {!isService && (
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                    {isResale ? 'Costo Unitario Compra ($)' : 'Costo Estimado Base ($)'}
-                  </label>
-                  <input 
-                    type="number" 
-                    value={estimatedCost} 
-                    onChange={e => setEstimatedCost(e.target.value)} 
-                    placeholder={isResale ? 'Ej. 10.00' : 'Opcional (Ej. 5.00)'} 
-                    step="0.01"
-                    style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
-                  />
-                </div>
-              )}
-            </div>
+        const access = transactionalEntityManager.create(UserTenantAccess, {
+          user: savedUser,
+          tenantId,
+          role: UserRole.OPERATIVO,
+          roles: [UserRole.OPERATIVO],
+          isActive: true,
+          status: 'ACCEPTED',
+          salaryAmount: data.salaryAmount ? Number(data.salaryAmount) : null,
+          salaryPeriod: data.salaryPeriod || 'SEMANAL',
+          jobTitle: data.jobTitle || 'Personal Operativo (Limpieza / Mantenimiento)',
+          entryTime: data.entryTime || null,
+          exitTime: data.exitTime || null,
+          lunchStart: data.lunchStart || data.lunch_start || null,
+          lunchEnd: data.lunchEnd || data.lunch_end || null,
+        });
+        await transactionalEntityManager.save(access);
+        return savedUser;
+      }
 
-            {isResale && (
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                  {product ? 'Stock Actual' : 'Stock Inicial'}
-                </label>
-                <input 
-                  type="number" 
-                  value={stock} 
-                  onChange={e => setStock(e.target.value)} 
-                  placeholder="Ej. 15" 
-                  min="0"
-                  style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
-                />
-              </div>
-            )}
+      // Resolve roles list & primary role
+      let assignedRoles: UserRole[];
+      if (data.roles && Array.isArray(data.roles) && data.roles.length > 0) {
+        assignedRoles = data.roles;
+      } else if (data.role) {
+        assignedRoles = [data.role];
+      } else {
+        assignedRoles = [UserRole.POS];
+      }
+      const primaryRole = (data.role && assignedRoles.includes(data.role)) ? data.role : assignedRoles[0];
 
-            {isFormula && (
-              <div style={{ padding: '12px 14px', backgroundColor: '#fef3c7', borderRadius: '8px', border: '1px solid #fde68a', color: '#92400e', fontSize: '13px', marginTop: '6px' }}>
-                🧪 <b>Producto Armable / Con Fórmula:</b> Este producto se elabora a partir de insumos. Una vez guardado, podrás ingresar su receta y materias primas desde el menú del producto.
-              </div>
-            )}
+      // 1. Check if user already exists
+      let existingUser = await transactionalEntityManager.findOne(User, {
+        where: [
+          { username: data.username },
+          { email: data.email }
+        ],
+        relations: { tenantAccess: true }
+      });
 
-            {isService && (
-              <>
-                {isReservationsEnabled ? (
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                      <IonIcon icon={timeOutline} /> Duración Estimada (Minutos)
-                    </label>
-                    <input 
-                      type="number" 
-                      value={durationMinutes} 
-                      onChange={e => setDurationMinutes(e.target.value)} 
-                      placeholder="Ej. 30, 45, 60..." 
-                      min="5"
-                      step="5"
-                      style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
-                    />
-                  </div>
-                ) : null}
-                <div style={{ padding: '10px 12px', backgroundColor: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe', color: '#1e40af', fontSize: '13px', marginTop: '10px' }}>
-                  {isReservationsEnabled ? (
-                    <>💆 <b>Servicio / Cita:</b> No maneja stock físico. Si para realizar este servicio consumes insumos o materiales de trabajo (ej. tintes, desinfectante, etc.), podrás vincularlos en "Configurar Insumos del Servicio" desde la tarjeta.</>
-                  ) : (
-                    <>💆 <b>Servicio Directo:</b> No maneja stock físico. Diseñado para facturar mano de obra, trabajos o atenciones directamente en Caja (POS).</>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
+      let savedUser;
+      let status = 'ACCEPTED';
 
-          {/* Modalidad y Disponibilidad (Productos y Fórmulas) */}
-          {!isService && (
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: '700', color: '#1e293b' }}>
-                Disponibilidad y Tipo de Entrega
-              </h4>
+      if (existingUser) {
+        // User exists, send an invitation instead of creating a new user
+        savedUser = existingUser;
+        status = 'PENDING';
+        
+        // Check if they already have access to this tenant
+        const alreadyHasAccess = savedUser.tenantAccess?.some(a => a.tenantId === tenantId);
+        if (alreadyHasAccess) {
+          throw new Error('El usuario ya pertenece a esta sucursal o tiene una invitación pendiente');
+        }
+      } else {
+        // Create new user
+        const hash = await bcrypt.hash(data.password, 10);
+        const user = transactionalEntityManager.create(User, {
+          username: data.username,
+          email: data.email,
+          identification: data.identification || null,
+          phone: data.phone || null,
+          passwordHash: hash,
+          role: primaryRole,
+          isEmailVerified: false,
+        });
+        savedUser = await transactionalEntityManager.save(user);
+        status = 'ACCEPTED';
+      }
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-                <button
-                  type="button"
-                  onClick={() => setAvailabilityType('INMEDIATO')}
-                  style={{
-                    padding: '10px 8px',
-                    borderRadius: '8px',
-                    border: `2px solid ${availabilityType === 'INMEDIATO' ? '#2563eb' : '#e2e8f0'}`,
-                    backgroundColor: availabilityType === 'INMEDIATO' ? '#eff6ff' : '#ffffff',
-                    color: availabilityType === 'INMEDIATO' ? '#1d4ed8' : '#475569',
-                    fontWeight: availabilityType === 'INMEDIATO' ? '700' : '500',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    textAlign: 'center'
-                  }}
-                >
-                  ⚡ Entrega Inmediata
-                  <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>Stock físico o salida rápida</div>
-                </button>
+      // Create access link
+      const access = transactionalEntityManager.create(UserTenantAccess, {
+        user: savedUser,
+        tenantId,
+        tenant: { id: tenantId } as any,
+        role: primaryRole,
+        roles: assignedRoles,
+        isActive: true,
+        status: status,
+        salaryAmount: data.salaryAmount ? Number(data.salaryAmount) : null,
+        salaryPeriod: data.salaryPeriod || null,
+        jobTitle: data.jobTitle || data.job_title || null,
+        entryTime: data.entryTime || data.entry_time || null,
+        exitTime: data.exitTime || data.exit_time || null,
+        lunchStart: data.lunchStart || data.lunch_start || null,
+        lunchEnd: data.lunchEnd || data.lunch_end || null,
+      });
+      await transactionalEntityManager.save(access);
 
-                <button
-                  type="button"
-                  onClick={() => setAvailabilityType('BAJO_ENCARGO')}
-                  style={{
-                    padding: '10px 8px',
-                    borderRadius: '8px',
-                    border: `2px solid ${availabilityType === 'BAJO_ENCARGO' ? '#d97706' : '#e2e8f0'}`,
-                    backgroundColor: availabilityType === 'BAJO_ENCARGO' ? '#fffbeb' : '#ffffff',
-                    color: availabilityType === 'BAJO_ENCARGO' ? '#b45309' : '#475569',
-                    fontWeight: availabilityType === 'BAJO_ENCARGO' ? '700' : '500',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    textAlign: 'center'
-                  }}
-                >
-                  🎂 Bajo Encargo
-                  <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>Cocina / Repostería / A pedido</div>
-                </button>
-              </div>
+      return savedUser;
+    });
+  }
 
-              {/* Preorden por Proveedor (Catálogo) */}
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '10px',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  border: isSupplierPreorder ? '1.5px solid #a855f7' : '1px solid #e2e8f0',
-                  background: isSupplierPreorder ? '#faf5ff' : '#f8fafc',
-                  cursor: 'pointer'
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSupplierPreorder}
-                  onChange={e => setIsSupplierPreorder(e.target.checked)}
-                  style={{ marginTop: '2px', accentColor: '#9333ea', width: '16px', height: '16px' }}
-                />
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: isSupplierPreorder ? '#7e22ce' : '#1e293b' }}>
-                    📦 Preorden por Catálogo (Sujeto a Proveedor)
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                    Ideal para ropa, calzado o mercancía por encargo. En la tienda pública el cliente enviará una solicitud sin pagar de inmediato hasta que verifiques disponibilidad.
-                  </div>
-                </div>
-              </label>
-            </div>
-          )}
+  async update(tenantId: string, userId: string, data: any): Promise<any> {
+    if (!tenantId) throw new Error('Tenant ID required');
 
-          {/* Assigned Staff Card - Solo para Servicios con módulo de citas activo */}
-          {isService && isReservationsEnabled && (
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <IonIcon icon={personOutline} color="primary" /> Especialistas / Personal que realiza este trabajo
-                </h4>
-              {users.length > 0 && (
-                <button 
-                  type="button"
-                  onClick={handleSelectAllStaff}
-                  style={{ background: 'none', border: 'none', color: 'var(--ion-color-primary)', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
-                >
-                  {selectedStaffIds.length === users.length ? 'Deseleccionar Todos' : 'Seleccionar Todos'}
-                </button>
-              )}
-            </div>
+    let access = await this.usersRepo.manager.findOne(UserTenantAccess, {
+      where: { userId, tenantId }
+    });
 
-            <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: '#64748b', lineHeight: '1.4' }}>
-              Elige qué trabajadoras o especialistas están capacitadas para brindar este servicio. 
-              {selectedStaffIds.length === 0 ? (
-                <span style={{ color: '#0284c7', display: 'block', marginTop: '4px', fontWeight: '500' }}>
-                  ℹ️ Al no seleccionar ninguna, cualquier trabajadora disponible podrá atenderlo por defecto.
-                </span>
-              ) : (
-                <span style={{ color: '#059669', display: 'block', marginTop: '4px', fontWeight: '500' }}>
-                  ✓ Solo las {selectedStaffIds.length} personas seleccionadas podrán ser elegidas para este servicio en la reserva.
-                </span>
-              )}
-            </p>
+    if (!access) {
+      const user = await this.usersRepo.findOne({ where: { id: userId } });
+      if (!user) throw new Error('Usuario no encontrado');
+      const fallbackRoles = (data.roles && Array.isArray(data.roles) && data.roles.length > 0)
+        ? data.roles
+        : (data.role ? [data.role] : [user.role || UserRole.POS]);
 
-            {users.length === 0 ? (
-              <div style={{ padding: '12px', backgroundColor: '#f1f5f9', borderRadius: '8px', fontSize: '13px', color: '#64748b', textAlign: 'center' }}>
-                No hay otros miembros registrados en el equipo. Puedes agregar usuarios desde la sección <b>Usuarios</b>.
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
-                {users.map(u => {
-                  const isChecked = selectedStaffIds.includes(u.id);
-                  return (
-                    <div 
-                      key={u.id}
-                      onClick={() => toggleStaff(u.id)}
-                      style={{
-                        padding: '12px',
-                        borderRadius: '10px',
-                        border: isChecked ? '2px solid var(--ion-color-primary)' : '1px solid #cbd5e1',
-                        backgroundColor: isChecked ? '#eff6ff' : '#ffffff',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        transition: 'all 0.15s ease',
-                        boxShadow: isChecked ? '0 2px 4px rgba(0,0,0,0.06)' : 'none'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-                        <div style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          backgroundColor: isChecked ? 'var(--ion-color-primary)' : '#e2e8f0',
-                          color: isChecked ? '#ffffff' : '#475569',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 'bold',
-                          fontSize: '13px',
-                          flexShrink: 0
-                        }}>
-                          {u.username.substring(0, 2).toUpperCase()}
-                        </div>
-                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          <div style={{ fontWeight: '600', fontSize: '13px', color: '#1e293b' }}>
-                            {u.username}
-                          </div>
-                          {u.jobTitle && (
-                            <div style={{ fontSize: '11px', color: '#64748b' }}>
-                              {u.jobTitle}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div style={{ flexShrink: 0, marginLeft: '6px' }}>
-                        {isChecked ? (
-                          <IonIcon icon={checkmarkCircle} color="primary" style={{ fontSize: '20px' }} />
-                        ) : (
-                          <div style={{ width: '18px', height: '18px', borderRadius: '50%', border: '2px solid #94a3b8' }} />
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          )}
+      access = this.usersRepo.manager.create(UserTenantAccess, {
+        userId,
+        tenantId,
+        isActive: true,
+        status: 'ACCEPTED',
+        role: data.role || fallbackRoles[0] || UserRole.POS,
+        roles: fallbackRoles,
+      });
+    }
 
-        </div>
-      </IonContent>
+    if (data.roles !== undefined) {
+      if (Array.isArray(data.roles) && data.roles.length > 0) {
+        access.roles = data.roles;
+        if (data.role && data.roles.includes(data.role)) {
+          access.role = data.role;
+        } else if (!data.roles.includes(access.role)) {
+          access.role = data.roles[0];
+        }
+      } else {
+        access.roles = data.role ? [data.role] : [access.role || UserRole.POS];
+      }
+    } else if (data.role !== undefined) {
+      access.role = data.role;
+      if (!access.roles || access.roles.length === 0) {
+        access.roles = [data.role];
+      } else if (!access.roles.includes(data.role)) {
+        access.roles = [data.role, ...access.roles];
+      }
+    }
 
-      <IonFooter className="ion-no-border" style={{ backgroundColor: '#ffffff', borderTop: '1px solid #e2e8f0', padding: '10px 16px' }}>
-        <div style={{ maxWidth: '640px', margin: '0 auto', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-          <IonButton fill="outline" color="medium" onClick={onClose} disabled={saving}>
-            Cancelar
-          </IonButton>
-          <IonButton color="primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Guardando...' : (product ? 'Guardar Cambios' : 'Crear')}
-          </IonButton>
-        </div>
-      </IonFooter>
-    </IonModal>
-  );
-};
+    if (data.jobTitle !== undefined || data.job_title !== undefined) {
+      access.jobTitle = (data.jobTitle !== undefined ? data.jobTitle : data.job_title) || null;
+    }
+    if (data.entryTime !== undefined || data.entry_time !== undefined) {
+      access.entryTime = (data.entryTime !== undefined ? data.entryTime : data.entry_time) || null;
+    }
+    if (data.exitTime !== undefined || data.exit_time !== undefined) {
+      access.exitTime = (data.exitTime !== undefined ? data.exitTime : data.exit_time) || null;
+    }
+    if (data.lunchStart !== undefined || data.lunch_start !== undefined) {
+      access.lunchStart = (data.lunchStart !== undefined ? data.lunchStart : data.lunch_start) || null;
+    }
+    if (data.lunchEnd !== undefined || data.lunch_end !== undefined) {
+      access.lunchEnd = (data.lunchEnd !== undefined ? data.lunchEnd : data.lunch_end) || null;
+    }
+    if (data.salaryAmount !== undefined) {
+      access.salaryAmount = data.salaryAmount ? Number(data.salaryAmount) : null;
+    }
+    if (data.salaryPeriod !== undefined) {
+      access.salaryPeriod = data.salaryPeriod || null;
+    }
+
+    if (data.identification !== undefined || data.phone !== undefined) {
+      await this.usersRepo.update(userId, {
+        ...(data.identification !== undefined ? { identification: data.identification } : {}),
+        ...(data.phone !== undefined ? { phone: data.phone } : {}),
+      });
+    }
+
+    await this.usersRepo.manager.save(access);
+    return { success: true, access };
+  }
+
+  async delete(tenantId: string, id: string): Promise<void> {
+    if (!tenantId) return;
+    
+    await this.usersRepo.manager.query(
+      `DELETE FROM "user_tenant_access" WHERE "userId" = $1 AND "tenantId" = $2`,
+      [id, tenantId]
+    );
+  }
+
+  async paySalary(tenantId: string, userId: string, data: any): Promise<void> {
+    if (!tenantId) throw new Error('Tenant ID required');
+    
+    await this.usersRepo.manager.transaction(async manager => {
+      // Create expense
+      const expense = manager.create('OperatingExpense', {
+        tenantId,
+        description: `Pago de Nómina - Empleado ${data.username || userId}`,
+        amount: Number(data.amount),
+        paymentMethod: data.method || 'CASH',
+        category: 'PAYROLL',
+        createdAt: data.date ? new Date(data.date) : new Date()
+      });
+      await manager.save(expense);
+    });
+  }
+
+  async acceptInvite(userId: string, tenantId: string): Promise<void> {
+    const access = await this.usersRepo.manager.findOne(UserTenantAccess, {
+      where: { userId, tenantId, status: 'PENDING' }
+    });
+    if (!access) throw new Error('Invitación no encontrada o ya procesada');
+    access.status = 'ACCEPTED';
+    await this.usersRepo.manager.save(access);
+  }
+
+  async rejectInvite(userId: string, tenantId: string): Promise<void> {
+    const access = await this.usersRepo.manager.findOne(UserTenantAccess, {
+      where: { userId, tenantId, status: 'PENDING' }
+    });
+    if (!access) throw new Error('Invitación no encontrada o ya procesada');
+    access.status = 'REJECTED';
+    await this.usersRepo.manager.save(access);
+  }
+
+  async getAccessRequests(tenantId: string): Promise<AccessRequest[]> {
+    if (!tenantId) return [];
+    const accessReqRepo = this.usersRepo.manager.getRepository(AccessRequest);
+    return accessReqRepo.find({
+      where: { tenantId, status: AccessRequestStatus.PENDING },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async approveAccessRequest(tenantId: string, requestId: string): Promise<AccessRequest> {
+    const accessReqRepo = this.usersRepo.manager.getRepository(AccessRequest);
+    const req = await accessReqRepo.findOne({ where: { id: requestId, tenantId } });
+    if (!req) throw new NotFoundException('Solicitud no encontrada');
+
+    const user = await this.usersRepo.findOne({
+      where: { id: req.userId },
+      relations: { tenantAccess: { tenant: true } },
+    });
+
+    const tenant = await this.usersRepo.manager.findOne(Tenant, { where: { id: tenantId } });
+    const tenantName = tenant ? tenant.name : 'FinoWork';
+
+    const access = user?.tenantAccess?.find(a => a.tenantId === req.tenantId);
+    const authorizedRoles = (access?.roles && access.roles.length > 0) ? access.roles : [req.role];
+
+    const payload = {
+      id: user?.id || req.userId,
+      username: req.userName,
+      email: user?.email,
+      identification: user?.identification,
+      phone: user?.phone,
+      isEmailVerified: !!user?.isEmailVerified,
+      sub: req.userId,
+      role: req.role,
+      roles: authorizedRoles,
+      tenantId: req.tenantId,
+      tenantName: tenantName,
+    };
+
+    const allWorkspaces = user?.tenantAccess?.map(a => ({
+      tenantId: a.tenantId,
+      name: a.tenant?.name || 'Sucursal',
+      role: a.role,
+      roles: (a.roles && a.roles.length > 0) ? a.roles : [a.role],
+      status: a.status,
+    })) || [{
+      tenantId: req.tenantId,
+      name: payload.tenantName,
+      role: req.role,
+      roles: authorizedRoles,
+      status: 'ACCEPTED',
+    }];
+
+    const token = this.jwtService.sign(payload);
+    req.status = AccessRequestStatus.APPROVED;
+    req.approvedToken = token;
+    req.approvedPayload = JSON.stringify({
+      user: payload,
+      workspaces: allWorkspaces,
+    });
+
+    return accessReqRepo.save(req);
+  }
+
+  async rejectAccessRequest(tenantId: string, requestId: string): Promise<AccessRequest> {
+    const accessReqRepo = this.usersRepo.manager.getRepository(AccessRequest);
+    const req = await accessReqRepo.findOne({ where: { id: requestId, tenantId } });
+    if (!req) throw new NotFoundException('Solicitud no encontrada');
+
+    req.status = AccessRequestStatus.REJECTED;
+    return accessReqRepo.save(req);
+  }
+}
 </file>
 
 <file path="apps/frontend/src/pages/Calculator.tsx">
@@ -30958,18 +30940,7 @@ const Login: React.FC = () => {
     return raw ? JSON.parse(raw)?.message || '' : '';
   });
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get('expired') === 'true') {
-      presentToast({
-        message: 'Tu sesión ha expirado',
-        duration: 4000,
-        color: 'warning',
-        position: 'top'
-      });
-      window.history.replaceState(null, '', '/login');
-    }
-  }, [location.search, presentToast]);
+
 
   const checkRequestStatus = async (requestId: string) => {
     setIsCheckingStatus(true);
@@ -36759,6 +36730,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const { user } = useContext(AuthContext);
   const [presentToast] = useIonToast();
 
+  const isAdmin =
+    user?.role === UserRole.ADMIN ||
+    user?.role === UserRole.SUPERADMIN ||
+    (user?.role as string) === 'ADMIN' ||
+    (user?.role as string) === 'SUPERADMIN';
+
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isSimulatingOffline, setIsSimulatingOffline] = useState<boolean>(() => localStorage.getItem('flujofino_simulating_offline') === 'true');
   const [pendingOfflineCount, setPendingOfflineCount] = useState<number>(0);
@@ -36925,14 +36902,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   };
 
   const handleApplyRateMode = async (mode: string, customRate?: number) => {
-    const isAdmin =
-      user?.role === UserRole.ADMIN ||
-      user?.role === UserRole.SUPERADMIN ||
-      (user?.role as string) === 'ADMIN' ||
-      (user?.role as string) === 'SUPERADMIN';
-
     if (!isAdmin) {
-      presentToast({ message: 'Solo los administradores pueden modificar la tasa', duration: 2000, color: 'warning' });
+      presentToast({
+        message: '🔒 Solo un administrador puede modificar la tasa del negocio',
+        duration: 2500,
+        color: 'warning'
+      });
       return;
     }
 
@@ -37099,10 +37074,24 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             {/* Rate Pill */}
             {showRate && (
               <div
-                className="ff-pill ff-pill-interactive ff-pill-rate"
-                onClick={() => setShowRateModal(true)}
-                title="Tasa de cambio actual (Clic para cambiar de modo)"
-                style={{ cursor: 'pointer', userSelect: 'none' }}
+                className={`ff-pill ${isAdmin ? 'ff-pill-interactive' : ''} ff-pill-rate`}
+                onClick={() => {
+                  if (isAdmin) {
+                    setShowRateModal(true);
+                  } else {
+                    presentToast({
+                      message: '🔒 Solo un administrador puede modificar la tasa del negocio',
+                      duration: 2500,
+                      color: 'warning',
+                    });
+                  }
+                }}
+                title={
+                  isAdmin
+                    ? 'Tasa de cambio actual (Clic para cambiar de modo)'
+                    : 'Tasa de facturación activa del negocio (Solo administradores)'
+                }
+                style={{ cursor: isAdmin ? 'pointer' : 'default', userSelect: 'none' }}
               >
                 <span>{getRatePillText()}</span>
               </div>
@@ -37188,12 +37177,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         onClose={() => setShowVerifyModal(false)}
       />
 
-      {/* Modal Rápido Selector Multitasa */}
-      <IonModal
-        isOpen={showRateModal}
-        onDidDismiss={() => setShowRateModal(false)}
-        style={{ '--border-radius': '20px', '--max-width': '520px', '--max-height': '90vh' } as any}
-      >
+      {/* Modal Rápido Selector Multitasa (Solo administradores) */}
+      {isAdmin && (
+        <IonModal
+          isOpen={showRateModal}
+          onDidDismiss={() => setShowRateModal(false)}
+          style={{ '--border-radius': '20px', '--max-width': '520px', '--max-height': '90vh' } as any}
+        >
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#ffffff', overflow: 'hidden' }}>
           {/* Header */}
           <div style={{
@@ -37430,6 +37420,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </div>
         </div>
       </IonModal>
+      )}
     </>
   );
 };
@@ -46788,13 +46779,19 @@ const Orders: React.FC = () => {
                           } as any}
                         >
                           <IonSelectOption value="">(Sin asignar)</IonSelectOption>
-                          {employees
-                            .filter(e => [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO].includes(e.role as UserRole))
-                            .map(driver => (
+                          {employees.map(driver => {
+                            const roleName = driver.jobTitle || (
+                              driver.role === UserRole.DELIVERY ? 'Repartidor' :
+                              driver.role === UserRole.POS ? 'Cajero / Delivery' :
+                              driver.role === UserRole.ADMIN ? 'Admin' :
+                              driver.role === UserRole.OPERATIVO ? 'Operativo' : (driver.role || 'Empleado')
+                            );
+                            return (
                               <IonSelectOption key={driver.id} value={driver.id}>
-                                🛵 {driver.username || driver.name} ({driver.role === 'DELIVERY' ? 'Repartidor' : driver.role === 'POS' ? 'Cajero / Delivery' : driver.role})
+                                🛵 {driver.username || driver.name} ({roleName})
                               </IonSelectOption>
-                            ))}
+                            );
+                          })}
                         </IonSelect>
                       </div>
                     )}
@@ -47179,13 +47176,19 @@ const Orders: React.FC = () => {
                           } as any}
                         >
                           <IonSelectOption value="">-- Sin repartidor asignado --</IonSelectOption>
-                          {employees
-                            .filter(e => [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO].includes(e.role as UserRole))
-                            .map((driver: any) => (
+                          {employees.map((driver: any) => {
+                            const roleName = driver.jobTitle || (
+                              driver.role === UserRole.DELIVERY ? 'Repartidor' :
+                              driver.role === UserRole.POS ? 'Cajero / Delivery' :
+                              driver.role === UserRole.ADMIN ? 'Admin' :
+                              driver.role === UserRole.OPERATIVO ? 'Operativo' : (driver.role || 'Empleado')
+                            );
+                            return (
                               <IonSelectOption key={driver.id} value={driver.id}>
-                                🛵 {driver.name || driver.username} ({driver.role === 'DELIVERY' ? 'Repartidor' : driver.role === 'POS' ? 'Cajero / Delivery' : driver.role})
+                                🛵 {driver.name || driver.username} ({roleName})
                               </IonSelectOption>
-                            ))}
+                            );
+                          })}
                         </IonSelect>
                       </div>
                     )}
@@ -48152,10 +48155,36 @@ const Pos: React.FC = () => {
 
   const fetchEmployees = async () => {
     try {
-      const res = await apiClient.get<any[]>('/users');
-      setEmployees(res.data || []);
-    } catch (e) {}
+      const res = await apiClient.get<any[]>('/users/employees');
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        setEmployees(res.data);
+        return;
+      }
+    } catch (e) {
+      console.warn('Error cargando /users/employees:', e);
+    }
+    try {
+      const fallback = await apiClient.get<any[]>('/users');
+      if (Array.isArray(fallback.data)) {
+        setEmployees(fallback.data);
+      }
+    } catch (err) {
+      console.error('Error cargando empleados:', err);
+    }
   };
+
+  useEffect(() => {
+    if (showCheckoutModal) {
+      fetchEmployees();
+      fetchDeliveryZones();
+    }
+  }, [showCheckoutModal]);
+
+  useEffect(() => {
+    if (deliveryMethod === DeliveryMethod.DELIVERY) {
+      fetchEmployees();
+    }
+  }, [deliveryMethod]);
 
   const fetchRawMaterials = async () => {
     try {
@@ -49340,8 +49369,8 @@ const Pos: React.FC = () => {
                 {/* Delivery Zone & Shipping Info */}
                 {deliveryMethod === DeliveryMethod.DELIVERY && (
                   <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '12px', marginBottom: '14px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
-                      <div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
+                      <div style={{ width: '100%' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
                           Zona de Envío *
                         </label>
@@ -49351,7 +49380,7 @@ const Pos: React.FC = () => {
                           placeholder="Selecciona zona de envío..."
                           onIonChange={e => setDeliveryZoneId(e.detail.value)}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-slate-800 text-sm"
-                          style={{ '--padding-start': '0px', '--padding-end': '0px', minHeight: '42px' }}
+                          style={{ '--padding-start': '6px', '--padding-end': '6px', minHeight: '42px', width: '100%', maxWidth: '100%' }}
                         >
                           <IonSelectOption value="">Selecciona zona de envío...</IonSelectOption>
                           {deliveryZones.map(zone => (
@@ -49361,7 +49390,7 @@ const Pos: React.FC = () => {
                           ))}
                         </IonSelect>
                       </div>
-                      <div>
+                      <div style={{ width: '100%' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
                           🛵 Repartidor Asignado
                         </label>
@@ -49371,16 +49400,22 @@ const Pos: React.FC = () => {
                           placeholder="Sin asignar / A convenir"
                           onIonChange={e => setDeliveryUserId(e.detail.value)}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-slate-800 text-sm"
-                          style={{ '--padding-start': '0px', '--padding-end': '0px', minHeight: '42px' }}
+                          style={{ '--padding-start': '6px', '--padding-end': '6px', minHeight: '42px', width: '100%', maxWidth: '100%' }}
                         >
                           <IonSelectOption value="">Sin asignar / A convenir</IonSelectOption>
-                          {employees
-                            .filter(e => [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO].includes(e.role as UserRole))
-                            .map(d => (
+                          {employees.map(d => {
+                            const roleName = d.jobTitle || (
+                              d.role === UserRole.DELIVERY ? 'Repartidor' :
+                              d.role === UserRole.POS ? 'Cajero / Delivery' :
+                              d.role === UserRole.ADMIN ? 'Admin' :
+                              d.role === UserRole.OPERATIVO ? 'Operativo' : (d.role || 'Empleado')
+                            );
+                            return (
                               <IonSelectOption key={d.id} value={d.id}>
-                                🛵 {d.username || d.name} ({d.role === 'DELIVERY' ? 'Repartidor' : d.role === 'POS' ? 'Cajero / Delivery' : d.role})
+                                🛵 {d.username || d.name} ({roleName})
                               </IonSelectOption>
-                            ))}
+                            );
+                          })}
                         </IonSelect>
                       </div>
                     </div>

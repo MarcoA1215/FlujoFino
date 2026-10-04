@@ -1,4 +1,4 @@
-﻿import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 import { Order } from '../entities/order.entity';
@@ -150,9 +150,15 @@ export class DeliveriesService {
     const exchangeRate = await this.getEffectiveExchangeRate(tenantId);
 
     // Obtener todos los usuarios con rol DELIVERY en el tenant
-    const deliveryAccesses = await this.accessRepo.find({
-      where: { tenantId, role: UserRole.DELIVERY, isActive: true },
+    const allAccesses = await this.accessRepo.find({
+      where: { tenantId, isActive: true },
       relations: { user: true },
+    });
+    const deliveryAccesses = allAccesses.filter(a => {
+      if (a.role === UserRole.DELIVERY) return true;
+      if (Array.isArray(a.roles) && a.roles.includes(UserRole.DELIVERY)) return true;
+      if (typeof a.roles === 'string' && a.roles.split(',').includes(UserRole.DELIVERY)) return true;
+      return false;
     });
 
     // Obtener todas las órdenes completadas de delivery

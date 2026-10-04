@@ -421,6 +421,15 @@ const PublicBooking: React.FC = () => {
     fetchSlots();
   }, [selectedDate, selectedServiceIds, selectedStaff, tenantId]);
 
+  const isServiceRequired = tenantInfo?.bookingRequireService !== false;
+
+  // Ensure step 1 is never active if bookingRequireService is disabled
+  useEffect(() => {
+    if (tenantInfo && !isServiceRequired && step === 1) {
+      setStep(2);
+    }
+  }, [tenantInfo, isServiceRequired, step]);
+
   if (loading) return <IonPage><IonContent className="ion-padding ion-text-center"><IonSpinner /></IonContent></IonPage>;
 
   if (tenantInfo?.isSuspended) {
@@ -569,17 +578,9 @@ const PublicBooking: React.FC = () => {
     return s.is_service === true || s.category === 'Servicios';
   });
   const hasServices = availableServices.length > 0;
-  const isServiceRequired = tenantInfo?.bookingRequireService !== false;
   const hasStore = Boolean(tenantInfo?.hasStore ?? ((tenantInfo?.featureBuySell || tenantInfo?.featureRecipes) && tenantInfo?.featureShowCatalog !== false));
   const companyPhone = tenantInfo?.companyPhone || tenantInfo?.settings?.companyPhone || '';
   const headerColor = tenantInfo?.settings?.themeHeaderColor || '#0f172a';
-
-  // Ensure step 1 is never active if bookingRequireService is disabled
-  useEffect(() => {
-    if (tenantInfo && !isServiceRequired && step === 1) {
-      setStep(2);
-    }
-  }, [tenantInfo, isServiceRequired, step]);
 
   const goBack = () => {
     if (step === 2 && isServiceRequired) {

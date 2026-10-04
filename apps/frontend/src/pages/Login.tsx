@@ -18,15 +18,12 @@ import {
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import { useIonRouter } from '@ionic/react';
-import { useLocation } from 'react-router-dom';
-
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const { login } = useContext(AuthContext);
   const [presentToast] = useIonToast();
   const router = useIonRouter();
-  const location = useLocation();
 
   // Pending access request state
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(() => {

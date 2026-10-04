@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 import React, { useState, useEffect, useContext } from 'react';
 import {
   IonPage,
@@ -37,9 +37,13 @@ import {
   cashOutline,
   cardOutline,
   checkmarkCircleOutline,
+  warningOutline,
+  checkmarkOutline,
+  colorPaletteOutline,
+  sparklesOutline,
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
-import { getContrastColor } from '../utils/colors';
+import { getContrastColor, isColorTooLight, ensureReadableColor, PRESET_THEME_COLORS } from '../utils/colors';
 import { AuthContext } from '../context/AuthContext';
 import {
   UserRole,
@@ -297,9 +301,14 @@ const SettingsPage: React.FC = () => {
       const primary = updatedSettings.themePrimaryColor || '#10b981';
       const header = updatedSettings.themeHeaderColor || '#ffffff';
       const contrastText = getContrastColor(primary);
+      const headerContrastText = getContrastColor(header);
+      const readablePrimary = ensureReadableColor(primary);
+
       document.documentElement.style.setProperty('--theme-primary', primary);
       document.documentElement.style.setProperty('--theme-primary-contrast', contrastText);
+      document.documentElement.style.setProperty('--theme-primary-readable', readablePrimary);
       document.documentElement.style.setProperty('--theme-header', header);
+      document.documentElement.style.setProperty('--theme-header-contrast', headerContrastText);
       document.documentElement.style.setProperty('--ion-color-primary', primary);
       document.documentElement.style.setProperty('--ion-color-primary-contrast', contrastText);
 
@@ -1200,53 +1209,214 @@ const SettingsPage: React.FC = () => {
             <IonCol size="12">
               <IonCard>
                 <IonCardHeader>
-                  <IonCardTitle>Personalización de Interfaz</IonCardTitle>
+                  <div className="flex items-center gap-2">
+                    <IonIcon icon={colorPaletteOutline} className="text-emerald-500 text-xl" />
+                    <IonCardTitle>Personalización de Marca y Colores</IonCardTitle>
+                  </div>
                 </IonCardHeader>
                 <IonCardContent>
-                  <p style={{marginBottom: '15px'}}>Cambia los colores base de tu sucursal para que coincidan con tu marca.</p>
+                  <p className="text-slate-600 text-sm mb-4">
+                    Personaliza los colores de tu sucursal. Estos tonos se aplican al menú lateral, encabezados, botones y enlaces.
+                  </p>
+
+                  {/* Paleta rápida de colores recomendados */}
+                  <div className="mb-6 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                    <div className="flex items-center gap-1.5 mb-2.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      <IonIcon icon={sparklesOutline} className="text-amber-500 text-sm" />
+                      <span>Colores Recomendados (Alto Contraste)</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2.5">
+                      {PRESET_THEME_COLORS.map(c => {
+                        const isSelected = (settings.themePrimaryColor || '').toUpperCase() === c.hex.toUpperCase();
+                        return (
+                          <button
+                            key={c.hex}
+                            type="button"
+                            onClick={() => setSettings({ ...settings, themePrimaryColor: c.hex })}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
+                              isSelected
+                                ? 'border-slate-900 bg-white shadow-xs font-bold text-slate-900 ring-2 ring-slate-900/10'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            <span
+                              className="w-3.5 h-3.5 rounded-full inline-block shadow-2xs shrink-0"
+                              style={{ backgroundColor: c.hex }}
+                            />
+                            <span>{c.name}</span>
+                            {isSelected && <IonIcon icon={checkmarkOutline} className="text-xs text-slate-900 ml-0.5" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                   
-                  <div className="space-y-4 pt-2">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                        Color Principal (Menú y Botones)
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="color"
-                          value={/^#[0-9A-Fa-f]{6}$/.test(settings.themePrimaryColor || '') ? settings.themePrimaryColor : '#10b981'}
-                          onChange={e => setSettings({ ...settings, themePrimaryColor: e.target.value.toUpperCase() })}
-                          className="w-10 h-10 rounded-full cursor-pointer border border-slate-300 shadow-xs overflow-hidden p-0 bg-transparent shrink-0"
-                        />
-                        <input
-                          type="text"
-                          maxLength={7}
-                          value={settings.themePrimaryColor || ''}
-                          placeholder="#10B981"
-                          onChange={e => setSettings({ ...settings, themePrimaryColor: e.target.value })}
-                          className="w-32 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-mono text-sm uppercase focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
-                        />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
+                    {/* Selectores de color */}
+                    <div className="space-y-5">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                          Color Principal (Menú, Botones y Acciones)
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="color"
+                            value={/^#[0-9A-Fa-f]{6}$/.test(settings.themePrimaryColor || '') ? settings.themePrimaryColor : '#10b981'}
+                            onChange={e => setSettings({ ...settings, themePrimaryColor: e.target.value.toUpperCase() })}
+                            className="w-11 h-11 rounded-xl cursor-pointer border border-slate-300 shadow-2xs overflow-hidden p-0 bg-transparent shrink-0"
+                          />
+                          <input
+                            type="text"
+                            maxLength={7}
+                            value={settings.themePrimaryColor || ''}
+                            placeholder="#10B981"
+                            onChange={e => setSettings({ ...settings, themePrimaryColor: e.target.value.toUpperCase() })}
+                            className="w-36 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-mono text-sm uppercase focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-bold"
+                          />
+                        </div>
+
+                        {/* Advertencia de contraste si el color es muy claro */}
+                        {isColorTooLight(settings.themePrimaryColor || '') && (
+                          <div className="mt-3 p-3 bg-amber-50/90 border border-amber-300 rounded-xl flex items-start gap-2.5 text-amber-900 text-xs shadow-2xs">
+                            <IonIcon icon={warningOutline} className="text-amber-600 text-base shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-bold text-amber-950">Advertencia: Color muy claro sobre fondos blancos</p>
+                              <p className="text-amber-800 mt-1 leading-relaxed">
+                                Este color tiene poco contraste contra fondos blancos. Los botones de texto, modales y enlaces podrían verse difíciles de leer. FlujoFino protegerá automáticamente los diálogos críticos, pero te recomendamos elegir un tono más oscuro o saturado para una experiencia óptima.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                          Color Encabezados (Barra Superior)
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="color"
+                            value={/^#[0-9A-Fa-f]{6}$/.test(settings.themeHeaderColor || '') ? settings.themeHeaderColor : '#ffffff'}
+                            onChange={e => setSettings({ ...settings, themeHeaderColor: e.target.value.toUpperCase() })}
+                            className="w-11 h-11 rounded-xl cursor-pointer border border-slate-300 shadow-2xs overflow-hidden p-0 bg-transparent shrink-0"
+                          />
+                          <input
+                            type="text"
+                            maxLength={7}
+                            value={settings.themeHeaderColor || ''}
+                            placeholder="#FFFFFF"
+                            onChange={e => setSettings({ ...settings, themeHeaderColor: e.target.value.toUpperCase() })}
+                            className="w-36 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-mono text-sm uppercase focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-bold"
+                          />
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            type="button"
+                            onClick={() => setSettings({ ...settings, themeHeaderColor: '#FFFFFF' })}
+                            className="text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer"
+                          >
+                            Blanco Limpio (#FFFFFF)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSettings({ ...settings, themeHeaderColor: settings.themePrimaryColor || '#10B981' })}
+                            className="text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer"
+                          >
+                            Mismo que Principal
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                        Color Encabezados (Superior)
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="color"
-                          value={/^#[0-9A-Fa-f]{6}$/.test(settings.themeHeaderColor || '') ? settings.themeHeaderColor : '#ffffff'}
-                          onChange={e => setSettings({ ...settings, themeHeaderColor: e.target.value.toUpperCase() })}
-                          className="w-10 h-10 rounded-full cursor-pointer border border-slate-300 shadow-xs overflow-hidden p-0 bg-transparent shrink-0"
-                        />
-                        <input
-                          type="text"
-                          maxLength={7}
-                          value={settings.themeHeaderColor || ''}
-                          placeholder="#FFFFFF"
-                          onChange={e => setSettings({ ...settings, themeHeaderColor: e.target.value })}
-                          className="w-32 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-mono text-sm uppercase focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
-                        />
+                    {/* Simulador y Vista Previa en Vivo */}
+                    <div className="bg-slate-100/70 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                            Vista Previa en Tiempo Real
+                          </span>
+                          <span className="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                            Simulación de Interfaz
+                          </span>
+                        </div>
+
+                        {/* Barra Superior Simulada */}
+                        <div
+                          className="rounded-xl p-3 border border-slate-300 shadow-xs mb-3 flex items-center justify-between transition-colors"
+                          style={{
+                            backgroundColor: settings.themeHeaderColor || '#ffffff',
+                            color: getContrastColor(settings.themeHeaderColor || '#ffffff')
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-4 h-0.5 bg-current rounded-full block relative before:content-[''] before:absolute before:-top-1.5 before:left-0 before:w-4 before:h-0.5 before:bg-current before:rounded-full after:content-[''] after:absolute after:top-1.5 after:left-0 after:w-4 after:h-0.5 after:bg-current after:rounded-full" />
+                            <span className="text-xs font-bold tracking-tight">FlujoFino POS</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="opacity-80">Negocio</span>
+                          </div>
+                        </div>
+
+                        {/* Superficie de Diálogo / Tarjeta Blanca */}
+                        <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-800">Prueba de Elementos</span>
+                            <span
+                              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                              style={{
+                                backgroundColor: (settings.themePrimaryColor || '#10b981') + '20',
+                                color: ensureReadableColor(settings.themePrimaryColor || '#10b981')
+                              }}
+                            >
+                              Insignia
+                            </span>
+                          </div>
+
+                          <div className="flex gap-2">
+                            {/* Botón Sólido */}
+                            <div
+                              className="flex-1 py-2 rounded-lg text-xs font-bold text-center shadow-xs cursor-default transition-colors"
+                              style={{
+                                backgroundColor: settings.themePrimaryColor || '#10b981',
+                                color: getContrastColor(settings.themePrimaryColor || '#10b981')
+                              }}
+                            >
+                              Botón Sólido
+                            </div>
+
+                            {/* Botón Contorno / Texto */}
+                            <div
+                              className="flex-1 py-2 rounded-lg text-xs font-bold text-center border cursor-default transition-colors"
+                              style={{
+                                borderColor: settings.themePrimaryColor || '#10b981',
+                                color: ensureReadableColor(settings.themePrimaryColor || '#10b981'),
+                                backgroundColor: '#ffffff'
+                              }}
+                            >
+                              Botón Borde
+                            </div>
+                          </div>
+
+                          {/* Diálogo de Confirmación Simulado */}
+                          <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5">
+                            <p className="text-[11px] font-bold text-slate-800">Cerrar Sesión (Diálogo)</p>
+                            <p className="text-[10px] text-slate-500">¿Estás seguro de que quieres salir?</p>
+                            <div className="flex justify-end gap-3 mt-2 text-[11px] font-bold">
+                              <span className="text-slate-500">CANCELAR</span>
+                              <span
+                                style={{
+                                  color: '#ef4444' // role destructive
+                                }}
+                              >
+                                SALIR
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 text-[11px] text-slate-500 text-center">
+                        Los cambios se aplicarán en todos tus dispositivos al guardar.
                       </div>
                     </div>
                   </div>

@@ -554,3 +554,55 @@ ion-modal[style*="--height:auto"] .ion-page {
   position: relative !important;
 }
 
+/* ==========================================================================
+   ION-ALERT & MODAL BUTTON SAFEGUARDS
+   Prevents invisible buttons when primary color is light/white
+   ========================================================================== */
+.alert-wrapper {
+  border-radius: 16px !important;
+  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1) !important;
+}
+
+.alert-title.sc-ion-alert-md,
+.alert-title.sc-ion-alert-ios {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+.alert-message.sc-ion-alert-md,
+.alert-message.sc-ion-alert-ios {
+  color: #475569 !important;
+}
+
+/* Buttons in alerts: Safe readable color against white dialog surface */
+.alert-button.sc-ion-alert-md,
+.alert-button.sc-ion-alert-ios,
+ion-alert .alert-button {
+  color: var(--theme-primary-readable, #0f172a) !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.03em !important;
+  padding: 10px 16px !important;
+  border-radius: 8px !important;
+  transition: background-color 0.15s ease !important;
+}
+
+.alert-button.sc-ion-alert-md:hover,
+.alert-button.sc-ion-alert-ios:hover,
+ion-alert .alert-button:hover {
+  background-color: #f1f5f9 !important;
+}
+
+/* Cancel button: Neutral slate for clear hierarchy */
+.alert-button.alert-button-role-cancel,
+ion-alert [role="cancel"].alert-button {
+  color: #64748b !important;
+}
+
+/* Destructive action button: Vibrant red */
+.alert-button.alert-button-role-destructive,
+ion-alert [role="destructive"].alert-button {
+  color: #ef4444 !important;
+}
+
