@@ -19,7 +19,15 @@ export const apiClient = axios.create({
 const MUTATION_METHODS = ['post', 'put', 'delete', 'patch'];
 
 apiClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    // Garantizar que toda petición lleve el token actual aunque defaults aún no haya sincronizado
+    if (!config.headers.Authorization) {
+      const { value: token } = await Preferences.get({ key: 'token' });
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+
     const method = config.method?.toLowerCase() || '';
     if (MUTATION_METHODS.includes(method) && !config.skipGlobalLoading) {
       getGlobalLoadingHandler()?.show(config.loadingMessage || 'Procesando...');
@@ -44,17 +52,6 @@ apiClient.interceptors.response.use(
       const method = error.config.method?.toLowerCase() || '';
       if (MUTATION_METHODS.includes(method) && !error.config.skipGlobalLoading) {
         getGlobalLoadingHandler()?.hide();
-      }
-    }
-
-    if (error.response && error.response.status === 401) {
-      // Evitar loop infinito si ya estamos en /login
-      if (!window.location.pathname.includes('/login')) {
-        await Preferences.remove({ key: 'token' });
-        await Preferences.remove({ key: 'user' });
-        delete apiClient.defaults.headers.common['Authorization'];
-        // Limpieza total del estado local (forzamos unmount completo)
-        window.location.href = '/login?expired=true';
       }
     }
     return Promise.reject(error);

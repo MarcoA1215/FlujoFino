@@ -42,18 +42,7 @@ const Login: React.FC = () => {
     return raw ? JSON.parse(raw)?.message || '' : '';
   });
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get('expired') === 'true') {
-      presentToast({
-        message: 'Tu sesión ha expirado',
-        duration: 4000,
-        color: 'warning',
-        position: 'top'
-      });
-      window.history.replaceState(null, '', '/login');
-    }
-  }, [location.search, presentToast]);
+
 
   const checkRequestStatus = async (requestId: string) => {
     setIsCheckingStatus(true);
