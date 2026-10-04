@@ -112,6 +112,42 @@ export class UsersService implements OnModuleInit {
     if (!tenantId) throw new Error('Se requiere tenantId para crear un usuario');
     
     return await this.usersRepo.manager.transaction(async transactionalEntityManager => {
+      if (data.role === UserRole.OPERATIVO) {
+        const cleanName = data.name || data.username || 'Personal Operativo';
+        const generatedUsername = (data.username || `operativo_${Date.now()}`).trim();
+        const generatedEmail = (data.email && data.email.trim())
+          ? data.email.trim().toLowerCase()
+          : `${generatedUsername.toLowerCase()}@no-access.local`;
+
+        const randomHash = await bcrypt.hash(`no_login_${Date.now()}_${Math.random()}`, 10);
+
+        const user = transactionalEntityManager.create(User, {
+          username: cleanName,
+          email: generatedEmail,
+          identification: data.identification || null,
+          phone: data.phone || null,
+          passwordHash: randomHash,
+          role: UserRole.OPERATIVO,
+          isEmailVerified: false,
+        });
+        const savedUser = await transactionalEntityManager.save(user);
+
+        const access = transactionalEntityManager.create(UserTenantAccess, {
+          user: savedUser,
+          tenantId,
+          role: UserRole.OPERATIVO,
+          isActive: true,
+          status: 'ACCEPTED',
+          salaryAmount: data.salaryAmount ? Number(data.salaryAmount) : null,
+          salaryPeriod: data.salaryPeriod || 'SEMANAL',
+          jobTitle: data.jobTitle || 'Personal Operativo (Limpieza / Mantenimiento)',
+          entryTime: data.entryTime || null,
+          exitTime: data.exitTime || null,
+        });
+        await transactionalEntityManager.save(access);
+        return savedUser;
+      }
+
       // 1. Check if user already exists
       let existingUser = await transactionalEntityManager.findOne(User, {
         where: [

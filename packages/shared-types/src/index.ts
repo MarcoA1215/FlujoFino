@@ -184,7 +184,8 @@ export enum UserRole {
   POS = 'POS',
   DELIVERY = 'DELIVERY',
   INVENTORY = 'INVENTORY',
-  PROMOTOR = 'PROMOTOR'
+  PROMOTOR = 'PROMOTOR',
+  OPERATIVO = 'OPERATIVO',
 }
 
 export enum ReservationStatus {

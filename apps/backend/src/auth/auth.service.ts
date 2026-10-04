@@ -64,6 +64,10 @@ export class AuthService {
     const user = await this.usersService.findByUsername(username);
     if (!user) return null;
 
+    if (user.role === UserRole.OPERATIVO) {
+      throw new UnauthorizedException('Este usuario está registrado como personal operativo sin acceso a la plataforma.');
+    }
+
     if (!(await bcrypt.compare(pass, user.passwordHash))) return null;
 
     const { passwordHash, ...result } = user;

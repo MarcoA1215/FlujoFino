@@ -698,11 +698,13 @@ const Orders: React.FC = () => {
                           } as any}
                         >
                           <IonSelectOption value="">(Sin asignar)</IonSelectOption>
-                          {employees.filter(e => e.role === UserRole.DELIVERY).map(driver => (
-                            <IonSelectOption key={driver.id} value={driver.id}>
-                              {driver.username || driver.name}
-                            </IonSelectOption>
-                          ))}
+                          {employees
+                            .filter(e => [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO].includes(e.role as UserRole))
+                            .map(driver => (
+                              <IonSelectOption key={driver.id} value={driver.id}>
+                                🛵 {driver.username || driver.name} ({driver.role === 'DELIVERY' ? 'Repartidor' : driver.role === 'POS' ? 'Cajero / Delivery' : driver.role})
+                              </IonSelectOption>
+                            ))}
                         </IonSelect>
                       </div>
                     )}
@@ -1087,11 +1089,13 @@ const Orders: React.FC = () => {
                           } as any}
                         >
                           <IonSelectOption value="">-- Sin repartidor asignado --</IonSelectOption>
-                          {employees.filter(e => e.role === UserRole.DELIVERY).map((driver: any) => (
-                            <IonSelectOption key={driver.id} value={driver.id}>
-                              🛵 {driver.name || driver.username}
-                            </IonSelectOption>
-                          ))}
+                          {employees
+                            .filter(e => [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO].includes(e.role as UserRole))
+                            .map((driver: any) => (
+                              <IonSelectOption key={driver.id} value={driver.id}>
+                                🛵 {driver.name || driver.username} ({driver.role === 'DELIVERY' ? 'Repartidor' : driver.role === 'POS' ? 'Cajero / Delivery' : driver.role})
+                              </IonSelectOption>
+                            ))}
                         </IonSelect>
                       </div>
                     )}

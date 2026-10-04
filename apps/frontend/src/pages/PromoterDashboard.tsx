@@ -77,9 +77,18 @@ const PromoterDashboard: React.FC = () => {
     fetchStats();
   }, []);
 
+  const getPublicBaseUrl = () => {
+    if (
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' || window.location.protocol === 'capacitor:')
+    ) {
+      return 'https://flujo-fino-frontend.vercel.app'; // Dominio público de producción
+    }
+    return window.location.origin;
+  };
+
   const referralCode = stats?.code || 'PROM-';
-  const originUrl = window.location.origin;
-  const affiliateLink = `${originUrl}/register?ref=${referralCode}`;
+  const affiliateLink = `${getPublicBaseUrl()}/register?ref=${referralCode}`;
 
   const copyToClipboard = (text: string, label = 'Enlace') => {
     if (navigator.clipboard && navigator.clipboard.writeText) {

@@ -358,8 +358,9 @@ export class OrdersService {
         const dAccess = await manager.findOne(UserTenantAccess, {
           where: { userId: dto.deliveryUserId, tenantId, isActive: true }
         });
-        if (!dAccess || dAccess.role !== UserRole.DELIVERY) {
-          throw new BadRequestException('El repartidor asignado debe ser un usuario activo con rol DELIVERY');
+        const allowedRoles = [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO];
+        if (!dAccess || !allowedRoles.includes(dAccess.role as UserRole)) {
+          throw new BadRequestException('El repartidor asignado debe ser un miembro activo del equipo de trabajo');
         }
         deliveryUserIdToSave = dto.deliveryUserId;
       }
@@ -408,109 +409,135 @@ export class OrdersService {
       const savedOrder = await manager.save(Order, order);
 
       for (const itemDto of dto.items) {
-        const product = productMap.get(itemDto.productId);
-        
-        if (!product) throw new BadRequestException('Producto no encontrado');
+        let product = productMap.get(itemDto.productId);
+        let extraMaterial: RawMaterial | null = null;
+
+        if (!product) {
+          extraMaterial = await manager.findOne(RawMaterial, {
+            where: { tenantId, id: itemDto.productId, allowAsExtra: true },
+          });
+          if (!extraMaterial) {
+            throw new BadRequestException(`Producto o insumo extra no encontrado (${itemDto.productId})`);
+          }
+        }
 
         const subtotal = itemDto.quantity * itemDto.unitPrice;
         totalAmount += subtotal;
 
-        const isSupplierPreorderOrder = initialStatus === OrderStatus.SOLICITUD_ENCARGO;
+        let unitCost = 0;
 
-        if (!isSupplierPreorderOrder) {
-          if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
-            for (const ci of product.comboItems) {
-              if (ci.component) {
-                ci.component.stockQuantity -= (itemDto.quantity * ci.quantity);
-                await manager.save(Product, ci.component);
+        if (extraMaterial) {
+          extraMaterial.stockQuantity -= itemDto.quantity;
+          await manager.save(RawMaterial, extraMaterial);
+
+          const mov = manager.create(StockMovement, {
+            tenantId,
+            rawMaterialId: extraMaterial.id,
+            type: MovementType.OUT_SALE,
+            quantity: itemDto.quantity,
+            totalCost: itemDto.quantity * extraMaterial.costPerUnit,
+            description: `Venta de Extra Suelto: ${extraMaterial.name}`,
+          });
+          await manager.save(StockMovement, mov);
+
+          unitCost = Number(extraMaterial.costPerUnit || 0);
+        } else if (product) {
+          const isSupplierPreorderOrder = initialStatus === OrderStatus.SOLICITUD_ENCARGO;
+
+          if (!isSupplierPreorderOrder) {
+            if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
+              for (const ci of product.comboItems) {
+                if (ci.component) {
+                  ci.component.stockQuantity -= (itemDto.quantity * ci.quantity);
+                  await manager.save(Product, ci.component);
+                }
+              }
+            } else if (product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
+              for (const ri of product.recipe) {
+                if (ri.rawMaterial) {
+                  const isRemoved = itemDto.removedIngredients?.some(rem => 
+                    rem === ri.rawMaterial.id || rem.toLowerCase() === ri.rawMaterial.name.toLowerCase()
+                  );
+                  if (isRemoved) continue;
+
+                  ri.rawMaterial.stockQuantity -= (itemDto.quantity * ri.quantity);
+                  await manager.save(RawMaterial, ri.rawMaterial);
+                  const mov = manager.create(StockMovement, { tenantId,
+                    rawMaterialId: ri.rawMaterial.id,
+                    type: MovementType.OUT_SALE,
+                    quantity: itemDto.quantity * ri.quantity,
+                    totalCost: (itemDto.quantity * ri.quantity) * ri.rawMaterial.costPerUnit,
+                    description: 'Venta de Producto: ' + product.name
+                  });
+                  await manager.save(StockMovement, mov);
+                }
+              }
+            } else if (!product.isCombo || product.isPreAssembled) {
+              const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
+              if (!isService) {
+                const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
+                const isBajoEncargo = product.availabilityType === 'BAJO_ENCARGO';
+                if (currentStock < itemDto.quantity && !isBajoEncargo) {
+                  throw new BadRequestException(`Stock insuficiente para "${product.name}". Disponible: ${currentStock}, solicitado: ${itemDto.quantity}`);
+                }
+                product.stock = Math.max(0, currentStock - itemDto.quantity);
+                product.stockQuantity = product.stock;
+                await manager.save(Product, product);
               }
             }
-          } else if (product.recipe && product.recipe.length > 0 && !product.isPreAssembled) {
-            for (const ri of product.recipe) {
-              if (ri.rawMaterial) {
-                const isRemoved = itemDto.removedIngredients?.some(rem => 
-                  rem === ri.rawMaterial.id || rem.toLowerCase() === ri.rawMaterial.name.toLowerCase()
-                );
-                if (isRemoved) continue;
 
-                ri.rawMaterial.stockQuantity -= (itemDto.quantity * ri.quantity);
-                await manager.save(RawMaterial, ri.rawMaterial);
-                const mov = manager.create(StockMovement, { tenantId,
-                  rawMaterialId: ri.rawMaterial.id,
-                  type: MovementType.OUT_SALE,
-                  quantity: itemDto.quantity * ri.quantity,
-                  totalCost: (itemDto.quantity * ri.quantity) * ri.rawMaterial.costPerUnit,
-                  description: 'Venta de Producto: ' + product.name
-                });
-                await manager.save(StockMovement, mov);
+            // Descontar adicionales extra
+            if (itemDto.addedExtras && itemDto.addedExtras.length > 0) {
+              for (const extra of itemDto.addedExtras) {
+                if (!extra.rawMaterialId) continue;
+                const extraRm = await manager.findOne(RawMaterial, { where: { tenantId, id: extra.rawMaterialId } });
+                if (extraRm) {
+                  const extraQty = (Number(extra.quantity) || 1) * itemDto.quantity;
+                  extraRm.stockQuantity -= extraQty;
+                  await manager.save(RawMaterial, extraRm);
+                  const mov = manager.create(StockMovement, { tenantId,
+                    rawMaterialId: extraRm.id,
+                    type: MovementType.OUT_SALE,
+                    quantity: extraQty,
+                    totalCost: extraQty * extraRm.costPerUnit,
+                    description: `Extra (${extra.name}) para: ${product.name}`
+                  });
+                  await manager.save(StockMovement, mov);
+                }
               }
-            }
-          } else if (!product.isCombo || product.isPreAssembled) {
-            const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
-            if (!isService) {
-              const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
-              const isBajoEncargo = product.availabilityType === 'BAJO_ENCARGO';
-              if (currentStock < itemDto.quantity && !isBajoEncargo) {
-                throw new BadRequestException(`Stock insuficiente para "${product.name}". Disponible: ${currentStock}, solicitado: ${itemDto.quantity}`);
-              }
-              product.stock = Math.max(0, currentStock - itemDto.quantity);
-              product.stockQuantity = product.stock;
-              await manager.save(Product, product);
             }
           }
 
-          // Descontar adicionales extra
+          if (product.isCombo && !product.isPreAssembled && product.comboItems) {
+              for (const ci of product.comboItems) {
+                  if (ci.component && ci.component.recipe) {
+                      for (const ri of ci.component.recipe) {
+                          if (ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit * ci.quantity;
+                      }
+                  }
+              }
+          }
+          if (product.recipe && product.recipe.length > 0) {
+              for (const ri of product.recipe) {
+                  const isRemoved = itemDto.removedIngredients?.some(rem => 
+                    rem === ri.rawMaterial?.id || rem.toLowerCase() === ri.rawMaterial?.name?.toLowerCase()
+                  );
+                  if (!isRemoved && ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit;
+              }
+          } else if (product.cost !== undefined && product.cost !== null && Number(product.cost) > 0) {
+              unitCost = Number(product.cost);
+          } else if (product.estimatedCost) {
+              unitCost = Number(product.estimatedCost);
+          }
+
+          // Sumar costo de insumos extra
           if (itemDto.addedExtras && itemDto.addedExtras.length > 0) {
             for (const extra of itemDto.addedExtras) {
               if (!extra.rawMaterialId) continue;
               const extraRm = await manager.findOne(RawMaterial, { where: { tenantId, id: extra.rawMaterialId } });
               if (extraRm) {
-                const extraQty = (Number(extra.quantity) || 1) * itemDto.quantity;
-                extraRm.stockQuantity -= extraQty;
-                await manager.save(RawMaterial, extraRm);
-                const mov = manager.create(StockMovement, { tenantId,
-                  rawMaterialId: extraRm.id,
-                  type: MovementType.OUT_SALE,
-                  quantity: extraQty,
-                  totalCost: extraQty * extraRm.costPerUnit,
-                  description: `Extra (${extra.name}) para: ${product.name}`
-                });
-                await manager.save(StockMovement, mov);
+                unitCost += (Number(extra.quantity) || 1) * extraRm.costPerUnit;
               }
-            }
-          }
-        }
-
-        let unitCost = 0;
-        if (product.isCombo && !product.isPreAssembled && product.comboItems) {
-            for (const ci of product.comboItems) {
-                if (ci.component && ci.component.recipe) {
-                    for (const ri of ci.component.recipe) {
-                        if (ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit * ci.quantity;
-                    }
-                }
-            }
-        }
-        if (product.recipe && product.recipe.length > 0) {
-            for (const ri of product.recipe) {
-                const isRemoved = itemDto.removedIngredients?.some(rem => 
-                  rem === ri.rawMaterial?.id || rem.toLowerCase() === ri.rawMaterial?.name?.toLowerCase()
-                );
-                if (!isRemoved && ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit;
-            }
-        } else if (product.cost !== undefined && product.cost !== null && Number(product.cost) > 0) {
-            unitCost = Number(product.cost);
-        } else if (product.estimatedCost) {
-            unitCost = Number(product.estimatedCost);
-        }
-
-        // Sumar costo de insumos extra
-        if (itemDto.addedExtras && itemDto.addedExtras.length > 0) {
-          for (const extra of itemDto.addedExtras) {
-            if (!extra.rawMaterialId) continue;
-            const extraRm = await manager.findOne(RawMaterial, { where: { tenantId, id: extra.rawMaterialId } });
-            if (extraRm) {
-              unitCost += (Number(extra.quantity) || 1) * extraRm.costPerUnit;
             }
           }
         }
@@ -525,8 +552,8 @@ export class OrdersService {
 
         const orderItem = manager.create(OrderItem, { tenantId,
           orderId: savedOrder.id,
-          productId: product.id,
-          productName: product.name,
+          productId: extraMaterial ? extraMaterial.id : product!.id,
+          productName: extraMaterial ? `Extra: ${extraMaterial.name}` : product!.name,
           quantity: itemDto.quantity,
           unitPrice: itemDto.unitPrice,
           unitCost: unitCost,
@@ -785,6 +812,23 @@ export class OrdersService {
                   }
                 }
               }
+            } else {
+              const extraMaterial = await manager.findOne(RawMaterial, {
+                where: { tenantId, id: item.productId, allowAsExtra: true },
+              });
+              if (extraMaterial) {
+                extraMaterial.stockQuantity += item.quantity;
+                await manager.save(RawMaterial, extraMaterial);
+                const mov = manager.create(StockMovement, {
+                  tenantId,
+                  rawMaterialId: extraMaterial.id,
+                  type: MovementType.IN,
+                  quantity: item.quantity,
+                  totalCost: item.quantity * extraMaterial.costPerUnit,
+                  description: `Reverso Venta Extra Suelto por Cancelación: ${order.id}`,
+                });
+                await manager.save(StockMovement, mov);
+              }
             }
           }
         }
@@ -960,32 +1004,51 @@ export class OrdersService {
           where: { tenantId, id: productId },
           relations: { recipe: { rawMaterial: true }, comboItems: { component: true } }
         });
-        if (!product) return;
-        
+
         const multiplier = isDeduction ? -1 : 1;
-        
-        if (product.isCombo && !product.isPreAssembled && product.comboItems) {
-          for (const cItem of product.comboItems) {
-            if(cItem.component) {
-              cItem.component.stockQuantity += (quantity * cItem.quantity * multiplier);
-              cItem.component.stock = cItem.component.stockQuantity;
-              await manager.save(Product, cItem.component);
+
+        if (product) {
+          if (product.isCombo && !product.isPreAssembled && product.comboItems) {
+            for (const cItem of product.comboItems) {
+              if(cItem.component) {
+                cItem.component.stockQuantity += (quantity * cItem.quantity * multiplier);
+                cItem.component.stock = cItem.component.stockQuantity;
+                await manager.save(Product, cItem.component);
+              }
+            }
+          } else if (product.recipe && product.recipe.length > 0) {
+            for (const rItem of product.recipe) {
+              if(rItem.rawMaterial) {
+                rItem.rawMaterial.stockQuantity += (quantity * rItem.quantity * multiplier);
+                await manager.save(RawMaterial, rItem.rawMaterial);
+              }
+            }
+          } else if (!product.isCombo || product.isPreAssembled) {
+            const isService = product.is_service === true || product.category === 'Servicios' || Boolean(product.durationMinutes);
+            if (!isService) {
+              product.stockQuantity += (quantity * multiplier);
+              product.stock = product.stockQuantity;
+              await manager.save(Product, product);
             }
           }
-        } else if (product.recipe && product.recipe.length > 0) {
-          for (const rItem of product.recipe) {
-            if(rItem.rawMaterial) {
-              rItem.rawMaterial.stockQuantity += (quantity * rItem.quantity * multiplier);
-              await manager.save(RawMaterial, rItem.rawMaterial);
-            }
-          }
-        } else if (!product.isCombo || product.isPreAssembled) {
-          const isService = product.is_service === true || product.category === 'Servicios' || Boolean(product.durationMinutes);
-          if (!isService) {
-            product.stockQuantity += (quantity * multiplier);
-            product.stock = product.stockQuantity;
-            await manager.save(Product, product);
-          }
+          return;
+        }
+
+        const extraMaterial = await manager.findOne(RawMaterial, {
+          where: { tenantId, id: productId, allowAsExtra: true },
+        });
+        if (extraMaterial) {
+          extraMaterial.stockQuantity += (quantity * multiplier);
+          await manager.save(RawMaterial, extraMaterial);
+          const mov = manager.create(StockMovement, {
+            tenantId,
+            rawMaterialId: extraMaterial.id,
+            type: isDeduction ? MovementType.OUT_SALE : MovementType.IN,
+            quantity: quantity,
+            totalCost: quantity * extraMaterial.costPerUnit,
+            description: isDeduction ? `Venta de Extra Suelto: ${extraMaterial.name}` : `Reverso de Extra Suelto: ${extraMaterial.name}`,
+          });
+          await manager.save(StockMovement, mov);
         }
       };
 
@@ -1028,7 +1091,9 @@ export class OrdersService {
           });
           
           let unitCost = 0;
-          if(product) {
+          let itemName = '';
+          if (product) {
+              itemName = product.name;
               if (product.isCombo && !product.isPreAssembled && product.comboItems) {
                   for (const ci of product.comboItems) {
                       if (ci.component && ci.component.recipe) {
@@ -1045,13 +1110,21 @@ export class OrdersService {
               } else if (product.estimatedCost) {
                   unitCost = Number(product.estimatedCost);
               }
+          } else {
+              const extraMaterial = await manager.findOne(RawMaterial, {
+                where: { tenantId, id: productId, allowAsExtra: true },
+              });
+              if (extraMaterial) {
+                itemName = `Extra: ${extraMaterial.name}`;
+                unitCost = Number(extraMaterial.costPerUnit || 0);
+              }
           }
           
           const subtotal = newItem.quantity * newItem.unitPrice;
           const orderItem = manager.create(OrderItem, { tenantId,
             orderId: order.id,
             productId: productId,
-            productName: product?.name || '',
+            productName: itemName,
             quantity: newItem.quantity,
             unitPrice: newItem.unitPrice,
             unitCost: unitCost,
@@ -1104,8 +1177,9 @@ export class OrdersService {
           const dAccess = await manager.findOne(UserTenantAccess, {
             where: { userId: dto.deliveryUserId, tenantId, isActive: true }
           });
-          if (!dAccess || dAccess.role !== UserRole.DELIVERY) {
-            throw new BadRequestException('El repartidor asignado debe ser un usuario activo con rol DELIVERY');
+          const allowedRoles = [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO];
+          if (!dAccess || !allowedRoles.includes(dAccess.role as UserRole)) {
+            throw new BadRequestException('El repartidor asignado debe ser un miembro activo del equipo de trabajo');
           }
           order.deliveryUserId = dto.deliveryUserId;
         } else {
@@ -1257,7 +1331,8 @@ export class OrdersService {
       order: { createdAt: 'DESC' },
     });
 
-    const currentExchangeRate = await this.settingsService.getEffectiveRate(tenantId);
+    const currentExchangeRateObj = await this.settingsService.getExchangeRate(tenantId);
+    const currentExchangeRate = Number(currentExchangeRateObj?.exchangeRateBs || await this.settingsService.getEffectiveRate(tenantId));
 
     let totalSalesUSD = 0;
     let totalPaidUSD = 0;
@@ -1457,6 +1532,7 @@ export class OrdersService {
     return {
       date: targetDateStr,
       exchangeRate: currentExchangeRate,
+      currencySymbol: currentExchangeRateObj?.currencySymbol || 'Bs.',
       totalSalesUSD: Number(totalSalesUSD.toFixed(2)),
       totalPaidUSD: Number(totalPaidUSD.toFixed(2)),
       totalPendingUSD: Number(totalPendingUSD.toFixed(2)),
@@ -1550,8 +1626,9 @@ export class OrdersService {
       const dAccess = await this.dataSource.manager.findOne(UserTenantAccess, {
         where: { userId: deliveryUserId, tenantId, isActive: true },
       });
-      if (!dAccess || dAccess.role !== UserRole.DELIVERY) {
-        throw new BadRequestException('El repartidor asignado debe ser un usuario activo con rol DELIVERY');
+      const allowedRoles = [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO];
+      if (!dAccess || !allowedRoles.includes(dAccess.role as UserRole)) {
+        throw new BadRequestException('El repartidor asignado debe ser un miembro activo del equipo de trabajo');
       }
       order.deliveryUserId = deliveryUserId;
     } else {

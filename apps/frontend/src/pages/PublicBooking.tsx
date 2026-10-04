@@ -20,6 +20,13 @@ import { requestAndSubscribePush } from '../services/push-notification.service';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+export const formatDateLocal = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const PublicBooking: React.FC = () => {
   const { openImage } = useImageViewer();
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -325,7 +332,7 @@ const PublicBooking: React.FC = () => {
         customerName, 
         customerPhone, 
         identification: identification || undefined,
-        date: (selectedDate ? new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : undefined), 
+        date: (selectedDate ? formatDateLocal(selectedDate) : undefined), 
         time: selectedTime, 
         numberOfPeople: (tenantInfo?.bookingRequireService || selectedServices.length > 0) ? 1 : numberOfPeople, 
         notes,
@@ -400,7 +407,7 @@ const PublicBooking: React.FC = () => {
       if (!selectedDate || !tenantId) return;
       setLoadingSlots(true);
       try {
-        const dStr = new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+        const dStr = formatDateLocal(selectedDate);
         const sId = selectedServiceIds ? `&serviceId=${selectedServiceIds}` : '';
         const empId = selectedStaff?.id ? `&employeeId=${selectedStaff.id}` : '';
         const res = await axios.get(`${apiBase}/public/reservations/tenant/${tenantId}/availability?date=${dStr}${sId}${empId}`);

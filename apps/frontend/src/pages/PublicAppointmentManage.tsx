@@ -42,6 +42,13 @@ import axios from 'axios';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+const formatDateLocal = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const PublicAppointmentManage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
@@ -262,7 +269,7 @@ const PublicAppointmentManage: React.FC = () => {
     for(let i=0; i<14; i++) {
       const d = new Date();
       d.setDate(today.getDate() + i);
-      dates.push(new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0]);
+      dates.push(formatDateLocal(d));
     }
     return dates;
   };

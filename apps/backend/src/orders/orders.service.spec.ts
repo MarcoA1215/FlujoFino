@@ -6,7 +6,11 @@ import { Order } from '../entities/order.entity';
 import { Settings } from '../entities/settings.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
 import { Product } from '../entities/product.entity';
-import { PaymentStatus, OrderStatus } from '@nutrideli/shared-types';
+import { SettingsService } from '../settings/settings.service';
+import { PaymentStatus, OrderStatus, UserRole, MovementType } from '@nutrideli/shared-types';
+import { UserTenantAccess } from '../entities/user-tenant-access.entity';
+import { RawMaterial } from '../entities/raw-material.entity';
+import { StockMovement } from '../entities/stock-movement.entity';
 
 describe('OrdersService', () => {
   let service: OrdersService;
@@ -58,11 +62,17 @@ describe('OrdersService', () => {
       normalizeId: jest.fn((id) => id),
     };
 
+    const mockSettingsService = {
+      getEffectiveRate: jest.fn().mockResolvedValue(50.0),
+      getExchangeRate: jest.fn().mockResolvedValue({ exchangeRateBs: 50.0, currencySymbol: 'Bs.' }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdersService,
         { provide: DataSource, useValue: mockDataSource },
         { provide: CustomersService, useValue: mockCustomersService },
+        { provide: SettingsService, useValue: mockSettingsService },
       ],
     }).compile();
 
@@ -293,6 +303,106 @@ describe('OrdersService', () => {
       expect(serviceOrder.status).toBe(OrderStatus.PENDING);
       // La orden física debe degradarse a PREPARING por falta de stock
       expect(physicalOrder.status).toBe(OrderStatus.PREPARING);
+    });
+  });
+
+  describe('assignDelivery - Personal Multirrol', () => {
+    it('debe aceptar con éxito a un usuario con rol POS o ADMIN como repartidor sin arrojar excepción', async () => {
+      const tenantId = 'tenant-123';
+      const orderId = 'order-999';
+      const deliveryUserId = 'user-pos-1';
+
+      const existingOrder = {
+        id: orderId,
+        tenantId,
+        deliveryUserId: null,
+      };
+
+      mockOrderRepo.findOne.mockImplementation(({ where }: any) => {
+        if (where?.id === orderId) return Promise.resolve(existingOrder);
+        return Promise.resolve(null);
+      });
+
+      mockDataSource.manager = mockManager;
+      mockManager.findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === UserTenantAccess || entity?.name === 'UserTenantAccess') {
+          return Promise.resolve({
+            userId: deliveryUserId,
+            tenantId,
+            isActive: true,
+            role: UserRole.POS,
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      const result = await service.assignDelivery(tenantId, orderId, deliveryUserId);
+
+      expect(mockOrderRepo.save).toHaveBeenCalled();
+      expect(existingOrder.deliveryUserId).toBe(deliveryUserId);
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe('createOrder - Extras de Insumos Sueltos', () => {
+    it('debe descontar el stock directamente de RawMaterial y registrar OUT_SALE cuando se vende un extra suelto', async () => {
+      const tenantId = 'tenant-123';
+      const rawMaterialExtraId = 'rm-extra-salsa';
+
+      const mockExtraMaterial = {
+        id: rawMaterialExtraId,
+        tenantId,
+        name: 'Salsa Especial',
+        allowAsExtra: true,
+        stockQuantity: 10,
+        costPerUnit: 0.5,
+      };
+
+      mockManager.find.mockImplementation((entity: any) => {
+        if (entity === Product || entity?.name === 'Product') {
+          return Promise.resolve([]); // No es un producto regular
+        }
+        return Promise.resolve([]);
+      });
+
+      mockManager.findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === RawMaterial || entity?.name === 'RawMaterial') {
+          return Promise.resolve(mockExtraMaterial);
+        }
+        return Promise.resolve(null);
+      });
+
+      const orderDto: any = {
+        customerName: 'Cliente Prueba Extra',
+        paymentStatus: PaymentStatus.PAID,
+        paymentMethod: 'USD',
+        items: [
+          {
+            productId: rawMaterialExtraId,
+            quantity: 2,
+            unitPrice: 1.5,
+          },
+        ],
+      };
+
+      await service.createOrder(tenantId, orderDto);
+
+      // Descuento de stock en RawMaterial: 10 - 2 = 8
+      expect(mockExtraMaterial.stockQuantity).toBe(8);
+      expect(mockManager.save).toHaveBeenCalledWith(RawMaterial, mockExtraMaterial);
+
+      // Verificación del movimiento de stock OUT_SALE
+      expect(mockManager.create).toHaveBeenCalledWith(
+        StockMovement,
+        expect.objectContaining({
+          tenantId,
+          rawMaterialId: rawMaterialExtraId,
+          type: MovementType.OUT_SALE,
+          quantity: 2,
+          totalCost: 2 * 0.5,
+          description: 'Venta de Extra Suelto: Salsa Especial',
+        }),
+      );
     });
   });
 });

@@ -473,11 +473,36 @@ const Pos: React.FC = () => {
         set.add(p.category.trim());
       }
     });
-    return ['Todos', ...Array.from(set)];
-  }, [products]);
+    const hasExtras = availableRawMaterials.some(rm => rm.allowAsExtra);
+    const catList = ['Todos', ...Array.from(set)];
+    if (hasExtras) {
+      catList.push('🍟 Extras Sueltos');
+    }
+    return catList;
+  }, [products, availableRawMaterials]);
+
+  const getExtraPrice = (rm: any) => {
+    if (rm.extraPriceType === 'FIXED_PRICE') return Number(rm.extraPriceValue || 0);
+    if (rm.extraPriceType === 'MARGIN_PERCENT') return Number((rm.costPerUnit * (1 + (Number(rm.extraPriceValue) || 0) / 100)).toFixed(2));
+    return Number(rm.costPerUnit || 0);
+  };
 
   // Filtered products
   const filteredProducts = useMemo(() => {
+    if (selectedCategory === '🍟 Extras Sueltos') {
+      return availableRawMaterials
+        .filter(rm => rm.allowAsExtra)
+        .filter(rm => rm.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        .map(rm => ({
+          id: rm.id,
+          name: rm.name,
+          category: '🍟 Extras Sueltos',
+          salePrice: getExtraPrice(rm),
+          stockQuantity: Number(rm.stockQuantity || 0),
+          baseCost: Number(rm.costPerUnit || 0),
+          is_service: false,
+        } as Product));
+    }
     return products.filter(p => {
       const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory =
@@ -485,7 +510,7 @@ const Pos: React.FC = () => {
         (selectedCategory === 'Servicios' ? (p.category === 'Servicios' || p.durationMinutes) : p.category === selectedCategory);
       return matchesSearch && matchesCategory;
     });
-  }, [products, searchTerm, selectedCategory]);
+  }, [products, searchTerm, selectedCategory, availableRawMaterials]);
 
   // Cart operations
   const addToCart = (product: Product) => {
@@ -563,11 +588,6 @@ const Pos: React.FC = () => {
     }
   };
 
-  const getExtraPrice = (rm: any) => {
-    if (rm.extraPriceType === 'FIXED_PRICE') return Number(rm.extraPriceValue || 0);
-    if (rm.extraPriceType === 'MARGIN_PERCENT') return Number((rm.costPerUnit * (1 + (Number(rm.extraPriceValue) || 0) / 100)).toFixed(2));
-    return Number(rm.costPerUnit || 0);
-  };
 
   const addCustomizedToCart = () => {
     if (!customizingProduct) return;
@@ -1449,11 +1469,13 @@ const Pos: React.FC = () => {
                           style={{ '--padding-start': '0px', '--padding-end': '0px', minHeight: '42px' }}
                         >
                           <IonSelectOption value="">Sin asignar / A convenir</IonSelectOption>
-                          {employees.filter(e => e.role === UserRole.DELIVERY).map(d => (
-                            <IonSelectOption key={d.id} value={d.id}>
-                              🛵 {d.username || d.name}
-                            </IonSelectOption>
-                          ))}
+                          {employees
+                            .filter(e => [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO].includes(e.role as UserRole))
+                            .map(d => (
+                              <IonSelectOption key={d.id} value={d.id}>
+                                🛵 {d.username || d.name} ({d.role === 'DELIVERY' ? 'Repartidor' : d.role === 'POS' ? 'Cajero / Delivery' : d.role})
+                              </IonSelectOption>
+                            ))}
                         </IonSelect>
                       </div>
                     </div>

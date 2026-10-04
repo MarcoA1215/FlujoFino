@@ -50,6 +50,13 @@ interface UserData {
   createdAt: string;
 }
 
+export const formatDateLocal = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const getRoleLabel = (r: string) => {
   switch (r) {
     case UserRole.ADMIN: return 'Administrador';
@@ -57,6 +64,7 @@ const getRoleLabel = (r: string) => {
     case UserRole.KITCHEN: return 'Servicio / Preparación';
     case UserRole.DELIVERY: return 'Reparto / Envíos';
     case UserRole.INVENTORY: return 'Inventario / Stock';
+    case UserRole.OPERATIVO: return '🧹 Personal Operativo';
     default: return r;
   }
 };
@@ -69,6 +77,8 @@ const Users: React.FC = () => {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>(UserRole.POS);
   const [jobTitle, setJobTitle] = useState('');
+  const [identification, setIdentification] = useState('');
+  const [phone, setPhone] = useState('');
   const [entryTime, setEntryTime] = useState('');
   const [exitTime, setExitTime] = useState('');
   const [settings, setSettings] = useState<any>({});
@@ -88,7 +98,7 @@ const Users: React.FC = () => {
   const [selectedUserForPay, setSelectedUserForPay] = useState<UserData | null>(null);
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('CASH_USD');
-  const [payDate, setPayDate] = useState(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]);
+  const [payDate, setPayDate] = useState(formatDateLocal(new Date()));
   const [deductAdvances, setDeductAdvances] = useState(true);
 
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserData | null>(null);
@@ -225,15 +235,44 @@ const Users: React.FC = () => {
     setUsername('');
     setPassword('');
     setJobTitle('');
+    setIdentification('');
+    setPhone('');
     setEntryTime('');
     setExitTime('');
     setSalaryAmount('');
     setSalaryPeriod('SEMANAL');
+    setRole(UserRole.POS);
     setIsChecked(false);
     setIsExisting(false);
   };
 
   const handleCreate = async () => {
+    if (role === UserRole.OPERATIVO) {
+      if (!username.trim()) {
+        return presentToast({ message: 'Ingresa el nombre del empleado operativo', duration: 3000, color: 'warning' });
+      }
+      try {
+        await apiClient.post('/users', {
+          name: username.trim(),
+          username: username.trim(),
+          role: UserRole.OPERATIVO,
+          jobTitle: jobTitle.trim() || 'Personal Operativo (Limpieza / Mantenimiento)',
+          identification: identification.trim() || undefined,
+          phone: phone.trim() || undefined,
+          salaryAmount: salaryAmount ? Number(salaryAmount) : undefined,
+          salaryPeriod,
+          entryTime: entryTime || undefined,
+          exitTime: exitTime || undefined,
+        });
+        presentToast({ message: 'Personal operativo registrado exitosamente', duration: 2000, color: 'success' });
+        resetForm();
+        fetchUsers();
+      } catch (e: any) {
+        presentToast({ message: 'Error al registrar: ' + (e.response?.data?.message || e.message), duration: 4000, color: 'danger' });
+      }
+      return;
+    }
+
     if (!email || !username || !password) {
       return presentToast({ message: 'Todos los campos obligatorios son requeridos', duration: 3000, color: 'warning' });
     }
@@ -241,6 +280,8 @@ const Users: React.FC = () => {
       await apiClient.post('/users', { 
         username, email, password, role, 
         jobTitle: jobTitle.trim() || undefined,
+        identification: identification.trim() || undefined,
+        phone: phone.trim() || undefined,
         entryTime: entryTime || undefined,
         exitTime: exitTime || undefined,
         salaryAmount: salaryAmount ? Number(salaryAmount) : undefined, 
@@ -267,7 +308,7 @@ const Users: React.FC = () => {
       setPayAmount(base > 0 ? String(base) : '');
     }
     setPayMethod('CASH_USD');
-    setPayDate(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]);
+    setPayDate(formatDateLocal(new Date()));
   };
 
   const handleToggleDeductAdvances = (checked: boolean) => {
@@ -452,7 +493,117 @@ const Users: React.FC = () => {
                       <IonCardTitle>Crear Usuario</IonCardTitle>
                     </IonCardHeader>
                     <IonCardContent>
-                      {!isChecked ? (
+                      <div style={{ marginBottom: '14px' }}>
+                        <IonLabel style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A', display: 'block', marginBottom: '6px' }}>
+                          Tipo de Registro
+                        </IonLabel>
+                        <IonSelect
+                          interface="popover"
+                          value={role === UserRole.OPERATIVO ? 'OPERATIVO' : 'SYSTEM'}
+                          onIonChange={e => {
+                            if (e.detail.value === 'OPERATIVO') {
+                              setRole(UserRole.OPERATIVO);
+                              setIsChecked(true);
+                              setIsExisting(false);
+                              if (!jobTitle) setJobTitle('Limpieza y Mantenimiento');
+                            } else {
+                              setRole(UserRole.POS);
+                              setIsChecked(false);
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            border: '1px solid #CBD5E1',
+                            borderRadius: '10px',
+                            background: '#F8FAFC',
+                            fontSize: '13px',
+                            fontWeight: '600'
+                          }}
+                        >
+                          <IonSelectOption value="SYSTEM">💻 Empleado con Acceso al Sistema (Caja, Admin, Cocina...)</IonSelectOption>
+                          <IonSelectOption value="OPERATIVO">🧹 Personal Operativo / Sin Acceso (Limpieza, Vigilancia, etc.)</IonSelectOption>
+                        </IonSelect>
+                      </div>
+
+                      {role === UserRole.OPERATIVO ? (
+                        <>
+                          <IonItem>
+                            <IonLabel position="stacked">Nombre del Empleado *</IonLabel>
+                            <IonInput value={username} onIonInput={e => setUsername(e.detail.value!)} placeholder="Ej. Juan Pérez" />
+                          </IonItem>
+                          <IonItem>
+                            <IonLabel position="stacked">Cargo / Puesto</IonLabel>
+                            <IonInput 
+                              value={jobTitle} 
+                              onIonInput={e => setJobTitle(e.detail.value!)} 
+                              placeholder="Ej. Limpieza y Mantenimiento" 
+                            />
+                          </IonItem>
+                          <IonRow style={{ padding: 0 }}>
+                            <IonCol size="6" style={{ paddingLeft: 0, paddingRight: '4px' }}>
+                              <IonItem>
+                                <IonLabel position="stacked">Cédula / DNI</IonLabel>
+                                <IonInput 
+                                  value={identification} 
+                                  onIonInput={e => setIdentification(e.detail.value!)} 
+                                  placeholder="V-12345678" 
+                                />
+                              </IonItem>
+                            </IonCol>
+                            <IonCol size="6" style={{ paddingLeft: '4px', paddingRight: 0 }}>
+                              <IonItem>
+                                <IonLabel position="stacked">Teléfono</IonLabel>
+                                <IonInput 
+                                  type="tel"
+                                  value={phone} 
+                                  onIonInput={e => setPhone(e.detail.value!)} 
+                                  placeholder="0412..." 
+                                />
+                              </IonItem>
+                            </IonCol>
+                          </IonRow>
+                          <IonRow style={{ padding: 0 }}>
+                            <IonCol size="6" style={{ paddingLeft: 0, paddingRight: '4px' }}>
+                              <IonItem>
+                                <IonLabel position="stacked">Hora Entrada</IonLabel>
+                                <IonInput 
+                                  type="time" 
+                                  value={entryTime} 
+                                  onIonInput={e => setEntryTime(e.detail.value!)} 
+                                />
+                              </IonItem>
+                            </IonCol>
+                            <IonCol size="6" style={{ paddingLeft: '4px', paddingRight: 0 }}>
+                              <IonItem>
+                                <IonLabel position="stacked">Hora Salida</IonLabel>
+                                <IonInput 
+                                  type="time" 
+                                  value={exitTime} 
+                                  onIonInput={e => setExitTime(e.detail.value!)} 
+                                />
+                              </IonItem>
+                            </IonCol>
+                          </IonRow>
+                          <IonItem>
+                            <IonLabel position="stacked">Sueldo Acordado (USD)</IonLabel>
+                            <IonInput type="number" min="0" placeholder="Ej: 50" value={salaryAmount} onIonInput={e => setSalaryAmount(e.detail.value!)} />
+                          </IonItem>
+                          <IonItem>
+                            <IonLabel position="stacked">Frecuencia de Pago</IonLabel>
+                            <IonSelect value={salaryPeriod} onIonChange={e => setSalaryPeriod(e.detail.value)}>
+                              <IonSelectOption value="SEMANAL">Semanal</IonSelectOption>
+                              <IonSelectOption value="QUINCENAL">Quincenal</IonSelectOption>
+                              <IonSelectOption value="MENSUAL">Mensual</IonSelectOption>
+                            </IonSelect>
+                          </IonItem>
+                          <IonButton expand="block" color="primary" className="ion-margin-top" onClick={handleCreate}>
+                            Registrar Personal Operativo
+                          </IonButton>
+                          <IonButton expand="block" fill="clear" color="medium" onClick={resetForm}>
+                            Cancelar
+                          </IonButton>
+                        </>
+                      ) : !isChecked ? (
                         <>
                           <IonItem>
                             <IonLabel position="stacked">Correo Electrónico</IonLabel>
@@ -491,6 +642,7 @@ const Users: React.FC = () => {
                               <IonSelectOption value={UserRole.KITCHEN}>Especialista en Servicio / Preparación</IonSelectOption>
                               <IonSelectOption value={UserRole.DELIVERY}>Repartidor / Entregas</IonSelectOption>
                               <IonSelectOption value={UserRole.INVENTORY}>Control de Inventario / Insumos</IonSelectOption>
+                              <IonSelectOption value={UserRole.OPERATIVO}>🧹 Personal Operativo / Sin acceso al sistema (Limpieza, Vigilancia, etc.)</IonSelectOption>
                             </IonSelect>
                           </IonItem>
                           <IonItem>
@@ -588,7 +740,11 @@ const Users: React.FC = () => {
                                 </td>
                                 <td>{u.email}</td>
                                 <td>
-                                  <IonBadge color={u.role === UserRole.ADMIN ? 'danger' : 'primary'}>{getRoleLabel(u.role)}</IonBadge>
+                                  {u.role === UserRole.OPERATIVO ? (
+                                    <IonBadge color="medium">🧹 OPERATIVO (Sin Acceso)</IonBadge>
+                                  ) : (
+                                    <IonBadge color={u.role === UserRole.ADMIN ? 'danger' : 'primary'}>{getRoleLabel(u.role)}</IonBadge>
+                                  )}
                                 </td>
                                 <td>
                                   {adv && adv.totalUSD > 0 ? (
@@ -884,6 +1040,7 @@ const Users: React.FC = () => {
                 <IonSelectOption value={UserRole.KITCHEN}>Especialista en Servicio / Preparación</IonSelectOption>
                 <IonSelectOption value={UserRole.DELIVERY}>Repartidor / Entregas</IonSelectOption>
                 <IonSelectOption value={UserRole.INVENTORY}>Control de Inventario / Insumos</IonSelectOption>
+                <IonSelectOption value={UserRole.OPERATIVO}>🧹 Personal Operativo / Sin acceso al sistema (Limpieza, Vigilancia, etc.)</IonSelectOption>
               </IonSelect>
             </IonItem>
 

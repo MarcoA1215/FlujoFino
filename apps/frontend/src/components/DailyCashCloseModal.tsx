@@ -45,10 +45,11 @@ export const DailyCashCloseModal: React.FC<DailyCashCloseModalProps> = ({ isOpen
 
   const copyCashReportToWhatsApp = () => {
     if (!cashSummary) return;
+    const currencySymbol = cashSummary.currencySymbol || 'Bs.';
     const netCash = Number(cashSummary.netCashUSD !== undefined ? cashSummary.netCashUSD : ((cashSummary.totalCashUSD || 0) - (cashSummary.totalCashChangeUSD || 0) - (cashSummary.totalCashExpensesUSD || 0)));
     const text = `📊 *CIERRE DE CAJA / ARQUEO DIARIO*
 📅 Fecha: ${cashSummary.date}
-💱 Tasa BCV: Bs. ${Number(cashSummary.exchangeRate || 0).toFixed(2)}
+💱 Tasa BCV: ${currencySymbol} ${Number(cashSummary.exchangeRate || 0).toFixed(2)}
 
 💵 *ARQUEO EFECTIVO USD (GAVETA FÍSICA):*
 • Efectivo Cobrado Ventas: $${Number(cashSummary.totalCashUSD || 0).toFixed(2)}
@@ -56,8 +57,8 @@ export const DailyCashCloseModal: React.FC<DailyCashCloseModalProps> = ({ isOpen
 • (-) Egresos / Vales de caja: -$${Number(cashSummary.totalCashExpensesUSD || 0).toFixed(2)}
 👉 *= EFECTIVO NETO EN GAVETA:* $${netCash.toFixed(2)}
 
-💳 *PUNTO DE VENTA (Bs.):* Bs. ${Number(cashSummary.totalPuntoBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (equiv. $${Number(cashSummary.totalPuntoUSD || 0).toFixed(2)})
-📱 *PAGO MÓVIL (Bs.):* Bs. ${Number(cashSummary.totalPagoMovilBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (equiv. $${Number(cashSummary.totalPagoMovilUSD || 0).toFixed(2)})
+💳 *PUNTO DE VENTA (${currencySymbol}):* ${currencySymbol} ${Number(cashSummary.totalPuntoBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (equiv. $${Number(cashSummary.totalPuntoUSD || 0).toFixed(2)})
+📱 *PAGO MÓVIL (${currencySymbol}):* ${currencySymbol} ${Number(cashSummary.totalPagoMovilBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (equiv. $${Number(cashSummary.totalPagoMovilUSD || 0).toFixed(2)})
 💰 *TOTAL INGRESOS COBRADOS:* $${Number(cashSummary.totalPaidUSD || 0).toFixed(2)}
 ⏳ *PENDIENTE POR COBRAR:* $${Number(cashSummary.totalPendingUSD || 0).toFixed(2)}
 📈 *VENTAS TOTALES DEL DÍA:* $${Number(cashSummary.totalSalesUSD || 0).toFixed(2)}
@@ -68,9 +69,9 @@ export const DailyCashCloseModal: React.FC<DailyCashCloseModalProps> = ({ isOpen
 - 🛵 Delivery: ${cashSummary.deliveryOrdersCount}
 - 🛒 Tienda Web: ${cashSummary.webOrdersCount}
 ${cashSummary.cashExpensesList?.length > 0 ? `\n💸 *EGRESOS / VALES DE CAJA (${cashSummary.cashExpensesList.length}):*\n` + cashSummary.cashExpensesList.map((e: any) => `• ${e.description}: -$${Number(e.amount).toFixed(2)}`).join('\n') : ''}
-${cashSummary.puntoList?.length > 0 ? `\n💳 *VENTAS POR PUNTO DE VENTA (${cashSummary.puntoList.length}):*\n` + cashSummary.puntoList.map((p: any) => `• Ref: ${p.ref || 'S/R'} | Bs. ${Number(p.amountBs).toFixed(2)} | ${p.bank || 'Punto'} | ${p.customerName || 'Cliente'}`).join('\n') : ''}
-${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS (${cashSummary.pagoMovilList.length}):*\n` + cashSummary.pagoMovilList.map((p: any) => `• Ref: ${p.ref || 'S/R'} | Bs. ${Number(p.amountBs).toFixed(2)} | ${p.customerName || 'Cliente'}`).join('\n') : ''}
-${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSummary.vueltosList.length}):*\n` + cashSummary.vueltosList.map((v: any) => `• #${v.orderNumber} - ${v.customerName}: $${Number(v.amountUsd).toFixed(2)} (${v.method === 'PAGO_MOVIL' ? `Pago Móvil Ref: ${v.ref}` : v.method === 'CASH_BS' ? 'Efectivo Bs' : 'Efectivo USD'})`).join('\n') : ''}
+${cashSummary.puntoList?.length > 0 ? `\n💳 *VENTAS POR PUNTO DE VENTA (${cashSummary.puntoList.length}):*\n` + cashSummary.puntoList.map((p: any) => `• Ref: ${p.ref || 'S/R'} | ${currencySymbol} ${Number(p.amountBs).toFixed(2)} | ${p.bank || 'Punto'} | ${p.customerName || 'Cliente'}`).join('\n') : ''}
+${cashSummary.pagoMovilList?.length > 0 ? `\n📱 *PAGOS MÓVILES REGISTRADOS (${cashSummary.pagoMovilList.length}):*\n` + cashSummary.pagoMovilList.map((p: any) => `• Ref: ${p.ref || 'S/R'} | ${currencySymbol} ${Number(p.amountBs).toFixed(2)} | ${p.customerName || 'Cliente'}`).join('\n') : ''}
+${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSummary.vueltosList.length}):*\n` + cashSummary.vueltosList.map((v: any) => `• #${v.orderNumber} - ${v.customerName}: $${Number(v.amountUsd).toFixed(2)} (${v.method === 'PAGO_MOVIL' ? `Pago Móvil Ref: ${v.ref}` : v.method === 'CASH_BS' ? `Efectivo ${currencySymbol}` : 'Efectivo USD'})`).join('\n') : ''}
 `;
 
     if (navigator.clipboard) {
@@ -116,7 +117,7 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '12px', fontWeight: '600', color: '#64748B' }}>Tasa Activa</div>
-                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#10B981' }}>Bs. {Number(cashSummary.exchangeRate || 0).toFixed(2)}</div>
+                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#10B981' }}>{cashSummary.currencySymbol || 'Bs.'} {Number(cashSummary.exchangeRate || 0).toFixed(2)}</div>
                 </div>
               </div>
 
@@ -159,7 +160,7 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
                     <IonIcon icon={cardOutline} /> PUNTO DE VENTA
                   </div>
                   <div style={{ fontSize: '18px', fontWeight: '900', color: '#0F172A', margin: '6px 0 2px 0' }}>
-                    Bs. {Number(cashSummary.totalPuntoBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {cashSummary.currencySymbol || 'Bs.'} {Number(cashSummary.totalPuntoBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <small style={{ color: '#64748B', fontSize: '11px' }}>≈ ${Number(cashSummary.totalPuntoUSD || 0).toFixed(2)} ({cashSummary.puntoList?.length || 0} v.)</small>
                 </div>
@@ -170,7 +171,7 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
                     <IonIcon icon={phonePortraitOutline} /> PAGO MÓVIL
                   </div>
                   <div style={{ fontSize: '18px', fontWeight: '900', color: '#0F172A', margin: '6px 0 2px 0' }}>
-                    Bs. {Number(cashSummary.totalPagoMovilBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {cashSummary.currencySymbol || 'Bs.'} {Number(cashSummary.totalPagoMovilBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <small style={{ color: '#64748B', fontSize: '11px' }}>≈ ${Number(cashSummary.totalPagoMovilUSD || 0).toFixed(2)} ({cashSummary.pagoMovilList?.length || 0} tr.)</small>
                 </div>

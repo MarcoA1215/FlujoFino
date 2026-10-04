@@ -45,6 +45,13 @@ import { AuthContext } from '../context/AuthContext';
 import { useImageViewer } from '../context/ImageViewerContext';
 import AppHeader from '../components/AppHeader';
 
+export const formatDateLocal = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const Reservations: React.FC = () => {
   const { user } = useContext(AuthContext);
   const { openImage } = useImageViewer();
@@ -55,8 +62,7 @@ const Reservations: React.FC = () => {
 
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
   const [selectedDate, setSelectedDate] = useState<string>(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+    return formatDateLocal(new Date());
   });
 
   const [showModal, setShowModal] = useState(false);
@@ -409,11 +415,11 @@ const Reservations: React.FC = () => {
   const changeDay = (offset: number) => {
     const [y, m, d] = selectedDate.split('-').map(Number);
     const dateObj = new Date(y, m - 1, d + offset);
-    setSelectedDate(dateObj.toISOString().split('T')[0]);
+    setSelectedDate(formatDateLocal(dateObj));
   };
 
   const resetToToday = () => {
-    setSelectedDate(new Date().toISOString().split('T')[0]);
+    setSelectedDate(formatDateLocal(new Date()));
   };
 
   // FullCalendar event items for week view
