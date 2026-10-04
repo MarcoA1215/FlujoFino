@@ -1,4 +1,4 @@
-﻿import React, { useContext } from 'react';
+import React, { useContext } from 'react';
 import { IonButton, IonIcon } from '@ionic/react';
 import { cardOutline, warningOutline } from 'ionicons/icons';
 import { SubscriptionContext } from '../context/SubscriptionContext';
@@ -7,14 +7,14 @@ import { UserRole } from '@finowork/shared-types';
 
 export const SubscriptionWarningBanner: React.FC = () => {
   const { user } = useContext(AuthContext);
-  const { daysLeft, isExpired, setIsReportModalOpen } = useContext(SubscriptionContext);
+  const { subscription, daysLeft, isExpired, isLoading, setIsReportModalOpen } = useContext(SubscriptionContext);
 
   const isSuperAdmin =
     user?.role === UserRole.SUPERADMIN ||
     (user?.role as string) === 'SUPERADMIN' ||
     user?.email === 'superadmin@flujofino.com';
 
-  if (isSuperAdmin || !user?.tenantId || isExpired) {
+  if (isLoading || !subscription || isSuperAdmin || !user?.tenantId || isExpired) {
     return null;
   }
 
