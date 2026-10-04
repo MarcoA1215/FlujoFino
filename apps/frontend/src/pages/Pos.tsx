@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 import React, { useEffect, useState, useContext, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
@@ -247,10 +247,36 @@ const Pos: React.FC = () => {
 
   const fetchEmployees = async () => {
     try {
-      const res = await apiClient.get<any[]>('/users');
-      setEmployees(res.data || []);
-    } catch (e) {}
+      const res = await apiClient.get<any[]>('/users/employees');
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        setEmployees(res.data);
+        return;
+      }
+    } catch (e) {
+      console.warn('Error cargando /users/employees:', e);
+    }
+    try {
+      const fallback = await apiClient.get<any[]>('/users');
+      if (Array.isArray(fallback.data)) {
+        setEmployees(fallback.data);
+      }
+    } catch (err) {
+      console.error('Error cargando empleados:', err);
+    }
   };
+
+  useEffect(() => {
+    if (showCheckoutModal) {
+      fetchEmployees();
+      fetchDeliveryZones();
+    }
+  }, [showCheckoutModal]);
+
+  useEffect(() => {
+    if (deliveryMethod === DeliveryMethod.DELIVERY) {
+      fetchEmployees();
+    }
+  }, [deliveryMethod]);
 
   const fetchRawMaterials = async () => {
     try {
@@ -1435,8 +1461,8 @@ const Pos: React.FC = () => {
                 {/* Delivery Zone & Shipping Info */}
                 {deliveryMethod === DeliveryMethod.DELIVERY && (
                   <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '12px', marginBottom: '14px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
-                      <div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
+                      <div style={{ width: '100%' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
                           Zona de Envío *
                         </label>
@@ -1446,7 +1472,7 @@ const Pos: React.FC = () => {
                           placeholder="Selecciona zona de envío..."
                           onIonChange={e => setDeliveryZoneId(e.detail.value)}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-slate-800 text-sm"
-                          style={{ '--padding-start': '0px', '--padding-end': '0px', minHeight: '42px' }}
+                          style={{ '--padding-start': '6px', '--padding-end': '6px', minHeight: '42px', width: '100%', maxWidth: '100%' }}
                         >
                           <IonSelectOption value="">Selecciona zona de envío...</IonSelectOption>
                           {deliveryZones.map(zone => (
@@ -1456,7 +1482,7 @@ const Pos: React.FC = () => {
                           ))}
                         </IonSelect>
                       </div>
-                      <div>
+                      <div style={{ width: '100%' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
                           🛵 Repartidor Asignado
                         </label>
@@ -1466,16 +1492,22 @@ const Pos: React.FC = () => {
                           placeholder="Sin asignar / A convenir"
                           onIonChange={e => setDeliveryUserId(e.detail.value)}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-slate-800 text-sm"
-                          style={{ '--padding-start': '0px', '--padding-end': '0px', minHeight: '42px' }}
+                          style={{ '--padding-start': '6px', '--padding-end': '6px', minHeight: '42px', width: '100%', maxWidth: '100%' }}
                         >
                           <IonSelectOption value="">Sin asignar / A convenir</IonSelectOption>
-                          {employees
-                            .filter(e => [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO].includes(e.role as UserRole))
-                            .map(d => (
+                          {employees.map(d => {
+                            const roleName = d.jobTitle || (
+                              d.role === UserRole.DELIVERY ? 'Repartidor' :
+                              d.role === UserRole.POS ? 'Cajero / Delivery' :
+                              d.role === UserRole.ADMIN ? 'Admin' :
+                              d.role === UserRole.OPERATIVO ? 'Operativo' : (d.role || 'Empleado')
+                            );
+                            return (
                               <IonSelectOption key={d.id} value={d.id}>
-                                🛵 {d.username || d.name} ({d.role === 'DELIVERY' ? 'Repartidor' : d.role === 'POS' ? 'Cajero / Delivery' : d.role})
+                                🛵 {d.username || d.name} ({roleName})
                               </IonSelectOption>
-                            ))}
+                            );
+                          })}
                         </IonSelect>
                       </div>
                     </div>

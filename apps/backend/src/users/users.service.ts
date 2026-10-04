@@ -1,4 +1,4 @@
-﻿import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
+import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
@@ -81,37 +81,19 @@ export class UsersService implements OnModuleInit {
 
   async findActiveEmployees(tenantId?: string): Promise<{ id: string; username: string; name: string; role: UserRole; roles?: UserRole[]; jobTitle?: string; entryTime?: string; exitTime?: string; lunchStart?: string; lunchEnd?: string }[]> {
     if (!tenantId) return [];
-
-    const accesses = await this.usersRepo.manager.find(UserTenantAccess, {
-      where: {
-        tenantId,
-        isActive: true,
-        status: 'ACCEPTED',
-      },
-      relations: {
-        user: true,
-      },
-      order: {
-        user: {
-          username: 'ASC',
-        },
-      },
-    });
-
-    return accesses
-      .filter(a => !!a.user)
-      .map(a => ({
-        id: a.user.id,
-        username: a.user.username,
-        name: a.user.username,
-        role: a.role,
-        roles: (a.roles && a.roles.length > 0) ? a.roles : [a.role],
-        jobTitle: a.jobTitle || undefined,
-        entryTime: a.entryTime || undefined,
-        exitTime: a.exitTime || undefined,
-        lunchStart: a.lunchStart || undefined,
-        lunchEnd: a.lunchEnd || undefined,
-      }));
+    const users = await this.findAll(tenantId);
+    return users.map(u => ({
+      id: u.id,
+      username: u.username,
+      name: u.username,
+      role: u.role,
+      roles: (u as any).roles && (u as any).roles.length > 0 ? (u as any).roles : [u.role],
+      jobTitle: (u as any).jobTitle || undefined,
+      entryTime: (u as any).entryTime || undefined,
+      exitTime: (u as any).exitTime || undefined,
+      lunchStart: (u as any).lunchStart || undefined,
+      lunchEnd: (u as any).lunchEnd || undefined,
+    }));
   }
 
   async create(tenantId: string, data: any): Promise<User> {
@@ -207,9 +189,10 @@ export class UsersService implements OnModuleInit {
       }
 
       // Create access link
-      const access = transactionalEntityManager.create('UserTenantAccess', {
+      const access = transactionalEntityManager.create(UserTenantAccess, {
         user: savedUser,
-        tenant: { id: tenantId },
+        tenantId,
+        tenant: { id: tenantId } as any,
         role: primaryRole,
         roles: assignedRoles,
         isActive: true,

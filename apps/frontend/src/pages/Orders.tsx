@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useMemo, useContext } from 'react';
+import React, { useEffect, useState, useMemo, useContext } from 'react';
 import {
   IonPage,
   IonContent,
@@ -698,13 +698,19 @@ const Orders: React.FC = () => {
                           } as any}
                         >
                           <IonSelectOption value="">(Sin asignar)</IonSelectOption>
-                          {employees
-                            .filter(e => [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO].includes(e.role as UserRole))
-                            .map(driver => (
+                          {employees.map(driver => {
+                            const roleName = driver.jobTitle || (
+                              driver.role === UserRole.DELIVERY ? 'Repartidor' :
+                              driver.role === UserRole.POS ? 'Cajero / Delivery' :
+                              driver.role === UserRole.ADMIN ? 'Admin' :
+                              driver.role === UserRole.OPERATIVO ? 'Operativo' : (driver.role || 'Empleado')
+                            );
+                            return (
                               <IonSelectOption key={driver.id} value={driver.id}>
-                                🛵 {driver.username || driver.name} ({driver.role === 'DELIVERY' ? 'Repartidor' : driver.role === 'POS' ? 'Cajero / Delivery' : driver.role})
+                                🛵 {driver.username || driver.name} ({roleName})
                               </IonSelectOption>
-                            ))}
+                            );
+                          })}
                         </IonSelect>
                       </div>
                     )}
@@ -1089,13 +1095,19 @@ const Orders: React.FC = () => {
                           } as any}
                         >
                           <IonSelectOption value="">-- Sin repartidor asignado --</IonSelectOption>
-                          {employees
-                            .filter(e => [UserRole.DELIVERY, UserRole.POS, UserRole.ADMIN, UserRole.OPERATIVO].includes(e.role as UserRole))
-                            .map((driver: any) => (
+                          {employees.map((driver: any) => {
+                            const roleName = driver.jobTitle || (
+                              driver.role === UserRole.DELIVERY ? 'Repartidor' :
+                              driver.role === UserRole.POS ? 'Cajero / Delivery' :
+                              driver.role === UserRole.ADMIN ? 'Admin' :
+                              driver.role === UserRole.OPERATIVO ? 'Operativo' : (driver.role || 'Empleado')
+                            );
+                            return (
                               <IonSelectOption key={driver.id} value={driver.id}>
-                                🛵 {driver.name || driver.username} ({driver.role === 'DELIVERY' ? 'Repartidor' : driver.role === 'POS' ? 'Cajero / Delivery' : driver.role})
+                                🛵 {driver.name || driver.username} ({roleName})
                               </IonSelectOption>
-                            ))}
+                            );
+                          })}
                         </IonSelect>
                       </div>
                     )}

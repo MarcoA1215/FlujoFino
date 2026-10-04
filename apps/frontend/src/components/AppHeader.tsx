@@ -48,6 +48,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const { user } = useContext(AuthContext);
   const [presentToast] = useIonToast();
 
+  const isAdmin =
+    user?.role === UserRole.ADMIN ||
+    user?.role === UserRole.SUPERADMIN ||
+    (user?.role as string) === 'ADMIN' ||
+    (user?.role as string) === 'SUPERADMIN';
+
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isSimulatingOffline, setIsSimulatingOffline] = useState<boolean>(() => localStorage.getItem('flujofino_simulating_offline') === 'true');
   const [pendingOfflineCount, setPendingOfflineCount] = useState<number>(0);
@@ -214,14 +220,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   };
 
   const handleApplyRateMode = async (mode: string, customRate?: number) => {
-    const isAdmin =
-      user?.role === UserRole.ADMIN ||
-      user?.role === UserRole.SUPERADMIN ||
-      (user?.role as string) === 'ADMIN' ||
-      (user?.role as string) === 'SUPERADMIN';
-
     if (!isAdmin) {
-      presentToast({ message: 'Solo los administradores pueden modificar la tasa', duration: 2000, color: 'warning' });
+      presentToast({
+        message: '🔒 Solo un administrador puede modificar la tasa del negocio',
+        duration: 2500,
+        color: 'warning'
+      });
       return;
     }
 
@@ -388,10 +392,24 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             {/* Rate Pill */}
             {showRate && (
               <div
-                className="ff-pill ff-pill-interactive ff-pill-rate"
-                onClick={() => setShowRateModal(true)}
-                title="Tasa de cambio actual (Clic para cambiar de modo)"
-                style={{ cursor: 'pointer', userSelect: 'none' }}
+                className={`ff-pill ${isAdmin ? 'ff-pill-interactive' : ''} ff-pill-rate`}
+                onClick={() => {
+                  if (isAdmin) {
+                    setShowRateModal(true);
+                  } else {
+                    presentToast({
+                      message: '🔒 Solo un administrador puede modificar la tasa del negocio',
+                      duration: 2500,
+                      color: 'warning',
+                    });
+                  }
+                }}
+                title={
+                  isAdmin
+                    ? 'Tasa de cambio actual (Clic para cambiar de modo)'
+                    : 'Tasa de facturación activa del negocio (Solo administradores)'
+                }
+                style={{ cursor: isAdmin ? 'pointer' : 'default', userSelect: 'none' }}
               >
                 <span>{getRatePillText()}</span>
               </div>
@@ -477,12 +495,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         onClose={() => setShowVerifyModal(false)}
       />
 
-      {/* Modal Rápido Selector Multitasa */}
-      <IonModal
-        isOpen={showRateModal}
-        onDidDismiss={() => setShowRateModal(false)}
-        style={{ '--border-radius': '20px', '--max-width': '520px', '--max-height': '90vh' } as any}
-      >
+      {/* Modal Rápido Selector Multitasa (Solo administradores) */}
+      {isAdmin && (
+        <IonModal
+          isOpen={showRateModal}
+          onDidDismiss={() => setShowRateModal(false)}
+          style={{ '--border-radius': '20px', '--max-width': '520px', '--max-height': '90vh' } as any}
+        >
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#ffffff', overflow: 'hidden' }}>
           {/* Header */}
           <div style={{
@@ -719,6 +738,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </div>
         </div>
       </IonModal>
+      )}
     </>
   );
 };
