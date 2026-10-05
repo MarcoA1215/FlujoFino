@@ -130,11 +130,49 @@ const PublicBooking: React.FC = () => {
   const rateBs = Number(tenantInfo?.exchangeRateBs || 40.0);
   const minDepositPercentage = Number(tenantInfo?.minDepositPercentage || 0);
 
+  const [paymentProofUrl, setPaymentProofUrl] = useState<string>('');
+  const [uploadingProof, setUploadingProof] = useState<boolean>(false);
+
   const copyToClipboard = (text: string, label: string) => {
     if (!text) return;
     if (navigator?.clipboard?.writeText) {
       navigator.clipboard.writeText(text);
       presentToast({ message: `${label} copiado al portapapeles`, duration: 2000, color: 'success' });
+    }
+  };
+
+  const copyAllPagoMovil = () => {
+    if (!tenantInfo) return;
+    const payAmtNum = parseFloat(bookingPaymentAmount) || 0;
+    const amountBs = payAmtNum > 0 ? (Math.round(payAmtNum * rateBs * 100) / 100).toFixed(2) : '';
+    const lines = [
+      tenantInfo.bankInfo ? `Banco: ${tenantInfo.bankInfo}` : '',
+      tenantInfo.companyCedula ? `Cédula: ${tenantInfo.companyCedula}` : '',
+      tenantInfo.companyPhone ? `Teléfono: ${tenantInfo.companyPhone}` : '',
+      amountBs ? `Monto: Bs. ${amountBs}` : '',
+    ].filter(Boolean).join('\n');
+    copyToClipboard(lines, 'Datos de Pago Móvil');
+  };
+
+  const handleUploadPaymentProof = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploadingProof(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await axios.post(`${apiBase}/public/reservations/appointment/upload-proof`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data?.url) {
+        setPaymentProofUrl(res.data.url);
+        presentToast({ message: 'Comprobante adjuntado con éxito', duration: 2500, color: 'success' });
+      }
+    } catch (err) {
+      console.error(err);
+      presentToast({ message: 'Error al subir comprobante', duration: 3000, color: 'danger' });
+    } finally {
+      setUploadingProof(false);
     }
   };
 
@@ -357,6 +395,7 @@ const PublicBooking: React.FC = () => {
         paymentReference: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? bookingPaymentRef.trim() : undefined,
         paymentAmount: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? payAmtNum : undefined,
         paymentAmountBs: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? Math.round(payAmtNum * rateBs * 100) / 100 : undefined,
+        paymentProofUrl: paymentProofUrl || undefined,
         paymentNotes: totalServicePrice > 0 ? (
           [
             bookingOriginBank ? `Banco origen: ${bookingOriginBank}` : '',
@@ -1809,6 +1848,31 @@ const PublicBooking: React.FC = () => {
 
                           {bookingPaymentMethod === 'PAGO_MOVIL' && (
                             <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>
+                                  Datos de Pago Móvil:
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={copyAllPagoMovil}
+                                  style={{
+                                    background: '#EFF6FF',
+                                    color: '#1D4ED8',
+                                    border: '1px solid #BFDBFE',
+                                    borderRadius: '8px',
+                                    padding: '4px 8px',
+                                    fontSize: '11px',
+                                    fontWeight: '700',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  <IonIcon icon={copyOutline} />
+                                  Copiar todo
+                                </button>
+                              </div>
                               {tenantInfo?.bankInfo && <div style={{ marginBottom: '4px' }}><strong>Banco:</strong> {tenantInfo.bankInfo}</div>}
                               {tenantInfo?.companyPhone && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' }}>
@@ -2022,7 +2086,7 @@ const PublicBooking: React.FC = () => {
                           </div>
 
                           {/* Payment Notes */}
-                          <div style={{ marginBottom: '10px' }}>
+                          <div style={{ marginBottom: '12px' }}>
                             <IonLabel style={{ fontWeight: 'bold', fontSize: '12px', color: '#334155', display: 'block', marginBottom: '4px' }}>
                               Observación del pago (Opcional):
                             </IonLabel>
@@ -2033,6 +2097,29 @@ const PublicBooking: React.FC = () => {
                                 onIonInput={e => setBookingPaymentNotes(e.detail.value!)}
                               />
                             </IonItem>
+                          </div>
+
+                          {/* Adjuntar comprobante / foto opcional */}
+                          <div style={{ marginBottom: '14px', background: '#F8FAFC', padding: '12px', borderRadius: '10px', border: '1px dashed #CBD5E1' }}>
+                            <IonLabel style={{ fontWeight: 'bold', fontSize: '12px', color: '#334155', display: 'block', marginBottom: '6px' }}>
+                              📸 Captura o Foto del Comprobante (Opcional):
+                            </IonLabel>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              onChange={handleUploadPaymentProof} 
+                              style={{ fontSize: '12px', width: '100%' }}
+                            />
+                            {uploadingProof && (
+                              <div style={{ fontSize: '11px', color: '#0284C7', marginTop: '6px' }}>
+                                ⏳ Subiendo imagen del comprobante...
+                              </div>
+                            )}
+                            {paymentProofUrl && (
+                              <div style={{ fontSize: '11px', color: '#10B981', marginTop: '6px', fontWeight: 'bold' }}>
+                                ✅ Comprobante adjuntado con éxito
+                              </div>
+                            )}
                           </div>
                         </>
                       )}

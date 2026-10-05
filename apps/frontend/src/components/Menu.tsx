@@ -76,10 +76,10 @@ const WORK_MODE_OPTIONS: WorkModeOption[] = [
   },
   {
     role: UserRole.KITCHEN,
-    name: 'Modo Cocina / Preparación',
-    badgeLabel: '🍳 Modo Cocina',
-    icon: '🍳',
-    description: 'Comandas y preparación de órdenes.',
+    name: 'Modo Especialista / Preparación',
+    badgeLabel: '✂️ Modo Especialista / Preparación',
+    icon: '✂️',
+    description: 'Comandas, citas y preparación de órdenes.',
   },
   {
     role: UserRole.ADMIN,

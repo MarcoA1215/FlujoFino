@@ -98,6 +98,9 @@ type Order = {
     email?: string;
     jobTitle?: string;
   };
+  paymentReported?: boolean;
+  paymentProofUrl?: string;
+  paymentRejectedReason?: string;
 };
 
 const Orders: React.FC = () => {
@@ -136,12 +139,56 @@ const Orders: React.FC = () => {
   const [presentAlert] = useIonAlert();
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<any>(null);
   const [selectedOrderForAbono, setSelectedOrderForAbono] = useState<any>(null);
+  const [selectedOrderForCobro, setSelectedOrderForCobro] = useState<Order | null>(null);
+  const [cobroMethod, setCobroMethod] = useState<'USD' | 'PAGO_MOVIL' | 'PUNTO' | 'TRANSFER'>('USD');
+  const [cobroUsdReceived, setCobroUsdReceived] = useState<string>('');
+  const [cobroRef, setCobroRef] = useState<string>('');
+  const [cobroBank, setCobroBank] = useState<string>('');
   const [abonoAmount, setAbonoAmount] = useState<string>('');
   const [abonoCurrency, setAbonoCurrency] = useState<'USD' | 'VES'>('USD');
   const [abonoMethod, setAbonoMethod] = useState<string>('USD');
   const [abonoRef, setAbonoRef] = useState<string>('');
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('');
+
+  const handleApprovePayment = async (orderId: string) => {
+    try {
+      await apiClient.patch(`/orders/${orderId}/approve-payment`);
+      presentToast({ message: '✅ Pago verificado y aprobado con éxito', duration: 2500, color: 'success' });
+      fetchOrders();
+    } catch (e: any) {
+      console.error(e);
+      presentToast({ message: 'Error aprobando pago: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
+    }
+  };
+
+  const handleRejectPayment = (orderId: string) => {
+    presentAlert({
+      header: 'Rechazar Comprobante',
+      message: 'Indica el motivo por el cual no se validó el pago:',
+      inputs: [
+        { name: 'reason', type: 'text', placeholder: 'Ej. No se refleja en cuenta / Monto incorrecto' }
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Rechazar Pago',
+          role: 'destructive',
+          handler: async (data: any) => {
+            const reason = data.reason?.trim() || 'Comprobante no válido o no recibido';
+            try {
+              await apiClient.patch(`/orders/${orderId}/reject-payment`, { reason });
+              presentToast({ message: 'Comprobante marcado como rechazado', duration: 2500, color: 'warning' });
+              fetchOrders();
+            } catch (e: any) {
+              console.error(e);
+              presentToast({ message: 'Error rechazando pago: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
+            }
+          }
+        }
+      ]
+    });
+  };
 
   const isDeliveryDriver = (emp: any) => {
     if (!emp) return false;
@@ -260,153 +307,11 @@ const Orders: React.FC = () => {
   };
 
   const openPaymentAlert = (order: Order) => {
-    const remaining = Math.max(0, order.totalAmount - (order.abonosTotal || 0));
-    const remainingBs = (remaining * exchangeRate).toFixed(2);
-
-    presentAlert({
-      header: 'Cobrar Pedido',
-      subHeader: `Saldo restante: $${remaining.toFixed(2)} (Bs. ${remainingBs})`,
-      message: 'Selecciona cómo realizó el pago el cliente o registra un abono parcial:',
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: '➕ Registrar Abono Parcial',
-          handler: () => {
-            setSelectedOrderForAbono(order);
-            setAbonoAmount('');
-            setAbonoMethod('USD');
-            setAbonoRef('');
-          }
-        },
-        {
-          text: '📱 Pago Móvil (Total)',
-          handler: () => openPagoMovilAlert(order)
-        },
-        {
-          text: '💳 Punto de Venta (Total)',
-          handler: () => openPuntoAlert(order)
-        },
-        {
-          text: '💵 Divisas USD (Total)',
-          handler: () => openUSDPaymentAlert(order)
-        }
-      ]
-    });
-  };
-
-  const openPagoMovilAlert = (order: Order) => {
-    const remaining = order.totalAmount - (order.abonosTotal || 0);
-    const totalBs = (remaining * exchangeRate).toFixed(2);
-    presentAlert({
-      header: 'Confirmar Pago Móvil',
-      subHeader: `Monto a transferir: Bs. ${totalBs}`,
-      inputs: [
-        { name: 'pmRef', type: 'text', placeholder: 'N° de Referencia *' },
-        { name: 'pmBank', type: 'text', placeholder: 'Banco emisor (ej. Banesco)' }
-      ],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Confirmar Pago',
-          handler: async (data: any) => {
-            if (!data.pmRef) {
-              presentToast({ message: 'La referencia es obligatoria', duration: 3000, color: 'warning' });
-              return false;
-            }
-            try {
-              await apiClient.patch(`/orders/${order.id}/payment`, {
-                status: PaymentStatus.PAID,
-                paymentMethod: 'PAGO_MOVIL',
-                pagoMovilRef: data.pmRef,
-                pagoMovilBank: normalizeBankName(data.pmBank) || 'Pago Móvil',
-                amountBs: parseFloat(totalBs),
-                exchangeRate
-              });
-              fetchOrders();
-              presentToast({ message: 'Pago registrado con éxito', duration: 2000, color: 'success' });
-            } catch (e) {
-              presentToast({ message: 'Error registrando pago', duration: 3000, color: 'danger' });
-            }
-          }
-        }
-      ]
-    });
-  };
-
-  const openPuntoAlert = (order: Order) => {
-    const remaining = order.totalAmount - (order.abonosTotal || 0);
-    const totalBs = (remaining * exchangeRate).toFixed(2);
-    presentAlert({
-      header: 'Confirmar Punto de Venta',
-      subHeader: `Monto a cobrar: Bs. ${totalBs}`,
-      inputs: [
-        { name: 'puntoRef', type: 'text', placeholder: 'N° de Aprobación del Voucher *' },
-        { name: 'puntoBank', type: 'text', placeholder: 'Banco del Punto (Opcional)' }
-      ],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Confirmar Pago',
-          handler: async (data: any) => {
-            if (!data.puntoRef) {
-              presentToast({ message: 'El N° de Aprobación es obligatorio', duration: 3000, color: 'warning' });
-              return false;
-            }
-            try {
-              await apiClient.patch(`/orders/${order.id}/payment`, {
-                status: PaymentStatus.PAID,
-                paymentMethod: 'PUNTO',
-                pagoMovilRef: data.puntoRef,
-                pagoMovilBank: normalizeBankName(data.puntoBank) || 'Punto de Venta',
-                amountBs: parseFloat(totalBs),
-                exchangeRate
-              });
-              fetchOrders();
-              presentToast({ message: 'Pago registrado con éxito', duration: 2000, color: 'success' });
-            } catch (e) {
-              presentToast({ message: 'Error registrando pago', duration: 3000, color: 'danger' });
-            }
-          }
-        }
-      ]
-    });
-  };
-
-  const openUSDPaymentAlert = (order: Order) => {
-    const remaining = order.totalAmount - (order.abonosTotal || 0);
-    presentAlert({
-      header: 'Confirmar Efectivo USD',
-      subHeader: `Restante por cobrar: $${remaining.toFixed(2)}`,
-      inputs: [
-        { name: 'usdReceived', type: 'number', placeholder: 'Monto recibido ($)' }
-      ],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Confirmar',
-          handler: async (data: any) => {
-            const received = parseFloat(data.usdReceived);
-            if (!received || received < remaining) {
-              presentToast({ message: 'El monto recibido debe ser mayor o igual al saldo', duration: 3000, color: 'warning' });
-              return false;
-            }
-            const changeUsd = received - remaining;
-            const changeBs = changeUsd * exchangeRate;
-            try {
-              await apiClient.patch(`/orders/${order.id}/payment`, {
-                status: PaymentStatus.PAID,
-                paymentMethod: 'USD',
-                notes: (order.notes ? order.notes + '\n' : '') + `Pago USD: $${remaining.toFixed(2)} | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
-              });
-              fetchOrders();
-              presentToast({ message: 'Pago en USD registrado', duration: 2000, color: 'success' });
-            } catch (e) {
-              presentToast({ message: 'Error registrando pago', duration: 3000, color: 'danger' });
-            }
-          }
-        }
-      ]
-    });
+    setSelectedOrderForCobro(order);
+    setCobroMethod('USD');
+    setCobroUsdReceived('');
+    setCobroRef('');
+    setCobroBank('');
   };
 
   const counts = useMemo(() => {
@@ -679,7 +584,7 @@ const Orders: React.FC = () => {
                     </div>
 
                     {order.deliveryMethod === DeliveryMethod.DELIVERY && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', background: '#F0F9FF', padding: '6px 10px', borderRadius: '10px', border: '1px solid #BAE6FD' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', background: '#F0F9FF', padding: '6px 10px', borderRadius: '10px', border: '1px solid #BAE6FD' }}>
                         <span style={{ fontSize: '12px', fontWeight: '800', color: '#0284C7' }}>🛵 Repartidor:</span>
                         <IonSelect
                           interface="popover"
@@ -717,6 +622,21 @@ const Orders: React.FC = () => {
                               );
                             })}
                         </IonSelect>
+                      </div>
+                    )}
+
+                    {/* TAREA 2: Detalles de Delivery Visibles */}
+                    {order.deliveryMethod === DeliveryMethod.DELIVERY && (
+                      <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '8px', padding: '8px 10px', margin: '6px 0 10px 0', fontSize: '12px', color: '#0369A1' }}>
+                        <div style={{ fontWeight: '800', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <IonIcon icon={bicycleOutline} />
+                          <span>Delivery: {order.deliveryZone?.name || 'Zona General'} (+${Number(order.deliveryFee || 0).toFixed(2)})</span>
+                        </div>
+                        {order.customerAddress && (
+                          <div style={{ marginTop: '2px', color: '#0C4A6E' }}>
+                            📍 <b>Dirección:</b> {order.customerAddress}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -838,6 +758,44 @@ const Orders: React.FC = () => {
                               <div style={{ marginTop: '8px', padding: '8px 10px', background: '#ECFDF5', borderRadius: '10px', border: '1px solid #A7F3D0', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ color: '#065F46' }}>Abonado: <b>${abonosTotal.toFixed(2)}</b></span>
                                 <span style={{ color: '#047857', fontWeight: '800' }}>Saldo a favor: +${(abonosTotal - totalUsd).toFixed(2)}</span>
+                              </div>
+                            )}
+
+                            {/* TAREA 1: Pago Móvil / Electrónico Por Verificar */}
+                            {!isPaid && (order.paymentReported || order.pagoMovilRef || order.transferRef || order.binanceRef) && (
+                              <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', padding: '10px', marginTop: '8px' }}>
+                                <div style={{ fontSize: '12px', fontWeight: '800', color: '#92400E', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span>📱 PAGO REPORTADO POR VERIFICAR</span>
+                                  {order.paymentProofUrl && (
+                                    <a
+                                      href={order.paymentProofUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      style={{ color: '#B45309', textDecoration: 'underline', fontSize: '11px', fontWeight: '700' }}
+                                    >
+                                      Ver Capture ↗
+                                    </a>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '13px', color: '#78350F', marginTop: '2px' }}>
+                                  Ref: <b>{order.pagoMovilRef || order.transferRef || order.binanceRef}</b> | Banco: {order.pagoMovilBank || order.transferBank || (order.binanceRef ? 'Binance' : 'Pago Móvil')} | Monto: {order.amountBs ? `Bs. ${Number(order.amountBs).toFixed(2)}` : `$${totalUsd.toFixed(2)}`}
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApprovePayment(order.id)}
+                                    style={{ background: '#10B981', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                                  >
+                                    ✅ Confirmar que cayó en Cuenta
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRejectPayment(order.id)}
+                                    style={{ background: '#EF4444', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                                  >
+                                    ❌ No Cayó / Inválido
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </>
@@ -1814,6 +1772,261 @@ const Orders: React.FC = () => {
                   >
                     Confirmar Abono {effectiveUsd > 0 ? `($${effectiveUsd.toFixed(2)})` : ''}
                   </button>
+                </div>
+              </div>
+            );
+          })()}
+        </IonModal>
+
+        {/* TAREA 3: Modal Limpio de Cobro Directo (Reemplaza alertas anidadas de Ionic) */}
+        <IonModal isOpen={!!selectedOrderForCobro} onDidDismiss={() => setSelectedOrderForCobro(null)} style={{ '--border-radius': '20px' } as any}>
+          {selectedOrderForCobro && (() => {
+            const total = Number(selectedOrderForCobro.totalAmount || 0);
+            const yaAbonado = Number(selectedOrderForCobro.abonosTotal || 0);
+            const restante = Math.max(0, total - yaAbonado);
+            const effectiveOrderRate = Number(selectedOrderForCobro.exchangeRate) > 0 ? Number(selectedOrderForCobro.exchangeRate) : (Number(exchangeRate) || 40);
+            const restanteBs = Number((restante * effectiveOrderRate).toFixed(2));
+
+            const handleConfirmCobro = async () => {
+              if (cobroMethod === 'USD') {
+                const received = parseFloat(cobroUsdReceived);
+                if (!received || received < restante) {
+                  presentToast({ message: 'El monto recibido debe ser mayor o igual al saldo restante', duration: 3000, color: 'warning' });
+                  return;
+                }
+                const changeUsd = received - restante;
+                const changeBs = changeUsd * effectiveOrderRate;
+                try {
+                  await apiClient.patch(`/orders/${selectedOrderForCobro.id}/payment`, {
+                    status: PaymentStatus.PAID,
+                    paymentMethod: 'USD',
+                    notes: (selectedOrderForCobro.notes ? selectedOrderForCobro.notes + '\n' : '') + `Pago USD: $${restante.toFixed(2)} | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
+                  });
+                  presentToast({ message: 'Pago en USD registrado', duration: 2000, color: 'success' });
+                  setSelectedOrderForCobro(null);
+                  fetchOrders();
+                } catch (e: any) {
+                  presentToast({ message: 'Error registrando pago: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
+                }
+              } else if (cobroMethod === 'PAGO_MOVIL') {
+                if (!cobroRef.trim()) {
+                  presentToast({ message: 'La referencia del Pago Móvil es obligatoria', duration: 3000, color: 'warning' });
+                  return;
+                }
+                try {
+                  await apiClient.patch(`/orders/${selectedOrderForCobro.id}/payment`, {
+                    status: PaymentStatus.PAID,
+                    paymentMethod: 'PAGO_MOVIL',
+                    pagoMovilRef: cobroRef.trim(),
+                    pagoMovilBank: normalizeBankName(cobroBank) || 'Pago Móvil',
+                    amountBs: restanteBs,
+                    exchangeRate: effectiveOrderRate
+                  });
+                  presentToast({ message: 'Pago móvil registrado con éxito', duration: 2000, color: 'success' });
+                  setSelectedOrderForCobro(null);
+                  fetchOrders();
+                } catch (e: any) {
+                  presentToast({ message: 'Error registrando pago: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
+                }
+              } else if (cobroMethod === 'PUNTO') {
+                if (!cobroRef.trim()) {
+                  presentToast({ message: 'El N° de Aprobación del Voucher es obligatorio', duration: 3000, color: 'warning' });
+                  return;
+                }
+                try {
+                  await apiClient.patch(`/orders/${selectedOrderForCobro.id}/payment`, {
+                    status: PaymentStatus.PAID,
+                    paymentMethod: 'PUNTO',
+                    pagoMovilRef: cobroRef.trim(),
+                    pagoMovilBank: normalizeBankName(cobroBank) || 'Punto de Venta',
+                    amountBs: restanteBs,
+                    exchangeRate: effectiveOrderRate
+                  });
+                  presentToast({ message: 'Pago por Punto de Venta registrado', duration: 2000, color: 'success' });
+                  setSelectedOrderForCobro(null);
+                  fetchOrders();
+                } catch (e: any) {
+                  presentToast({ message: 'Error registrando pago: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
+                }
+              } else if (cobroMethod === 'TRANSFER') {
+                if (!cobroRef.trim()) {
+                  presentToast({ message: 'El N° de Transferencia es obligatorio', duration: 3000, color: 'warning' });
+                  return;
+                }
+                try {
+                  await apiClient.patch(`/orders/${selectedOrderForCobro.id}/payment`, {
+                    status: PaymentStatus.PAID,
+                    paymentMethod: 'TRANSFER',
+                    transferRef: cobroRef.trim(),
+                    transferBank: normalizeBankName(cobroBank) || 'Transferencia',
+                    amountBs: restanteBs,
+                    exchangeRate: effectiveOrderRate
+                  });
+                  presentToast({ message: 'Transferencia registrada con éxito', duration: 2000, color: 'success' });
+                  setSelectedOrderForCobro(null);
+                  fetchOrders();
+                } catch (e: any) {
+                  presentToast({ message: 'Error registrando pago: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
+                }
+              }
+            };
+
+            const receivedNum = parseFloat(cobroUsdReceived) || 0;
+            const vueltoUsd = Math.max(0, receivedNum - restante);
+            const vueltoBs = vueltoUsd * effectiveOrderRate;
+
+            return (
+              <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
+                      Cobrar Pedido #{selectedOrderForCobro.id.slice(0, 8).toUpperCase()}
+                    </h2>
+                    <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                      {selectedOrderForCobro.customerName || 'Cliente General'}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrderForCobro(null)}
+                    style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  >
+                    <IonIcon icon={closeOutline} style={{ color: '#64748B' }} />
+                  </button>
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
+                  {/* Total Banner */}
+                  <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '14px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: '600' }}>SALDO RESTANTE</div>
+                      <div style={{ fontSize: '22px', fontWeight: '900', color: '#10B981' }}>${restante.toFixed(2)}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: '600' }}>EN MONEDA LOCAL</div>
+                      <div style={{ fontSize: '16px', fontWeight: '800', color: '#0F172A' }}>{currencySymbol} {restanteBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
+                    </div>
+                  </div>
+
+                  {/* Método Selector */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
+                      Forma de Cobro:
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                      {[
+                        { id: 'USD', label: '💵 Divisas USD' },
+                        { id: 'PAGO_MOVIL', label: '📱 Pago Móvil' },
+                        { id: 'PUNTO', label: '💳 Punto de Venta' },
+                        { id: 'TRANSFER', label: '🏦 Transferencia' }
+                      ].map(m => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setCobroMethod(m.id as any)}
+                          style={{
+                            padding: '12px',
+                            borderRadius: '10px',
+                            border: cobroMethod === m.id ? '2px solid #10B981' : '1px solid #CBD5E1',
+                            background: cobroMethod === m.id ? '#ECFDF5' : '#ffffff',
+                            color: cobroMethod === m.id ? '#065F46' : '#475569',
+                            fontWeight: '700',
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            textAlign: 'left'
+                          }}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Inputs específicos según método */}
+                  {cobroMethod === 'USD' && (
+                    <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '14px', border: '1px solid #E2E8F0', marginBottom: '16px' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                        Monto Recibido en Dólares ($) *
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        value={cobroUsdReceived}
+                        onChange={e => setCobroUsdReceived(e.target.value)}
+                        placeholder={`Mínimo $${restante.toFixed(2)}`}
+                        style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '16px', fontWeight: '700', marginBottom: '8px' }}
+                      />
+                      {receivedNum >= restante && (
+                        <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#065F46' }}>
+                          <b>Vuelto a dar:</b> ${vueltoUsd.toFixed(2)} (Bs. {vueltoBs.toFixed(2)})
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {(cobroMethod === 'PAGO_MOVIL' || cobroMethod === 'PUNTO' || cobroMethod === 'TRANSFER') && (
+                    <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '14px', border: '1px solid #E2E8F0', marginBottom: '16px' }}>
+                      <div style={{ marginBottom: '10px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                          {cobroMethod === 'PUNTO' ? 'N° de Aprobación del Voucher *' : 'N° de Referencia *'}
+                        </label>
+                        <input
+                          type="text"
+                          value={cobroRef}
+                          onChange={e => setCobroRef(e.target.value)}
+                          placeholder="Ej. 649201"
+                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                          Banco emisor (Opcional)
+                        </label>
+                        <input
+                          type="text"
+                          value={cobroBank}
+                          onChange={e => setCobroBank(e.target.value)}
+                          placeholder="Ej. Banesco, Mercantil, BDV..."
+                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Acciones */}
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ord = selectedOrderForCobro;
+                        setSelectedOrderForCobro(null);
+                        setSelectedOrderForAbono(ord);
+                        setAbonoAmount('');
+                        setAbonoMethod('USD');
+                        setAbonoRef('');
+                      }}
+                      style={{
+                        padding: '12px',
+                        borderRadius: '12px',
+                        border: '1px solid #FCD34D',
+                        background: '#FEF3C7',
+                        color: '#92400E',
+                        fontWeight: '700',
+                        fontSize: '13px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ➕ Registrar Abono Parcial
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmCobro}
+                      className="ff-btn-primary"
+                      style={{ flex: 1, padding: '14px', fontSize: '15px', justifyContent: 'center' }}
+                    >
+                      Confirmar Cobro ✓
+                    </button>
+                  </div>
                 </div>
               </div>
             );

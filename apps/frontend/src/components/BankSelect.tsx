@@ -73,14 +73,15 @@ export const BankSelect: React.FC<BankSelectProps> = ({
           required={required}
           style={{
             width: '100%',
-            height: isSmall ? '34px' : '40px',
-            padding: isSmall ? '4px 28px 4px 10px' : '8px 32px 8px 12px',
+            height: isSmall ? '38px' : '44px',
+            minHeight: isSmall ? '38px' : '44px',
+            padding: isSmall ? '6px 30px 6px 12px' : '10px 36px 10px 14px',
             borderRadius: isSmall ? '8px' : '10px',
             border: '1px solid #CBD5E1',
             background: disabled ? '#F1F5F9' : '#FFFFFF',
             color: normalizedValue ? '#0F172A' : '#64748B',
             fontWeight: 600,
-            fontSize: isSmall ? '12px' : '13px',
+            fontSize: isSmall ? '13px' : '14px',
             outline: 'none',
             appearance: 'none',
             WebkitAppearance: 'none',

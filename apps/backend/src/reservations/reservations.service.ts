@@ -329,8 +329,59 @@ export class ReservationsService {
     const total = Number(res.totalAmount || 0);
     res.abonosTotal = total;
     res.abonosHistory = res.abonosHistory || [];
-    res.abonosHistory.push({ amount: total, date: new Date().toISOString() });
+    res.abonosHistory.push({ amount: total, date: new Date().toISOString(), status: 'APPROVED' });
     res.paymentStatus = PaymentStatus.PAID;
+    res.paymentReported = false;
+    res.paymentRejectedReason = null as any;
+    return this.repo.save(res);
+  }
+
+  async approvePayment(tenantId: string, id: string) {
+    const res = await this.repo.findOne({ where: { id, tenantId } });
+    if (!res) throw new NotFoundException('Cita no encontrada');
+
+    res.paymentStatus = PaymentStatus.PAID;
+    res.paymentReported = false;
+    res.paymentRejectedReason = null as any;
+
+    if (Array.isArray(res.abonosHistory)) {
+      res.abonosHistory = res.abonosHistory.map(entry => {
+        if (entry.status === 'REPORTED' || entry.status === 'REPORTED_PENDING_APPROVAL') {
+          return { ...entry, status: 'APPROVED' };
+        }
+        return entry;
+      });
+    }
+
+    const total = Number(res.totalAmount || 0);
+    if (Number(res.abonosTotal || 0) < total) {
+      res.abonosTotal = total;
+    }
+
+    return this.repo.save(res);
+  }
+
+  async rejectPayment(tenantId: string, id: string, reason?: string) {
+    const res = await this.repo.findOne({ where: { id, tenantId } });
+    if (!res) throw new NotFoundException('Cita no encontrada');
+
+    const cleanReason = (reason || 'No cayó / Comprobante inválido').trim();
+    res.paymentStatus = PaymentStatus.PENDING;
+    res.paymentReported = false;
+    res.paymentRejectedReason = cleanReason;
+
+    if (Array.isArray(res.abonosHistory)) {
+      res.abonosHistory = res.abonosHistory.map(entry => {
+        if (entry.status === 'REPORTED' || entry.status === 'REPORTED_PENDING_APPROVAL') {
+          return { ...entry, status: 'REJECTED', rejectReason: cleanReason };
+        }
+        return entry;
+      });
+    }
+
+    const noteTag = `[Comprobante rechazado: ${cleanReason}]`;
+    res.notes = res.notes ? `${res.notes} | ${noteTag}` : noteTag;
+
     return this.repo.save(res);
   }
 

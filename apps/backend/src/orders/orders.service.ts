@@ -160,6 +160,18 @@ export class CreateOrderDto {
   linkedReservationId?: string;
 
   @IsOptional()
+  @IsBoolean()
+  paymentReported?: boolean;
+
+  @IsOptional()
+  @IsString()
+  paymentProofUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentRejectedReason?: string;
+
+  @IsOptional()
   status?: OrderStatus;
 
   @IsOptional()
@@ -410,7 +422,10 @@ export class OrdersService {
         customerAddress: dto.customerAddress || '',
         notes: finalNotes,
         tableNumber: dto.tableNumber || '',
-        paymentStatus: dto.paymentStatus,
+        paymentStatus: dto.paymentStatus || PaymentStatus.PENDING,
+        paymentReported: Boolean(dto.paymentReported || (dto.pagoMovilRef || dto.transferRef || dto.binanceRef)) && dto.paymentStatus !== PaymentStatus.PAID,
+        paymentProofUrl: dto.paymentProofUrl || undefined,
+        paymentRejectedReason: dto.paymentRejectedReason || undefined,
         status: initialStatus,
         requestedDeliveryDate: dto.requestedDeliveryDate ? new Date(dto.requestedDeliveryDate) : undefined,
         deliveryMethod: dto.deliveryMethod || DeliveryMethod.IN_STORE,
@@ -720,6 +735,34 @@ export class OrdersService {
     if (dto.changeRef !== undefined) order.changeRef = dto.changeRef;
     if (dto.amountBs !== undefined) order.amountBs = dto.amountBs;
     if (dto.exchangeRate !== undefined) order.exchangeRate = dto.exchangeRate;
+
+    return orderRepo.save(order);
+  }
+
+  async approvePayment(tenantId: string, id: string) {
+    const orderRepo = this.dataSource.getRepository(Order);
+    const order = await orderRepo.findOne({ where: { tenantId, id } });
+    if (!order) throw new BadRequestException('Pedido no encontrado');
+    if (order.status === OrderStatus.CANCELED) throw new BadRequestException('El pedido está cancelado');
+
+    order.paymentStatus = PaymentStatus.PAID;
+    order.paymentReported = false;
+    order.paymentRejectedReason = null as any;
+
+    return orderRepo.save(order);
+  }
+
+  async rejectPayment(tenantId: string, id: string, reason?: string) {
+    const orderRepo = this.dataSource.getRepository(Order);
+    const order = await orderRepo.findOne({ where: { tenantId, id } });
+    if (!order) throw new BadRequestException('Pedido no encontrado');
+
+    const cleanReason = (reason || 'No cayó / Comprobante inválido').trim();
+    order.paymentStatus = PaymentStatus.PENDING;
+    order.paymentReported = false;
+    order.paymentRejectedReason = cleanReason;
+    const noteTag = `[Comprobante rechazado: ${cleanReason}]`;
+    order.notes = order.notes ? `${order.notes} | ${noteTag}` : noteTag;
 
     return orderRepo.save(order);
   }

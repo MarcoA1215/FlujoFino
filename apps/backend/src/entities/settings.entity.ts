@@ -83,6 +83,9 @@ export class Settings {
   allowCashierBypassDeposit: boolean;
 
   // Feature Flags / Onboarding
+  @Column('boolean', { default: true })
+  featureDelivery: boolean;
+
   @Column('boolean', { default: false })
   featureCustomerSchedules: boolean;
 

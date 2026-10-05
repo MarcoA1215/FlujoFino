@@ -1,4 +1,4 @@
-﻿import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
+import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { ReservationStatus, PaymentStatus } from '@finowork/shared-types';
 import { Tenant } from './tenant.entity';

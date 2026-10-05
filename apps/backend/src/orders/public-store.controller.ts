@@ -263,10 +263,14 @@ export class PublicStoreController {
     }
 
     // 2. Crear orden mediante OrdersService
+    const hasElectronicPayment = Boolean(dto.pagoMovilRef || dto.transferRef || dto.binanceRef || dto.paymentReported);
     const orderPayload: CreateOrderDto = {
       ...dto,
       status: hasPreorder ? OrderStatus.SOLICITUD_ENCARGO : dto.status,
-      paymentStatus: hasPreorder ? PaymentStatus.PENDING : (dto.paymentStatus || PaymentStatus.PENDING),
+      // NUNCA marcar automáticamente como PAID ningún pedido online con método electrónico
+      paymentStatus: PaymentStatus.PENDING,
+      paymentReported: hasElectronicPayment,
+      paymentProofUrl: dto.paymentProofUrl || undefined,
       requestedDeliveryDate: dto.requestedDeliveryDate,
     };
 
@@ -285,6 +289,8 @@ export class PublicStoreController {
       orderId: createdOrder.id,
       orderNumber: createdOrder.id.slice(0, 8).toUpperCase(),
       status: createdOrder.status,
+      paymentStatus: createdOrder.paymentStatus,
+      paymentReported: createdOrder.paymentReported,
       totalAmount: createdOrder.totalAmount,
       totalAmountBs: createdOrder.amountBs,
       deliveryMethod: createdOrder.deliveryMethod,
@@ -302,6 +308,12 @@ export class PublicStoreController {
         id: true,
         status: true,
         paymentStatus: true,
+        paymentReported: true,
+        paymentProofUrl: true,
+        paymentRejectedReason: true,
+        pagoMovilRef: true,
+        transferRef: true,
+        binanceRef: true,
         customerName: true,
         customerPhone: true,
         totalAmount: true,
@@ -319,6 +331,12 @@ export class PublicStoreController {
       orderNumber: order.id.slice(0, 8).toUpperCase(),
       status: order.status,
       paymentStatus: order.paymentStatus,
+      paymentReported: order.paymentReported,
+      paymentProofUrl: order.paymentProofUrl,
+      paymentRejectedReason: order.paymentRejectedReason,
+      pagoMovilRef: order.pagoMovilRef,
+      transferRef: order.transferRef,
+      binanceRef: order.binanceRef,
       customerName: order.customerName,
       totalAmount: order.totalAmount,
       amountBs: order.amountBs,

@@ -281,6 +281,7 @@ const SettingsPage: React.FC = () => {
         featureRecipes: settings.featureRecipes,
         featureBuySell: settings.featureBuySell,
         featureProduction: settings.featureProduction !== false,
+        featureDelivery: settings.featureDelivery !== false,
         featureShowCatalog: settings.featureShowCatalog,
         bookingRequireService: settings.bookingRequireService,
         bookingAllowStaffSelection: settings.bookingAllowStaffSelection,
@@ -1073,6 +1074,15 @@ const SettingsPage: React.FC = () => {
                       </p>
                     </IonLabel>
                     <IonToggle checked={settings.featureProduction !== false} onIonChange={e => setSettings({...settings, featureProduction: e.detail.checked})} />
+                  </IonItem>
+                  <IonItem>
+                    <IonLabel className="ion-text-wrap">
+                      <h2>Repartidores y Servicio de Delivery (Envíos a domicilio)</h2>
+                      <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
+                        Permite asignar pedidos a repartidores y cobrar costo de flete. Desactívalo si tu negocio es exclusivamente de citas, servicios presenciales o venta en mostrador.
+                      </p>
+                    </IonLabel>
+                    <IonToggle checked={settings.featureDelivery !== false} onIonChange={e => setSettings({...settings, featureDelivery: e.detail.checked})} />
                   </IonItem>
                   <IonItem>
                     <IonLabel className="ion-text-wrap">

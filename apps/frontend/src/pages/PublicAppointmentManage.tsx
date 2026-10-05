@@ -368,12 +368,16 @@ const PublicAppointmentManage: React.FC = () => {
                   }}>
                     {/* Header with Status Pill */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', fontWeight: 'bold', fontSize: '16px', color: isPaidComplete ? '#15803d' : '#1d4ed8' }}>
+                      <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', fontWeight: 'bold', fontSize: '16px', color: appointment.paymentStatus === 'PAID' ? '#15803d' : '#1d4ed8' }}>
                         <IonIcon icon={walletOutline} style={{ marginRight: '8px', fontSize: '18px' }}/> Inversión & Pago
                       </h3>
-                      {isPaidComplete ? (
+                      {appointment.paymentStatus === 'PAID' ? (
                         <span style={{ fontSize: '11px', fontWeight: 'bold', backgroundColor: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: '10px' }}>
-                          ✓ Pagado Completo
+                          ✅ Verificado y Aprobado
+                        </span>
+                      ) : (appointment.paymentReported || (appointment.abonosHistory && appointment.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) ? (
+                        <span style={{ fontSize: '11px', fontWeight: 'bold', backgroundColor: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: '10px' }}>
+                          ⏳ En Verificación
                         </span>
                       ) : isPartialPaid ? (
                         <span style={{ fontSize: '11px', fontWeight: 'bold', backgroundColor: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: '10px' }}>
@@ -384,6 +388,41 @@ const PublicAppointmentManage: React.FC = () => {
                           Pendiente
                         </span>
                       )}
+                    </div>
+
+                    {/* Payment Verification Callout Badge */}
+                    <div style={{ marginBottom: '12px' }}>
+                      {appointment.paymentStatus === 'PAID' ? (
+                        <div style={{
+                          backgroundColor: '#ecfdf5',
+                          border: '1.5px solid #10b981',
+                          borderRadius: '10px',
+                          padding: '10px 14px',
+                          color: '#065f46',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          ✅ Pago Verificado y Aprobado (${totalAmount.toFixed(2)})
+                        </div>
+                      ) : (appointment.paymentReported || (appointment.abonosHistory && appointment.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) ? (
+                        <div style={{
+                          backgroundColor: '#fef3c7',
+                          border: '1.5px solid #fcd34d',
+                          borderRadius: '10px',
+                          padding: '10px 14px',
+                          color: '#92400e',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          ⏳ Pago Reportado: En proceso de verificación por el negocio
+                        </div>
+                      ) : null}
                     </div>
 
                     {/* Amount & Exchange Rate Breakdown */}

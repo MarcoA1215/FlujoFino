@@ -112,6 +112,45 @@ const Reservations: React.FC = () => {
     }
   };
 
+  const handleApprovePayment = async (reservationId: string) => {
+    try {
+      await apiClient.patch(`/reservations/${reservationId}/approve-payment`);
+      presentToast({ message: '✅ Pago de cita verificado y aprobado con éxito', duration: 2500, color: 'success' });
+      fetchReservations();
+    } catch (e: any) {
+      console.error(e);
+      presentToast({ message: 'Error aprobando pago: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
+    }
+  };
+
+  const handleRejectPayment = (reservationId: string) => {
+    presentAlert({
+      header: 'Rechazar Comprobante de Cita',
+      message: 'Indica el motivo por el cual no se validó el pago:',
+      inputs: [
+        { name: 'reason', type: 'text', placeholder: 'Ej. No se refleja en cuenta / Monto incorrecto' }
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Rechazar Pago',
+          role: 'destructive',
+          handler: async (data: any) => {
+            const reason = data.reason?.trim() || 'Comprobante no válido o no recibido';
+            try {
+              await apiClient.patch(`/reservations/${reservationId}/reject-payment`, { reason });
+              presentToast({ message: 'Comprobante marcado como rechazado', duration: 2500, color: 'warning' });
+              fetchReservations();
+            } catch (e: any) {
+              console.error(e);
+              presentToast({ message: 'Error rechazando pago: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
+            }
+          }
+        }
+      ]
+    });
+  };
+
   const fetchReservations = async () => {
     try {
       const cached = await offlineDb.cachedReservations.toArray();
@@ -243,6 +282,18 @@ const Reservations: React.FC = () => {
     const found = products.find(p => p.id === sId);
     if (found && (!totalAmount || totalAmount === 0)) {
       setTotalAmount(found.salePrice || 0);
+    }
+
+    if (sId && found && found.assignedStaffIds) {
+      const assignedIds = Array.isArray(found.assignedStaffIds)
+        ? found.assignedStaffIds
+        : (typeof found.assignedStaffIds === 'string'
+            ? found.assignedStaffIds.split(',').map((s: string) => s.trim())
+            : []);
+
+      if (assignedIds.length > 0 && employeeId && !assignedIds.includes(employeeId)) {
+        setEmployeeId('');
+      }
     }
   };
 
@@ -467,6 +518,44 @@ const Reservations: React.FC = () => {
       .join('')
       .toUpperCase();
   }, [user?.tenantName]);
+
+  const servicesList = useMemo(() => {
+    return products.filter(p => {
+      if (p.product_type === 'SERVICIO') return true;
+      if (p.product_type === 'REVENTA' || p.product_type === 'FORMULA') return false;
+      return p.is_service === true || p.category?.toLowerCase() === 'servicios';
+    });
+  }, [products]);
+
+  const availableSpecialists = useMemo(() => {
+    // 1. Descartar usuarios que solo sean DELIVERY u OPERATIVO
+    const qualifiedStaff = employees.filter(emp => {
+      const roles: string[] = emp.roles && emp.roles.length > 0 ? emp.roles : [emp.role];
+      const isDeliveryOnly = roles.every(r => r === 'DELIVERY' || r === 'Repartidor');
+      const isOperativoOnly = roles.every(r => r === 'OPERATIVO');
+      if (isDeliveryOnly || isOperativoOnly) return false;
+      if (emp.username?.toLowerCase() === 'delivery' || emp.name?.toLowerCase() === 'delivery') return false;
+      return true;
+    });
+
+    // 2. Si hay un servicio seleccionado, filtrar por sus especialistas capacitadas si están definidas
+    if (serviceId) {
+      const selectedProd = products.find(p => p.id === serviceId);
+      if (selectedProd && selectedProd.assignedStaffIds) {
+        const assignedIds = Array.isArray(selectedProd.assignedStaffIds)
+          ? selectedProd.assignedStaffIds
+          : (typeof selectedProd.assignedStaffIds === 'string'
+              ? selectedProd.assignedStaffIds.split(',').map((s: string) => s.trim())
+              : []);
+
+        if (assignedIds.length > 0) {
+          return qualifiedStaff.filter(st => assignedIds.includes(st.id));
+        }
+      }
+    }
+
+    return qualifiedStaff;
+  }, [employees, serviceId, products]);
 
   return (
     <IonPage>
@@ -738,10 +827,56 @@ const Reservations: React.FC = () => {
                         </div>
 
                         {/* Specialist & Station */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#64748B', marginBottom: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#64748B', marginBottom: '8px' }}>
                           <IonIcon icon={personOutline} style={{ fontSize: '14px' }} />
                           <span>{res.employee?.name || res.employee?.username || 'Especialista Asignado'}</span>
                         </div>
+
+                        {/* TAREA 1: Pago Reportado Por Verificar en Cita */}
+                        {!isConfirmed && res.paymentStatus !== 'PAID' && (res.paymentReported || res.paymentProofUrl || (Array.isArray(res.abonosHistory) && res.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', padding: '10px', marginBottom: '10px' }}
+                          >
+                            <div style={{ fontSize: '12px', fontWeight: '800', color: '#92400E', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>📱 PAGO REPORTADO POR VERIFICAR</span>
+                              {res.paymentProofUrl && (
+                                <a
+                                  href={res.paymentProofUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{ color: '#B45309', textDecoration: 'underline', fontSize: '11px', fontWeight: '700' }}
+                                >
+                                  Ver Capture ↗
+                                </a>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#78350F', marginTop: '2px' }}>
+                              Total Cita: <b>${Number(res.totalAmount || 0).toFixed(2)}</b>
+                              {res.paymentRejectedReason && (
+                                <div style={{ color: '#DC2626', fontWeight: '700', marginTop: '2px' }}>
+                                  Motivo rechazo: {res.paymentRejectedReason}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleApprovePayment(res.id)}
+                                style={{ background: '#10B981', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                              >
+                                ✅ Confirmar Pago en Cuenta
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectPayment(res.id)}
+                                style={{ background: '#EF4444', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                              >
+                                ❌ No Cayó / Inválido
+                              </button>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Action buttons footer */}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', paddingTop: '8px', borderTop: '1px solid #F1F5F9', alignItems: 'center' }}>
@@ -1015,40 +1150,41 @@ const Reservations: React.FC = () => {
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
                     Servicio
                   </label>
-                  <IonSelect
-                    interface="popover"
+                  <select
                     value={serviceId}
-                    placeholder="Sin servicio específico"
-                    onIonChange={e => handleServiceChange(e.detail.value)}
-                    style={{ width: '100%', minHeight: '44px', padding: '4px 12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#ffffff', '--padding-start': '0px', '--padding-end': '0px' }}
+                    onChange={e => handleServiceChange(e.target.value)}
+                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#ffffff', color: '#0F172A', outline: 'none' }}
                   >
-                    <IonSelectOption value="">Sin servicio específico</IonSelectOption>
-                    {products.map(p => (
-                      <IonSelectOption key={p.id} value={p.id}>
-                        {p.name} ({p.durationMinutes || 30} min) - ${Number(p.salePrice).toFixed(2)}
-                      </IonSelectOption>
+                    <option value="">Sin servicio específico</option>
+                    {servicesList.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.durationMinutes || 30} min) - ${Number(p.salePrice || 0).toFixed(2)}
+                      </option>
                     ))}
-                  </IonSelect>
+                  </select>
+                  {servicesList.length === 0 && (
+                    <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#DC2626' }}>
+                      No hay servicios registrados. Ve a "Servicios / Productos" y crea uno de tipo Servicio.
+                    </p>
+                  )}
                 </div>
 
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
                     Especialista Asignado
                   </label>
-                  <IonSelect
-                    interface="popover"
+                  <select
                     value={employeeId}
-                    placeholder="Sin asignar / Cualquiera"
-                    onIonChange={e => setEmployeeId(e.detail.value)}
-                    style={{ width: '100%', minHeight: '44px', padding: '4px 12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#ffffff', '--padding-start': '0px', '--padding-end': '0px' }}
+                    onChange={e => setEmployeeId(e.target.value)}
+                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#ffffff', color: '#0F172A', outline: 'none' }}
                   >
-                    <IonSelectOption value="">Sin asignar / Cualquiera</IonSelectOption>
-                    {employees.map(emp => (
-                      <IonSelectOption key={emp.id} value={emp.id}>
-                        {emp.username || emp.name} {emp.jobTitle ? `(${emp.jobTitle})` : ''}
-                      </IonSelectOption>
+                    <option value="">Sin asignar / Cualquiera</option>
+                    {availableSpecialists.map(emp => (
+                      <option key={emp.id} value={emp.id}>
+                        👤 {emp.username || emp.name} {emp.jobTitle ? `(${emp.jobTitle})` : ''}
+                      </option>
                     ))}
-                  </IonSelect>
+                  </select>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
@@ -1137,6 +1273,59 @@ const Reservations: React.FC = () => {
                       </span>
                     </div>
                   </div>
+
+                  {/* TAREA 1: Pago Reportado Por Verificar en Modal */}
+                  {selectedEvent.paymentStatus !== 'PAID' && (selectedEvent.paymentReported || selectedEvent.paymentProofUrl || (Array.isArray(selectedEvent.abonosHistory) && selectedEvent.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) && (
+                    <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '14px', padding: '14px', marginBottom: '16px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: '#92400E', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>📱 PAGO REPORTADO POR VERIFICAR</span>
+                        {selectedEvent.paymentProofUrl && (
+                          <a
+                            href={selectedEvent.paymentProofUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: '#B45309', textDecoration: 'underline', fontSize: '12px', fontWeight: '700' }}
+                          >
+                            Ver Comprobante ↗
+                          </a>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#78350F', marginTop: '4px' }}>
+                        El cliente reportó un pago electrónico para esta cita. Confirma que los fondos hayan ingresado en tu cuenta bancaria.
+                      </div>
+                      {selectedEvent.paymentProofUrl && (
+                        <div style={{ marginTop: '8px' }}>
+                          <img
+                            src={selectedEvent.paymentProofUrl}
+                            alt="Capture de pago"
+                            style={{ maxHeight: '180px', borderRadius: '8px', border: '1px solid #CBD5E1', objectFit: 'contain', width: '100%' }}
+                          />
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleApprovePayment(selectedEvent.id);
+                            setShowDetails(false);
+                          }}
+                          style={{ flex: 1, background: '#10B981', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                          ✅ Confirmar que cayó en Cuenta
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleRejectPayment(selectedEvent.id);
+                            setShowDetails(false);
+                          }}
+                          style={{ background: '#EF4444', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                          ❌ Inválido
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Status Selection Buttons */}
                   <div style={{ marginBottom: '16px' }}>

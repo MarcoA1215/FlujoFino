@@ -117,6 +117,7 @@ const PublicStore: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderResult, setOrderResult] = useState<any | null>(null);
   const [liveOrderStatus, setLiveOrderStatus] = useState<string | null>(null);
+  const [livePaymentStatus, setLivePaymentStatus] = useState<string>('PENDING');
 
   const fetchStore = async () => {
     try {
@@ -183,11 +184,18 @@ const PublicStore: React.FC = () => {
 
     let currentStatus = orderResult.status || 'PENDING';
     setLiveOrderStatus(currentStatus);
+    setLivePaymentStatus(orderResult.paymentStatus || 'PENDING');
 
     const interval = setInterval(async () => {
       try {
         const res = await axios.get(`${apiBase}/public/store/order/${orderResult.orderId}`);
         const newStatus = res.data?.status;
+        const newPayStatus = res.data?.paymentStatus;
+
+        if (newPayStatus && newPayStatus !== livePaymentStatus) {
+          setLivePaymentStatus(newPayStatus);
+        }
+
         if (newStatus && newStatus !== currentStatus) {
           currentStatus = newStatus;
           setLiveOrderStatus(newStatus);
@@ -755,6 +763,43 @@ const PublicStore: React.FC = () => {
               <div style={{ fontSize: '12px', marginTop: '6px', opacity: 0.9 }}>
                 Esta pantalla se actualiza automáticamente cuando tu pedido cambie de estado.
               </div>
+            </div>
+
+            {/* Payment Verification Status Badge */}
+            <div style={{ margin: '14px 0' }}>
+              {livePaymentStatus === 'PAID' ? (
+                <div style={{
+                  background: '#ECFDF5',
+                  border: '1.5px solid #10B981',
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  color: '#065F46',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}>
+                  <span>✅ Pago Verificado y Aprobado (${orderResult.grandTotalUSD.toFixed(2)})</span>
+                </div>
+              ) : (pagoMovilRef || transferRef || binanceRef || orderResult.paymentReported || orderResult.paymentStatus === 'PENDING') ? (
+                <div style={{
+                  background: '#FEF3C7',
+                  border: '1.5px solid #FCD34D',
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  color: '#92400E',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}>
+                  <span>⏳ Pago Reportado: En proceso de verificación por el negocio</span>
+                </div>
+              ) : null}
             </div>
 
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', margin: '20px 0', textAlign: 'left' }}>

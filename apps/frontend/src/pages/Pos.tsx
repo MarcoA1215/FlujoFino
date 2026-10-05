@@ -1486,24 +1486,26 @@ const Pos: React.FC = () => {
                     >
                       🏪 En Tienda / Mesa
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeliveryMethod(DeliveryMethod.DELIVERY)}
-                      style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        borderRadius: '10px',
-                        border: 'none',
-                        fontWeight: '700',
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                        background: deliveryMethod === DeliveryMethod.DELIVERY ? '#10B981' : 'transparent',
-                        color: deliveryMethod === DeliveryMethod.DELIVERY ? '#ffffff' : '#64748B',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      🛵 Delivery
-                    </button>
+                    {settings?.featureDelivery !== false && (
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryMethod(DeliveryMethod.DELIVERY)}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: '10px',
+                          border: 'none',
+                          fontWeight: '700',
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                          background: deliveryMethod === DeliveryMethod.DELIVERY ? '#10B981' : 'transparent',
+                          color: deliveryMethod === DeliveryMethod.DELIVERY ? '#ffffff' : '#64748B',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        🛵 Delivery
+                      </button>
+                    )}
                   </div>
                 </div>
 

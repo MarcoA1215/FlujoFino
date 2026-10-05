@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, Request, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ReservationsService } from './reservations.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -57,6 +57,16 @@ export class ReservationsController {
   @Post(':id/pay-full')
   payFull(@Request() req, @Param('id') id: string) {
     return this.service.payFull(req.user.tenantId, id);
+  }
+
+  @Patch(':id/approve-payment')
+  approvePayment(@Request() req, @Param('id') id: string) {
+    return this.service.approvePayment(req.user.tenantId, id);
+  }
+
+  @Patch(':id/reject-payment')
+  rejectPayment(@Request() req, @Param('id') id: string, @Body('reason') reason?: string) {
+    return this.service.rejectPayment(req.user.tenantId, id, reason);
   }
 
   @Delete(':id/abono/:index')

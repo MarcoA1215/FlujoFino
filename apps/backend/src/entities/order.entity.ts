@@ -1,4 +1,4 @@
-﻿import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
+import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Tenant } from './tenant.entity';
 import { User } from './user.entity';
 import { Customer } from './customer.entity';
@@ -57,6 +57,15 @@ export class Order {
     default: PaymentStatus.PENDING,
   })
   paymentStatus: PaymentStatus;
+
+  @Column('boolean', { default: false })
+  paymentReported: boolean;
+
+  @Column({ nullable: true })
+  paymentProofUrl: string;
+
+  @Column({ nullable: true })
+  paymentRejectedReason: string;
 
   @Column({ nullable: true })
   paymentMethod: string; // 'USD' | 'PAGO_MOVIL' | 'PUNTO' | 'PENDING'

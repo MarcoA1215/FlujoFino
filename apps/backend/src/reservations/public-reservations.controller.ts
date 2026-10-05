@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Param, Get, NotFoundException, BadRequestException, Put, Query } from '@nestjs/common';
+import { Controller, Post, Body, Param, Get, NotFoundException, BadRequestException, Put, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ReservationsService } from './reservations.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual, In } from 'typeorm';
@@ -12,6 +13,7 @@ import { Public } from '../auth/public.decorator';
 import { OrderItem } from '../entities/order-item.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { CustomersService } from '../customers/customers.service';
+import { StorageService } from '../storage/storage.service';
 import { isTenantSuspendedOrExpired } from '../utils/tenant-status';
 
 @Public()
@@ -20,8 +22,17 @@ export class PublicReservationsController {
   constructor(
     private readonly reservationsService: ReservationsService,
     private readonly customersService: CustomersService,
+    private readonly storageService: StorageService,
     @InjectRepository(Tenant) private tenantRepo: Repository<Tenant>
   ) {}
+
+  @Post('appointment/upload-proof')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadProof(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('Archivo requerido');
+    const url = await this.storageService.uploadFile(file, `public-proofs`);
+    return { url };
+  }
 
   @Get('tenant/:id')
   async getTenantInfo(@Param('id') token: string) {
@@ -243,13 +254,16 @@ export class PublicReservationsController {
           reference: dto.paymentReference.trim(),
           date: new Date().toISOString(),
           notes: dto.paymentNotes ? dto.paymentNotes.trim() : 'Pago inicial al reservar',
-          status: 'REPORTED',
+          status: 'REPORTED_PENDING_APPROVAL',
         };
 
         resDb.abonosHistory = [paymentEntry];
         resDb.abonosTotal = payAmt;
-        if (totalAmount > 0) {
-          resDb.paymentStatus = payAmt >= totalAmount ? PaymentStatus.PAID : PaymentStatus.PARTIAL;
+        // Regla: Ninguna cita online con método electrónico se marca automáticamente como PAID
+        resDb.paymentStatus = PaymentStatus.PENDING;
+        resDb.paymentReported = true;
+        if (dto.paymentProofUrl) {
+          resDb.paymentProofUrl = dto.paymentProofUrl;
         }
         const methodLabel = dto.paymentMethod === 'PAGO_MOVIL' ? 'Pago Móvil' : dto.paymentMethod === 'BINANCE' ? 'Binance' : dto.paymentMethod === 'TRANSFER' ? 'Transferencia' : 'Pago';
         const noteTag = `[Pago Inicial: $${payAmt.toFixed(2)} vía ${methodLabel} Ref: ${dto.paymentReference.trim()}]`;
@@ -328,6 +342,9 @@ export class PublicReservationsController {
       abonosTotal: abonosTotal,
       remainingAmount: remainingAmount,
       paymentStatus: reservation.paymentStatus || 'PENDING',
+      paymentReported: Boolean(reservation.paymentReported),
+      paymentProofUrl: reservation.paymentProofUrl || null,
+      paymentRejectedReason: reservation.paymentRejectedReason || null,
       durationMinutes: serviceDetails?.durationMinutes || 30,
       abonosHistory: reservation.abonosHistory || [],
       // Financial settings:
@@ -358,6 +375,7 @@ export class PublicReservationsController {
       method: string;
       reference: string;
       notes?: string;
+      paymentProofUrl?: string;
     }
   ) {
     if (!dto.amount || dto.amount <= 0) {
@@ -379,22 +397,18 @@ export class PublicReservationsController {
       reference: dto.reference.trim(),
       date: new Date().toISOString(),
       notes: dto.notes ? dto.notes.trim() : undefined,
-      status: 'REPORTED',
+      status: 'REPORTED_PENDING_APPROVAL',
     };
 
     reservation.abonosHistory = reservation.abonosHistory || [];
     reservation.abonosHistory.push(paymentEntry);
     reservation.abonosTotal = Number(reservation.abonosTotal || 0) + Number(dto.amount);
 
-    const total = Number(reservation.totalAmount || 0);
-    const remaining = total - reservation.abonosTotal;
-
-    if (total > 0) {
-      if (remaining <= 0) {
-        reservation.paymentStatus = PaymentStatus.PAID;
-      } else {
-        reservation.paymentStatus = PaymentStatus.PARTIAL;
-      }
+    // Mantiene PENDING hasta verificación administrativa
+    reservation.paymentStatus = PaymentStatus.PENDING;
+    reservation.paymentReported = true;
+    if (dto.paymentProofUrl) {
+      reservation.paymentProofUrl = dto.paymentProofUrl;
     }
 
     const methodLabel = dto.method === 'PAGO_MOVIL' ? 'Pago Móvil' : dto.method === 'BINANCE' ? 'Binance' : dto.method === 'TRANSFER' ? 'Transferencia' : 'Pago';
@@ -408,6 +422,7 @@ export class PublicReservationsController {
       message: 'Pago reportado con éxito. El local verificará tu comprobante.',
       abonosTotal: reservation.abonosTotal,
       paymentStatus: reservation.paymentStatus,
+      paymentReported: reservation.paymentReported,
       entry: paymentEntry,
     };
   }

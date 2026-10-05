@@ -64,7 +64,7 @@ const AVAILABLE_ROLES: RoleOption[] = [
   { role: UserRole.POS, label: 'Caja / Punto de Venta (POS)' },
   { role: UserRole.INVENTORY, label: 'Control de Inventario / Insumos (INVENTORY)' },
   { role: UserRole.DELIVERY, label: 'Repartidor / Delivery (DELIVERY)' },
-  { role: UserRole.KITCHEN, label: 'Cocina / Preparación (KITCHEN)' },
+  { role: UserRole.KITCHEN, label: 'Especialista / Preparación (KITCHEN)' },
   { role: UserRole.ADMIN, label: 'Administrador de Sucursal (ADMIN)' },
 ];
 
@@ -74,7 +74,7 @@ const getRoleBadgeInfo = (r: string) => {
     case UserRole.POS: return { label: 'Caja', color: 'primary' };
     case UserRole.INVENTORY: return { label: 'Inventario', color: 'warning' };
     case UserRole.DELIVERY: return { label: 'Reparto', color: 'tertiary' };
-    case UserRole.KITCHEN: return { label: 'Cocina', color: 'secondary' };
+    case UserRole.KITCHEN: return { label: 'Especialista / Cocina', color: 'secondary' };
     case UserRole.OPERATIVO: return { label: 'Operativo', color: 'medium' };
     default: return { label: r, color: 'medium' };
   }
@@ -528,12 +528,14 @@ const Users: React.FC = () => {
                   Equipo ({users.length})
                 </IonLabel>
               </IonSegmentButton>
-              <IonSegmentButton value="delivery">
-                <IonLabel style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600 }}>
-                  <IonIcon icon={carOutline} />
-                  Repartidores
-                </IonLabel>
-              </IonSegmentButton>
+              {settings?.featureDelivery !== false && (
+                <IonSegmentButton value="delivery">
+                  <IonLabel style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600 }}>
+                    <IonIcon icon={carOutline} />
+                    Repartidores
+                  </IonLabel>
+                </IonSegmentButton>
+              )}
               <IonSegmentButton value="requests">
                 <IonLabel style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600 }}>
                   <IonIcon icon={timeOutline} />

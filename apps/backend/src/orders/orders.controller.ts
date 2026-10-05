@@ -75,6 +75,16 @@ export class OrdersController {
   updatePaymentStatus(@Request() req: any, @Param('id') id: string, @Body() dto: UpdatePaymentDto) {
     return this.ordersService.updatePaymentStatus(req.user.tenantId, id, dto);}
 
+  @Patch(':id/approve-payment')
+  approvePayment(@Request() req: any, @Param('id') id: string) {
+    return this.ordersService.approvePayment(req.user.tenantId, id);
+  }
+
+  @Patch(':id/reject-payment')
+  rejectPayment(@Request() req: any, @Param('id') id: string, @Body('reason') reason?: string) {
+    return this.ordersService.rejectPayment(req.user.tenantId, id, reason);
+  }
+
   @Patch(':id/status')
   updateOrderStatus(@Request() req: any, @Param('id') id: string, @Body('status') status: OrderStatus) {
     return this.ordersService.updateOrderStatus(req.user.tenantId, id, status);}
