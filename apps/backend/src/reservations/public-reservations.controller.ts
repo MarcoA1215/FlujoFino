@@ -7,10 +7,11 @@ import { Tenant } from '../entities/tenant.entity';
 import { Settings } from '../entities/settings.entity';
 import { Reservation } from '../entities/reservation.entity';
 import { Product } from '../entities/product.entity';
-import { ReservationStatus, PaymentStatus } from '@finowork/shared-types';
+import { ReservationStatus, PaymentStatus, DeliveryMethod, OrderStatus } from '@finowork/shared-types';
 import { decodeTenantId } from '../utils/tenant-crypto';
 import { Public } from '../auth/public.decorator';
 import { OrderItem } from '../entities/order-item.entity';
+import { Order } from '../entities/order.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { CustomersService } from '../customers/customers.service';
 import { StorageService } from '../storage/storage.service';
@@ -134,7 +135,9 @@ export class PublicReservationsController {
       hasStore: Boolean(hasStore),
       staff: staff,
       exchangeRateBs: rate,
-      minDepositPercentage: Number(settings?.minDepositPercentage || 0),
+      minDepositPercentage: Number(settings?.bookingDepositPercentage ?? settings?.minDepositPercentage ?? 0),
+      bookingRequireDeposit: settings?.bookingRequireDeposit ?? (Number(settings?.bookingDepositPercentage ?? settings?.minDepositPercentage) > 0),
+      bookingDepositPercentage: Number(settings?.bookingDepositPercentage ?? settings?.minDepositPercentage ?? 0),
       allowPartialPayments: settings?.allowPartialPayments ?? true,
       bankInfo: settings?.companyBank || '',
       companyCedula: settings?.companyCedula || '',
@@ -189,7 +192,8 @@ export class PublicReservationsController {
     const settings = await settingsRepo.findOne({ where: { tenantId: id } });
 
     const totalAmount = Number(dto.totalAmount || 0);
-    const minDepositPct = Number(settings?.minDepositPercentage || 0);
+    const isDepositRequired = settings?.bookingRequireDeposit ?? (Number(settings?.bookingDepositPercentage ?? settings?.minDepositPercentage) > 0);
+    const minDepositPct = isDepositRequired ? Number(settings?.bookingDepositPercentage ?? settings?.minDepositPercentage ?? 0) : 0;
 
     // Validate payment reference and minimum deposit
     if (minDepositPct > 0 && totalAmount > 0) {
@@ -231,11 +235,12 @@ export class PublicReservationsController {
 
     // Create reservation natively
     const res = await this.reservationsService.create(id, dto);
+    let resDb: any = null;
 
     // If payment was reported during booking, attach it to abonosHistory and calculate status
     if (dto.paymentReference && dto.paymentReference.trim()) {
       const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
-      const resDb = await reservationRepo.findOne({ where: { id: res.id } });
+      resDb = await reservationRepo.findOne({ where: { id: res.id } });
       if (resDb) {
         const rawPayAmt = Number(dto.paymentAmount || totalAmount);
         const payAmt = totalAmount > 0 ? Math.min(rawPayAmt, totalAmount) : rawPayAmt;
@@ -269,11 +274,91 @@ export class PublicReservationsController {
         const noteTag = `[Pago Inicial: $${payAmt.toFixed(2)} vía ${methodLabel} Ref: ${dto.paymentReference.trim()}]`;
         resDb.notes = resDb.notes ? `${resDb.notes} | ${noteTag}` : noteTag;
         await reservationRepo.save(resDb);
-        return resDb;
       }
     }
 
-    return res;
+    const finalReservation = resDb || res;
+
+    // Auto-crear y sincronizar orden vinculada para que aparezca en Pedidos/Tickets y Caja
+    try {
+      const orderRepo = this.tenantRepo.manager.getRepository(Order);
+      const productRepo = this.tenantRepo.manager.getRepository(Product);
+      const orderItemRepo = this.tenantRepo.manager.getRepository(OrderItem);
+
+      let rate = Number(settings?.exchangeRateBs || 0);
+      if (!rate || rate === 40.0) {
+        const globalSettings = await settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+        rate = Number(globalSettings?.exchangeRateBs || 40.0);
+      }
+
+      let reqDeliveryDate: Date | undefined;
+      if (dto.date) {
+        const timePart = dto.time ? `${dto.time}:00` : '12:00:00';
+        const parsedD = new Date(`${dto.date}T${timePart}`);
+        if (!isNaN(parsedD.getTime())) reqDeliveryDate = parsedD;
+      }
+
+      const linkedOrder = orderRepo.create({
+        tenantId: id,
+        customerId: finalReservation.customerId,
+        customerName: finalReservation.customerName,
+        customerPhone: finalReservation.customerPhone || '',
+        identification: finalReservation.identification || undefined,
+        notes: finalReservation.notes ? `[Cita: ${dto.date} ${dto.time || ''}] ${finalReservation.notes}` : `[Cita: ${dto.date} ${dto.time || ''}]`,
+        tableNumber: finalReservation.tableNumber || '',
+        requestedDeliveryDate: reqDeliveryDate,
+        status: OrderStatus.PENDING,
+        paymentStatus: finalReservation.paymentStatus || PaymentStatus.PENDING,
+        paymentReported: Boolean(finalReservation.paymentReported),
+        paymentProofUrl: finalReservation.paymentProofUrl || undefined,
+        paymentRejectedReason: finalReservation.paymentRejectedReason || undefined,
+        deliveryMethod: DeliveryMethod.IN_STORE,
+        totalAmount: Number(finalReservation.totalAmount || 0),
+        abonosTotal: Number(finalReservation.abonosTotal || 0),
+        abonosHistory: finalReservation.abonosHistory || [],
+        employeeId: finalReservation.employeeId || undefined,
+        linkedReservationId: finalReservation.id,
+        paymentMethod: dto.paymentMethod || undefined,
+        pagoMovilRef: dto.paymentMethod === 'PAGO_MOVIL' ? dto.paymentReference : undefined,
+        binanceRef: dto.paymentMethod === 'BINANCE' ? dto.paymentReference : undefined,
+        transferRef: dto.paymentMethod === 'TRANSFER' ? dto.paymentReference : undefined,
+        exchangeRate: rate,
+        amountBs: dto.paymentAmountBs ? Number(dto.paymentAmountBs) : undefined,
+        splitPayments: (finalReservation.abonosHistory && finalReservation.abonosHistory.length > 0) ? [{
+          method: dto.paymentMethod || 'PAGO_MOVIL',
+          amountUSD: Number(finalReservation.abonosTotal || 0),
+          amountBS: Number(finalReservation.abonosHistory[0]?.amountBs || 0),
+          reference: dto.paymentReference || undefined,
+        }] : undefined,
+      });
+
+      const savedOrder = await orderRepo.save(linkedOrder);
+      finalReservation.orderId = savedOrder.id;
+      const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
+      await reservationRepo.save(finalReservation);
+
+      if (finalReservation.serviceId) {
+        const sIds = finalReservation.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
+        for (const sId of sIds) {
+          const prod = await productRepo.findOne({ where: { id: sId } });
+          if (prod) {
+            const item = orderItemRepo.create({
+              orderId: savedOrder.id,
+              productId: prod.id,
+              productName: prod.name,
+              quantity: 1,
+              unitPrice: Number(prod.salePrice || 0),
+              subtotal: Number(prod.salePrice || 0),
+            });
+            await orderItemRepo.save(item);
+          }
+        }
+      }
+    } catch (orderErr) {
+      console.error('Error auto-creating linked order for reservation:', orderErr);
+    }
+
+    return finalReservation;
   }
 
   @Get('appointment/:id')

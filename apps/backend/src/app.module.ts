@@ -3,6 +3,7 @@ import { UserTenantAccess } from './entities/user-tenant-access.entity';
 import { WorkSchedule } from './entities/work-schedule.entity';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { TenantStatusGuard } from './auth/tenant-status.guard';
 import { RolesGuard } from './auth/roles.guard';
 import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
@@ -90,6 +91,11 @@ import { PromotersModule } from './promoters/promoters.module';
     PromotersModule,
   ],
   controllers: [AppController],
-  providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }, { provide: APP_GUARD, useClass: RolesGuard }],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: TenantStatusGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
+  ],
 })
 export class AppModule {}

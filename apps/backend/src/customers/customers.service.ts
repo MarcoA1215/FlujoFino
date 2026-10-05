@@ -60,7 +60,6 @@ export class CustomersService {
       if (data.notes && !customer.notes) {
         customer.notes = data.notes;
       }
-      customer.totalVisits = (customer.totalVisits || 0) + 1;
       return this.customerRepo.save(customer);
     } else {
       customer = this.customerRepo.create({
@@ -69,9 +68,18 @@ export class CustomersService {
         phone: cleanPhone || data.phone,
         identification: cleanId || undefined,
         notes: data.notes || undefined,
-        totalVisits: 1,
+        totalVisits: 0,
       });
       return this.customerRepo.save(customer);
+    }
+  }
+
+  async incrementVisits(tenantId: string, customerId: string): Promise<void> {
+    if (!customerId) return;
+    const customer = await this.customerRepo.findOne({ where: { tenantId, id: customerId } });
+    if (customer) {
+      customer.totalVisits = (customer.totalVisits || 0) + 1;
+      await this.customerRepo.save(customer);
     }
   }
 

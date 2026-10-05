@@ -1,4 +1,4 @@
-﻿import { Test, TestingModule } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { OrdersService } from './orders.service';
 import { CustomersService } from '../customers/customers.service';
@@ -7,7 +7,7 @@ import { Settings } from '../entities/settings.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
 import { Product } from '../entities/product.entity';
 import { SettingsService } from '../settings/settings.service';
-import { PaymentStatus, OrderStatus, UserRole, MovementType } from '@finowork/shared-types';
+import { PaymentStatus, OrderStatus, UserRole, MovementType, DeliveryMethod } from '@finowork/shared-types';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
@@ -60,6 +60,8 @@ describe('OrdersService', () => {
     mockCustomersService = {
       normalizePhone: jest.fn((p) => p),
       normalizeId: jest.fn((id) => id),
+      findOrCreateOrUpdate: jest.fn().mockResolvedValue({ id: 'c-1', name: 'Cliente' }),
+      incrementVisits: jest.fn().mockResolvedValue(undefined),
     };
 
     const mockSettingsService = {
@@ -246,6 +248,85 @@ describe('OrdersService', () => {
       // netCashUSD = 100 (ventas) - 10 (vueltos) - 90 (egresos) = 0
       expect(result.netCashUSD).toBe(0);
     });
+
+    it('debe agrupar deliveryStats según driverId para órdenes Delivery pagadas o completadas', async () => {
+      const tenantId = 'tenant-test-1';
+      const dateStr = '2026-10-01';
+
+      mockSettingsRepo.findOne.mockResolvedValue({ tenantId, exchangeRateBs: 50.0 });
+      mockExpenseRepo.find.mockResolvedValue([]);
+
+      const driverAId = 'driver-uuid-a';
+      const driverBId = 'driver-uuid-b';
+
+      const order1 = {
+        id: 'ord-1',
+        tenantId,
+        totalAmount: 30,
+        deliveryMethod: DeliveryMethod.DELIVERY,
+        paymentStatus: PaymentStatus.PAID,
+        status: OrderStatus.READY,
+        driverId: driverAId,
+        driver: { username: 'Carlos Repartidor' },
+      };
+      const order2 = {
+        id: 'ord-2',
+        tenantId,
+        totalAmount: 25,
+        deliveryMethod: DeliveryMethod.DELIVERY,
+        paymentStatus: PaymentStatus.PENDING,
+        status: OrderStatus.DELIVERED,
+        driverId: driverAId,
+        driver: { username: 'Carlos Repartidor' },
+      };
+      const order3 = {
+        id: 'ord-3',
+        tenantId,
+        totalAmount: 40,
+        deliveryMethod: DeliveryMethod.DELIVERY,
+        paymentStatus: PaymentStatus.PAID,
+        status: OrderStatus.DELIVERED,
+        driverId: driverBId,
+        driver: { username: 'Luis Delivery' },
+      };
+      // Orden cancelada (no debe contar)
+      const orderCanceled = {
+        id: 'ord-4',
+        tenantId,
+        totalAmount: 50,
+        deliveryMethod: DeliveryMethod.DELIVERY,
+        paymentStatus: PaymentStatus.PAID,
+        status: OrderStatus.CANCELED,
+        driverId: driverAId,
+      };
+      // Orden en tienda (no debe contar en deliveryStats)
+      const orderInStore = {
+        id: 'ord-5',
+        tenantId,
+        totalAmount: 15,
+        deliveryMethod: DeliveryMethod.IN_STORE,
+        paymentStatus: PaymentStatus.PAID,
+        status: OrderStatus.DELIVERED,
+        driverId: driverAId,
+      };
+
+      mockOrderRepo.find.mockResolvedValue([order1, order2, order3, orderCanceled, orderInStore]);
+
+      const result = await service.getDailyCashSummary(tenantId, dateStr);
+
+      expect(result.deliveryStats).toBeDefined();
+      expect(result.deliveryStats).toHaveLength(2);
+
+      const statsDriverA = result.deliveryStats.find((s: any) => s.driverId === driverAId);
+      expect(statsDriverA).toBeDefined();
+      expect(statsDriverA?.tripsCount).toBe(2);
+      expect(statsDriverA?.totalDeliveredAmountUSD).toBe(55);
+
+      const statsDriverB = result.deliveryStats.find((s: any) => s.driverId === driverBId);
+      expect(statsDriverB).toBeDefined();
+      expect(statsDriverB?.tripsCount).toBe(1);
+      expect(statsDriverB?.totalDeliveredAmountUSD).toBe(40);
+    });
   });
 
   describe('autoAllocatePhysicalStock - Servicios', () => {
@@ -340,6 +421,7 @@ describe('OrdersService', () => {
 
       expect(mockOrderRepo.save).toHaveBeenCalled();
       expect(existingOrder.deliveryUserId).toBe(deliveryUserId);
+      expect((existingOrder as any).driverId).toBe(deliveryUserId);
       expect(result).toBeDefined();
     });
   });
@@ -403,6 +485,30 @@ describe('OrdersService', () => {
           description: 'Venta de Extra Suelto: Salsa Especial',
         }),
       );
+    });
+  });
+
+  describe('Customer Visits Tracking', () => {
+    it('debe incrementar visitas del cliente sólo cuando la orden pasa a estado PAID', async () => {
+      const tenantId = 'tenant-123';
+      const orderId = 'order-pay-1';
+      const customerId = 'cust-123';
+
+      const existingOrder = {
+        id: orderId,
+        tenantId,
+        customerId,
+        totalAmount: 50,
+        paymentStatus: PaymentStatus.PENDING,
+        status: OrderStatus.PREPARING,
+      };
+
+      mockOrderRepo.findOne.mockResolvedValue(existingOrder);
+      mockOrderRepo.save.mockImplementation((ord: any) => Promise.resolve(ord));
+
+      await service.updatePaymentStatus(tenantId, orderId, { status: PaymentStatus.PAID });
+
+      expect(mockCustomersService.incrementVisits).toHaveBeenCalledWith(tenantId, customerId);
     });
   });
 });

@@ -589,9 +589,9 @@ const SettingsPage: React.FC = () => {
                   <p style={{marginBottom: '15px'}}>Opciones generales del punto de venta y operaciones.</p>
                   <IonItem>
                     <IonLabel className="ion-text-wrap">
-                      <h2>Permitir Pagos Parciales (Abonos / Cuentas Abiertas)</h2>
+                      <h2>Permitir Pagos Parciales en Caja (Abonos / Cuentas Abiertas)</h2>
                       <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
-                        Permite a los cajeros registrar pedidos con inicial o cuenta por cobrar.
+                        Permite a los cajeros en el punto de venta registrar pedidos con inicial o cuenta por cobrar. (La seña para citas online se configura de forma independiente en Reservaciones).
                       </p>
                     </IonLabel>
                     <IonToggle checked={settings.allowPartialPayments !== false} onIonChange={e => setSettings({...settings, allowPartialPayments: e.detail.checked})} />

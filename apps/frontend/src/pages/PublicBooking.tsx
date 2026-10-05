@@ -128,7 +128,9 @@ const PublicBooking: React.FC = () => {
   const [bookingOriginBank, setBookingOriginBank] = useState<string>('');
 
   const rateBs = Number(tenantInfo?.exchangeRateBs || 40.0);
-  const minDepositPercentage = Number(tenantInfo?.minDepositPercentage || 0);
+  const bookingDepositPct = Number(tenantInfo?.bookingDepositPercentage ?? tenantInfo?.minDepositPercentage ?? 0);
+  const isDepositEnabled = Boolean(tenantInfo?.bookingRequireDeposit ?? (bookingDepositPct > 0));
+  const minDepositPercentage = isDepositEnabled ? bookingDepositPct : 0;
 
   const [paymentProofUrl, setPaymentProofUrl] = useState<string>('');
   const [uploadingProof, setUploadingProof] = useState<boolean>(false);
@@ -1786,20 +1788,21 @@ const PublicBooking: React.FC = () => {
                             >
                               Pago Completo (${totalServicePrice.toFixed(2)})
                             </IonButton>
-                            <IonButton 
-                              size="small" 
-                              fill={bookingPaymentOption === 'DEPOSIT' ? 'solid' : 'outline'} 
-                              color="primary"
-                              style={{ flex: 1, margin: 0, fontSize: '11px', fontWeight: 'bold' }}
-                              onClick={() => {
-                                setBookingPaymentOption('DEPOSIT');
-                                const minPct = minDepositPercentage > 0 ? minDepositPercentage : 30;
-                                const minDep = Math.round((totalServicePrice * (minPct / 100)) * 100) / 100;
-                                setBookingPaymentAmount(minDep.toString());
-                              }}
-                            >
-                              Abono / Seña
-                            </IonButton>
+                            {isDepositEnabled && minDepositPercentage > 0 && (
+                              <IonButton 
+                                size="small" 
+                                fill={bookingPaymentOption === 'DEPOSIT' ? 'solid' : 'outline'} 
+                                color="primary"
+                                style={{ flex: 1, margin: 0, fontSize: '11px', fontWeight: 'bold' }}
+                                onClick={() => {
+                                  setBookingPaymentOption('DEPOSIT');
+                                  const minDep = Math.round((totalServicePrice * (minDepositPercentage / 100)) * 100) / 100;
+                                  setBookingPaymentAmount(minDep.toString());
+                                }}
+                              >
+                                Abono / Seña ({minDepositPercentage}%)
+                              </IonButton>
+                            )}
                           </div>
 
                           {/* Amount to report */}

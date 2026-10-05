@@ -85,17 +85,33 @@ export class OrdersController {
     return this.ordersService.rejectPayment(req.user.tenantId, id, reason);
   }
 
+  @Post('fondo-caja')
+  registerFondoCaja(
+    @Request() req: any,
+    @Body('amount') amount: number,
+    @Body('description') description?: string
+  ) {
+    return this.ordersService.registerFondoCaja(req.user.tenantId, amount, description);
+  }
+
   @Patch(':id/status')
-  updateOrderStatus(@Request() req: any, @Param('id') id: string, @Body('status') status: OrderStatus) {
-    return this.ordersService.updateOrderStatus(req.user.tenantId, id, status);}
+  updateOrderStatus(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body('status') status: OrderStatus,
+    @Body('driverId') driverId?: string,
+  ) {
+    return this.ordersService.updateOrderStatus(req.user.tenantId, id, status, req.user?.id, req.user?.role, driverId);
+  }
 
   @Post(':id/clone')
   clone(@Request() req: any, @Param('id') id: string) {
-    return this.ordersService.cloneOrder(req.user.tenantId, id);}
+    return this.ordersService.cloneOrder(req.user.tenantId, id);
+  }
 
   @Put(':id')
   editOrder(@Request() req: any, @Param('id') id: string, @Body() dto: CreateOrderDto) {
-    return this.ordersService.editOrder(req.user.tenantId, id, dto, req.user?.id);
+    return this.ordersService.editOrder(req.user.tenantId, id, dto, req.user?.id, req.user?.role);
   }
 
   @Post(':id/deliver-partial')
@@ -117,7 +133,12 @@ export class OrdersController {
   }
 
   @Patch(':id/assign-delivery')
-  assignDelivery(@Request() req: any, @Param('id') id: string, @Body('deliveryUserId') deliveryUserId?: string) {
-    return this.ordersService.assignDelivery(req.user.tenantId, id, deliveryUserId);
+  assignDelivery(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body('deliveryUserId') deliveryUserId?: string,
+    @Body('driverId') driverId?: string,
+  ) {
+    return this.ordersService.assignDelivery(req.user.tenantId, id, driverId || deliveryUserId);
   }
 }

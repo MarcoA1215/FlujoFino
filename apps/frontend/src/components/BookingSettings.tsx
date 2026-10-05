@@ -155,6 +155,56 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                   color="primary" 
                 />
               </IonItem>
+
+              <IonItem lines="none" style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', marginTop: '12px' }}>
+                <IonLabel className="ion-text-wrap">
+                  <h2 style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>Exigir Seña / Anticipo para Reservas Online</h2>
+                  <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+                    Requiere que el cliente pague un abono previo obligatorio para apartar su turno y evitar inasistencias (no-shows). Si lo desactivas, los clientes podrán agendar pagando completo o pagando al ser atendidos.
+                  </p>
+                </IonLabel>
+                <IonToggle 
+                  slot="end" 
+                  checked={settings.bookingRequireDeposit ?? (Number(settings.bookingDepositPercentage ?? settings.minDepositPercentage) > 0)} 
+                  onIonChange={e => {
+                    const checked = e.detail.checked;
+                    setSettings({ 
+                      ...settings, 
+                      bookingRequireDeposit: checked,
+                      bookingDepositPercentage: checked ? (settings.bookingDepositPercentage || settings.minDepositPercentage || 30) : 0
+                    });
+                  }} 
+                  color="primary" 
+                />
+              </IonItem>
+
+              {(settings.bookingRequireDeposit ?? (Number(settings.bookingDepositPercentage ?? settings.minDepositPercentage) > 0)) && (
+                <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '8px' }}>
+                  <IonLabel style={{ fontSize: '13px', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    Porcentaje de Seña Requerido (%)
+                  </IonLabel>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={settings.bookingDepositPercentage ?? settings.minDepositPercentage ?? 30}
+                    onChange={e => setSettings({ ...settings, bookingDepositPercentage: Math.max(1, Math.min(100, parseFloat(e.target.value) || 0)) })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '14px',
+                      background: '#ffffff',
+                      color: '#0f172a',
+                    }}
+                    placeholder="Ej. 30"
+                  />
+                  <small style={{ color: '#64748b', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+                    Ejemplo: 30% o 50% del costo total del servicio seleccionado.
+                  </small>
+                </div>
+              )}
             </IonCardContent>
           </IonCard>
         </IonCol>

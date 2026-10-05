@@ -123,6 +123,15 @@ export class Settings {
   @Column('int', { default: 365, nullable: true })
   bookingMaxAdvanceDays: number; // Maximum days in advance customers can book (e.g. 30, 90, 365)
 
+  @Column('int', { default: 0 })
+  endOfDayOffsetHours: number; // Horas después de medianoche en que cierra el día comercial (0-6)
+
+  @Column('boolean', { default: false })
+  bookingRequireDeposit: boolean;
+
+  @Column('decimal', { precision: 5, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  bookingDepositPercentage: number;
+
   @Column({ nullable: true })
   themePrimaryColor: string;
 

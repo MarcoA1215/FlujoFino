@@ -101,6 +101,7 @@ type Order = {
   paymentReported?: boolean;
   paymentProofUrl?: string;
   paymentRejectedReason?: string;
+  linkedReservationId?: string;
 };
 
 const Orders: React.FC = () => {
@@ -323,7 +324,7 @@ const Orders: React.FC = () => {
     if (!Array.isArray(orders)) return { activos: 0, porCobrar: 0, porConfirmar: 0, historial: 0 };
     const activos = orders.filter(o => o && (o.status === OrderStatus.PENDING || o.status === OrderStatus.PREPARING)).length;
     const porCobrar = orders.filter(o => o && [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED && o.status !== OrderStatus.CANCELADO_PROVEEDOR && o.status !== OrderStatus.SOLICITUD_ENCARGO).length;
-    const porConfirmar = orders.filter(o => o && o.status === OrderStatus.SOLICITUD_ENCARGO).length;
+    const porConfirmar = orders.filter(o => o && (o.status === OrderStatus.SOLICITUD_ENCARGO || Boolean(o.paymentReported))).length;
     const historial = orders.filter(o => o && (o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED || o.status === OrderStatus.CANCELADO_PROVEEDOR)).length;
     return { activos, porCobrar, porConfirmar, historial };
   }, [orders]);
@@ -335,7 +336,7 @@ const Orders: React.FC = () => {
       const isActivo = o.status === OrderStatus.PENDING || o.status === OrderStatus.PREPARING;
       const isHistorial = o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED || o.status === OrderStatus.CANCELADO_PROVEEDOR;
       const isPorCobrar = [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED && o.status !== OrderStatus.CANCELADO_PROVEEDOR && o.status !== OrderStatus.SOLICITUD_ENCARGO;
-      const isPorConfirmar = o.status === OrderStatus.SOLICITUD_ENCARGO;
+      const isPorConfirmar = o.status === OrderStatus.SOLICITUD_ENCARGO || Boolean(o.paymentReported);
 
       if (tab === 'activos' && !isActivo) return false;
       if (tab === 'por_cobrar' && !isPorCobrar) return false;
@@ -414,7 +415,7 @@ const Orders: React.FC = () => {
                 onClick={() => setTab('por_confirmar')}
                 style={counts.porConfirmar > 0 ? { borderColor: '#A855F7', color: '#7E22CE', fontWeight: '800' } : {}}
               >
-                Por Confirmar (Proveedor) ({counts.porConfirmar})
+                {systemSettings?.featureBuySell === false ? 'Por Verificar' : 'Por Confirmar'} ({counts.porConfirmar})
               </button>
               <button
                 type="button"
@@ -568,6 +569,11 @@ const Orders: React.FC = () => {
 
                     {/* Meta Pills (Table / Delivery / Employee / Requested Date) */}
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                      {order.linkedReservationId && (
+                        <span style={{ fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: '#ECFDF5', color: '#065F46', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid #A7F3D0' }}>
+                          🗓️ Cita Agendada
+                        </span>
+                      )}
                       {order.requestedDeliveryDate && (
                         <span style={{ fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: '#FEF3C7', color: '#92400E', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           📅 Requerido: {new Date(order.requestedDeliveryDate).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}

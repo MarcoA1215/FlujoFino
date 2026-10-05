@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Reservation } from '../entities/reservation.entity';
+import { Order } from '../entities/order.entity';
 import { ReservationStatus, PaymentStatus } from '@finowork/shared-types';
 import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -358,7 +359,30 @@ export class ReservationsService {
       res.abonosTotal = total;
     }
 
-    return this.repo.save(res);
+    const savedRes = await this.repo.save(res);
+
+    // Sincronización bidireccional con Order
+    try {
+      const orderRepo = this.repo.manager.getRepository(Order);
+      const order = await orderRepo.findOne({
+        where: [
+          { id: res.orderId, tenantId },
+          { linkedReservationId: res.id, tenantId }
+        ]
+      });
+      if (order) {
+        order.paymentStatus = PaymentStatus.PAID;
+        order.paymentReported = false;
+        order.paymentRejectedReason = null as any;
+        order.abonosTotal = savedRes.abonosTotal;
+        order.abonosHistory = savedRes.abonosHistory;
+        await orderRepo.save(order);
+      }
+    } catch (err) {
+      console.error('Error sincronizando Order al aprobar pago de cita:', err);
+    }
+
+    return savedRes;
   }
 
   async rejectPayment(tenantId: string, id: string, reason?: string) {
@@ -382,7 +406,29 @@ export class ReservationsService {
     const noteTag = `[Comprobante rechazado: ${cleanReason}]`;
     res.notes = res.notes ? `${res.notes} | ${noteTag}` : noteTag;
 
-    return this.repo.save(res);
+    const savedRes = await this.repo.save(res);
+
+    // Sincronización bidireccional con Order
+    try {
+      const orderRepo = this.repo.manager.getRepository(Order);
+      const order = await orderRepo.findOne({
+        where: [
+          { id: res.orderId, tenantId },
+          { linkedReservationId: res.id, tenantId }
+        ]
+      });
+      if (order) {
+        order.paymentStatus = PaymentStatus.PENDING;
+        order.paymentReported = false;
+        order.paymentRejectedReason = cleanReason;
+        order.notes = order.notes ? `${order.notes} | ${noteTag}` : noteTag;
+        await orderRepo.save(order);
+      }
+    } catch (err) {
+      console.error('Error sincronizando Order al rechazar comprobante de cita:', err);
+    }
+
+    return savedRes;
   }
 
   private recalculatePaymentStatus(res: Reservation) {

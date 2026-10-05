@@ -260,6 +260,15 @@ export class SettingsService implements OnModuleInit {
       }
     }
     if (payload.slotInterval !== undefined) settings.slotInterval = payload.slotInterval;
+    if (payload.endOfDayOffsetHours !== undefined) {
+      const offset = Number(payload.endOfDayOffsetHours);
+      settings.endOfDayOffsetHours = Math.max(0, Math.min(6, isNaN(offset) ? 0 : Math.floor(offset)));
+    }
+
+    if (payload.bookingRequireDeposit !== undefined) settings.bookingRequireDeposit = payload.bookingRequireDeposit;
+    if (payload.bookingDepositPercentage !== undefined) {
+      settings.bookingDepositPercentage = Math.max(0, Math.min(100, Number(payload.bookingDepositPercentage) || 0));
+    }
 
     if (payload.themePrimaryColor !== undefined) settings.themePrimaryColor = payload.themePrimaryColor;
     if (payload.themeHeaderColor !== undefined) settings.themeHeaderColor = payload.themeHeaderColor;

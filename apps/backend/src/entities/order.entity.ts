@@ -7,6 +7,13 @@ import { OrderItem } from './order-item.entity';
 import { DeliveryZone } from './delivery-zone.entity';
 import { OrderStatus, PaymentStatus, DeliveryMethod } from '@finowork/shared-types';
 
+export interface SplitPaymentItem {
+  method: string;
+  amountUSD: number;
+  amountBS: number;
+  reference?: string;
+}
+
 @Entity()
 @Index(['tenantId', 'createdAt'])
 @Index(['tenantId', 'status'])
@@ -69,6 +76,9 @@ export class Order {
 
   @Column({ nullable: true })
   paymentMethod: string; // 'USD' | 'PAGO_MOVIL' | 'PUNTO' | 'PENDING'
+
+  @Column({ type: 'jsonb', nullable: true })
+  splitPayments?: SplitPaymentItem[];
 
   @Column({
     type: 'enum',
@@ -154,7 +164,7 @@ export class Order {
   transferBank: string;
 
   @Index()
-  @CreateDateColumn()
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 
   @OneToMany(() => OrderItem, item => item.order)
@@ -187,6 +197,13 @@ export class Order {
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'deliveryUserId' })
   deliveryUser: User;
+
+  @Column({ type: 'uuid', nullable: true })
+  driverId: string;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'driverId' })
+  driver: User;
 
   @Index()
   @Column({ nullable: true })
