@@ -57,6 +57,24 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     return {};
   });
 
+  const [localStaffUsers, setLocalStaffUsers] = useState<any[]>(users || []);
+
+  useEffect(() => {
+    if (users && users.length > 0) {
+      setLocalStaffUsers(users);
+    }
+  }, [users]);
+
+  useEffect(() => {
+    if (isOpen) {
+      apiClient.get('/users').then(res => {
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setLocalStaffUsers(res.data);
+        }
+      }).catch(() => {});
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     apiClient.get('/settings').then(res => {
       if (res.data) setSettings(res.data);
@@ -124,6 +142,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
   }, [availableTypes, product, selectedType]);
 
+  const qualifiedStaffList = React.useMemo(() => {
+    return localStaffUsers.filter(emp => {
+      const roles: string[] = emp.roles && emp.roles.length > 0 ? emp.roles : [emp.role];
+      const isDeliveryOnly = roles.every(r => r === 'DELIVERY' || r === 'Repartidor');
+      const isOperativoOnly = roles.every(r => r === 'OPERATIVO');
+      if (isDeliveryOnly || isOperativoOnly) return false;
+      if (emp.username?.toLowerCase() === 'delivery' || emp.name?.toLowerCase() === 'delivery') return false;
+      return true;
+    });
+  }, [localStaffUsers]);
+
   const toggleStaff = (userId: string) => {
     setSelectedStaffIds(prev => 
       prev.includes(userId) 
@@ -133,10 +162,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   };
 
   const handleSelectAllStaff = () => {
-    if (selectedStaffIds.length === users.length) {
+    if (selectedStaffIds.length === qualifiedStaffList.length) {
       setSelectedStaffIds([]);
     } else {
-      setSelectedStaffIds(users.map(u => u.id));
+      setSelectedStaffIds(qualifiedStaffList.map(u => u.id));
     }
   };
 
@@ -497,13 +526,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <IonIcon icon={personOutline} color="primary" /> Especialistas / Personal que realiza este trabajo
                 </h4>
-              {users.length > 0 && (
+              {localStaffUsers.length > 0 && (
                 <button 
                   type="button"
                   onClick={handleSelectAllStaff}
                   style={{ background: 'none', border: 'none', color: 'var(--ion-color-primary)', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
                 >
-                  {selectedStaffIds.length === users.length ? 'Deseleccionar Todos' : 'Seleccionar Todos'}
+                  {selectedStaffIds.length === qualifiedStaffList.length ? 'Deseleccionar Todos' : 'Seleccionar Todos'}
                 </button>
               )}
             </div>
@@ -521,13 +550,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               )}
             </p>
 
-            {users.length === 0 ? (
+            {qualifiedStaffList.length === 0 ? (
               <div style={{ padding: '12px', backgroundColor: '#f1f5f9', borderRadius: '8px', fontSize: '13px', color: '#64748b', textAlign: 'center' }}>
                 No hay otros miembros registrados en el equipo. Puedes agregar usuarios desde la sección <b>Usuarios</b>.
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
-                {users.map(u => {
+                {qualifiedStaffList.map(u => {
                   const isChecked = selectedStaffIds.includes(u.id);
                   return (
                     <div 
@@ -560,11 +589,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                           fontSize: '13px',
                           flexShrink: 0
                         }}>
-                          {u.username.substring(0, 2).toUpperCase()}
+                          {(u.username || u.name || 'US').substring(0, 2).toUpperCase()}
                         </div>
                         <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <div style={{ fontWeight: '600', fontSize: '13px', color: '#1e293b' }}>
-                            {u.username}
+                            {u.username || u.name}
                           </div>
                           {u.jobTitle && (
                             <div style={{ fontSize: '11px', color: '#64748b' }}>

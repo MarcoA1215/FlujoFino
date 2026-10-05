@@ -2,7 +2,7 @@
 import { refreshOutline, cubeOutline, buildOutline, cutOutline, closeOutline, searchOutline, archiveOutline } from 'ionicons/icons';
 import { IonList, IonItem, IonLabel, IonBadge } from '@ionic/react';
 import React, { useEffect, useState, useMemo } from 'react';
-import { IonToggle, IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonActionSheet, useIonToast, IonIcon } from '@ionic/react';
+import { IonToggle, IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonActionSheet, useIonToast, IonIcon, useIonViewWillEnter } from '@ionic/react';
 import { apiClient } from '../api/client';
 import type { Product } from '../types';
 import { ProductCard } from '../components/products/ProductCard';
@@ -117,9 +117,26 @@ const Products: React.FC = () => {
   useEffect(() => {
     fetchData();
     fetchUsers();
+
+    const handleUsersUpdated = () => {
+      fetchUsers();
+    };
+    window.addEventListener('users_updated', handleUsersUpdated);
+    window.addEventListener('focus', handleUsersUpdated);
+
+    return () => {
+      window.removeEventListener('users_updated', handleUsersUpdated);
+      window.removeEventListener('focus', handleUsersUpdated);
+    };
   }, []);
 
+  useIonViewWillEnter(() => {
+    fetchData();
+    fetchUsers();
+  });
+
   const openCreateModal = (isCombo: boolean, archetype: 'REVENTA' | 'FORMULA' | 'SERVICIO' = 'REVENTA') => {
+    fetchUsers();
     setProductToEdit(null);
     setIsCreatingCombo(isCombo);
     setSelectedArchetype(archetype);
@@ -127,6 +144,7 @@ const Products: React.FC = () => {
   };
 
   const openEditModal = (p: Product) => {
+    fetchUsers();
     setProductToEdit(p);
     setIsCreatingCombo(!!p.isCombo);
     const pType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = 

@@ -351,6 +351,7 @@ const Users: React.FC = () => {
       presentToast({ message: isExisting ? 'Usuario invitado exitosamente' : 'Usuario creado exitosamente', duration: 2000, color: 'success' });
       resetForm();
       fetchUsers();
+      window.dispatchEvent(new CustomEvent('users_updated'));
     } catch (e: any) {
       presentToast({ message: 'Error al procesar: ' + (e.response?.data?.message || e.message), duration: 4000, color: 'danger' });
     }
@@ -456,6 +457,7 @@ const Users: React.FC = () => {
       presentToast({ message: 'Usuario actualizado exitosamente', duration: 2000, color: 'success' });
       setSelectedUserForEdit(null);
       fetchUsers();
+      window.dispatchEvent(new CustomEvent('users_updated'));
     } catch (e: any) {
       presentToast({ message: 'Error al actualizar: ' + (e.response?.data?.message || e.message), duration: 4000, color: 'danger' });
     }
@@ -475,6 +477,7 @@ const Users: React.FC = () => {
               await apiClient.delete(`/users/${id}`);
               presentToast({ message: 'Usuario eliminado exitosamente', duration: 2000, color: 'success' });
               fetchUsers();
+              window.dispatchEvent(new CustomEvent('users_updated'));
             } catch (e: any) {
               presentToast({ message: 'Error al eliminar: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
             }
