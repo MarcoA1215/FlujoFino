@@ -43,6 +43,7 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useImageViewer } from '../context/ImageViewerContext';
 import { requestAndSubscribePush } from '../services/push-notification.service';
+import { formatWhatsAppUrl } from '../utils/whatsapp';
 import { playNotificationSound } from '../utils/audio';
 import { BankSelect } from '../components/BankSelect';
 
@@ -553,9 +554,8 @@ const PublicStore: React.FC = () => {
       lines.push(`📝 *Notas:* ${orderResult.notes}`);
     }
 
-    const text = encodeURIComponent(lines.join('\n'));
-    const url = phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`;
-    window.open(url, '_blank');
+    const message = lines.join('\n');
+    window.open(formatWhatsAppUrl(phone, message), '_blank');
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -833,8 +833,7 @@ const PublicStore: React.FC = () => {
               <IonButton
                 fill="clear"
                 onClick={() => {
-                  const phone = storeData.settings.companyPhone.replace(/\D/g, '');
-                  window.open(`https://wa.me/${phone}`, '_blank');
+                  window.open(formatWhatsAppUrl(storeData.settings.companyPhone), '_blank');
                 }}
               >
                 <IonIcon slot="icon-only" icon={logoWhatsapp} style={{ color: '#25D366', fontSize: '1.5rem' }} />

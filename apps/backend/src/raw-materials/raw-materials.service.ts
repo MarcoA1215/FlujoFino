@@ -1,4 +1,4 @@
-﻿import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DataSource, Repository, IsNull, EntityManager } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RawMaterial } from '../entities/raw-material.entity';
@@ -83,8 +83,12 @@ export class RawMaterialsService {
   }
 
   async restock(tenantId: string, id: string, dto: RestockRawMaterialDto) {
-    if (dto.quantity <= 0) throw new BadRequestException('La cantidad debe ser mayor a 0');
-    if (dto.totalCost < 0) throw new BadRequestException('El costo no puede ser negativo');
+    if (!Number.isFinite(Number(dto.quantity)) || Number(dto.quantity) <= 0) {
+      throw new BadRequestException('La cantidad debe ser un número finito mayor a 0');
+    }
+    if (!Number.isFinite(Number(dto.totalCost)) || Number(dto.totalCost) < 0) {
+      throw new BadRequestException('El costo debe ser un número finito mayor o igual a 0');
+    }
     return this.dataSource.transaction(async (manager) => {
       const material = await manager.findOne(RawMaterial, { where: { tenantId, id } });
       if (!material) throw new NotFoundException('Insumo no encontrado');

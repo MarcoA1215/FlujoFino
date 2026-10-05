@@ -58,16 +58,29 @@ export const StockOperationModal: React.FC<Props> = ({ material, operationType, 
             }
           } catch (e) {}
         }
-        if (!effectiveRate || effectiveRate <= 0) {
-          effectiveRate = 1;
+        if (currency === 'VES') {
+          if (!effectiveRate || effectiveRate <= 0) {
+            presentToast({
+              message: 'La tasa de cambio en Bolívares no está configurada o es inválida. Configúrala antes de registrar compras en Bs.',
+              duration: 3500,
+              color: 'warning'
+            });
+            return;
+          }
         }
 
         const costUSD: number = currency === 'VES'
           ? Number(cost) / effectiveRate
           : Number(cost);
+
+        if (!Number.isFinite(costUSD) || costUSD <= 0) {
+          presentToast({ message: 'El costo calculado no es válido', duration: 2500, color: 'danger' });
+          return;
+        }
+
         await apiClient.post(`/raw-materials/${material.id}/restock`, {
           quantity: finalQuantity,
-          totalCost: costUSD
+          totalCost: Number(costUSD.toFixed(4))
         });
         presentToast({ message: 'Compra registrada', duration: 2000, color: 'success' });
       } else if (operationType === 'loss') {

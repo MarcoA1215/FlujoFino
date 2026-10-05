@@ -760,8 +760,9 @@ const PublicBooking: React.FC = () => {
               <IonButton
                 fill="clear"
                 onClick={() => {
-                  const phone = companyPhone.replace(/\D/g, '');
-                  window.open(`https://wa.me/${phone}`, '_blank');
+                  let clean = companyPhone.replace(/\D/g, '');
+                  if (clean.startsWith('0')) clean = `58${clean.slice(1)}`;
+                  window.open(`https://wa.me/${clean}`, '_blank');
                 }}
               >
                 <IonIcon slot="icon-only" icon={logoWhatsapp} style={{ color: '#25D366', fontSize: '1.5rem' }} />

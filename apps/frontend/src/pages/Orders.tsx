@@ -26,6 +26,7 @@ import { normalizeBankName } from '../constants/banks';
 import type { DeliveryZone } from '../types';
 import { AuthContext } from '../context/AuthContext';
 import AppHeader from '../components/AppHeader';
+import { formatWhatsAppUrl } from '../utils/whatsapp';
 
 type OrderItem = {
   id: string;
@@ -217,11 +218,10 @@ const Orders: React.FC = () => {
     try {
       await apiClient.patch(`/orders/${order.id}/confirm-supplier`, {});
       presentToast({ message: 'Disponibilidad confirmada con éxito', duration: 2500, color: 'success' });
-      const cleanPhone = String(order.customerPhone || '').replace(/\D/g, '');
       const shortId = String(order.id || '').slice(0, 8).toUpperCase();
-      if (cleanPhone) {
-        const msg = encodeURIComponent(`Hola ${order.customerName || 'Cliente'}, ¡confirmamos disponibilidad de tu encargo #${shortId} con el distribuidor! Ya puedes proceder a realizar el pago o abono para apartar tus prendas/artículos.`);
-        window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
+      if (order.customerPhone) {
+        const msg = `Hola ${order.customerName || 'Cliente'}, ¡confirmamos disponibilidad de tu encargo #${shortId} con el distribuidor! Ya puedes proceder a realizar el pago o abono para apartar tus prendas/artículos.`;
+        window.open(formatWhatsAppUrl(order.customerPhone, msg), '_blank');
       }
       fetchOrders();
     } catch (e: any) {
@@ -244,10 +244,9 @@ const Orders: React.FC = () => {
             try {
               await apiClient.patch(`/orders/${order.id}/reject-supplier`, {});
               presentToast({ message: 'Encargo cancelado por falta de stock en proveedor', duration: 2500, color: 'medium' });
-              const cleanPhone = String(order.customerPhone || '').replace(/\D/g, '');
-              if (cleanPhone) {
-                const msg = encodeURIComponent(`Hola ${order.customerName || 'Cliente'}, lamentamos informarte que los artículos de tu encargo #${shortId} están temporalmente agotados con el distribuidor.`);
-                window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
+              if (order.customerPhone) {
+                const msg = `Hola ${order.customerName || 'Cliente'}, lamentamos informarte que los artículos de tu encargo #${shortId} están temporalmente agotados con el distribuidor.`;
+                window.open(formatWhatsAppUrl(order.customerPhone, msg), '_blank');
               }
               fetchOrders();
             } catch (e) {
@@ -562,7 +561,6 @@ const Orders: React.FC = () => {
               const isPaid = order.paymentStatus === PaymentStatus.PAID;
               const isPartial = order.paymentStatus === PaymentStatus.PARTIAL;
 
-              const cleanPhone = String(order.customerPhone || '').replace(/\D/g, '');
               const shortId = String(order.id || '').slice(0, 8).toUpperCase();
               const formattedDate = (() => {
                 if (!order.createdAt) return '';
@@ -604,9 +602,9 @@ const Orders: React.FC = () => {
                       <div>
                         <div style={{ fontSize: '16px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span>{order.customerName || 'Cliente General'}</span>
-                          {cleanPhone && (
+                          {order.customerPhone && (
                             <a
-                              href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(`Hola ${order.customerName || 'Cliente'}, te escribimos respecto a tu pedido #${shortId}.`)}`}
+                              href={formatWhatsAppUrl(order.customerPhone, `Hola ${order.customerName || 'Cliente'}, te escribimos respecto a tu pedido #${shortId}.`)}
                               target="_blank"
                               rel="noreferrer"
                               style={{ color: '#10B981', display: 'inline-flex' }}
@@ -1587,8 +1585,8 @@ const Orders: React.FC = () => {
                 presentToast({ message: 'Ingresa un monto válido para el abono', duration: 2500, color: 'warning' });
                 return;
               }
-              const isOpenTab = selectedOrderForAbono.paymentMethod === 'PENDING' || Boolean(selectedOrderForAbono.tableNumber);
-              if (effectiveUsd > restante + 0.01 && !isOpenTab) {
+              const isTableTab = Boolean(selectedOrderForAbono.tableNumber);
+              if (effectiveUsd > restante + 0.05 && !isTableTab) {
                 presentToast({ message: `El abono no puede superar el saldo restante ($${restante.toFixed(2)})`, duration: 3000, color: 'warning' });
                 return;
               }

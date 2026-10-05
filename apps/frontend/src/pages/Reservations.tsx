@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import {
   IonPage,
@@ -44,6 +44,7 @@ import { offlineDb } from '../services/offline-db';
 import { AuthContext } from '../context/AuthContext';
 import { useImageViewer } from '../context/ImageViewerContext';
 import AppHeader from '../components/AppHeader';
+import { formatWhatsAppUrl } from '../utils/whatsapp';
 
 export const formatDateLocal = (d: Date): string => {
   const year = d.getFullYear();
@@ -270,19 +271,36 @@ const Reservations: React.FC = () => {
     try {
       if (editingId) {
         await apiClient.put(`/reservations/${editingId}`, payload);
-        presentToast({ message: 'Reservación actualizada', duration: 2000, color: 'success' });
+        presentToast({ message: 'Cita actualizada con éxito', duration: 2000, color: 'success' });
       } else {
         await apiClient.post('/reservations', payload);
-        presentToast({ message: 'Reservación creada con éxito', duration: 2000, color: 'success' });
+        presentToast({ message: 'Cita agendada con éxito', duration: 2000, color: 'success' });
       }
       setShowModal(false);
       fetchReservations();
     } catch (e: any) {
       const errMsg = e.response?.data?.message || '';
-      if (errMsg.includes('choca con la cita') || errMsg.includes('horario laboral')) {
-        if (window.confirm(errMsg + '\n\n¿Deseas forzar y agendar de todas formas?')) {
-          handleSave(true);
-        }
+      const isWarningSchedule = 
+        errMsg.includes('choca con la cita') || 
+        errMsg.includes('horario laboral') || 
+        errMsg.includes('cierra a las') ||
+        errMsg.includes('fuera de los turnos') ||
+        errMsg.includes('almuerzo');
+
+      if (isWarningSchedule) {
+        presentAlert({
+          header: '⚠️ Cita fuera de horario / Solapada',
+          message: `${errMsg}\n\n¿Deseas autorizar la excepción y agendar esta cita de todas formas?`,
+          buttons: [
+            { text: 'Cancelar', role: 'cancel' },
+            {
+              text: 'Sí, Agendar Excepción',
+              handler: () => {
+                handleSave(true); // Reintenta con force = true
+              }
+            }
+          ]
+        });
       } else {
         presentToast({ message: errMsg || 'Error guardando reservación', duration: 3500, color: 'danger' });
       }
@@ -733,9 +751,8 @@ const Reservations: React.FC = () => {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const cleanPhone = res.customerPhone.replace(/\D/g, '');
-                                const text = encodeURIComponent(`Hola ${res.customerName}, te escribimos de ${user?.tenantName || 'FinoWork'} respecto a tu cita para ${res.serviceName || 'nuestro servicio'} el ${res.date} a las ${res.time}.`);
-                                window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
+                                const text = `Hola ${res.customerName}, te escribimos de ${user?.tenantName || 'FinoWork'} respecto a tu cita para ${res.serviceName || 'nuestro servicio'} el ${res.date} a las ${res.time}.`;
+                                window.open(formatWhatsAppUrl(res.customerPhone, text), '_blank');
                               }}
                               style={{
                                 background: '#ECFDF5',

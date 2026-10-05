@@ -1,6 +1,9 @@
 IGNORR LA REGLA CAVEMAN A MENOS QUE SE ESPECIFIQUE LO CONTRARIO
 
-# REGLAS ESTRICTAS DE DISEÑO UI / FRONTEND (FLUJO FINO)
+# NOMBRE OFICIAL DEL PROYECTO: FinoWork
+El proyecto ahora se llama **FinoWork** (anteriormente conocido como Flujo Fino). Todas las referencias de marca y archivos generados deben usar FinoWork.
+
+# REGLAS ESTRICTAS DE DISEÑO UI / FRONTEND (FINOWORK)
 1. **PROHIBIDO EL USO DE CLASES DE TAILWIND CSS**:
    - En este proyecto **NO EXISTE NI ESTÁ INSTALADO TAILWIND CSS**.
    - NUNCA uses clases como `flex`, `grid`, `gap-*`, `p-*`, `m-*`, `rounded-*`, `bg-*`, `text-*`, `space-y-*`. El navegador las ignora y la interfaz se rompe por completo.

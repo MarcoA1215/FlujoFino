@@ -203,6 +203,13 @@ export class OrdersService {
     if (amount <= 0) throw new BadRequestException('El monto debe ser mayor a 0');
     const order = await this.dataSource.getRepository(Order).findOne({ where: { tenantId, id: orderId } });
     if (!order) throw new Error("Order not found");
+
+    const restante = Math.max(0, Number((order.totalAmount - (order.abonosTotal || 0)).toFixed(2)));
+    // Si no es una cuenta abierta de mesa en curso, no permitir superar el total pendiente
+    if (!order.tableNumber && amount > restante + 0.05) {
+      throw new BadRequestException(`El abono ($${amount.toFixed(2)}) supera el saldo restante ($${restante.toFixed(2)})`);
+    }
+
     const history = order.abonosHistory || [];
     history.push({ 
       id: Date.now().toString(), 

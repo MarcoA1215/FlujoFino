@@ -754,40 +754,43 @@ const Pos: React.FC = () => {
       return;
     }
 
-    if (paymentMethod === 'USD') {
-      if (usdReceived === '' || usdReceived === undefined || isNaN(Number(usdReceived))) {
-        presentToast({
-          message: 'Por favor ingresa el monto de efectivo recibido en divisas ($)',
-          duration: 3000,
-          color: 'warning'
-        });
-        return;
+    // Caso 9: Si la orden tiene 100% de descuento ($0.00), permitir confirmar como cortesía/descuento total
+    if (totalCart > 0) {
+      if (paymentMethod === 'USD') {
+        if (usdReceived === '' || usdReceived === undefined || isNaN(Number(usdReceived))) {
+          presentToast({
+            message: 'Por favor ingresa el monto de efectivo recibido en divisas ($)',
+            duration: 3000,
+            color: 'warning'
+          });
+          return;
+        }
+        if (Number(usdReceived) < totalCart) {
+          presentToast({
+            message: `El monto recibido ($${Number(usdReceived).toFixed(2)}) es menor al total a pagar ($${totalCart.toFixed(2)})`,
+            duration: 3000,
+            color: 'warning'
+          });
+          return;
+        }
       }
-      if (Number(usdReceived) < totalCart) {
-        presentToast({
-          message: `El monto recibido ($${Number(usdReceived).toFixed(2)}) es menor al total a pagar ($${totalCart.toFixed(2)})`,
-          duration: 3000,
-          color: 'warning'
-        });
-        return;
-      }
-    }
 
-    if (paymentMethod === 'PAGO_MOVIL') {
-      const cleanRef = pagoMovilRef.trim();
-      if (!cleanRef || cleanRef.length < 4) {
-        presentToast({
-          message: 'La referencia de Pago Móvil debe contener al menos 4 dígitos numéricos',
-          duration: 3000,
-          color: 'warning'
-        });
+      if (paymentMethod === 'PAGO_MOVIL') {
+        const cleanRef = pagoMovilRef.trim();
+        if (!cleanRef || cleanRef.length < 4) {
+          presentToast({
+            message: 'La referencia de Pago Móvil debe contener al menos 4 dígitos numéricos',
+            duration: 3000,
+            color: 'warning'
+          });
+          return;
+        }
+      }
+
+      if (paymentMethod === 'PUNTO' && !puntoRef.trim()) {
+        presentToast({ message: 'Por favor ingresa la referencia o voucher del Punto de Venta', duration: 2500, color: 'warning' });
         return;
       }
-    }
-
-    if (paymentMethod === 'PUNTO' && !puntoRef.trim()) {
-      presentToast({ message: 'Por favor ingresa la referencia o voucher del Punto de Venta', duration: 2500, color: 'warning' });
-      return;
     }
 
     if (paymentMethod === 'BINANCE' && !binanceRef.trim()) {
@@ -1656,9 +1659,17 @@ const Pos: React.FC = () => {
                     <input
                       type="number"
                       min="0"
+                      max={discountType === 'PERCENTAGE' ? '100' : undefined}
                       step="any"
                       value={discountValue}
-                      onChange={e => setDiscountValue(e.target.value)}
+                      onChange={e => {
+                        const v = e.target.value;
+                        if (discountType === 'PERCENTAGE' && Number(v) > 100) {
+                          setDiscountValue('100');
+                        } else {
+                          setDiscountValue(v);
+                        }
+                      }}
                       placeholder={discountType === 'FIXED' ? 'Monto ($)' : 'Porcentaje (%)'}
                       style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#ffffff', color: '#0F172A' }}
                     />

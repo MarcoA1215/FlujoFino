@@ -1,4 +1,4 @@
-﻿import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Reservation } from '../entities/reservation.entity';
@@ -22,7 +22,7 @@ export class ReservationsService {
     return this.repo.find({ where: { tenantId }, order: { date: 'ASC', time: 'ASC' } });
   }
 
-  async validateBusinessHours(tenantId: string, date: string, time: string) {
+  async validateBusinessHours(tenantId: string, date: string, time: string, durationMinutes = 30) {
     const settingsRepo = this.repo.manager.getRepository('Settings');
     const settings: any = await settingsRepo.findOne({ where: { tenantId } });
     if (!settings || !settings.businessHours) return;
@@ -42,25 +42,34 @@ export class ReservationsService {
     };
 
     const reqMins = toMins(time);
+    const reqEndMins = reqMins + durationMinutes;
     const start1 = toMins(dayConfig.startTime || '08:00');
     const end1 = toMins(dayConfig.endTime || '18:00');
-    const inShift1 = reqMins >= start1 && reqMins < end1;
+    const inShift1 = reqMins >= start1 && reqEndMins <= end1;
 
     let inShift2 = false;
     if (dayConfig.hasSecondShift && dayConfig.secondStartTime && dayConfig.secondEndTime) {
       const start2 = toMins(dayConfig.secondStartTime);
       const end2 = toMins(dayConfig.secondEndTime);
-      inShift2 = reqMins >= start2 && reqMins < end2;
+      inShift2 = reqMins >= start2 && reqEndMins <= end2;
     }
 
     if (!inShift1 && !inShift2) {
+      const formatTime = (m: number) => {
+        const h = Math.floor(m / 60);
+        const min = m % 60;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12;
+        return `${h12}:${min.toString().padStart(2, '0')} ${ampm}`;
+      };
+
       if (dayConfig.hasSecondShift) {
         throw new BadRequestException(
-          `El horario de atención es de ${dayConfig.startTime} a ${dayConfig.endTime} y de ${dayConfig.secondStartTime} a ${dayConfig.secondEndTime}. La hora ${time} está fuera de los turnos laborales.`
+          `El horario de atención es de ${dayConfig.startTime} a ${dayConfig.endTime} y de ${dayConfig.secondStartTime} a ${dayConfig.secondEndTime}. La cita terminaría a las ${formatTime(reqEndMins)}, pero el local está fuera de los turnos de apertura.`
         );
       } else {
         throw new BadRequestException(
-          `El horario laboral es de ${dayConfig.startTime} a ${dayConfig.endTime}. No puedes agendar a las ${time}.`
+          `La cita terminaría a las ${formatTime(reqEndMins)}, pero el local cierra a las ${dayConfig.endTime}.`
         );
       }
     }
@@ -184,9 +193,40 @@ export class ReservationsService {
     }
   }
 
+  private async calculateServiceDuration(tenantId: string, serviceId?: string, serviceName?: string): Promise<number> {
+    const settingsRepo = this.repo.manager.getRepository('Settings');
+    const settings: any = await settingsRepo.findOne({ where: { tenantId } });
+    const interval = Number(settings?.slotInterval) || 30;
+
+    const productRepo = this.repo.manager.getRepository('Product');
+    const products: any[] = await productRepo.find({ where: { tenantId } });
+    const productMap = new Map(products.map(p => [p.id, p]));
+    const productNameMap = new Map(products.map(p => [p.name.trim().toLowerCase(), p]));
+
+    let reqDuration = 0;
+    if (serviceId) {
+      const sIds = serviceId.split(',').map(s => s.trim()).filter(Boolean);
+      for (const sId of sIds) {
+        const sp = productMap.get(sId);
+        if (sp && sp.durationMinutes) reqDuration += Number(sp.durationMinutes);
+        else reqDuration += interval;
+      }
+    }
+    if (reqDuration === 0 && serviceName) {
+      const names = serviceName.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      for (const nm of names) {
+        const sp = productNameMap.get(nm);
+        if (sp && sp.durationMinutes) reqDuration += Number(sp.durationMinutes);
+        else reqDuration += interval;
+      }
+    }
+    return reqDuration > 0 ? reqDuration : interval;
+  }
+
   async create(tenantId: string, dto: any) {
     if (dto.date && dto.time && !dto.force) {
-      await this.validateBusinessHours(tenantId, dto.date, dto.time);
+      const duration = await this.calculateServiceDuration(tenantId, dto.serviceId, dto.serviceName);
+      await this.validateBusinessHours(tenantId, dto.date, dto.time, duration);
       await this.validateSlotOverlap(tenantId, dto.date, dto.time, dto.serviceId, dto.serviceName, undefined, dto.employeeId);
     }
     if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
@@ -220,7 +260,8 @@ export class ReservationsService {
 
   async update(tenantId: string, id: string, dto: any) {
     if (dto.date && dto.time && !dto.force) {
-      await this.validateBusinessHours(tenantId, dto.date, dto.time);
+      const duration = await this.calculateServiceDuration(tenantId, dto.serviceId, dto.serviceName);
+      await this.validateBusinessHours(tenantId, dto.date, dto.time, duration);
       await this.validateSlotOverlap(tenantId, dto.date, dto.time, dto.serviceId, dto.serviceName, id, dto.employeeId);
     }
     if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
