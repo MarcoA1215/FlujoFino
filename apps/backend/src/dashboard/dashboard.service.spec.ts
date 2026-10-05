@@ -123,8 +123,8 @@ describe('DashboardService', () => {
 
       rawMaterialRepo.find?.mockImplementation(async (options: any) => {
         expect(options.where).toEqual([
-          { tenantId: 'tenant-123', isActive: true },
-          { tenantId: 'tenant-123', isActive: IsNull() },
+          { tenantId: '12345678-1234-4234-8234-123456789abc', isActive: true },
+          { tenantId: '12345678-1234-4234-8234-123456789abc', isActive: IsNull() },
         ]);
         return [activeRawMaterial];
       });
@@ -148,7 +148,7 @@ describe('DashboardService', () => {
         },
       ]);
 
-      const summary = await service.getSummary('tenant-123');
+      const summary = await service.getSummary('12345678-1234-4234-8234-123456789abc');
 
       // Validar que el insumo archivado con stock 0 NO está en lowStockMaterials
       const archivedInLowStock = summary.lowStockMaterials.find((rm: any) => rm.id === 'archived-mat-999');

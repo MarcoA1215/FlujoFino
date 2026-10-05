@@ -7,6 +7,7 @@ import {
 } from '@capacitor/push-notifications';
 import axios from 'axios';
 import { useEffect } from 'react';
+import { DEFAULT_SUPERADMIN_EMAIL, UserRole } from '@finowork/shared-types';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const FALLBACK_VAPID_PUBLIC_KEY =
@@ -201,8 +202,9 @@ export function usePushNotifications(
     if (!identifier) return;
 
     const isSuperAdmin =
-      user.role === 'SUPERADMIN' ||
-      user.email === 'superadmin@flujofino.com';
+      user.role === UserRole.SUPERADMIN ||
+      (user.role as string) === 'SUPERADMIN' ||
+      user.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
 
     const role = isSuperAdmin ? 'SUPERADMIN' : (user.role || 'ADMIN');
     registerPushNotifications(identifier, user.tenantId, role).catch(console.error);

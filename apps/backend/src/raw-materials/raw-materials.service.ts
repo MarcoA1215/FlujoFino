@@ -11,6 +11,7 @@ import { UpdateRawMaterialDto } from './dto/update-raw-material.dto';
 import { RegisterLossDto } from './dto/register-loss.dto';
 import { UpdateMovementDto } from './dto/update-movement.dto';
 import { ArchiveRawMaterialDto } from './dto/archive-raw-material.dto';
+import { ScaledMath } from '../common/utils/scaled-math';
 
 @Injectable()
 export class RawMaterialsService {
@@ -48,7 +49,8 @@ export class RawMaterialsService {
 
   async create(tenantId: string, dto: CreateRawMaterialDto) {
     return this.dataSource.transaction(async (manager) => {
-      const material = manager.create(RawMaterial, { tenantId,
+      const material = manager.create(RawMaterial, {
+        tenantId,
         name: dto.name,
         unit: dto.unit,
         costPerUnit: dto.costPerUnit,
@@ -61,11 +63,16 @@ export class RawMaterialsService {
       const savedMaterial = await manager.save(RawMaterial, material);
 
       if (dto.initialStock && dto.initialStock > 0) {
-        const movement = manager.create(StockMovement, { tenantId,
+        const scaledStock = ScaledMath.toScaled(dto.initialStock);
+        const scaledCost = ScaledMath.toScaled(dto.costPerUnit);
+        const totalCost = ScaledMath.fromScaled(ScaledMath.mul(scaledStock, scaledCost));
+
+        const movement = manager.create(StockMovement, {
+          tenantId,
           rawMaterialId: savedMaterial.id,
           type: MovementType.IN_PURCHASE,
           quantity: dto.initialStock,
-          totalCost: dto.initialStock * dto.costPerUnit,
+          totalCost: totalCost,
           description: 'Stock inicial',
         });
         await manager.save(StockMovement, movement);
@@ -93,24 +100,32 @@ export class RawMaterialsService {
       const material = await manager.findOne(RawMaterial, { where: { tenantId, id } });
       if (!material) throw new NotFoundException('Insumo no encontrado');
 
-      // Cálculo de Precio Promedio Ponderado (WAC)
-      const currentTotalValue = material.stockQuantity * material.costPerUnit;
-      const newTotalValue = dto.totalCost;
-      const newTotalStock = material.stockQuantity + dto.quantity;
+      // Cálculo de Precio Promedio Ponderado (WAC) con precisión entera escalada
+      const scaledCurrentStock = ScaledMath.toScaled(material.stockQuantity);
+      const scaledCurrentCost = ScaledMath.toScaled(material.costPerUnit);
+      const scaledCurrentTotalValue = ScaledMath.mul(scaledCurrentStock, scaledCurrentCost);
 
-      if (newTotalStock > 0) {
-        material.costPerUnit = (currentTotalValue + newTotalValue) / newTotalStock;
+      const scaledNewTotalValue = ScaledMath.toScaled(dto.totalCost);
+      const scaledAddQty = ScaledMath.toScaled(dto.quantity);
+      const scaledNewTotalStock = ScaledMath.add(scaledCurrentStock, scaledAddQty);
+
+      if (scaledNewTotalStock > 0n) {
+        const scaledCombinedValue = ScaledMath.add(scaledCurrentTotalValue, scaledNewTotalValue);
+        const scaledCostPerUnit = ScaledMath.div(scaledCombinedValue, scaledNewTotalStock);
+        material.costPerUnit = ScaledMath.fromScaled(scaledCostPerUnit);
       } else {
-        material.costPerUnit = dto.totalCost / dto.quantity; // Fallback de seguridad
+        const scaledCostPerUnit = ScaledMath.div(scaledNewTotalValue, scaledAddQty);
+        material.costPerUnit = ScaledMath.fromScaled(scaledCostPerUnit);
       }
       
-      // Actualizar stock
-      material.stockQuantity = newTotalStock;
+      // Actualizar stock sin truncamiento forzado
+      material.stockQuantity = ScaledMath.fromScaled(scaledNewTotalStock);
       
       const updatedMaterial = await manager.save(RawMaterial, material);
 
       // Registrar el movimiento de entrada (Inversión)
-      const movement = manager.create(StockMovement, { tenantId,
+      const movement = manager.create(StockMovement, {
+        tenantId,
         rawMaterialId: id,
         type: MovementType.IN_PURCHASE,
         quantity: dto.quantity,
@@ -129,20 +144,26 @@ export class RawMaterialsService {
       const material = await manager.findOne(RawMaterial, { where: { tenantId, id } });
       if (!material) throw new NotFoundException('Insumo no encontrado');
 
-      if (material.stockQuantity < dto.quantity) {
+      const scaledStock = ScaledMath.toScaled(material.stockQuantity);
+      const scaledLossQty = ScaledMath.toScaled(dto.quantity);
+
+      if (scaledStock < scaledLossQty) {
         throw new BadRequestException('Stock insuficiente para la merma solicitada');
       }
 
-      material.stockQuantity -= dto.quantity;
+      const scaledRemainingStock = ScaledMath.sub(scaledStock, scaledLossQty);
+      material.stockQuantity = ScaledMath.fromScaled(scaledRemainingStock);
       const updatedMaterial = await manager.save(RawMaterial, material);
 
-      const lossValue = dto.quantity * material.costPerUnit;
+      const scaledCostPerUnit = ScaledMath.toScaled(material.costPerUnit);
+      const lossValue = ScaledMath.fromScaled(ScaledMath.mul(scaledLossQty, scaledCostPerUnit));
       
-      const movement = manager.create(StockMovement, { tenantId,
+      const movement = manager.create(StockMovement, {
+        tenantId,
         rawMaterialId: id,
         type: MovementType.LOSS,
         quantity: dto.quantity,
-        totalCost: lossValue, // registramos el costo que se perdió
+        totalCost: lossValue,
         description: `Merma/Pérdida: ${dto.reason}`,
       });
       await manager.save(StockMovement, movement);
@@ -169,31 +190,34 @@ export class RawMaterialsService {
       order: { createdAt: 'ASC' }
     });
 
-    let currentStock = 0;
-    let currentCostPerUnit = 0;
+    let scaledCurrentStock = 0n;
+    let scaledCurrentCostPerUnit = 0n;
 
     for (const mov of movements) {
-      const qty = Number(mov.quantity) || 0;
-      const cost = Number(mov.totalCost) || 0;
+      const scaledQty = ScaledMath.toScaled(mov.quantity);
+      const scaledCost = ScaledMath.toScaled(mov.totalCost);
 
       if (mov.type === MovementType.IN_PURCHASE || (mov.type as string).startsWith('IN')) {
-        const prevStock = currentStock;
-        const prevValue = prevStock * currentCostPerUnit;
-        const newStock = prevStock + qty;
+        const scaledPrevStock = scaledCurrentStock;
+        const scaledPrevValue = ScaledMath.mul(scaledPrevStock, scaledCurrentCostPerUnit);
+        const scaledNewStock = ScaledMath.add(scaledPrevStock, scaledQty);
 
-        if (newStock > 0) {
-          currentCostPerUnit = (prevValue + cost) / newStock;
+        if (scaledNewStock > 0n) {
+          const scaledCombinedValue = ScaledMath.add(scaledPrevValue, scaledCost);
+          scaledCurrentCostPerUnit = ScaledMath.div(scaledCombinedValue, scaledNewStock);
         } else {
-          currentCostPerUnit = qty > 0 ? cost / qty : 0;
+          scaledCurrentCostPerUnit = scaledQty > 0n ? ScaledMath.div(scaledCost, scaledQty) : 0n;
         }
-        currentStock = newStock;
+        scaledCurrentStock = scaledNewStock;
       } else {
-        currentStock = Math.max(0, currentStock - qty);
+        const scaledSubStock = ScaledMath.sub(scaledCurrentStock, scaledQty);
+        scaledCurrentStock = scaledSubStock > 0n ? scaledSubStock : 0n;
       }
     }
 
-    material.stockQuantity = Number(currentStock.toFixed(4));
-    material.costPerUnit = Number(currentCostPerUnit.toFixed(4));
+    // Almacenar escala completa sin truncamiento preventivo de .toFixed(4)
+    material.stockQuantity = ScaledMath.fromScaled(scaledCurrentStock);
+    material.costPerUnit = ScaledMath.fromScaled(scaledCurrentCostPerUnit);
     return manager.save(RawMaterial, material);
   }
 
@@ -231,7 +255,6 @@ export class RawMaterialsService {
       .select(['p.id AS "id"', 'p.name AS "name"'])
       .getRawMany();
 
-    // Eliminar duplicados si una receta tiene múltiples entradas para el mismo insumo
     const uniqueMap = new Map<string, { id: string; name: string }>();
     for (const item of rawItems) {
       if (!uniqueMap.has(item.id)) {
@@ -253,7 +276,6 @@ export class RawMaterialsService {
 
     return this.dataSource.transaction(async (manager) => {
       if (dto?.removeFromRecipes) {
-        // Eliminar recipe_item donde rawMaterialId = id y product.tenantId = tenantId
         await manager
           .createQueryBuilder()
           .delete()

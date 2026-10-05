@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -32,11 +32,11 @@ import {
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
-import { UserRole } from '@finowork/shared-types';
+import { UserRole, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
 
 const FeedbackPage: React.FC = () => {
   const { user } = useContext(AuthContext);
-  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || user?.email === 'superadmin@flujofino.com';
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
 
   const [tab, setTab] = useState<'clientes' | 'soporte'>('clientes');
   const [feedbacks, setFeedbacks] = useState<any[]>([]);

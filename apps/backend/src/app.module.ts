@@ -69,7 +69,9 @@ import { PromotersModule } from './promoters/promoters.module';
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
         entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription, SalaryAdvance, Investment, Promoter, PromoterCommission],
-        synchronize: true,
+        synchronize: configService.get<string>('DB_SYNCHRONIZE') !== undefined
+          ? configService.get<string>('DB_SYNCHRONIZE') === 'true'
+          : configService.get<string>('NODE_ENV') !== 'production',
       }),
       inject: [ConfigService],
     }),

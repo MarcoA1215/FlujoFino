@@ -182,6 +182,7 @@ const PublicStore: React.FC = () => {
   useEffect(() => {
     if (!orderResult?.orderId) return;
 
+    let isMounted = true;
     let currentStatus = orderResult.status || 'PENDING';
     setLiveOrderStatus(currentStatus);
     setLivePaymentStatus(orderResult.paymentStatus || 'PENDING');
@@ -189,10 +190,11 @@ const PublicStore: React.FC = () => {
     const interval = setInterval(async () => {
       try {
         const res = await axios.get(`${apiBase}/public/store/order/${orderResult.orderId}`);
+        if (!isMounted) return;
         const newStatus = res.data?.status;
         const newPayStatus = res.data?.paymentStatus;
 
-        if (newPayStatus && newPayStatus !== livePaymentStatus) {
+        if (newPayStatus) {
           setLivePaymentStatus(newPayStatus);
         }
 
@@ -210,7 +212,10 @@ const PublicStore: React.FC = () => {
       } catch (err) {}
     }, 6000);
 
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [orderResult?.orderId]);
 
   const getStatusLabel = (status: string) => {

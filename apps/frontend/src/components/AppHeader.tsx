@@ -144,11 +144,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     window.addEventListener('offline', handleOffline);
     window.addEventListener('settings_updated', handleSettingsUpdated);
 
-    refreshPendingCount();
+    let isMounted = true;
+    const safeRefresh = async () => {
+      if (isMounted) await refreshPendingCount();
+    };
+
+    safeRefresh();
     fetchRate();
 
-    const interval = setInterval(refreshPendingCount, 6000);
+    const interval = setInterval(safeRefresh, 6000);
     return () => {
+      isMounted = false;
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('settings_updated', handleSettingsUpdated);
@@ -170,9 +176,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   useEffect(() => {
     if (isAdmin) {
-      fetchPendingAccessRequests();
-      const interval = setInterval(fetchPendingAccessRequests, 15000);
-      return () => clearInterval(interval);
+      let isMounted = true;
+      const safeFetch = async () => {
+        if (isMounted) await fetchPendingAccessRequests();
+      };
+      safeFetch();
+      const interval = setInterval(safeFetch, 15000);
+      return () => {
+        isMounted = false;
+        clearInterval(interval);
+      };
     }
   }, [isAdmin]);
 

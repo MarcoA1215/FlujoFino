@@ -1,10 +1,10 @@
-﻿import React, { useContext } from 'react';
+import React, { useContext } from 'react';
 import { IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, IonListHeader, useIonToast } from '@ionic/react';
 import { useIonRouter } from '@ionic/react';
 import { businessOutline, shieldCheckmarkOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
-import { UserRole } from '@finowork/shared-types';
+import { UserRole, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
 
 const SelectWorkspace: React.FC = () => {
   const { user, login, logout, token } = useContext(AuthContext);
@@ -54,7 +54,7 @@ const SelectWorkspace: React.FC = () => {
     }
   };
 
-  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
   const workspaces = user?.workspaces || [];
   const pending = workspaces.filter((w: any) => w.status === 'PENDING');
   const active = workspaces.filter((w: any) => w.status === 'ACCEPTED');

@@ -1,6 +1,5 @@
-// @ts-nocheck
 import React, { useEffect, useState } from 'react';
-import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, IonInput, useIonToast, IonSelect, IonSelectOption } from '@ionic/react';
+import { IonContent, IonPage, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, useIonToast, IonSelect, IonSelectOption } from '@ionic/react';
 import { calculatorOutline, addOutline, removeOutline, trashOutline, copyOutline, cartOutline } from 'ionicons/icons';
 
 import { apiClient } from '../api/client';
@@ -130,7 +129,7 @@ const Calculator: React.FC = () => {
   return (
     <IonPage>
       <AppHeader title="Calculadora de Presupuestos" />
-      <IonContent fullscreen className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' }}>
+      <IonContent fullscreen className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' } as any}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '90px' }}>
           <div className="ff-search-pill" style={{ marginBottom: '16px' }}>
             <input

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useEffect, useState, useContext, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
@@ -7,18 +6,13 @@ import {
   IonGrid,
   IonRow,
   IonCol,
-  IonButton,
   IonIcon,
   IonSpinner,
   IonModal,
-  IonInput,
   IonSelect,
   IonSelectOption,
   IonToggle,
-  IonBadge,
-  useIonToast,
-  useIonAlert,
-  useIonRouter
+  useIonToast
 } from '@ionic/react';
 import {
   searchOutline,
@@ -31,9 +25,7 @@ import {
   phonePortraitOutline,
   logoBitcoin,
   checkmarkCircle,
-  chevronForwardOutline,
   storefrontOutline,
-  bicycleOutline,
   timeOutline,
   imageOutline,
   arrowForwardOutline
@@ -62,6 +54,11 @@ type Product = {
   isPreAssembled?: boolean;
   comboItems?: any[];
   product_type?: string;
+  stock?: number;
+  physicalStock?: number;
+  is_service?: boolean;
+  availabilityType?: string;
+  isSupplierPreorder?: boolean;
 };
 
 type CartItem = {
@@ -80,9 +77,7 @@ const Pos: React.FC = () => {
   const { openImage } = useImageViewer();
   const { user } = useContext(AuthContext);
   const [presentToast] = useIonToast();
-  const [presentAlert] = useIonAlert();
   const location = useLocation();
-  const router = useIonRouter();
 
   // Products & Categories
   const [products, setProducts] = useState<Product[]>([]);
@@ -127,7 +122,7 @@ const Pos: React.FC = () => {
     } catch (e) {}
     return 'Bs.';
   });
-  const [allowPartialPayments, setAllowPartialPayments] = useState<boolean>(false);
+  const [, setAllowPartialPayments] = useState<boolean>(false);
   const [settings, setSettings] = useState<any>(() => {
     try {
       const saved = localStorage.getItem('flujofino_cached_settings');
@@ -144,12 +139,12 @@ const Pos: React.FC = () => {
 
   // Payment specific fields
   const [pagoMovilRef, setPagoMovilRef] = useState('');
-  const [pagoMovilPhone, setPagoMovilPhone] = useState('');
-  const [pagoMovilCedula, setPagoMovilCedula] = useState('');
+  const [pagoMovilPhone] = useState('');
+  const [pagoMovilCedula] = useState('');
   const [pagoMovilBank, setPagoMovilBank] = useState('');
 
   const [puntoRef, setPuntoRef] = useState('');
-  const [puntoBank, setPuntoBank] = useState('');
+  const [puntoBank] = useState('');
 
   const [binanceRef, setBinanceRef] = useState('');
   const [transferRef, setTransferRef] = useState('');
@@ -1526,12 +1521,12 @@ const Pos: React.FC = () => {
                           placeholder="Selecciona zona de envío..."
                           onIonChange={e => setDeliveryZoneId(e.detail.value)}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-slate-800 text-sm"
-                          style={{ '--padding-start': '6px', '--padding-end': '6px', minHeight: '42px', width: '100%', maxWidth: '100%' }}
+                          style={{ '--padding-start': '6px', '--padding-end': '6px', minHeight: '42px', width: '100%', maxWidth: '100%' } as any}
                         >
                           <IonSelectOption value="">Selecciona zona de envío...</IonSelectOption>
                           {deliveryZones.map(zone => (
                             <IonSelectOption key={zone.id} value={zone.id}>
-                              {zone.name} (+${zone.priceUSD})
+                              {zone.name} (+${zone.feePrice ?? zone.priceUSD ?? 0})
                             </IonSelectOption>
                           ))}
                         </IonSelect>
@@ -1546,7 +1541,7 @@ const Pos: React.FC = () => {
                           placeholder="Sin asignar / A convenir"
                           onIonChange={e => setDeliveryUserId(e.detail.value)}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-slate-800 text-sm"
-                          style={{ '--padding-start': '6px', '--padding-end': '6px', minHeight: '42px', width: '100%', maxWidth: '100%' }}
+                          style={{ '--padding-start': '6px', '--padding-end': '6px', minHeight: '42px', width: '100%', maxWidth: '100%' } as any}
                         >
                           <IonSelectOption value="">Sin asignar / A convenir</IonSelectOption>
                           {employees
@@ -1626,7 +1621,7 @@ const Pos: React.FC = () => {
                         placeholder="Sin asignar"
                         onIonChange={e => setEmployeeId(e.detail.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-slate-800 text-sm"
-                        style={{ '--padding-start': '0px', '--padding-end': '0px', minHeight: '44px' }}
+                        style={{ '--padding-start': '0px', '--padding-end': '0px', minHeight: '44px' } as any}
                       >
                         <IonSelectOption value="">Sin asignar</IonSelectOption>
                         {employees.map(emp => (
@@ -1656,7 +1651,7 @@ const Pos: React.FC = () => {
                       interface="popover"
                       value={discountType}
                       onIonChange={e => setDiscountType(e.detail.value)}
-                      style={{ width: '110px', minHeight: '38px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#ffffff', fontSize: '12px', color: '#0F172A', '--padding-start': '8px', '--padding-end': '8px' }}
+                      style={{ width: '110px', minHeight: '38px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#ffffff', fontSize: '12px', color: '#0F172A', '--padding-start': '8px', '--padding-end': '8px' } as any}
                     >
                       <IonSelectOption value="FIXED">$ Fijo</IonSelectOption>
                       <IonSelectOption value="PERCENTAGE">% Porc.</IonSelectOption>

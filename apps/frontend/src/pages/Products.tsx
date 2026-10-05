@@ -1,8 +1,7 @@
-// @ts-nocheck
 import { refreshOutline, cubeOutline, buildOutline, cutOutline, closeOutline, searchOutline, archiveOutline } from 'ionicons/icons';
 import { IonList, IonItem, IonLabel, IonBadge } from '@ionic/react';
 import React, { useEffect, useState, useMemo } from 'react';
-import { IonToggle, IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonActionSheet, useIonToast, IonIcon, useIonViewWillEnter } from '@ionic/react';
+import { IonToggle, IonContent, IonPage, IonGrid, IonRow, IonCol, IonButton, useIonAlert, useIonActionSheet, useIonToast, IonIcon, useIonViewWillEnter } from '@ionic/react';
 import { apiClient } from '../api/client';
 import type { Product } from '../types';
 import { ProductCard } from '../components/products/ProductCard';

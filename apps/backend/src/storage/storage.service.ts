@@ -1,32 +1,51 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 const sharp = require('sharp');
 
 @Injectable()
 export class StorageService {
-  private s3Client: S3Client;
-  private bucket: string = 'img_catalogo'; // We can use the default or configurable bucket
+  private s3Client: S3Client | null = null;
+  private bucket: string;
 
- constructor(private configService: ConfigService) {
-  this.s3Client = new S3Client({
-    forcePathStyle: true,
-    endpoint: this.configService.get<string>('S3_ENDPOINT') || 'https://tu-proyecto.storage.supabase.co/storage/v1/s3',
-    region: this.configService.get<string>('S3_REGION') || 'us-east-1',
-    credentials: {
-      accessKeyId: this.configService.get<string>('S3_ACCESS_KEY_ID', ''),
-      secretAccessKey: this.configService.get<string>('S3_SECRET_ACCESS_KEY', ''),
-    },
-  });
-}
+  constructor(private configService: ConfigService) {
+    this.bucket = this.configService.get<string>('S3_BUCKET') || '';
+    const endpoint = this.configService.get<string>('S3_ENDPOINT') || '';
+    const accessKeyId = this.configService.get<string>('S3_ACCESS_KEY_ID') || '';
+    const secretAccessKey = this.configService.get<string>('S3_SECRET_ACCESS_KEY') || '';
+    const region = this.configService.get<string>('S3_REGION') || 'us-east-1';
 
-  /**
-   * Submits a file buffer directly to S3 storage bucket, compressing it if it's an image.
-   * Supabase expects the bucket name as part of the S3 URL configuration or as bucket parameter.
-   */
+    if (endpoint && accessKeyId && secretAccessKey) {
+      this.s3Client = new S3Client({
+        forcePathStyle: true,
+        endpoint,
+        region,
+        credentials: {
+          accessKeyId,
+          secretAccessKey,
+        },
+      });
+    }
+  }
+
+  private validateConfig(): void {
+    const missing: string[] = [];
+    if (!this.configService.get<string>('S3_ENDPOINT')) missing.push('S3_ENDPOINT');
+    if (!this.bucket) missing.push('S3_BUCKET');
+    if (!this.configService.get<string>('S3_ACCESS_KEY_ID')) missing.push('S3_ACCESS_KEY_ID');
+    if (!this.configService.get<string>('S3_SECRET_ACCESS_KEY')) missing.push('S3_SECRET_ACCESS_KEY');
+
+    if (missing.length > 0) {
+      throw new InternalServerErrorException(
+        `Configuración de almacenamiento S3 incompleta. Faltan variables de entorno requeridas: ${missing.join(', ')}`
+      );
+    }
+  }
+
   async uploadFile(file: Express.Multer.File, path: string = 'images'): Promise<string> {
+    this.validateConfig();
+
     try {
       const isImage = file.mimetype.startsWith('image/');
       let fileBuffer = file.buffer;
@@ -34,10 +53,9 @@ export class StorageService {
       let extension = file.originalname.split('.').pop() || 'jpg';
 
       if (isImage) {
-        // Compress the image using sharp
         fileBuffer = await sharp(file.buffer)
-          .resize({ width: 1200, withoutEnlargement: true }) // Max width 1200px
-          .webp({ quality: 80 }) // Convert to WebP with 80% quality
+          .resize({ width: 1200, withoutEnlargement: true })
+          .webp({ quality: 80 })
           .toBuffer();
         
         contentType = 'image/webp';
@@ -47,34 +65,49 @@ export class StorageService {
       const fileName = `${path}/${randomUUID()}.${extension}`;
       
       const command = new PutObjectCommand({
-        Bucket: this.bucket, // Supabase storage bucket name. E.g., 'img_catalogo'
+        Bucket: this.bucket,
         Key: fileName,
         Body: fileBuffer,
         ContentType: contentType,
       });
 
-      await this.s3Client.send(command);
+      await this.s3Client!.send(command);
 
-      // Return the public URL or relative path based on whether the bucket is public
-      // Since it's supabase, standard public url format:
       const endpoint = this.configService.get<string>('S3_ENDPOINT') || '';
-      const supabaseHost = endpoint.includes('storage.supabase.co')
-        ? endpoint.replace('/storage/v1/s3', '')
-        : 'https://sobczifocynyrcwfhezm.supabase.co';
-      return `${supabaseHost}/storage/v1/object/public/${this.bucket}/${fileName}`;
+      const customPublicUrl = this.configService.get<string>('S3_PUBLIC_URL');
+      
+      if (customPublicUrl) {
+        return `${customPublicUrl.replace(/\/$/, '')}/${this.bucket}/${fileName}`;
+      }
+
+      if (endpoint.includes('storage.supabase.co')) {
+        const supabaseHost = endpoint.replace('/storage/v1/s3', '');
+        return `${supabaseHost}/storage/v1/object/public/${this.bucket}/${fileName}`;
+      }
+
+      return `${endpoint.replace(/\/$/, '')}/${this.bucket}/${fileName}`;
     } catch (error) {
+      if (error instanceof InternalServerErrorException) throw error;
       console.error('Error uploading file to storage:', error);
-      throw new InternalServerErrorException('Could not upload file');
+      throw new InternalServerErrorException('Error al subir el archivo al almacenamiento S3: ' + (error.message || ''));
     }
   }
 
   async deleteFile(url: string): Promise<void> {
     try {
-      // Extract key from the URL
+      if (!this.bucket || !this.s3Client) return;
       const keyIndex = url.indexOf(`/object/public/${this.bucket}/`);
-      if (keyIndex === -1) return; // Not a valid supabase url for this bucket
+      let key = '';
+      if (keyIndex !== -1) {
+        key = url.substring(keyIndex + `/object/public/${this.bucket}/`.length);
+      } else {
+        const genericIndex = url.indexOf(`/${this.bucket}/`);
+        if (genericIndex !== -1) {
+          key = url.substring(genericIndex + `/${this.bucket}/`.length);
+        }
+      }
 
-      const key = url.substring(keyIndex + `/object/public/${this.bucket}/`.length);
+      if (!key) return;
 
       const command = new DeleteObjectCommand({
         Bucket: this.bucket,

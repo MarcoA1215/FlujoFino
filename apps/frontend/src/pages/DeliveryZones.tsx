@@ -1,6 +1,5 @@
-// @ts-nocheck
 import React, { useEffect, useState } from 'react';
-import { IonContent, IonPage, IonGrid, IonRow, IonCol, IonItem, IonLabel, IonButton, IonIcon, IonList, IonInput, useIonToast, IonText, IonFab, IonFabButton, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons } from '@ionic/react';
+import { IonContent, IonPage, IonButton, IonIcon, useIonToast, IonFab, IonFabButton, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons } from '@ionic/react';
 import { addOutline, trashOutline, pencilOutline, mapOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import type { DeliveryZone } from '../types';
@@ -81,7 +80,7 @@ const DeliveryZones: React.FC = () => {
   return (
     <IonPage>
       <AppHeader title="Zonas de Delivery" />
-      <IonContent fullscreen className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' }}>
+      <IonContent fullscreen className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' } as any}>
         <div style={{ maxWidth: '800px', margin: '0 auto', paddingBottom: '90px' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px' }}>
             <div className="ff-search-pill" style={{ flex: 1 }}>

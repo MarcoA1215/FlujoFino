@@ -78,11 +78,18 @@ const Login: React.FC = () => {
   // Poll every 10 seconds while a request is pending
   useEffect(() => {
     if (!pendingRequestId) return;
-    checkRequestStatus(pendingRequestId);
+    let isMounted = true;
+    const safeCheck = async (reqId: string) => {
+      if (isMounted) await checkRequestStatus(reqId);
+    };
+    safeCheck(pendingRequestId);
     const interval = setInterval(() => {
-      checkRequestStatus(pendingRequestId);
+      safeCheck(pendingRequestId);
     }, 10000);
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [pendingRequestId]);
 
   const handleLogin = async () => {

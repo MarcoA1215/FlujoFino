@@ -71,7 +71,7 @@ export class ReservationsController {
 
   @Delete(':id/abono/:index')
   revertAbono(@Request() req, @Param('id') id: string, @Param('index') index: string) {
-    return this.service.revertAbono(req.user.tenantId, id, parseInt(index, 10));
+    return this.service.revertAbono(req.user.tenantId, id, index);
   }
 
   @Post(':id/notify-delay')

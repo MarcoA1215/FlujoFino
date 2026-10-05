@@ -115,12 +115,22 @@ export class DeliveriesService {
     });
 
     return orders.map(o => {
+      const orderRate = Number(o.exchangeRate) || 0;
+      const historicalRate = orderRate > 0 ? orderRate : exchangeRate;
+
       const fleteUSD = Number(o.deliveryFee || 0);
-      const fleteBS = Number((fleteUSD * exchangeRate).toFixed(2));
+      const fleteBS = Number((fleteUSD * historicalRate).toFixed(2));
 
       const isCashOrder = o.paymentStatus === PaymentStatus.PENDING || o.paymentMethod === 'USD';
       const cashToCollect = isCashOrder ? Math.max(0, Number(o.totalAmount || 0) - Number(o.abonosTotal || 0)) : 0;
-      const cashToCollectBS = Number((cashToCollect * exchangeRate).toFixed(2));
+      let cashToCollectBS = 0;
+      if (isCashOrder && cashToCollect > 0) {
+        if (Number(o.abonosTotal || 0) === 0 && o.amountBs !== undefined && o.amountBs !== null && Number(o.amountBs) > 0) {
+          cashToCollectBS = Number(Number(o.amountBs).toFixed(2));
+        } else {
+          cashToCollectBS = Number((cashToCollect * historicalRate).toFixed(2));
+        }
+      }
 
       return {
         id: o.id,
@@ -214,19 +224,33 @@ export class DeliveriesService {
     let globalCashToCollectBS = 0;
 
     for (const o of orders) {
-      if (!o.deliveryUserId) continue;
+      const driverId = o.deliveryUserId || o.driverId;
+      if (!driverId) continue;
+
+      const orderRate = Number(o.exchangeRate) || 0;
+      const historicalRate = orderRate > 0 ? orderRate : exchangeRate;
 
       const fleteUSD = Number(o.deliveryFee || 0);
-      const fleteBS = Number((fleteUSD * exchangeRate).toFixed(2));
+      const fleteBS = Number((fleteUSD * historicalRate).toFixed(2));
 
       const isCashOrder = o.paymentStatus === PaymentStatus.PENDING || o.paymentMethod === 'USD';
       const cashToCollect = isCashOrder ? Math.max(0, Number(o.totalAmount || 0) - Number(o.abonosTotal || 0)) : 0;
-      const cashToCollectBS = Number((cashToCollect * exchangeRate).toFixed(2));
+      
+      // Prohibido calcular al vuelo con la tasa viva actual del servidor.
+      // Se utiliza estrictamente el equivalente en Bolívares congelado en order.amountBs o la tasa histórica de la orden.
+      let cashToCollectBS = 0;
+      if (isCashOrder && cashToCollect > 0) {
+        if (Number(o.abonosTotal || 0) === 0 && o.amountBs !== undefined && o.amountBs !== null && Number(o.amountBs) > 0) {
+          cashToCollectBS = Number(Number(o.amountBs).toFixed(2));
+        } else {
+          cashToCollectBS = Number((cashToCollect * historicalRate).toFixed(2));
+        }
+      }
 
-      if (!driversMap[o.deliveryUserId]) {
-        const dName = o.deliveryUser?.username || 'Repartidor';
-        driversMap[o.deliveryUserId] = {
-          userId: o.deliveryUserId,
+      if (!driversMap[driverId]) {
+        const dName = o.deliveryUser?.username || o.driver?.username || 'Repartidor';
+        driversMap[driverId] = {
+          userId: driverId,
           username: dName,
           name: dName,
           completedDeliveries: 0,
@@ -238,7 +262,7 @@ export class DeliveriesService {
         };
       }
 
-      const driver = driversMap[o.deliveryUserId];
+      const driver = driversMap[driverId];
       driver.completedDeliveries += 1;
       driver.totalFletesUSD = Number((driver.totalFletesUSD + fleteUSD).toFixed(2));
       driver.totalFletesBS = Number((driver.totalFletesBS + fleteBS).toFixed(2));

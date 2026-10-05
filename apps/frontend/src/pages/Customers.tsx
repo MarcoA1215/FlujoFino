@@ -1,5 +1,4 @@
-﻿// @ts-nocheck
-import React, { useState, useEffect, useMemo, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   IonPage,
   IonHeader,

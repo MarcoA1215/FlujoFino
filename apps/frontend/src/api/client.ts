@@ -18,6 +18,11 @@ export const apiClient = axios.create({
 
 const MUTATION_METHODS = ['post', 'put', 'delete', 'patch'];
 
+// Contador interno estricto de peticiones en vuelo con overlay activo
+let activeRequestsCount = 0;
+
+export const getActiveRequestsCount = () => activeRequestsCount;
+
 apiClient.interceptors.request.use(
   async (config) => {
     // Garantizar que toda petición lleve el token actual aunque defaults aún no haya sincronizado
@@ -30,6 +35,7 @@ apiClient.interceptors.request.use(
 
     const method = config.method?.toLowerCase() || '';
     if (MUTATION_METHODS.includes(method) && !config.skipGlobalLoading) {
+      activeRequestsCount++;
       getGlobalLoadingHandler()?.show(config.loadingMessage || 'Procesando...');
     }
     return config;
@@ -43,7 +49,10 @@ apiClient.interceptors.response.use(
   (response) => {
     const method = response.config.method?.toLowerCase() || '';
     if (MUTATION_METHODS.includes(method) && !response.config.skipGlobalLoading) {
-      getGlobalLoadingHandler()?.hide();
+      activeRequestsCount = Math.max(0, activeRequestsCount - 1);
+      if (activeRequestsCount === 0) {
+        getGlobalLoadingHandler()?.hide();
+      }
     }
     return response;
   },
@@ -51,10 +60,30 @@ apiClient.interceptors.response.use(
     if (error.config) {
       const method = error.config.method?.toLowerCase() || '';
       if (MUTATION_METHODS.includes(method) && !error.config.skipGlobalLoading) {
-        getGlobalLoadingHandler()?.hide();
+        activeRequestsCount = Math.max(0, activeRequestsCount - 1);
+        if (activeRequestsCount === 0) {
+          getGlobalLoadingHandler()?.hide();
+        }
       }
     }
+
+    // Manejo de expiración de token (401)
+    if (error.response?.status === 401) {
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/public')) {
+        await Preferences.remove({ key: 'token' });
+        await Preferences.remove({ key: 'user' });
+        delete apiClient.defaults.headers.common['Authorization'];
+        window.location.href = '/login';
+      }
+    }
+
+    // Redirección si la suscripción del tenant está vencida o suspendida (403)
+    if (error.response?.status === 403 && error.response?.data?.code === 'TENANT_SUSPENDED_OR_EXPIRED') {
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/subscription-expired') && !window.location.pathname.startsWith('/select-workspace')) {
+        window.location.href = '/subscription-expired';
+      }
+    }
+
     return Promise.reject(error);
   }
 );
-

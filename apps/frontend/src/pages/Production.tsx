@@ -1,6 +1,5 @@
-// @ts-nocheck
-import { refreshOutline, trashOutline } from 'ionicons/icons';
-import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonSearchbar, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonButton, IonBadge, useIonAlert, useIonToast, IonToolbar, IonTitle, IonIcon, IonSegment, IonSegmentButton, IonLabel, IonList, IonItem, } from '@ionic/react';
+import { trashOutline } from 'ionicons/icons';
+import { IonContent, IonPage, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonButton, IonBadge, useIonAlert, useIonToast, IonIcon, IonLabel, IonList, IonItem } from '@ionic/react';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { AppHeader } from '../components/AppHeader';
@@ -11,11 +10,15 @@ type Product = {
   stockQuantity: number;
   salePrice: number;
   isCombo?: boolean;
-    isPreAssembled?: boolean;
-    comboItems?: any[];
-    recipe?: any[];
+  isPreAssembled?: boolean;
+  comboItems?: any[];
+  recipe?: any[];
   physicalStock?: number;
   reservedQuantity?: number;
+  category?: string;
+  durationMinutes?: number;
+  is_service?: boolean;
+  product_type?: string;
 };
 
 type Batch = {
@@ -137,7 +140,7 @@ const Production: React.FC = () => {
   return (
     <IonPage>
       <AppHeader title="Producción de Lotes" />
-      <IonContent fullscreen className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' }}>
+      <IonContent fullscreen className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' } as any}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '90px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
             <div style={{ display: 'flex', background: '#E2E8F0', padding: '3px', borderRadius: '12px' }}>

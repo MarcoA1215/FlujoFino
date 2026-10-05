@@ -262,16 +262,47 @@ export class PublicStoreController {
       }
     }
 
-    // 2. Crear orden mediante OrdersService
+    // 2. Crear orden mediante OrdersService con sanitización estricta de seguridad
     const hasElectronicPayment = Boolean(dto.pagoMovilRef || dto.transferRef || dto.binanceRef || dto.paymentReported);
     const orderPayload: CreateOrderDto = {
-      ...dto,
-      status: hasPreorder ? OrderStatus.SOLICITUD_ENCARGO : dto.status,
-      // NUNCA marcar automáticamente como PAID ningún pedido online con método electrónico
+      items: dto.items,
+      customerName: dto.customerName?.trim(),
+      customerPhone: dto.customerPhone?.trim(),
+      customerAddress: dto.customerAddress?.trim(),
+      deliveryMethod: dto.deliveryMethod,
+      deliveryZoneId: dto.deliveryZoneId,
+      notes: dto.notes?.trim(),
+      tableNumber: dto.tableNumber?.trim(),
+      paymentMethod: dto.paymentMethod,
+      pagoMovilRef: dto.pagoMovilRef?.trim(),
+      pagoMovilPhone: dto.pagoMovilPhone?.trim(),
+      pagoMovilCedula: dto.pagoMovilCedula?.trim(),
+      pagoMovilBank: dto.pagoMovilBank?.trim(),
+      puntoRef: dto.puntoRef?.trim(),
+      puntoBank: dto.puntoBank?.trim(),
+      binanceRef: dto.binanceRef?.trim(),
+      transferRef: dto.transferRef?.trim(),
+      transferBank: dto.transferBank?.trim(),
+      amountBs: dto.amountBs ? Number(dto.amountBs) : undefined,
+      exchangeRate: dto.exchangeRate ? Number(dto.exchangeRate) : undefined,
+      splitPayments: dto.splitPayments,
+      usdReceived: dto.usdReceived ? Number(dto.usdReceived) : undefined,
+      changeAmount: dto.changeAmount ? Number(dto.changeAmount) : undefined,
+      changeAmountBs: dto.changeAmountBs ? Number(dto.changeAmountBs) : undefined,
+      changeMethod: dto.changeMethod,
+      changeRef: dto.changeRef,
+      // Blindaje de seguridad: el cliente público no puede auto-aprobarse pedidos,
+      // ni aplicar descuentos, ni inyectar abonos o reasignar personal
+      status: hasPreorder ? OrderStatus.SOLICITUD_ENCARGO : OrderStatus.PENDING,
       paymentStatus: PaymentStatus.PENDING,
       paymentReported: hasElectronicPayment,
       paymentProofUrl: dto.paymentProofUrl || undefined,
       requestedDeliveryDate: dto.requestedDeliveryDate,
+      discountAmount: 0,
+      initialAbono: undefined,
+      employeeId: undefined,
+      driverId: undefined,
+      deliveryUserId: undefined,
     };
 
     const createdOrder = await this.ordersService.createOrder(tenantId, orderPayload);

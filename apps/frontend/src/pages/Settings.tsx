@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useEffect, useContext } from 'react';
 import {
   IonPage,
@@ -59,7 +58,7 @@ import { BankSelect } from '../components/BankSelect';
 
 interface Settings {
   exchangeRateBs?: number;
-  exchangeRateMode?: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'MANUAL';
+  exchangeRateMode?: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'MANUAL' | 'COP';
   manualExchangeRate?: number | null;
   currencySymbol?: string;
   availableRates?: {
@@ -90,6 +89,7 @@ interface Settings {
   featureRecipes?: boolean;
   featureBuySell?: boolean;
   featureProduction?: boolean;
+  featureDelivery?: boolean;
   featureShowCatalog?: boolean;
   bookingRequireService?: boolean;
   bookingAllowStaffSelection?: boolean;
@@ -349,7 +349,7 @@ const SettingsPage: React.FC = () => {
   return (
     <IonPage>
       <AppHeader title="Configuración" />
-      <IonContent className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' }}>
+      <IonContent className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' } as any}>
         <IonGrid style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <IonRow>
             {/* Tarjeta Programa de Referidos • Invita y Ahorra */}

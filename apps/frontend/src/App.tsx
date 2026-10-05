@@ -29,15 +29,14 @@ import { AuthProvider, AuthContext } from './context/AuthContext';
 import { SubscriptionProvider, SubscriptionContext } from './context/SubscriptionContext';
 import { ImageViewerProvider } from './context/ImageViewerContext';
 import { LoadingProvider } from './context/LoadingContext';
+import { SettingsProvider } from './context/SettingsContext';
 import { LoadingOverlay } from './components/common/LoadingOverlay';
 import { SubscriptionWarningBanner } from './components/SubscriptionWarningBanner';
 import { ReportPaymentModal } from './components/ReportPaymentModal';
-import { UserRole } from '@finowork/shared-types';
+import { UserRole, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
 import { useContext, useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { usePushNotifications } from './hooks/usePushNotifications';
-import { apiClient } from './api/client';
-import { getContrastColor, ensureReadableColor } from './utils/colors';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -63,7 +62,7 @@ const HomeRedirector: React.FC = () => {
   if (isLoading || isSubLoading) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
-  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
   if (isSuperAdmin) {
     return <Navigate to="/platform-admin" replace />;
   }
@@ -128,7 +127,7 @@ const PrivateRoute: React.FC<{ children: React.ReactNode; allowedRoles?: UserRol
   const isSuperAdmin =
     user?.role === UserRole.SUPERADMIN ||
     (user?.role as string) === 'SUPERADMIN' ||
-    user?.email === 'superadmin@flujofino.com';
+    user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
 
   if (!isSuperAdmin && user?.tenantId && isExpired) {
     return <Navigate to="/subscription-expired" replace />;
@@ -154,7 +153,7 @@ const ExpiredPaywallRoute: React.FC = () => {
   const isSuperAdmin =
     user?.role === UserRole.SUPERADMIN ||
     (user?.role as string) === 'SUPERADMIN' ||
-    user?.email === 'superadmin@flujofino.com';
+    user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
 
   if (isSuperAdmin || !isExpired) {
     return <Navigate to="/dashboard" replace />;
@@ -167,7 +166,7 @@ const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const { isAuthenticated, isLoading, user } = useContext(AuthContext);
   if (isLoading) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
   if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
@@ -176,7 +175,7 @@ const PromoterRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const { isAuthenticated, isLoading, user } = useContext(AuthContext);
   if (isLoading) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
   const isPromotor = user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR';
   if (!isSuperAdmin && !isPromotor) {
     return <Navigate to="/dashboard" replace />;
@@ -200,20 +199,22 @@ const App: React.FC = () => {
 
   return (
     <AuthProvider>
-      <SubscriptionProvider>
-        <ImageViewerProvider>
-          <LoadingProvider>
-            <IonApp>
-              <LoadingOverlay />
-              <IonReactRouter>
-                <ErrorBoundary>
-                  <MainLayout />
-                </ErrorBoundary>
-              </IonReactRouter>
-            </IonApp>
-          </LoadingProvider>
-        </ImageViewerProvider>
-      </SubscriptionProvider>
+      <SettingsProvider>
+        <SubscriptionProvider>
+          <ImageViewerProvider>
+            <LoadingProvider>
+              <IonApp>
+                <LoadingOverlay />
+                <IonReactRouter>
+                  <ErrorBoundary>
+                    <MainLayout />
+                  </ErrorBoundary>
+                </IonReactRouter>
+              </IonApp>
+            </LoadingProvider>
+          </ImageViewerProvider>
+        </SubscriptionProvider>
+      </SettingsProvider>
     </AuthProvider>
   );
 };
@@ -224,50 +225,6 @@ const MainLayout: React.FC = () => {
   const { isReportModalOpen, setIsReportModalOpen } = useContext(SubscriptionContext);
   const location = useLocation();
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
-
-  const [settings, setSettings] = useState<any>(() => {
-    try {
-      const saved = localStorage.getItem('tenant_settings');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  useEffect(() => {
-    if (user?.tenantId) {
-      apiClient.get('/settings').then(res => {
-        setSettings(res.data);
-        localStorage.setItem('tenant_settings', JSON.stringify(res.data));
-      }).catch(console.error);
-    }
-  }, [user?.tenantId]);
-
-  useEffect(() => {
-    const handleSettingsUpdate = (e: any) => {
-      if (e.detail) {
-        setSettings(e.detail);
-      }
-    };
-    window.addEventListener('settings_updated', handleSettingsUpdate);
-    return () => window.removeEventListener('settings_updated', handleSettingsUpdate);
-  }, []);
-
-  useEffect(() => {
-    const primary = settings?.themePrimaryColor || '#10b981';
-    const header = settings?.themeHeaderColor || '#ffffff';
-    const contrastText = getContrastColor(primary);
-    const headerContrastText = getContrastColor(header);
-    const readablePrimary = ensureReadableColor(primary);
-
-    document.documentElement.style.setProperty('--theme-primary', primary);
-    document.documentElement.style.setProperty('--theme-primary-contrast', contrastText);
-    document.documentElement.style.setProperty('--theme-primary-readable', readablePrimary);
-    document.documentElement.style.setProperty('--theme-header', header);
-    document.documentElement.style.setProperty('--theme-header-contrast', headerContrastText);
-    document.documentElement.style.setProperty('--ion-color-primary', primary);
-    document.documentElement.style.setProperty('--ion-color-primary-contrast', contrastText);
-  }, [settings?.themePrimaryColor, settings?.themeHeaderColor]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -287,7 +244,7 @@ const MainLayout: React.FC = () => {
                         location.pathname.startsWith('/tienda') || 
                         location.pathname.startsWith('/appointment');
   const isExpiredRoute = location.pathname === '/subscription-expired';
-  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
   const isPromotor = user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR';
 
   return (

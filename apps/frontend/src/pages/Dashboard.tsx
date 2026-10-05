@@ -1,12 +1,8 @@
-﻿// @ts-nocheck
 import React, { useEffect, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   IonPage,
   IonContent,
-  IonGrid,
-  IonRow,
-  IonCol,
   IonIcon,
   IonSpinner,
   useIonToast
@@ -18,7 +14,6 @@ import {
   cartOutline,
   pieChartOutline,
   alertCircleOutline,
-  addOutline,
   calendarOutline,
   peopleOutline,
   cardOutline
@@ -26,7 +21,6 @@ import {
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
-import { UserRole } from '@finowork/shared-types';
 import type { DashboardSummary } from '../types';
 import AppHeader from '../components/AppHeader';
 import InvestmentModal from '../components/InvestmentModal';

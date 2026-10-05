@@ -109,6 +109,10 @@ export type DashboardSummary = {
     quantity: number;
     revenue: number;
   }[];
+  totalConsolidatedInvestment?: number;
+  totalExternalInvestment?: number;
+  totalConsolidatedReinvestment?: number;
+  payrollExpenses?: number;
 };
 
 
@@ -117,4 +121,5 @@ export type DeliveryZone = {
   id: string;
   name: string;
   feePrice: number;
+  priceUSD?: number;
 };

@@ -1,4 +1,4 @@
-﻿import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { IonIcon } from '@ionic/react';
 import {
@@ -20,8 +20,8 @@ import {
   construct
 } from 'ionicons/icons';
 import { AuthContext } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import { UserRole } from '@finowork/shared-types';
-import { apiClient } from '../api/client';
 
 interface BottomNavItem {
   id: string;
@@ -36,22 +36,7 @@ const BottomNav: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, user } = useContext(AuthContext);
-
-  const [settings, setSettings] = useState<any>(() => {
-    try {
-      const cached = localStorage.getItem('flujofino_cached_settings');
-      if (cached) return JSON.parse(cached);
-    } catch {}
-    return {};
-  });
-
-  useEffect(() => {
-    if (isAuthenticated && user?.tenantId) {
-      apiClient.get('/settings').then(res => {
-        if (res.data) setSettings(res.data);
-      }).catch(() => {});
-    }
-  }, [isAuthenticated, user?.tenantId]);
+  const { settings } = useSettings();
 
   useEffect(() => {
     if ((user?.role === UserRole.POS || (user?.role as string) === 'POS') && location.pathname === '/dashboard') {

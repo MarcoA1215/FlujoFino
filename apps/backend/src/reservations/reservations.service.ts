@@ -8,6 +8,7 @@ import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import { NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class ReservationsService {
@@ -301,25 +302,48 @@ export class ReservationsService {
     if (!res) throw new BadRequestException('No encontrado');
     
     res.abonosHistory = res.abonosHistory || [];
-    res.abonosHistory.push({ amount, date: new Date().toISOString() });
-    res.abonosTotal = (res.abonosTotal || 0) + amount;
+    const abonoId = randomUUID();
+    res.abonosHistory.push({ id: abonoId, amount, date: new Date().toISOString() });
+    res.abonosTotal = Math.round(((res.abonosTotal || 0) + Number(amount)) * 100) / 100;
     
     this.recalculatePaymentStatus(res);
     return this.repo.save(res);
   }
 
-  async revertAbono(tenantId: string, id: string, index: number) {
+  async revertAbono(tenantId: string, id: string, abonoIdentifier: string | number) {
     const res = await this.repo.findOne({ where: { id, tenantId } });
     if (!res) throw new BadRequestException('No encontrado');
     
-    if (!res.abonosHistory || !res.abonosHistory[index]) {
-      throw new BadRequestException('Abono inválido');
+    if (!res.abonosHistory || res.abonosHistory.length === 0) {
+      throw new BadRequestException('No hay historial de abonos para revertir');
     }
 
-    const removed = res.abonosHistory.splice(index, 1)[0];
-    res.abonosTotal -= removed.amount;
-    if (res.abonosTotal < 0) res.abonosTotal = 0;
-    
+    const abonoIdStr = String(abonoIdentifier);
+    let targetIndex = res.abonosHistory.findIndex((a: any) => a.id === abonoIdStr);
+
+    // Fallback retrocompatible para registros históricos sin UUID
+    if (targetIndex === -1 && !isNaN(Number(abonoIdentifier))) {
+      const numericIndex = Number(abonoIdentifier);
+      if (res.abonosHistory[numericIndex]) {
+        targetIndex = numericIndex;
+      }
+    }
+
+    if (targetIndex === -1) {
+      throw new BadRequestException('Abono no encontrado');
+    }
+
+    const removed = res.abonosHistory[targetIndex];
+    const removedAmount = Number(removed.amount || 0);
+
+    // Eliminación inmutable buscando y filtrando estrictamente por el id (UUID)
+    if (removed.id) {
+      res.abonosHistory = res.abonosHistory.filter((a: any) => a.id !== removed.id);
+    } else {
+      res.abonosHistory = res.abonosHistory.filter((_, idx) => idx !== targetIndex);
+    }
+
+    res.abonosTotal = Math.round(Math.max(0, (res.abonosTotal || 0) - removedAmount) * 100) / 100;
     this.recalculatePaymentStatus(res);
     return this.repo.save(res);
   }
@@ -330,7 +354,7 @@ export class ReservationsService {
     const total = Number(res.totalAmount || 0);
     res.abonosTotal = total;
     res.abonosHistory = res.abonosHistory || [];
-    res.abonosHistory.push({ amount: total, date: new Date().toISOString(), status: 'APPROVED' });
+    res.abonosHistory.push({ id: randomUUID(), amount: total, date: new Date().toISOString(), status: 'APPROVED' });
     res.paymentStatus = PaymentStatus.PAID;
     res.paymentReported = false;
     res.paymentRejectedReason = null as any;
@@ -432,9 +456,9 @@ export class ReservationsService {
   }
 
   private recalculatePaymentStatus(res: Reservation) {
-    const total = Number(res.totalAmount || 0);
-    const abonos = Number(res.abonosTotal || 0);
-    const remaining = total - abonos;
+    const total = Math.round(Number(res.totalAmount || 0) * 100) / 100;
+    const abonos = Math.round(Number(res.abonosTotal || 0) * 100) / 100;
+    const remaining = Math.round((total - abonos) * 100) / 100;
 
     if (total > 0) {
       if (abonos <= 0) res.paymentStatus = PaymentStatus.PENDING;

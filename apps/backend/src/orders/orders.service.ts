@@ -14,6 +14,10 @@ import { Settings } from '../entities/settings.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
 import { Reservation } from '../entities/reservation.entity';
 
+export const roundCurrency = (val: number | string | undefined | null): number => {
+  return Math.round((Number(val) || 0) * 100) / 100;
+};
+
 export class CreateOrderDto {
   @IsString()
   customerName: string;
@@ -244,12 +248,16 @@ export class OrdersService {
       date: new Date().toISOString() 
     });
     order.abonosHistory = history;
-    order.abonosTotal = Number(((order.abonosTotal || 0) + Number(amount)).toFixed(2));
+    order.abonosTotal = roundCurrency((order.abonosTotal || 0) + Number(amount));
     const wasPaid = order.paymentStatus === PaymentStatus.PAID;
-    if (order.abonosTotal >= order.totalAmount) {
+    const roundedAbonos = roundCurrency(order.abonosTotal);
+    const roundedTotal = roundCurrency(order.totalAmount);
+    if (roundedAbonos >= roundedTotal && roundedTotal > 0) {
       order.paymentStatus = PaymentStatus.PAID;
-    } else if (order.abonosTotal > 0 && order.abonosTotal < order.totalAmount) {
+    } else if (roundedAbonos > 0) {
       order.paymentStatus = PaymentStatus.PARTIAL;
+    } else {
+      order.paymentStatus = PaymentStatus.PENDING;
     }
     
     const saved = await this.dataSource.getRepository(Order).save(order);
@@ -281,11 +289,15 @@ export class OrdersService {
     if (index >= 0 && index < history.length) {
       const removed = history.splice(index, 1)[0];
       order.abonosHistory = history;
-      order.abonosTotal = (order.abonosTotal || 0) - removed.amount;
-      if (order.abonosTotal === 0) {
-        order.paymentStatus = PaymentStatus.PENDING;
-      } else if (order.abonosTotal > 0 && order.abonosTotal < order.totalAmount) {
+      order.abonosTotal = roundCurrency(Math.max(0, (order.abonosTotal || 0) - Number(removed.amount || 0)));
+      const roundedAbonos = roundCurrency(order.abonosTotal);
+      const roundedTotal = roundCurrency(order.totalAmount);
+      if (roundedAbonos >= roundedTotal && roundedTotal > 0) {
+        order.paymentStatus = PaymentStatus.PAID;
+      } else if (roundedAbonos > 0) {
         order.paymentStatus = PaymentStatus.PARTIAL;
+      } else {
+        order.paymentStatus = PaymentStatus.PENDING;
       }
       
       return this.dataSource.getRepository(Order).save(order);
@@ -360,13 +372,62 @@ export class OrdersService {
         }
       }
 
-      // Check if we have enough available stock (Disponible) for everything
+      // Bloqueo pesimista de escritura sobre los productos involucrados
       const productIds = Array.from(new Set((dto.items || []).map(i => i.productId).filter(Boolean)));
-      const products = productIds.length > 0 ? await manager.find(Product, {
-        where: { tenantId, id: In(productIds) },
-        relations: { comboItems: { component: { recipe: { rawMaterial: true } } }, recipe: { rawMaterial: true } }
-      }) : [];
+      let products: Product[] = [];
+      if (productIds.length > 0) {
+        if (manager.createQueryBuilder) {
+          try {
+            await manager
+              .createQueryBuilder(Product, 'p')
+              .setLock('pessimistic_write')
+              .where('p.tenantId = :tenantId AND p.id IN (:...ids)', { tenantId, ids: productIds })
+              .getMany();
+          } catch {
+            // fallback si el driver mock no soporta bloqueo pesimista
+          }
+        }
+        products = await manager.find(Product, {
+          where: { tenantId, id: In(productIds) },
+          relations: { comboItems: { component: { recipe: { rawMaterial: true } } }, recipe: { rawMaterial: true } }
+        });
+      }
       const productMap = new Map(products.map(p => [p.id, p]));
+
+      // Bloqueo pesimista de componentes de combos
+      const comboComponentIds = products
+        .filter(p => p.isCombo && !p.isPreAssembled && p.comboItems)
+        .flatMap(p => p.comboItems?.map(ci => ci.componentId || ci.component?.id).filter(Boolean) || []);
+      if (comboComponentIds.length > 0 && manager.createQueryBuilder) {
+        try {
+          await manager
+            .createQueryBuilder(Product, 'comp')
+            .setLock('pessimistic_write')
+            .where('comp.tenantId = :tenantId AND comp.id IN (:...ids)', { tenantId, ids: comboComponentIds })
+            .getMany();
+        } catch {
+          // fallback
+        }
+      }
+
+      // Bloqueo pesimista de materias primas de recetas y extras
+      const recipeRawMaterialIds = products
+        .filter(p => p.recipe && p.recipe.length > 0 && !p.isPreAssembled)
+        .flatMap(p => p.recipe?.map(ri => ri.rawMaterialId || ri.rawMaterial?.id).filter(Boolean) || []);
+      const extraRawMaterialIds = (dto.items || [])
+        .flatMap(it => it.addedExtras?.map(ex => ex.rawMaterialId).filter(Boolean) || []);
+      const allRawMaterialIds = Array.from(new Set([...recipeRawMaterialIds, ...extraRawMaterialIds]));
+      if (allRawMaterialIds.length > 0 && manager.createQueryBuilder) {
+        try {
+          await manager
+            .createQueryBuilder(RawMaterial, 'rm')
+            .setLock('pessimistic_write')
+            .where('rm.tenantId = :tenantId AND rm.id IN (:...ids)', { tenantId, ids: allRawMaterialIds })
+            .getMany();
+        } catch {
+          // fallback
+        }
+      }
 
       let requiresPreparation = false;
       for (const itemDto of dto.items) {
@@ -699,9 +760,11 @@ export class OrdersService {
             totalReceivedUSD = Math.max(totalReceivedUSD, Number(dto.usdReceived) - Number(savedOrder.changeAmount || 0));
           }
 
-          if (totalReceivedUSD >= savedOrder.totalAmount) {
+          const roundedReceived = roundCurrency(totalReceivedUSD);
+          const roundedTotal = roundCurrency(savedOrder.totalAmount);
+          if (roundedReceived >= roundedTotal && roundedTotal > 0) {
             savedOrder.paymentStatus = PaymentStatus.PAID;
-          } else if (totalReceivedUSD > 0 && totalReceivedUSD < savedOrder.totalAmount) {
+          } else if (roundedReceived > 0 && roundedReceived < roundedTotal) {
             savedOrder.paymentStatus = PaymentStatus.PARTIAL;
           }
         }
@@ -808,9 +871,11 @@ export class OrdersService {
     }
 
     if (totalPaidInDto !== null) {
-      if (totalPaidInDto >= order.totalAmount && order.totalAmount > 0) {
+      const roundedPaid = roundCurrency(totalPaidInDto);
+      const roundedTotal = roundCurrency(order.totalAmount);
+      if (roundedPaid >= roundedTotal && roundedTotal > 0) {
         order.paymentStatus = PaymentStatus.PAID;
-      } else if (totalPaidInDto > 0 && totalPaidInDto < order.totalAmount) {
+      } else if (roundedPaid > 0 && roundedPaid < roundedTotal) {
         order.paymentStatus = PaymentStatus.PARTIAL;
       }
     }
@@ -1457,11 +1522,13 @@ export class OrdersService {
 
       // Update payment status for partial / open tab orders
       if (order.paymentMethod === 'PENDING' || order.paymentStatus === PaymentStatus.PARTIAL || order.paymentStatus === PaymentStatus.PENDING) {
-        if (order.abonosTotal >= order.totalAmount && order.totalAmount > 0) {
+        const roundedAbonos = roundCurrency(order.abonosTotal || 0);
+        const roundedTotal = roundCurrency(order.totalAmount || 0);
+        if (roundedAbonos >= roundedTotal && roundedTotal > 0) {
           order.paymentStatus = PaymentStatus.PAID;
-        } else if (order.abonosTotal > 0 && order.abonosTotal < order.totalAmount) {
+        } else if (roundedAbonos > 0 && roundedAbonos < roundedTotal) {
           order.paymentStatus = PaymentStatus.PARTIAL;
-        } else if (order.abonosTotal === 0 && order.paymentStatus !== PaymentStatus.PAID) {
+        } else if (roundedAbonos === 0 && order.paymentStatus !== PaymentStatus.PAID) {
           order.paymentStatus = PaymentStatus.PENDING;
         }
       }

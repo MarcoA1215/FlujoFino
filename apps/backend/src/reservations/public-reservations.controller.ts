@@ -1,3 +1,4 @@
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min } from 'class-validator';
 import { Controller, Post, Body, Param, Get, NotFoundException, BadRequestException, Put, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ReservationsService } from './reservations.service';
@@ -16,6 +17,82 @@ import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { CustomersService } from '../customers/customers.service';
 import { StorageService } from '../storage/storage.service';
 import { isTenantSuspendedOrExpired } from '../utils/tenant-status';
+
+export class CreatePublicReservationDto {
+  @IsString()
+  @IsNotEmpty()
+  date: string;
+
+  @IsString()
+  @IsNotEmpty()
+  time: string;
+
+  @IsString()
+  @IsNotEmpty()
+  customerName: string;
+
+  @IsOptional()
+  @IsString()
+  customerPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  identification?: string;
+
+  @IsOptional()
+  @IsString()
+  serviceId?: string;
+
+  @IsOptional()
+  @IsString()
+  serviceName?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  numberOfPeople?: number;
+
+  @IsOptional()
+  @IsString()
+  employeeId?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  totalAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentReference?: string;
+
+  @IsOptional()
+  @IsNumber()
+  paymentAmount?: number;
+
+  @IsOptional()
+  @IsNumber()
+  paymentAmountBs?: number;
+
+  @IsOptional()
+  @IsString()
+  paymentNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentProofUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  tableNumber?: string;
+}
 
 @Public()
 @Controller('public/reservations')
@@ -168,7 +245,7 @@ export class PublicReservationsController {
   }
 
   @Post(':tenantId')
-  async createPublicReservation(@Param('tenantId') token: string, @Body() dto: any) {
+  async createPublicReservation(@Param('tenantId') token: string, @Body() dto: CreatePublicReservationDto) {
     let id: string;
     try {
       id = decodeTenantId(token);
@@ -217,6 +294,8 @@ export class PublicReservationsController {
     }
 
     // Synchronize customer profile
+    let resolvedCustomerId: string | undefined = undefined;
+    let resolvedIdentification: string | undefined = dto.identification;
     if (dto.customerName && dto.customerPhone) {
       try {
         const customer = await this.customersService.findOrCreateOrUpdate(id, {
@@ -224,17 +303,38 @@ export class PublicReservationsController {
           phone: dto.customerPhone,
           identification: dto.identification
         });
-        dto.customerId = customer.id;
-        if (!dto.identification && customer.identification) {
-          dto.identification = customer.identification;
+        resolvedCustomerId = customer.id;
+        if (!resolvedIdentification && customer.identification) {
+          resolvedIdentification = customer.identification;
         }
       } catch (err) {
         console.error('Customer sync error in public reservation:', err);
       }
     }
 
+    const sanitizedReservationPayload = {
+      date: dto.date,
+      time: dto.time,
+      customerName: dto.customerName?.trim(),
+      customerPhone: dto.customerPhone?.trim(),
+      identification: resolvedIdentification?.trim(),
+      customerId: resolvedCustomerId,
+      serviceId: dto.serviceId,
+      serviceName: dto.serviceName,
+      numberOfPeople: dto.numberOfPeople || 1,
+      employeeId: dto.employeeId,
+      notes: dto.notes?.trim(),
+      totalAmount: Number(dto.totalAmount || 0),
+      tableNumber: dto.tableNumber?.trim(),
+      // Sanitización estricta: nunca permitir que el payload del cliente fuerce estos estados
+      status: ReservationStatus.CONFIRMED,
+      paymentStatus: PaymentStatus.PENDING,
+      abonosTotal: 0,
+      abonosHistory: [],
+    };
+
     // Create reservation natively
-    const res = await this.reservationsService.create(id, dto);
+    const res = await this.reservationsService.create(id, sanitizedReservationPayload);
     let resDb: any = null;
 
     // If payment was reported during booking, attach it to abonosHistory and calculate status

@@ -31,14 +31,7 @@ export class ProductsService {
       }
     });
 
-    const needsHealing = products.filter(p => !p.is_service && p.category !== 'Servicios' && !p.isCombo && p.physicalStock !== undefined && p.physicalStock !== null && p.stockQuantity > p.physicalStock);
-    if (needsHealing.length > 0) {
-      Promise.all(needsHealing.map(p => {
-        p.stockQuantity = Math.max(0, p.physicalStock);
-        p.stock = p.stockQuantity;
-        return this.productRepo.save(p);
-      })).catch(err => console.error('Error auto-healing inconsistent product stock:', err));
-    }
+    // Eliminado bloque incontrolado de auto-healing asíncrono para evitar escrituras y mutaciones colaterales no deseadas en lecturas (findAll)
 
     return products.map(p => {
       let finalStock = p.stockQuantity;

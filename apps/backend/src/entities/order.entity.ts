@@ -2,7 +2,7 @@ import { ColumnNumericTransformer } from '../common/transformers/column-numeric.
 import { Tenant } from './tenant.entity';
 import { User } from './user.entity';
 import { Customer } from './customer.entity';
-import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Index, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, ManyToOne, JoinColumn, BeforeInsert, BeforeUpdate } from 'typeorm';
 import { OrderItem } from './order-item.entity';
 import { DeliveryZone } from './delivery-zone.entity';
 import { OrderStatus, PaymentStatus, DeliveryMethod } from '@finowork/shared-types';
@@ -208,4 +208,14 @@ export class Order {
   @Index()
   @Column({ nullable: true })
   linkedReservationId?: string;
+
+  @BeforeInsert()
+  @BeforeUpdate()
+  syncDriverAssignment() {
+    const effective = this.deliveryUserId || this.driverId;
+    if (effective) {
+      this.deliveryUserId = effective;
+      this.driverId = effective;
+    }
+  }
 }

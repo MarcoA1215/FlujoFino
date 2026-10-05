@@ -108,6 +108,7 @@ export interface ProductDTO {
   cost?: number;
   stock?: number;
   is_service?: boolean;
+  product_type?: 'REVENTA' | 'FORMULA' | 'SERVICIO' | string;
   availabilityType?: ProductAvailabilityType;
   isSupplierPreorder?: boolean;
 }
@@ -285,7 +286,7 @@ export interface CustomerLookupResponse {
   identification?: string;
 }
 
-export type ExchangeRateMode = 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'MANUAL';
+export type ExchangeRateMode = 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'MANUAL' | 'COP';
 
 export interface RatesCache {
   bcv?: number;
@@ -324,6 +325,7 @@ export interface SettingsDTO {
   featureRecipes?: boolean;
   featureBuySell?: boolean;
   featureProduction?: boolean;
+  featureDelivery?: boolean;
   featureShowCatalog?: boolean;
   bookingRequireService?: boolean;
   bookingAllowStaffSelection?: boolean;

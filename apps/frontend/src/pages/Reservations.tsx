@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import {
   IonPage,
@@ -8,7 +7,6 @@ import {
   useIonAlert,
   IonModal,
   useIonRouter,
-  IonSpinner,
   IonSelect,
   IonSelectOption
 } from '@ionic/react';
@@ -17,19 +15,13 @@ import {
   trashOutline,
   cashOutline,
   saveOutline,
-  refreshOutline,
   timeOutline,
   logoWhatsapp,
   personOutline,
   calendarOutline,
   chevronBackOutline,
   chevronForwardOutline,
-  cutOutline,
-  checkmarkCircleOutline,
-  closeCircleOutline,
-  alertCircleOutline,
   closeOutline,
-  arrowForwardOutline,
   cameraOutline,
   imageOutline
 } from 'ionicons/icons';
@@ -59,6 +51,7 @@ const Reservations: React.FC = () => {
   const router = useIonRouter();
   const [reservations, setReservations] = useState<any[]>([]);
   const [presentToast] = useIonToast();
+  const [presentAlert] = useIonAlert();
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
 
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
@@ -84,13 +77,12 @@ const Reservations: React.FC = () => {
 
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
-  const [abonoAmount, setAbonoAmount] = useState<string>('');
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [shiftTimeFrom, setShiftTimeFrom] = useState('');
   const [shiftMinutes, setShiftMinutes] = useState(30);
-  const [shiftAffected, setShiftAffected] = useState<any[]>([]);
-  const [settings, setSettings] = useState<any>({});
-  const [isOfflineMode, setIsOfflineMode] = useState<boolean>(!navigator.onLine);
+  const [, setShiftAffected] = useState<any[]>([]);
+  const [, setSettings] = useState<any>({});
+  const [, setIsOfflineMode] = useState<boolean>(!navigator.onLine);
   const [notifyingDelayId, setNotifyingDelayId] = useState<string | null>(null);
 
   const handleNotifyDelay = async (id: string, minutes: number = 15, e?: React.MouseEvent) => {
@@ -369,37 +361,6 @@ const Reservations: React.FC = () => {
     }
   };
 
-  const handlePayFull = async () => {
-    if (!selectedEvent) return;
-    try {
-      await apiClient.post(`/reservations/${selectedEvent.id}/pay-full`);
-      presentToast({ message: 'Servicio marcado como pagado', duration: 2000, color: 'success' });
-      const res = await apiClient.get('/reservations');
-      const updated = res.data.find((r: any) => r.id === selectedEvent.id);
-      setSelectedEvent(updated);
-      setReservations(res.data);
-    } catch (e) {
-      presentToast({ message: 'Error', duration: 2000, color: 'danger' });
-    }
-  };
-
-  const handleAddAbono = async () => {
-    if (!selectedEvent || !abonoAmount || parseFloat(abonoAmount) <= 0) return;
-    try {
-      await apiClient.post(`/reservations/${selectedEvent.id}/abono`, {
-        amount: parseFloat(abonoAmount)
-      });
-      setAbonoAmount('');
-      presentToast({ message: 'Abono registrado', duration: 2000, color: 'success' });
-      const res = await apiClient.get('/reservations');
-      const updated = res.data.find((r: any) => r.id === selectedEvent.id);
-      setSelectedEvent(updated);
-      setReservations(res.data);
-    } catch (e) {
-      presentToast({ message: 'Error registrando abono', duration: 2000, color: 'danger' });
-    }
-  };
-
   const deleteReservation = async (id: string) => {
     try {
       await apiClient.delete(`/reservations/${id}`);
@@ -420,8 +381,8 @@ const Reservations: React.FC = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       const updatedUrl = res.data.url;
-      setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, imageUrl: updatedUrl } : r));
-      setSelectedEvent(prev => (prev && prev.id === reservationId ? { ...prev, imageUrl: updatedUrl } : prev));
+      setReservations((prev: any[]) => prev.map(r => r.id === reservationId ? { ...r, imageUrl: updatedUrl } : r));
+      setSelectedEvent((prev: any) => (prev && prev.id === reservationId ? { ...prev, imageUrl: updatedUrl } : prev));
       presentToast({ message: 'Foto del servicio guardada con éxito', duration: 2500, color: 'success' });
     } catch (err: any) {
       console.error(err);
@@ -434,8 +395,8 @@ const Reservations: React.FC = () => {
   const handleRemovePhoto = async (reservationId: string) => {
     try {
       await apiClient.delete(`/reservations/${reservationId}/media`);
-      setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, imageUrl: null } : r));
-      setSelectedEvent(prev => (prev && prev.id === reservationId ? { ...prev, imageUrl: null } : prev));
+      setReservations((prev: any[]) => prev.map(r => r.id === reservationId ? { ...r, imageUrl: null } : r));
+      setSelectedEvent((prev: any) => (prev && prev.id === reservationId ? { ...prev, imageUrl: null } : prev));
       presentToast({ message: 'Foto eliminada del servicio', duration: 2000, color: 'warning' });
     } catch (err: any) {
       console.error(err);
@@ -508,16 +469,6 @@ const Reservations: React.FC = () => {
       };
     });
   }, [reservations]);
-
-  const tenantInitials = useMemo(() => {
-    const name = user?.tenantName || 'FinoWork';
-    return name
-      .split(' ')
-      .slice(0, 2)
-      .map(w => w[0])
-      .join('')
-      .toUpperCase();
-  }, [user?.tenantName]);
 
   const servicesList = useMemo(() => {
     return products.filter(p => {
@@ -720,7 +671,6 @@ const Reservations: React.FC = () => {
                   const duration = res.serviceDuration || 45;
                   const isConfirmed = res.status === ReservationStatus.CONFIRMED;
                   const isPending = res.status === ReservationStatus.PENDING;
-                  const isCanceled = res.status === ReservationStatus.CANCELED;
 
                   return (
                     <div
@@ -1607,7 +1557,7 @@ const Reservations: React.FC = () => {
                 interface="popover"
                 value={shiftMinutes}
                 onIonChange={e => setShiftMinutes(Number(e.detail.value))}
-                style={{ width: '100%', minHeight: '42px', padding: '2px 10px', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#ffffff', '--padding-start': '0px', '--padding-end': '0px' }}
+                style={{ width: '100%', minHeight: '42px', padding: '2px 10px', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#ffffff', '--padding-start': '0px', '--padding-end': '0px' } as any}
               >
                 <IonSelectOption value={15}>15 minutos</IonSelectOption>
                 <IonSelectOption value={30}>30 minutos</IonSelectOption>

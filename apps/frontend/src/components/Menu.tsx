@@ -20,7 +20,7 @@ import {
 import { useLocation } from 'react-router-dom';
 import { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import { UserRole, APP_NAME, DEFAULT_TENANT_NAME } from '@finowork/shared-types';
+import { UserRole, APP_NAME, DEFAULT_TENANT_NAME, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
 import {
   calendarOutline,
   peopleOutline,
@@ -42,6 +42,7 @@ import {
   shieldCheckmarkOutline,
   medalOutline,
 } from 'ionicons/icons';
+import { useSettings } from '../context/SettingsContext';
 import { apiClient } from '../api/client';
 
 interface WorkModeOption {
@@ -95,7 +96,7 @@ const Menu: React.FC = () => {
   const [presentAlert] = useIonAlert();
   const [presentToast] = useIonToast();
   const { user, logout, switchWorkspace, switchMode, isAuthenticated } = useContext(AuthContext);
-  const [settings, setSettings] = useState<any>({});
+  const { settings } = useSettings();
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
   const [workspaces, setWorkspaces] = useState<any[]>(user?.workspaces || []);
@@ -118,12 +119,6 @@ const Menu: React.FC = () => {
   useEffect(() => {
     if (isAuthenticated && user?.tenantId) {
       loadWorkspaces();
-      apiClient.get('/settings').then(res => {
-        setSettings(res.data);
-        if (res.data.themePrimaryColor) {
-          document.documentElement.style.setProperty('--ion-color-primary', res.data.themePrimaryColor);
-        }
-      }).catch(e => console.log(e));
     }
   }, [isAuthenticated, user?.tenantId]);
 
@@ -133,7 +128,7 @@ const Menu: React.FC = () => {
     };
   }, []);
 
-  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email === 'superadmin@flujofino.com';
+  const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
 
   if (!isAuthenticated || (!user?.tenantId && !isSuperAdmin) || location.pathname === '/select-workspace' || location.pathname.startsWith('/book') || location.pathname.startsWith('/appointment') || location.pathname.startsWith('/store')) {
     return null;

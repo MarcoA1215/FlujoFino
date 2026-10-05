@@ -1,6 +1,5 @@
-// @ts-nocheck
 import React from 'react';
-import { IonCol, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
+import { IonCol, IonButton, useIonActionSheet } from '@ionic/react';
 import { pencilOutline, cartOutline, warningOutline, timeOutline, archiveOutline, closeOutline } from 'ionicons/icons';
 import type { RawMaterial } from '../../types';
 

@@ -1,7 +1,6 @@
-// @ts-nocheck
 import React, { useState, useEffect } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton, IonLabel, useIonAlert, useIonToast, IonNote, IonIcon, IonModal, IonToggle } from '@ionic/react';
-import { addOutline, archiveOutline, refreshOutline, timeOutline, chevronUpOutline, chevronDownOutline } from 'ionicons/icons';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonContent, IonGrid, IonRow, IonCard, IonCardContent, IonItem, IonInput, IonSelect, IonSelectOption, IonButton, IonLabel, useIonAlert, useIonToast, IonNote, IonIcon, IonModal, IonToggle } from '@ionic/react';
+import { addOutline, archiveOutline, refreshOutline, timeOutline, chevronUpOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import type { RawMaterial } from '../types';
 import { RawMaterialCard } from '../components/raw-materials/RawMaterialCard';
@@ -239,10 +238,10 @@ const RawMaterials: React.FC = () => {
     try {
       await apiClient.put('/raw-materials/' + editingMaterial.id, { 
         name: editName.trim(), 
-        minStockAlert: parseFloat(editMinStock) || 0,
+        minStockAlert: Number(editMinStock) || 0,
         allowAsExtra: editAllowAsExtra,
         extraPriceType: editExtraPriceType,
-        extraPriceValue: parseFloat(editExtraPriceValue) || 0
+        extraPriceValue: Number(editExtraPriceValue) || 0
       });
       presentToast({ message: 'Insumo actualizado exitosamente', duration: 2000, color: 'success' });
       setEditingMaterial(null);
@@ -298,9 +297,7 @@ const RawMaterials: React.FC = () => {
   const handleTouchEnd = () => {
     if (isPullingRef.current) {
       if (pullDistance >= 55) {
-        // Trigger opening archived drawer
-        setShowArchivedPanel(true);
-        fetchArchivedMaterials();
+        toggleArchivedPanel();
       }
       isPullingRef.current = false;
       setIsPulling(false);
@@ -322,7 +319,7 @@ const RawMaterials: React.FC = () => {
         ref={contentRef}
         fullscreen
         className="ion-padding ff-has-bottom-nav"
-        style={{ '--background': '#F8FAFC' }}
+        style={{ '--background': '#F8FAFC' } as any}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -645,7 +642,7 @@ const RawMaterials: React.FC = () => {
           </IonButtons>
         </IonToolbar>
       </IonHeader>
-      <IonContent className="ion-padding" style={{ '--background': '#F8FAFC' }}>
+      <IonContent className="ion-padding" style={{ '--background': '#F8FAFC' } as any}>
         <IonCard style={{ borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
           <IonCardContent>
             <IonItem lines="full">
