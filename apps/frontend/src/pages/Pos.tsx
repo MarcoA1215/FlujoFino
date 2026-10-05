@@ -1125,7 +1125,10 @@ const Pos: React.FC = () => {
           <IonGrid style={{ padding: 0, marginTop: '8px' }}>
             <IonRow>
               {filteredProducts.map(p => {
-                const isService = settings?.featureProduction === false || p.category === 'Servicios' || !!p.durationMinutes;
+                const isService = p.product_type === 'SERVICIO' || p.is_service === true || p.category?.toLowerCase() === 'servicios' || Boolean(p.durationMinutes);
+                const pStock = p.stock !== undefined && p.stock !== null
+                  ? Number(p.stock)
+                  : (p.physicalStock !== undefined && p.physicalStock !== null ? Number(p.physicalStock) : Number(p.stockQuantity || 0));
                 const img = Array.isArray(p.images) && p.images.length > 0
                   ? p.images[p.images.length - 1]
                   : (typeof p.images === 'string' && p.images ? (p.images as string).split(',').pop()?.trim() : null);
@@ -1234,13 +1237,13 @@ const Pos: React.FC = () => {
                               fontWeight: '600',
                               padding: '3px 8px',
                               borderRadius: '6px',
-                              background: isService ? '#ECFDF5' : (p.stockQuantity <= 0 ? '#FEF2F2' : '#F1F5F9'),
-                              color: isService ? '#047857' : (p.stockQuantity <= 0 ? '#991B1B' : '#475569')
+                              background: isService ? '#ECFDF5' : (pStock <= 0 ? '#FEF2F2' : '#F1F5F9'),
+                              color: isService ? '#047857' : (pStock <= 0 ? '#991B1B' : '#475569')
                             }}
                           >
                             {isService
                               ? (p.durationMinutes ? `⏱️ ${p.durationMinutes}m` : 'Servicio')
-                              : (p.stockQuantity <= 0 ? 'Agotado' : `Stock: ${p.stockQuantity}`)}
+                              : (pStock <= 0 ? 'Agotado' : `Stock: ${pStock}`)}
                           </span>
 
                           {/* Circular Add Button */}

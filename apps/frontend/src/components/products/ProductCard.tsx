@@ -168,7 +168,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const isFormula = currentType === 'FORMULA';
   const isResale = currentType === 'REVENTA';
   const costValue = p.cost !== undefined && p.cost !== null && Number(p.cost) > 0 ? Number(p.cost) : (p.estimatedCost ? Number(p.estimatedCost) : 0);
-  const currentStock = p.stock !== undefined && p.stock !== null ? p.stock : p.stockQuantity;
+  const currentStock = p.stock !== undefined && p.stock !== null
+    ? Number(p.stock)
+    : (p.physicalStock !== undefined && p.physicalStock !== null ? Number(p.physicalStock) : Number(p.stockQuantity || 0));
 
   return (
     <IonCol size="12" sizeSm="6" sizeMd="4" sizeLg="3" style={{ display: 'flex' }}>

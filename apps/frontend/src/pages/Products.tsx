@@ -329,12 +329,20 @@ const Products: React.FC = () => {
   };
 
 
-  const isServiceOrNoProduction = (p: Product) => {
-    return settings?.featureProduction === false || p.category === 'Servicios';
+  const isProductService = (p: Product) => {
+    if (p.product_type === 'SERVICIO') return true;
+    if (p.product_type === 'REVENTA' || p.product_type === 'FORMULA') return false;
+    return p.is_service === true || p.category?.toLowerCase() === 'servicios';
+  };
+
+  const getProductStock = (p: Product) => {
+    if (p.stock !== undefined && p.stock !== null) return Number(p.stock);
+    if (p.physicalStock !== undefined && p.physicalStock !== null) return Number(p.physicalStock);
+    return Number(p.stockQuantity || 0);
   };
 
   const filteredData = products.filter(item => {
-    if (isClientMode && !isServiceOrNoProduction(item) && item.stockQuantity <= 0) return false;
+    if (isClientMode && !isProductService(item) && getProductStock(item) <= 0) return false;
     if (searchText.trim() === '') return true;
     return item.name.toLowerCase().includes(searchText.toLowerCase()) || 
       (item.category && item.category.toLowerCase().includes(searchText.toLowerCase()));
@@ -549,8 +557,8 @@ const Products: React.FC = () => {
                     const img = Array.isArray(p.images) && p.images.length > 0 
                       ? p.images[p.images.length - 1] 
                       : (typeof p.images === 'string' && p.images ? (p.images as string).split(',').pop()?.trim() : null);
-                    const isService = isServiceOrNoProduction(p);
-                    const currentStock = p.stock !== undefined && p.stock !== null ? p.stock : p.stockQuantity;
+                    const isService = isProductService(p);
+                    const currentStock = getProductStock(p);
                     return (
                       <IonItem key={p.id} style={{ '--padding-top': '10px', '--padding-bottom': '10px' }}>
                         {img && (
