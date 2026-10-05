@@ -33,6 +33,7 @@ const Production: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   
   const [presentToast] = useIonToast();
+  const [isProducing, setIsProducing] = useState<boolean>(false);
 
   const fetchData = async () => {
     try {
@@ -66,8 +67,10 @@ const Production: React.FC = () => {
           text: 'Fabricar Lote', 
           cssClass: 'alert-button-success',
           handler: async (data) => {
+            if (isProducing) return false;
             if (!data.quantity || parseFloat(data.quantity) <= 0) return false;
             try {
+              setIsProducing(true);
               await apiClient.post(`/production`, { 
                 productId: p.id,
                 quantity: parseFloat(data.quantity)
@@ -77,6 +80,8 @@ const Production: React.FC = () => {
             } catch(e: any) {
               const msg = e.response?.data?.message || 'Error al fabricar lote';
               presentToast({ message: msg, duration: 4000, color: 'danger' });
+            } finally {
+              setIsProducing(false);
             }
           } 
         }

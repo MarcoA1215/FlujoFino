@@ -167,13 +167,27 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
 
                 {/* Pago Movil */}
                 <div style={{ background: '#ffffff', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '14px', borderLeft: '4px solid #8B5CF6' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: '#6D28D9' }}>
-                    <IonIcon icon={phonePortraitOutline} /> PAGO MÓVIL
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: '#6D28D9' }}>
+                      <IonIcon icon={phonePortraitOutline} /> PAGO MÓVIL
+                    </div>
+                    <small style={{ color: '#64748B', fontSize: '11px' }}>{cashSummary.pagoMovilList?.length || 0} op.</small>
                   </div>
+                  
                   <div style={{ fontSize: '18px', fontWeight: '900', color: '#0F172A', margin: '6px 0 2px 0' }}>
                     {cashSummary.currencySymbol || 'Bs.'} {Number(cashSummary.totalPagoMovilBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <small style={{ color: '#64748B', fontSize: '11px' }}>≈ ${Number(cashSummary.totalPagoMovilUSD || 0).toFixed(2)} ({cashSummary.pagoMovilList?.length || 0} tr.)</small>
+                  
+                  {Number(cashSummary.totalPagoMovilChangeBs || 0) > 0 ? (
+                    <div style={{ fontSize: '11px', color: '#4C1D95', marginTop: '4px', borderTop: '1px dashed #DDD6FE', paddingTop: '4px' }}>
+                      <div>(-) Vueltos en Bs: <b style={{ color: '#DC2626' }}>-{cashSummary.currencySymbol || 'Bs.'} {Number(cashSummary.totalPagoMovilChangeBs).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</b></div>
+                      <div style={{ fontWeight: 800, color: '#6D28D9', marginTop: '2px' }}>
+                        = Neto Banco: {cashSummary.currencySymbol || 'Bs.'} {Number(Math.max(0, (cashSummary.totalPagoMovilBs || 0) - (cashSummary.totalPagoMovilChangeBs || 0))).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  ) : (
+                    <small style={{ color: '#64748B', fontSize: '11px' }}>≈ ${Number(cashSummary.totalPagoMovilUSD || 0).toFixed(2)} USD</small>
+                  )}
                 </div>
               </div>
 

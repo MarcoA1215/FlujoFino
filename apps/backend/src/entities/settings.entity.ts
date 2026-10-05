@@ -117,6 +117,9 @@ export class Settings {
   @Column('int', { default: 30 })
   slotInterval: number; // e.g. 15, 30, 60 minutes
 
+  @Column('int', { default: 365, nullable: true })
+  bookingMaxAdvanceDays: number; // Maximum days in advance customers can book (e.g. 30, 90, 365)
+
   @Column({ nullable: true })
   themePrimaryColor: string;
 

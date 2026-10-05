@@ -61,6 +61,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const [showCashCloseModal, setShowCashCloseModal] = useState<boolean>(false);
   const [showVerifyModal, setShowVerifyModal] = useState<boolean>(false);
   const [showRateModal, setShowRateModal] = useState<boolean>(false);
+  const [pendingAccessCount, setPendingAccessCount] = useState<number>(0);
 
   const [exchangeRate, setExchangeRate] = useState<number>(() => {
     try {
@@ -154,6 +155,26 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       clearInterval(interval);
     };
   }, []);
+
+  const fetchPendingAccessRequests = async () => {
+    if (!isAdmin) return;
+    try {
+      const res = await apiClient.get<any[]>('/users/access-requests');
+      if (Array.isArray(res.data)) {
+        setPendingAccessCount(res.data.length);
+      }
+    } catch (e) {
+      // Background check silent
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchPendingAccessRequests();
+      const interval = setInterval(fetchPendingAccessRequests, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [isAdmin]);
 
   const toggleOfflineSimulation = async () => {
     const nextVal = !isSimulatingOffline;
@@ -386,6 +407,19 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                   <IonIcon icon={syncOutline} style={{ fontSize: '13px' }} />
                 )}
                 <span>📦 {pendingOfflineCount} Sinc.</span>
+              </div>
+            )}
+
+            {/* Access Requests Alert Pill for Admin */}
+            {isAdmin && pendingAccessCount > 0 && (
+              <div
+                className="ff-pill ff-pill-interactive ff-pill-sync"
+                onClick={() => window.location.href = '/users'}
+                title="Solicitudes de acceso de empleados pendientes de autorización"
+                style={{ background: '#FEF3C7', color: '#92400E', border: '1px solid #FCD34D' }}
+              >
+                <span className="ff-pill-dot" style={{ background: '#F59E0B' }} />
+                <span>⏳ {pendingAccessCount} {pendingAccessCount === 1 ? 'Acceso' : 'Accesos'}</span>
               </div>
             )}
 

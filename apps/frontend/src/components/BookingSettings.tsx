@@ -110,6 +110,22 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                 Esto define los bloques de turno en tu calendario (ej. si eliges 30 mins, las citas solo se agendarán a las 8:00, 8:30, 9:00, etc.).
               </p>
 
+              <IonItem lines="none" style={{ backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '8px' }}>
+                <IonLabel>Anticipación Máxima de Reservas</IonLabel>
+                <IonSelect value={settings.bookingMaxAdvanceDays ?? 365} onIonChange={e => setSettings({...settings, bookingMaxAdvanceDays: e.detail.value})}>
+                  <IonSelectOption value={15}>Hasta 15 días</IonSelectOption>
+                  <IonSelectOption value={30}>Hasta 30 días (1 mes)</IonSelectOption>
+                  <IonSelectOption value={60}>Hasta 60 días (2 meses)</IonSelectOption>
+                  <IonSelectOption value={90}>Hasta 90 días (3 meses)</IonSelectOption>
+                  <IonSelectOption value={180}>Hasta 180 días (6 meses)</IonSelectOption>
+                  <IonSelectOption value={365}>Hasta 1 año (Recomendado)</IonSelectOption>
+                  <IonSelectOption value={730}>Hasta 2 años</IonSelectOption>
+                </IonSelect>
+              </IonItem>
+              <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 8px 16px 8px' }}>
+                Define con cuánta antelación pueden agendar tus clientes (ej. si deseas permitir que reserven con meses de anticipación para eventos, diciembre o temporadas especiales).
+              </p>
+
               <IonItem lines="none" style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
                 <IonLabel className="ion-text-wrap">
                   <h2 style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>¿Desea que el cliente reserve un servicio/producto de antemano?</h2>

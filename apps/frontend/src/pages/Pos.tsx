@@ -172,6 +172,7 @@ const Pos: React.FC = () => {
   // Editing & Linked
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [linkedReservationId, setLinkedReservationId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Employees
   const [employees, setEmployees] = useState<{ id: string; username: string; name?: string; role?: string; roles?: string[]; jobTitle?: string }[]>([]);
@@ -746,19 +747,42 @@ const Pos: React.FC = () => {
 
   // Place / Confirm Order (handles Online & Offline with Dexie)
   const placeOrder = async () => {
+    if (isSubmitting) return;
+
     if (cart.length === 0) {
       presentToast({ message: 'El carrito está vacío', duration: 2000, color: 'warning' });
       return;
     }
 
-    if (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived < totalCart) {
-      presentToast({ message: 'El monto recibido es menor al total a pagar', duration: 2500, color: 'warning' });
-      return;
+    if (paymentMethod === 'USD') {
+      if (usdReceived === '' || usdReceived === undefined || isNaN(Number(usdReceived))) {
+        presentToast({
+          message: 'Por favor ingresa el monto de efectivo recibido en divisas ($)',
+          duration: 3000,
+          color: 'warning'
+        });
+        return;
+      }
+      if (Number(usdReceived) < totalCart) {
+        presentToast({
+          message: `El monto recibido ($${Number(usdReceived).toFixed(2)}) es menor al total a pagar ($${totalCart.toFixed(2)})`,
+          duration: 3000,
+          color: 'warning'
+        });
+        return;
+      }
     }
 
-    if (paymentMethod === 'PAGO_MOVIL' && !pagoMovilRef.trim()) {
-      presentToast({ message: 'Por favor ingresa la referencia de Pago Móvil', duration: 2500, color: 'warning' });
-      return;
+    if (paymentMethod === 'PAGO_MOVIL') {
+      const cleanRef = pagoMovilRef.trim();
+      if (!cleanRef || cleanRef.length < 4) {
+        presentToast({
+          message: 'La referencia de Pago Móvil debe contener al menos 4 dígitos numéricos',
+          duration: 3000,
+          color: 'warning'
+        });
+        return;
+      }
     }
 
     if (paymentMethod === 'PUNTO' && !puntoRef.trim()) {
@@ -857,30 +881,70 @@ const Pos: React.FC = () => {
       linkedReservationId: linkedReservationId || undefined
     };
 
-    const isOffline = !navigator.onLine || localStorage.getItem('flujofino_simulating_offline') === 'true';
+    setIsSubmitting(true);
+    try {
+      const isOffline = !navigator.onLine || localStorage.getItem('flujofino_simulating_offline') === 'true';
 
-    // OFFLINE MODE: Save to Dexie
-    if (isOffline) {
+      // OFFLINE MODE: Save to Dexie
+      if (isOffline) {
+        try {
+          const offlineId = 'off_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+          const offlineOrder: OfflineOrder = {
+            offlineId,
+            tenantId: user?.tenantId || 'default',
+            payload,
+            rateAtSale: exchangeRate,
+            createdAt: new Date().toISOString(),
+            synced: false
+          };
+
+          await offlineDb.offlineOrders.add(offlineOrder);
+
+          presentToast({
+            message: '✓ Venta guardada localmente (Modo Offline)',
+            duration: 3000,
+            color: 'success'
+          });
+
+          // Reset cart and modal
+          setCart([]);
+          setCustomerName('');
+          setCustomerPhone('');
+          setCustomerAddress('');
+          setTableNumber('');
+          setPagoMovilRef('');
+          setPuntoRef('');
+          setBinanceRef('');
+          setTransferRef('');
+          setTransferBank('');
+          setUsdReceived('');
+          setChangeMethod('CASH_USD');
+          setChangeRef('');
+          setChangePhone('');
+          setChangeBank('');
+          setInitialAbono('');
+          setBypassMinDeposit(false);
+          setDiscountValue('');
+          setShowCheckoutModal(false);
+          setLinkedReservationId(null);
+          return;
+        } catch (dexieErr) {
+          console.error('Error guardando en Dexie:', dexieErr);
+          presentToast({ message: 'Error guardando orden local', duration: 3000, color: 'danger' });
+          return;
+        }
+      }
+
+      // ONLINE MODE: Send to server
       try {
-        const offlineId = 'off_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
-        const offlineOrder: OfflineOrder = {
-          offlineId,
-          tenantId: user?.tenantId || 'default',
-          payload,
-          rateAtSale: exchangeRate,
-          createdAt: new Date().toISOString(),
-          synced: false
-        };
+        if (editingOrderId) {
+          await apiClient.put(`/orders/${editingOrderId}`, payload);
+          presentToast({ message: 'Pedido actualizado con éxito', duration: 2500, color: 'success' });
+        } else {
+          await apiClient.post('/orders', payload);
+          presentToast({ message: '✓ ¡Pedido registrado con éxito!', duration: 2500, color: 'success' });
+        }
 
-        await offlineDb.offlineOrders.add(offlineOrder);
-
-        presentToast({
-          message: '✓ Venta guardada localmente (Modo Offline)',
-          duration: 3000,
-          color: 'success'
-        });
-
-        // Reset cart and modal
         setCart([]);
         setCustomerName('');
         setCustomerPhone('');
@@ -900,81 +964,46 @@ const Pos: React.FC = () => {
         setBypassMinDeposit(false);
         setDiscountValue('');
         setShowCheckoutModal(false);
+        setEditingOrderId(null);
         setLinkedReservationId(null);
-        return;
-      } catch (dexieErr) {
-        console.error('Error guardando en Dexie:', dexieErr);
-        presentToast({ message: 'Error guardando orden local', duration: 3000, color: 'danger' });
-        return;
-      }
-    }
+        fetchProducts();
+      } catch (e: any) {
+        console.error('Error procesando pedido:', e);
+        if (e.response) {
+          const errorMsg = e.response.data?.message || e.response.data?.error || 'Error al procesar el pedido';
+          presentToast({
+            message: `Error: ${Array.isArray(errorMsg) ? errorMsg.join(', ') : errorMsg}`,
+            duration: 4500,
+            color: 'danger'
+          });
+          return;
+        }
 
-    // ONLINE MODE: Send to server
-    try {
-      if (editingOrderId) {
-        await apiClient.put(`/orders/${editingOrderId}`, payload);
-        presentToast({ message: 'Pedido actualizado con éxito', duration: 2500, color: 'success' });
-      } else {
-        await apiClient.post('/orders', payload);
-        presentToast({ message: '✓ ¡Pedido registrado con éxito!', duration: 2500, color: 'success' });
+        // Fallback: If network failed unexpectedly (no response), save offline
+        try {
+          const offlineId = 'off_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+          const offlineOrder: OfflineOrder = {
+            offlineId,
+            tenantId: user?.tenantId || 'default',
+            payload,
+            rateAtSale: exchangeRate,
+            createdAt: new Date().toISOString(),
+            synced: false
+          };
+          await offlineDb.offlineOrders.add(offlineOrder);
+          presentToast({
+            message: 'Fallo de conexión: Pedido guardado localmente en Modo Offline',
+            duration: 3500,
+            color: 'warning'
+          });
+          setCart([]);
+          setShowCheckoutModal(false);
+        } catch (err) {
+          presentToast({ message: 'Error al registrar pedido', duration: 3000, color: 'danger' });
+        }
       }
-
-      setCart([]);
-      setCustomerName('');
-      setCustomerPhone('');
-      setCustomerAddress('');
-      setTableNumber('');
-      setPagoMovilRef('');
-      setPuntoRef('');
-      setBinanceRef('');
-      setTransferRef('');
-      setTransferBank('');
-      setUsdReceived('');
-      setChangeMethod('CASH_USD');
-      setChangeRef('');
-      setChangePhone('');
-      setChangeBank('');
-      setInitialAbono('');
-      setBypassMinDeposit(false);
-      setDiscountValue('');
-      setShowCheckoutModal(false);
-      setEditingOrderId(null);
-      setLinkedReservationId(null);
-      fetchProducts();
-    } catch (e: any) {
-      console.error('Error procesando pedido:', e);
-      if (e.response) {
-        const errorMsg = e.response.data?.message || e.response.data?.error || 'Error al procesar el pedido';
-        presentToast({
-          message: `Error: ${Array.isArray(errorMsg) ? errorMsg.join(', ') : errorMsg}`,
-          duration: 4500,
-          color: 'danger'
-        });
-        return;
-      }
-
-      // Fallback: If network failed unexpectedly (no response), save offline
-      try {
-        const offlineId = 'off_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
-        const offlineOrder: OfflineOrder = {
-          offlineId,
-          tenantId: user?.tenantId || 'default',
-          payload,
-          rateAtSale: exchangeRate,
-          createdAt: new Date().toISOString(),
-          synced: false
-        };
-        await offlineDb.offlineOrders.add(offlineOrder);
-        presentToast({
-          message: 'Fallo de conexión: Pedido guardado localmente en Modo Offline',
-          duration: 3500,
-          color: 'warning'
-        });
-        setCart([]);
-        setShowCheckoutModal(false);
-      } catch (err) {
-        presentToast({ message: 'Error al registrar pedido', duration: 3000, color: 'danger' });
-      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -2139,12 +2168,34 @@ const Pos: React.FC = () => {
                 {/* Big Action: Confirmar Pedido */}
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={placeOrder}
                   className="ff-btn-primary"
-                  style={{ width: '100%', padding: '14px', fontSize: '16px', borderRadius: '14px', marginTop: '6px' }}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    fontSize: '16px',
+                    borderRadius: '14px',
+                    marginTop: '6px',
+                    opacity: isSubmitting ? 0.7 : 1,
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
                 >
-                  <IonIcon icon={checkmarkCircle} style={{ fontSize: '20px' }} />
-                  {editingOrderId ? 'Guardar Cambios del Pedido' : 'Confirmar Pedido ✓'}
+                  {isSubmitting ? (
+                    <>
+                      <IonSpinner name="crescent" style={{ width: '20px', height: '20px', color: '#ffffff' }} />
+                      <span>Procesando pedido...</span>
+                    </>
+                  ) : (
+                    <>
+                      <IonIcon icon={checkmarkCircle} style={{ fontSize: '20px' }} />
+                      <span>{editingOrderId ? 'Guardar Cambios del Pedido' : 'Confirmar Pedido ✓'}</span>
+                    </>
+                  )}
                 </button>
             </div>
           </div>

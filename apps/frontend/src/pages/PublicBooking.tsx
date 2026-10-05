@@ -6,6 +6,7 @@ import {
   checkmarkCircleOutline, 
   timeOutline, 
   chevronBackOutline, 
+  chevronForwardOutline,
   imagesOutline, 
   personOutline, 
   sparklesOutline,
@@ -13,7 +14,10 @@ import {
   walletOutline,
   businessOutline,
   cartOutline,
-  logoWhatsapp
+  logoWhatsapp,
+  calendarOutline,
+  calendarNumberOutline,
+  flashOutline
 } from 'ionicons/icons';
 import { useImageViewer } from '../context/ImageViewerContext';
 import { requestAndSubscribePush } from '../services/push-notification.service';
@@ -389,26 +393,154 @@ const PublicBooking: React.FC = () => {
     }
   };
 
-  const getAvailableDates = () => {
-    const dates = [];
-    const today = new Date();
+  const maxAdvanceDays = Number(tenantInfo?.bookingMaxAdvanceDays || 365);
+  const [dateViewMode, setDateViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
+  const [visibleDaysCount, setVisibleDaysCount] = useState<number>(14);
+
+  const todayMidnight = useMemo(() => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    return t;
+  }, []);
+
+  const maxBookingDate = useMemo(() => {
+    const m = new Date();
+    m.setDate(m.getDate() + maxAdvanceDays);
+    m.setHours(23, 59, 59, 999);
+    return m;
+  }, [maxAdvanceDays]);
+
+  const isDateOpen = (d: Date): boolean => {
     const bHours = tenantInfo?.businessHours || {};
-    
-    // Generate next 14 days
-    for (let i = 0; i < 14; i++) {
-      const d = new Date();
-      d.setDate(today.getDate() + i);
-      const dayStr = d.getDay().toString();
-      
-      const dayConfig = bHours[dayStr];
-      if (dayConfig && dayConfig.isOpen) {
-        dates.push(d);
-      } else if (!bHours[dayStr] && Object.keys(bHours).length === 0) {
-        // Fallback if no business hours configured at all
+    if (Object.keys(bHours).length === 0) return true;
+    const dayStr = d.getDay().toString();
+    const dayConfig = bHours[dayStr];
+    return !!(dayConfig && dayConfig.isOpen);
+  };
+
+  const getUpcomingDates = (count: number) => {
+    const dates: Date[] = [];
+    let dayOffset = 0;
+    while (dates.length < count && dayOffset <= maxAdvanceDays) {
+      const d = new Date(todayMidnight);
+      d.setDate(todayMidnight.getDate() + dayOffset);
+      if (isDateOpen(d)) {
         dates.push(d);
       }
+      dayOffset++;
     }
     return dates;
+  };
+
+  const currentMonthLabel = useMemo(() => {
+    const raw = calendarMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }, [calendarMonth]);
+
+  const canGoPrevMonth = useMemo(() => {
+    const currentMonthStart = new Date(todayMidnight.getFullYear(), todayMidnight.getMonth(), 1);
+    const viewMonthStart = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+    return viewMonthStart.getTime() > currentMonthStart.getTime();
+  }, [calendarMonth, todayMidnight]);
+
+  const canGoNextMonth = useMemo(() => {
+    const maxMonthStart = new Date(maxBookingDate.getFullYear(), maxBookingDate.getMonth(), 1);
+    const viewMonthStart = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+    return viewMonthStart.getTime() < maxMonthStart.getTime();
+  }, [calendarMonth, maxBookingDate]);
+
+  const handlePrevMonth = () => {
+    if (!canGoPrevMonth) return;
+    setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    if (!canGoNextMonth) return;
+    setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  useEffect(() => {
+    if (selectedDate) {
+      setCalendarMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+    }
+  }, [selectedDate]);
+
+  const calendarDays = useMemo(() => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const firstDayOfWeek = (firstDay.getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const daysArray: ({
+      dayNumber: number;
+      date: Date;
+      isOpen: boolean;
+      isPast: boolean;
+      isTooFar: boolean;
+      isToday: boolean;
+      isSelected: boolean;
+    } | null)[] = [];
+
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      daysArray.push(null);
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateObj = new Date(year, month, d);
+      dateObj.setHours(0, 0, 0, 0);
+
+      const isPast = dateObj.getTime() < todayMidnight.getTime();
+      const isTooFar = dateObj.getTime() > maxBookingDate.getTime();
+      const isOpen = isDateOpen(dateObj);
+      const isToday = dateObj.getTime() === todayMidnight.getTime();
+      const isSelected = selectedDate ? formatDateLocal(dateObj) === formatDateLocal(selectedDate) : false;
+
+      daysArray.push({
+        dayNumber: d,
+        date: dateObj,
+        isOpen,
+        isPast,
+        isTooFar,
+        isToday,
+        isSelected
+      });
+    }
+
+    return daysArray;
+  }, [calendarMonth, todayMidnight, maxBookingDate, tenantInfo?.businessHours, selectedDate]);
+
+  const handleDirectDateChange = (val: string) => {
+    if (!val) return;
+    const [year, month, day] = val.split('-').map(Number);
+    const pickedDate = new Date(year, month - 1, day);
+    pickedDate.setHours(0, 0, 0, 0);
+
+    if (pickedDate < todayMidnight) {
+      presentToast({ message: 'No puedes reservar en fechas pasadas.', duration: 2500, color: 'warning' });
+      return;
+    }
+    if (pickedDate > maxBookingDate) {
+      presentToast({
+        message: `Solo se permiten reservas con hasta ${maxAdvanceDays} días de anticipación.`,
+        duration: 3000,
+        color: 'warning'
+      });
+      return;
+    }
+    if (!isDateOpen(pickedDate)) {
+      const dayNames = ['domingos', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados'];
+      presentToast({
+        message: `El local no atiende los ${dayNames[pickedDate.getDay()]}. Por favor elige otro día disponible.`,
+        duration: 3500,
+        color: 'warning'
+      });
+      return;
+    }
+
+    setSelectedDate(pickedDate);
+    setStep(3);
   };
 
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
@@ -1058,43 +1190,339 @@ const PublicBooking: React.FC = () => {
               {/* STEP 2: DATE */}
               {step === 2 && (
                 <div>
-                  <h3 style={{fontWeight: 'bold', marginBottom: '8px', textAlign: 'center'}}>Elige una Fecha</h3>
-                  
+                  <h3 style={{ fontWeight: '800', marginBottom: '4px', textAlign: 'center', fontSize: '18px', color: '#0F172A' }}>
+                    Elige una Fecha
+                  </h3>
+                  <p style={{ textAlign: 'center', color: '#64748b', fontSize: '13px', margin: '0 0 16px 0' }}>
+                    Selecciona el día de tu cita para ver los horarios disponibles
+                  </p>
+
                   {selectedServices.length > 0 && (
-                    <div style={{ backgroundColor: '#f1f5f9', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ backgroundColor: '#f1f5f9', padding: '10px 14px', borderRadius: '12px', marginBottom: '16px', fontSize: '13px', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #e2e8f0' }}>
                       <div>
                         <b>{selectedServiceNames}</b> • ⏱️ {totalDurationMinutes} min
                         {selectedStaff && <div><span style={{ color: '#64748b' }}>Especialista:</span> <b>{formatStaffName(selectedStaff.name)}</b></div>}
                       </div>
-                      <div style={{ fontWeight: 'bold', color: 'var(--ion-color-primary)', fontSize: '15px' }}>
+                      <div style={{ fontWeight: 'bold', color: '#10B981', fontSize: '15px' }}>
                         ${totalServicePrice.toFixed(2)}
                       </div>
                     </div>
                   )}
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                    {getAvailableDates().map((d, i) => (
-                      <div 
-                        key={i}
-                        onClick={() => { setSelectedDate(d); setStep(3); }}
-                        style={{
-                          padding: '14px 10px',
-                          border: '1.5px solid #10B981',
-                          borderRadius: '12px',
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          backgroundColor: '#ecfdf5',
-                          color: '#065f46',
-                          fontWeight: '700',
-                          fontSize: '13px',
-                          transition: 'all 0.15s ease',
-                          boxShadow: '0 2px 4px rgba(16, 185, 129, 0.08)'
-                        }}
-                      >
-                        {d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase()}
-                      </div>
-                    ))}
+                  {/* Direct Date Picker & Quick Jump Bar */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                    padding: '10px 14px',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    marginBottom: '16px',
+                    flexWrap: 'wrap'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <IonIcon icon={calendarNumberOutline} style={{ color: '#10B981', fontSize: '20px' }} />
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
+                        ¿Buscas una fecha lejana? Elige aquí:
+                      </span>
+                    </div>
+                    <input
+                      type="date"
+                      value={selectedDate ? formatDateLocal(selectedDate) : ''}
+                      min={formatDateLocal(todayMidnight)}
+                      max={formatDateLocal(maxBookingDate)}
+                      onChange={(e) => handleDirectDateChange(e.target.value)}
+                      style={{
+                        padding: '7px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        color: '#0f172a',
+                        backgroundColor: '#ffffff',
+                        cursor: 'pointer',
+                        outline: 'none'
+                      }}
+                    />
                   </div>
+
+                  {/* View Mode Toggle: Calendario Mensual vs Próximos Turnos */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '6px',
+                    marginBottom: '16px',
+                    backgroundColor: '#f1f5f9',
+                    padding: '4px',
+                    borderRadius: '12px'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setDateViewMode('calendar')}
+                      style={{
+                        flex: 1,
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: dateViewMode === 'calendar' ? '#ffffff' : 'transparent',
+                        color: dateViewMode === 'calendar' ? '#0f172a' : '#64748b',
+                        fontWeight: dateViewMode === 'calendar' ? 700 : 500,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        boxShadow: dateViewMode === 'calendar' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <IonIcon icon={calendarOutline} /> Vista Calendario
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDateViewMode('list')}
+                      style={{
+                        flex: 1,
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: dateViewMode === 'list' ? '#ffffff' : 'transparent',
+                        color: dateViewMode === 'list' ? '#0f172a' : '#64748b',
+                        fontWeight: dateViewMode === 'list' ? 700 : 500,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        boxShadow: dateViewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <IonIcon icon={flashOutline} /> Próximos Turnos
+                    </button>
+                  </div>
+
+                  {/* VIEW 1: INTERACTIVE MONTHLY CALENDAR */}
+                  {dateViewMode === 'calendar' && (
+                    <div style={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '14px',
+                      padding: '16px',
+                      backgroundColor: '#ffffff'
+                    }}>
+                      {/* Month Navigation */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '16px',
+                        paddingBottom: '12px',
+                        borderBottom: '1px solid #f1f5f9'
+                      }}>
+                        <button
+                          type="button"
+                          disabled={!canGoPrevMonth}
+                          onClick={handlePrevMonth}
+                          aria-label="Mes anterior"
+                          style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            backgroundColor: canGoPrevMonth ? '#f8fafc' : '#f1f5f9',
+                            color: canGoPrevMonth ? '#0f172a' : '#cbd5e1',
+                            cursor: canGoPrevMonth ? 'pointer' : 'not-allowed',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '16px'
+                          }}
+                        >
+                          <IonIcon icon={chevronBackOutline} />
+                        </button>
+
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontWeight: '800', fontSize: '16px', color: '#0f172a', textTransform: 'capitalize' }}>
+                            {currentMonthLabel}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={!canGoNextMonth}
+                          onClick={handleNextMonth}
+                          aria-label="Mes siguiente"
+                          style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            backgroundColor: canGoNextMonth ? '#f8fafc' : '#f1f5f9',
+                            color: canGoNextMonth ? '#0f172a' : '#cbd5e1',
+                            cursor: canGoNextMonth ? 'pointer' : 'not-allowed',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '16px'
+                          }}
+                        >
+                          <IonIcon icon={chevronForwardOutline} />
+                        </button>
+                      </div>
+
+                      {/* Weekdays Row */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '8px' }}>
+                        {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(w => (
+                          <div key={w} style={{ textAlign: 'center', fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>
+                            {w}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Days Grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+                        {calendarDays.map((cell, idx) => {
+                          if (!cell) {
+                            return <div key={`empty-${idx}`} style={{ height: '42px' }} />;
+                          }
+
+                          const isAvailable = !cell.isPast && !cell.isTooFar && cell.isOpen;
+
+                          return (
+                            <button
+                              key={`day-${cell.dayNumber}`}
+                              type="button"
+                              disabled={!isAvailable}
+                              onClick={() => {
+                                if (isAvailable) {
+                                  setSelectedDate(cell.date);
+                                  setStep(3);
+                                }
+                              }}
+                              title={
+                                cell.isPast ? 'Fecha pasada' :
+                                cell.isTooFar ? 'Fuera del rango permitido' :
+                                !cell.isOpen ? 'Local cerrado este día' :
+                                `Reservar para el ${cell.date.toLocaleDateString()}`
+                              }
+                              style={{
+                                height: '42px',
+                                borderRadius: '10px',
+                                border: isAvailable 
+                                  ? (cell.isSelected ? '2px solid #059669' : '1.5px solid #10B981')
+                                  : '1px solid #f1f5f9',
+                                backgroundColor: isAvailable
+                                  ? (cell.isSelected ? '#10B981' : '#ecfdf5')
+                                  : '#f8fafc',
+                                color: isAvailable
+                                  ? (cell.isSelected ? '#ffffff' : '#065f46')
+                                  : '#cbd5e1',
+                                fontWeight: isAvailable ? 700 : 500,
+                                fontSize: '13px',
+                                cursor: isAvailable ? 'pointer' : 'not-allowed',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: 0,
+                                position: 'relative',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <span>{cell.dayNumber}</span>
+                              {cell.isToday && (
+                                <span style={{
+                                  position: 'absolute',
+                                  bottom: '2px',
+                                  width: '4px',
+                                  height: '4px',
+                                  borderRadius: '50%',
+                                  backgroundColor: isAvailable ? '#059669' : '#94a3b8'
+                                }} />
+                              )}
+                              {!cell.isOpen && !cell.isPast && !cell.isTooFar && (
+                                <span style={{ fontSize: '8px', color: '#94a3b8', lineHeight: 1 }}>Cerrado</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Legend */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        gap: '16px',
+                        marginTop: '16px',
+                        paddingTop: '12px',
+                        borderTop: '1px solid #f1f5f9',
+                        fontSize: '11px',
+                        color: '#64748b'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{ width: '10px', height: '10px', borderRadius: '3px', backgroundColor: '#ecfdf5', border: '1px solid #10B981' }} />
+                          Disponible
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{ width: '10px', height: '10px', borderRadius: '3px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }} />
+                          Cerrado / No disponible
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VIEW 2: LIST OF UPCOMING AVAILABLE DAYS */}
+                  {dateViewMode === 'list' && (
+                    <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                        {getUpcomingDates(visibleDaysCount).map((d, i) => (
+                          <div 
+                            key={i}
+                            onClick={() => { setSelectedDate(d); setStep(3); }}
+                            style={{
+                              padding: '14px 10px',
+                              border: '1.5px solid #10B981',
+                              borderRadius: '12px',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              backgroundColor: '#ecfdf5',
+                              color: '#065f46',
+                              fontWeight: '700',
+                              fontSize: '13px',
+                              transition: 'all 0.15s ease',
+                              boxShadow: '0 2px 4px rgba(16, 185, 129, 0.08)'
+                            }}
+                          >
+                            {d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase()}
+                          </div>
+                        ))}
+                      </div>
+
+                      {visibleDaysCount < maxAdvanceDays && (
+                        <div style={{ textAlign: 'center', marginTop: '14px' }}>
+                          <button
+                            type="button"
+                            onClick={() => setVisibleDaysCount(prev => prev + 14)}
+                            style={{
+                              padding: '10px 18px',
+                              borderRadius: '10px',
+                              border: '1px dashed #10B981',
+                              backgroundColor: '#ffffff',
+                              color: '#065f46',
+                              fontWeight: 700,
+                              fontSize: '13px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            + Ver más fechas (+14 días)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1103,7 +1531,7 @@ const PublicBooking: React.FC = () => {
                 <div>
                   <h3 style={{fontWeight: 'bold', marginBottom: '6px', textAlign: 'center'}}>Horas Disponibles</h3>
                   <div style={{textAlign: 'center', marginBottom: '14px', color: '#64748b', fontSize: '13px'}}>
-                    Para el <b>{selectedDate?.toLocaleDateString()}</b> {selectedServices.length > 0 ? `(${totalDurationMinutes} min)` : ''}
+                    Para el <b>{selectedDate ? selectedDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : ''}</b> {selectedServices.length > 0 ? `(${totalDurationMinutes} min)` : ''}
                     {selectedStaff && ` con ${formatStaffName(selectedStaff.name)}`}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>

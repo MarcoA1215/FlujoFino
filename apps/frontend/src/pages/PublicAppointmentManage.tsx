@@ -271,16 +271,6 @@ const PublicAppointmentManage: React.FC = () => {
   const isPaidComplete = appointment.paymentStatus === 'PAID' || remainingAmount <= 0;
   const isPartialPaid = appointment.paymentStatus === 'PARTIAL' || (abonosTotal > 0 && remainingAmount > 0);
 
-  const generateFutureDates = () => {
-    const dates = [];
-    const today = new Date();
-    for(let i=0; i<14; i++) {
-      const d = new Date();
-      d.setDate(today.getDate() + i);
-      dates.push(formatDateLocal(d));
-    }
-    return dates;
-  };
 
   // Convert current input to Bs for live feedback
   const inputAmt = parseFloat(paymentAmount) || 0;
@@ -565,14 +555,28 @@ const PublicAppointmentManage: React.FC = () => {
               <IonCardContent style={{ padding: '20px' }}>
                 <h3 style={{fontWeight: 'bold', marginBottom: '15px', textAlign: 'center', color: '#1e293b'}}>Reprogramar Cita</h3>
                 
-                <IonItem lines="none" style={{ border: '1px solid #ddd', borderRadius: '8px', marginBottom: '15px' }}>
-                  <IonLabel position="stacked">Selecciona Nueva Fecha</IonLabel>
-                  <IonSelect value={selectedDate} onIonChange={e => setSelectedDate(e.detail.value)} placeholder="Elige un día">
-                    {generateFutureDates().map(d => (
-                      <IonSelectOption key={d} value={d}>{d}</IonSelectOption>
-                    ))}
-                  </IonSelect>
-                </IonItem>
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+                    Selecciona Nueva Fecha
+                  </label>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    min={formatDateLocal(new Date())}
+                    onChange={e => setSelectedDate(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '10px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: '#0f172a',
+                      backgroundColor: '#ffffff',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
 
                 {selectedDate && (
                   <div style={{ marginBottom: '20px' }}>

@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { DataSource, Between, In } from 'typeorm';
+import { DataSource, Between, In, Not, MoreThanOrEqual } from 'typeorm';
 import { IsOptional, IsArray, IsString, IsNumber, IsBoolean } from 'class-validator';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
@@ -256,6 +256,30 @@ export class OrdersService {
       : await this.settingsService.getEffectiveRate(tenantId);
 
     return this.dataSource.transaction(async (manager) => {
+      if (dto.paymentMethod === 'PAGO_MOVIL' && dto.pagoMovilRef && dto.pagoMovilRef.trim().length > 0) {
+        const cleanRef = dto.pagoMovilRef.trim();
+        if (cleanRef.length < 4) {
+          throw new BadRequestException('La referencia de Pago Móvil debe contener al menos 4 dígitos');
+        }
+
+        // Prevenir comprobantes reciclados en las últimas 48 horas
+        const since48h = new Date(Date.now() - 48 * 60 * 60 * 1000);
+        const duplicate = await manager.findOne(Order, {
+          where: {
+            tenantId,
+            pagoMovilRef: cleanRef,
+            createdAt: MoreThanOrEqual(since48h),
+            status: Not(OrderStatus.CANCELED),
+          }
+        });
+
+        if (duplicate) {
+          throw new BadRequestException(
+            `Esta referencia de Pago Móvil (${cleanRef}) ya fue registrada en la orden #${duplicate.id.slice(0, 8).toUpperCase()} en las últimas 48 horas.`
+          );
+        }
+      }
+
       let totalAmount = 0;
       let totalCost = 0;
       let deliveryFee = 0;

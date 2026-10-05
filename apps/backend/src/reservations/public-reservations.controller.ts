@@ -116,6 +116,7 @@ export class PublicReservationsController {
       featureShowCatalog: settings?.featureShowCatalog || false,
       bookingRequireService: settings?.bookingRequireService ?? true,
       bookingAllowStaffSelection: settings?.bookingAllowStaffSelection ?? false,
+      bookingMaxAdvanceDays: Number(settings?.bookingMaxAdvanceDays || 365),
       featureBuySell: settings?.featureBuySell ?? false,
       featureRecipes: settings?.featureRecipes ?? false,
       featureCustomerSchedules: settings?.featureCustomerSchedules ?? false,
