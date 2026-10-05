@@ -215,9 +215,14 @@ const Orders: React.FC = () => {
     }
   };
 
+  const [systemSettings, setSystemSettings] = useState<any>(null);
+
   const fetchSettings = async () => {
     try {
       const res = await apiClient.get<any>('/settings');
+      if (res.data) {
+        setSystemSettings(res.data);
+      }
       if (res.data?.exchangeRateBs && Number(res.data.exchangeRateBs) > 0) {
         setExchangeRate(Number(res.data.exchangeRateBs));
       }
@@ -465,6 +470,10 @@ const Orders: React.FC = () => {
 
               const isPaid = order.paymentStatus === PaymentStatus.PAID;
               const isPartial = order.paymentStatus === PaymentStatus.PARTIAL;
+
+              // En compraventa / retail o cuando no se manejan recetas de producción, el flujo es entrega directa
+              const isRetailMode = Boolean(systemSettings?.featureBuySell) || (systemSettings && !systemSettings.featureRecipes && !systemSettings.featureProduction);
+              const isRetailFlow = isRetailMode || (order.deliveryMethod === DeliveryMethod.IN_STORE && isPaid);
 
               const shortId = String(order.id || '').slice(0, 8).toUpperCase();
               const formattedDate = (() => {
@@ -917,20 +926,20 @@ const Orders: React.FC = () => {
                     {isPending && (
                       <button
                         type="button"
-                        onClick={() => updateStatus(order.id, OrderStatus.PREPARING)}
+                        onClick={() => updateStatus(order.id, isRetailFlow ? OrderStatus.DELIVERED : OrderStatus.PREPARING)}
                         style={{
                           flex: 1,
                           padding: '8px 12px',
                           borderRadius: '10px',
-                          border: '1px solid #93C5FD',
-                          background: '#EFF6FF',
-                          color: '#1D4ED8',
+                          border: isRetailFlow ? '1px solid #A7F3D0' : '1px solid #93C5FD',
+                          background: isRetailFlow ? '#ECFDF5' : '#EFF6FF',
+                          color: isRetailFlow ? '#065F46' : '#1D4ED8',
                           fontSize: '12px',
                           fontWeight: '700',
                           cursor: 'pointer'
                         }}
                       >
-                        Preparar
+                        {isRetailFlow ? (order.deliveryMethod === DeliveryMethod.DELIVERY ? 'Despachar ✓' : 'Entregar ✓') : 'Preparar'}
                       </button>
                     )}
 
@@ -950,7 +959,7 @@ const Orders: React.FC = () => {
                           cursor: 'pointer'
                         }}
                       >
-                        Completar ✓
+                        {order.deliveryMethod === DeliveryMethod.DELIVERY ? 'Despachado / Entregado ✓' : 'Completar ✓'}
                       </button>
                     )}
 

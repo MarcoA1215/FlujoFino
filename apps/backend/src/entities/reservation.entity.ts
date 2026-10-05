@@ -65,15 +65,6 @@ export class Reservation {
   @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING })
   paymentStatus: PaymentStatus;
 
-  @Column('boolean', { default: false })
-  paymentReported: boolean;
-
-  @Column({ nullable: true })
-  paymentProofUrl: string;
-
-  @Column({ nullable: true })
-  paymentRejectedReason: string;
-
   @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   totalAmount: number;
 
