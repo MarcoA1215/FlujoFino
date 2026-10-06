@@ -11,6 +11,7 @@ import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { PlatformConfig } from '../entities/platform-config.entity';
 import { Promoter } from '../entities/promoter.entity';
+import { Tenant } from '../entities/tenant.entity';
 
 function toMinutes(hhmm: string): number {
   const parts = hhmm.split(':');
@@ -268,8 +269,8 @@ export class AuthService {
     if (isSuperAdmin) {
       let tenantName = 'Plataforma Global';
       if (requestedTenantId && requestedTenantId !== 'platform-admin') {
-        const tenantRepo = this.dataSource.getRepository('Tenant');
-        const t: any = await tenantRepo.findOne({ where: { id: requestedTenantId } });
+        const tenantRepo = this.dataSource.getRepository(Tenant);
+        const t = await tenantRepo.findOne({ where: { id: requestedTenantId } });
         if (t) tenantName = t.name;
       }
       return {
@@ -392,7 +393,7 @@ export class AuthService {
         attempts++;
         const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
         myReferralCode = `${cleanPrefix}-${randomSuffix}`;
-        const existing = await queryRunner.manager.createQueryBuilder('Tenant', 't')
+        const existing = await queryRunner.manager.createQueryBuilder(Tenant, 't')
           .where('t.referral_code = :code', { code: myReferralCode })
           .getOne();
         if (!existing) {
@@ -414,7 +415,7 @@ export class AuthService {
             promoterId = promoter.id;
           }
         } else {
-          const referrerTenant = await queryRunner.manager.createQueryBuilder('Tenant', 't')
+          const referrerTenant = await queryRunner.manager.createQueryBuilder(Tenant, 't')
             .where('t.referral_code = :code', { code: inputCode })
             .getOne();
           if (referrerTenant) {
@@ -423,15 +424,15 @@ export class AuthService {
         }
       }
 
-      const tenant = queryRunner.manager.create('Tenant', {
+      const tenant = queryRunner.manager.create(Tenant, {
         name: body.tenantName,
-        trialEndsAt,
-        basePrice,
-        referralCode: myReferralCode,
-        referredByTenantId,
-        promoterId,
+        trial_ends_at: trialEndsAt,
+        base_price: basePrice,
+        referral_code: myReferralCode,
+        referred_by_tenant_id: referredByTenantId || undefined,
+        promoterId: promoterId || undefined,
       });
-      const savedTenant: any = await queryRunner.manager.save(tenant);
+      const savedTenant = await queryRunner.manager.save(Tenant, tenant);
 
       // 2. Create User as ADMIN
       const hashedPassword = await bcrypt.hash(body.password, 10);
