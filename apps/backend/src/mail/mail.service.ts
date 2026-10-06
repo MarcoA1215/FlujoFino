@@ -19,12 +19,6 @@ export class MailService {
     const secure = this.configService.get<string>('MAIL_SECURE') === 'true' || Number(port) === 465;
     const rawUser = this.configService.get<string>('MAIL_USER');
     const rawPass = this.configService.get<string>('MAIL_PASS');
-    const resendKey = this.configService.get<string>('RESEND_API_KEY');
-
-    if (resendKey) {
-      this.logger.log('✅ Resend API configurado como transporte principal de correos (puerto HTTPS 443).');
-      return;
-    }
 
     if (!rawUser || !rawPass) {
       this.logger.warn('Credenciales SMTP no configuradas. Los correos se registrarán en consola.');
@@ -110,43 +104,7 @@ export class MailService {
   }
 
   private async sendMail(to: string, subject: string, html: string): Promise<boolean> {
-    const resendKey = this.configService.get<string>('RESEND_API_KEY');
     const rawFrom = this.configService.get<string>('MAIL_FROM');
-
-    if (resendKey) {
-      try {
-        this.lastError = null;
-        const fromAddress = (rawFrom && rawFrom.includes('@')) ? rawFrom : `${APP_NAME} <onboarding@resend.dev>`;
-        const response = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${resendKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: fromAddress,
-            to: [to],
-            subject,
-            html,
-          }),
-        });
-
-        if (response.ok) {
-          this.logger.log(`✅ Correo enviado con éxito vía Resend (HTTPS 443) a ${to}`);
-          return true;
-        }
-
-        const errData = await response.json().catch(() => ({}));
-        this.lastError = errData?.message || `Error en Resend HTTP API (${response.status})`;
-        this.logger.error('Error enviando con Resend:', errData);
-        return false;
-      } catch (e: any) {
-        this.lastError = e?.message || 'Fallo de conexión con Resend API';
-        this.logger.error('Excepción al conectar con Resend:', e);
-        return false;
-      }
-    }
-
     const user = this.configService.get<string>('MAIL_USER') || DEFAULT_NOREPLY_EMAIL;
     const from = (rawFrom && rawFrom.includes('@')) ? rawFrom : `"${APP_NAME}" <${user}>`;
 
