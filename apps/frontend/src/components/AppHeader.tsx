@@ -25,6 +25,7 @@ import { apiClient } from '../api/client';
 import { offlineDb } from '../services/offline-db';
 import { DailyCashCloseModal } from './DailyCashCloseModal';
 import { EmailVerificationModal } from './EmailVerificationModal';
+import { SubscriptionWarningBanner } from './SubscriptionWarningBanner';
 
 interface AppHeaderProps {
   title?: string;
@@ -502,6 +503,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             {children}
           </IonButtons>
         </IonToolbar>
+        
+        <SubscriptionWarningBanner />
 
         {user && !user.isEmailVerified && (
           <div

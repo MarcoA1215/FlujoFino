@@ -31,7 +31,6 @@ import { ImageViewerProvider } from './context/ImageViewerContext';
 import { LoadingProvider } from './context/LoadingContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { LoadingOverlay } from './components/common/LoadingOverlay';
-import { SubscriptionWarningBanner } from './components/SubscriptionWarningBanner';
 import { ReportPaymentModal } from './components/ReportPaymentModal';
 import { UserRole, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
 import { useContext, useEffect, useState } from 'react';
@@ -267,7 +266,6 @@ const MainLayout: React.FC = () => {
           ⚡ Modo Sin Conexión: Visualizando agenda, clientes y catálogo guardados localmente.
         </div>
       )}
-      {!isPublicRoute && !isExpiredRoute && !isPromotor && <SubscriptionWarningBanner />}
       <IonSplitPane contentId="main" when={!isPublicRoute && !isExpiredRoute && (user?.tenantId || isSuperAdmin || isPromotor) ? 'md' : false}>
         {!isPublicRoute && !isExpiredRoute && <Menu />}
         <IonRouterOutlet id="main">

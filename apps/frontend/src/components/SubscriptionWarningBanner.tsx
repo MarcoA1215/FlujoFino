@@ -26,19 +26,17 @@ export const SubscriptionWarningBanner: React.FC = () => {
   return (
     <div
       style={{
-        backgroundColor: '#fef3c7',
-        borderBottom: '1px solid #f59e0b',
+        backgroundColor: '#fffbeb',
+        borderBottom: '1px solid #fde68a',
         color: '#92400e',
-        padding: '8px 16px',
+        padding: '6px 14px',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
         flexWrap: 'wrap',
-        gap: '12px',
-        fontSize: '0.88rem',
+        gap: '8px',
+        fontSize: '0.82rem',
         fontWeight: 600,
-        zIndex: 9999,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
