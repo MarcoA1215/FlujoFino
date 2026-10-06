@@ -24,4 +24,10 @@ export class NotificationsController {
     );
     return { success: true, id: saved?.id };
   }
+
+  @Public()
+  @Post('test')
+  async test(@Body() body: { identifier?: string; negocioId?: string }) {
+    return this.notificationsService.sendTestNotification(body?.identifier, body?.negocioId);
+  }
 }

@@ -43,6 +43,7 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useImageViewer } from '../context/ImageViewerContext';
 import { requestAndSubscribePush } from '../services/push-notification.service';
+import { CustomerNotificationPrompt } from '../components/CustomerNotificationPrompt';
 import { formatWhatsAppUrl } from '../utils/whatsapp';
 import { playNotificationSound } from '../utils/audio';
 import { BankSelect } from '../components/BankSelect';
@@ -843,6 +844,13 @@ const PublicStore: React.FC = () => {
                 </span>
               </div>
             </div>
+
+            <CustomerNotificationPrompt
+              identifier={customerPhone.trim() || customerCedula.trim()}
+              tenantId={tenantId}
+              type="order"
+              orderNumber={orderResult.orderNumber}
+            />
 
             <IonButton
               expand="block"

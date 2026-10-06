@@ -43,3 +43,7 @@ build/
 .yarn/cache/
 .yarn/unplugged/
 .yarn/build-state.yml
+
+# Repomix dumps
+repomix-backend.xml
+repomix-frontend.xml

@@ -21,6 +21,7 @@ import {
 } from 'ionicons/icons';
 import { useImageViewer } from '../context/ImageViewerContext';
 import { requestAndSubscribePush } from '../services/push-notification.service';
+import { CustomerNotificationPrompt } from '../components/CustomerNotificationPrompt';
 import { BankSelect } from '../components/BankSelect';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -733,6 +734,12 @@ const PublicBooking: React.FC = () => {
                     <p><b>Atención:</b> Equipo del Local (Coordinación continua)</p>
                   ) : null}
                 </div>
+
+                <CustomerNotificationPrompt
+                  identifier={customerPhone.trim() || identification?.trim()}
+                  tenantId={tenantId}
+                  type="booking"
+                />
 
                 <div style={{ marginTop: '25px', padding: '15px', backgroundColor: '#eef8ff', borderRadius: '8px', border: '1px dashed var(--ion-color-primary)' }}>
                   <h3 style={{ color: 'var(--ion-color-primary)', fontWeight: 'bold', fontSize: '16px', margin: '0 0 10px 0' }}>Enlace de Gestión</h3>

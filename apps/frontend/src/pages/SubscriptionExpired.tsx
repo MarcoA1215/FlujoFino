@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   IonPage,
   IonContent,
@@ -51,17 +51,11 @@ const SubscriptionExpired: React.FC = () => {
   const [reportBank, setReportBank] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const handleAmountUsdChange = (val: number) => {
-    setReportAmountUsd(val);
-    setReportAmountBs(Math.round(val * exchangeRate * 100) / 100);
-  };
-
-  const handleAmountBsChange = (val: number) => {
-    setReportAmountBs(val);
-    if (exchangeRate > 0) {
-      setReportAmountUsd(Math.round((val / exchangeRate) * 100) / 100);
-    }
-  };
+  useEffect(() => {
+    const fee = subscription?.finalFee || 20;
+    setReportAmountUsd(fee);
+    setReportAmountBs(Math.round(fee * exchangeRate * 100) / 100);
+  }, [subscription?.finalFee, exchangeRate]);
 
   const copyField = (text?: string, label?: string) => {
     if (!text) return;
@@ -480,55 +474,58 @@ const SubscriptionExpired: React.FC = () => {
               </IonSelect>
             </IonItem>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                  Monto USD ($)
+            {reportMethod !== SaaSPaymentMethod.BINANCE ? (
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                  Monto a Reportar en Bolívares (Bs):
                 </label>
-                <input
-                  type="number"
-                  step="any"
-                  value={reportAmountUsd}
-                  onChange={(e) => handleAmountUsdChange(Number(e.target.value))}
+                <div
                   style={{
-                    width: '100%',
-                    padding: '11px 12px',
-                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
                     border: '1px solid #cbd5e1',
-                    background: '#f8fafc',
-                    color: '#0f172a',
-                    fontWeight: 700,
-                    fontSize: '14px',
-                    boxSizing: 'border-box',
-                    outline: 'none',
+                    borderRadius: '10px',
+                    padding: '11px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                   }}
-                />
+                >
+                  <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
+                    Bs. {reportAmountBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#059669', backgroundColor: '#ecfdf5', padding: '3px 8px', borderRadius: '6px' }}>
+                    ${reportAmountUsd.toFixed(2)} USD
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                  💡 Monto fijo calculado a Tasa Oficial de <strong>Bs. {exchangeRate.toFixed(2)}</strong>.
+                </div>
               </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                  Monto Bs
+            ) : (
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                  Monto a Reportar en USDT ($):
                 </label>
-                <input
-                  type="number"
-                  step="any"
-                  value={reportAmountBs}
-                  onChange={(e) => handleAmountBsChange(Number(e.target.value))}
+                <div
                   style={{
-                    width: '100%',
-                    padding: '11px 12px',
-                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
                     border: '1px solid #cbd5e1',
-                    background: '#f8fafc',
-                    color: '#0f172a',
-                    fontWeight: 700,
-                    fontSize: '14px',
-                    boxSizing: 'border-box',
-                    outline: 'none',
+                    borderRadius: '10px',
+                    padding: '11px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                   }}
-                />
+                >
+                  <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
+                    ${reportAmountUsd.toFixed(2)} USDT
+                  </span>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#854d0e', backgroundColor: '#fef9c3', padding: '3px 8px', borderRadius: '6px' }}>
+                    Cuota Fija
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
 
             {(reportMethod === SaaSPaymentMethod.PAGO_MOVIL || reportMethod === SaaSPaymentMethod.CASH) && (
               <div style={{ marginBottom: '14px' }}>

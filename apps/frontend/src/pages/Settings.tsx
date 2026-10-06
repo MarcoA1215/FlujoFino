@@ -40,7 +40,16 @@ import {
   checkmarkOutline,
   colorPaletteOutline,
   sparklesOutline,
+  notificationsOutline,
+  volumeHighOutline,
 } from 'ionicons/icons';
+import {
+  getNotificationPermission,
+  registerPushNotifications,
+  testPushNotification,
+  playNotificationSound,
+  type NotificationPermissionState,
+} from '../services/push-notification.service';
 import { apiClient } from '../api/client';
 import { getContrastColor, isColorTooLight, ensureReadableColor, PRESET_THEME_COLORS } from '../utils/colors';
 import { AuthContext } from '../context/AuthContext';
@@ -49,6 +58,7 @@ import {
   TenantPlanType,
   TenantStatus,
   SaaSPaymentMethod,
+  DEFAULT_SUPERADMIN_EMAIL,
   type MySubscriptionDTO,
   type PlatformConfigDTO,
 } from '@finowork/shared-types';
@@ -125,6 +135,76 @@ const SettingsPage: React.FC = () => {
   const [reportReference, setReportReference] = useState<string>('');
   const [isSubmittingReport, setIsSubmittingReport] = useState<boolean>(false);
 
+  const [notificationStatus, setNotificationStatus] = useState<NotificationPermissionState>(() => getNotificationPermission());
+  const [isActivatingNotifications, setIsActivatingNotifications] = useState<boolean>(false);
+  const [isTestingNotifications, setIsTestingNotifications] = useState<boolean>(false);
+
+  useEffect(() => {
+    const updatePerm = () => setNotificationStatus(getNotificationPermission());
+    window.addEventListener('focus', updatePerm);
+    return () => window.removeEventListener('focus', updatePerm);
+  }, []);
+
+  const handleActivatePush = async () => {
+    if (!user) return;
+    setIsActivatingNotifications(true);
+    const identifier = user.email || user.username || user.id;
+    if (!identifier) {
+      setIsActivatingNotifications(false);
+      return;
+    }
+    const isSuperAdmin =
+      user.role === UserRole.SUPERADMIN ||
+      (user.role as string) === 'SUPERADMIN' ||
+      user.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
+    const role = isSuperAdmin ? 'SUPERADMIN' : (user.role || 'ADMIN');
+
+    try {
+      const res = await registerPushNotifications(identifier, user.tenantId, role, true);
+      const perm = getNotificationPermission();
+      setNotificationStatus(perm);
+      if (perm === 'granted' || res.success) {
+        presentToast({
+          message: '¡Notificaciones activadas con éxito!',
+          duration: 3000,
+          color: 'success',
+          icon: checkmarkCircleOutline,
+        });
+      } else if (perm === 'denied') {
+        presentToast({
+          message: 'El navegador tiene las notificaciones bloqueadas. Habilítalas en el candado de la URL.',
+          duration: 4500,
+          color: 'warning',
+          icon: warningOutline,
+        });
+      }
+    } finally {
+      setIsActivatingNotifications(false);
+    }
+  };
+
+  const handleTestPush = async () => {
+    setIsTestingNotifications(true);
+    try {
+      const identifier = user?.email || user?.username || user?.id;
+      const res = await testPushNotification(identifier, user?.tenantId);
+      presentToast({
+        message: res.message,
+        duration: 3500,
+        color: 'success',
+        icon: checkmarkCircleOutline,
+      });
+    } catch {
+      presentToast({
+        message: 'Alerta sonora y local reproducida con éxito.',
+        duration: 3000,
+        color: 'success',
+      });
+    } finally {
+      setIsTestingNotifications(false);
+    }
+  };
+
   const fetchSettings = async () => {
     try {
       const setRes = await apiClient.get<Settings>('/settings');
@@ -178,18 +258,6 @@ const SettingsPage: React.FC = () => {
     setReportReference('');
     fetchPlatformConfig();
     setIsReportModalOpen(true);
-  };
-
-  const handleAmountUsdChange = (val: number) => {
-    setReportAmountUsd(val);
-    setReportAmountBs(Math.round(val * exchangeRate * 100) / 100);
-  };
-
-  const handleAmountBsChange = (val: number) => {
-    setReportAmountBs(val);
-    if (exchangeRate > 0) {
-      setReportAmountUsd(Math.round((val / exchangeRate) * 100) / 100);
-    }
   };
 
   const handleSubmitReport = async () => {
@@ -643,6 +711,162 @@ const SettingsPage: React.FC = () => {
                       onIonChange={e => setSettings({...settings, requireApprovalAlways: e.detail.checked})} 
                     />
                   </IonItem>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
+          </IonRow>
+
+          {/* Tarjeta de Notificaciones Push y Alertas */}
+          <IonRow>
+            <IonCol size="12">
+              <IonCard style={{ borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: 'var(--ff-shadow-sm, 0 1px 3px rgba(0,0,0,0.05))', background: '#FFFFFF' }}>
+                <IonCardHeader style={{ paddingBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        width: '38px',
+                        height: '38px',
+                        borderRadius: '10px',
+                        backgroundColor: '#ECFDF5',
+                        color: '#10B981',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <IonIcon icon={notificationsOutline} style={{ fontSize: '20px' }} />
+                      </div>
+                      <div>
+                        <IonCardTitle style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>
+                          Notificaciones Push y Alertas en Tiempo Real
+                        </IonCardTitle>
+                        <p style={{ margin: 0, fontSize: '13px', color: '#64748B' }}>
+                          Recibe avisos y sonidos cuando clientes hagan pedidos o reserven citas.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      {notificationStatus === 'granted' && (
+                        <IonBadge style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, backgroundColor: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0' }}>
+                          ✓ Notificaciones Activas
+                        </IonBadge>
+                      )}
+                      {notificationStatus === 'denied' && (
+                        <IonBadge style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, backgroundColor: '#FEF2F2', color: '#991B1B', border: '1px solid #FECACA' }}>
+                          ✕ Bloqueadas por el navegador
+                        </IonBadge>
+                      )}
+                      {notificationStatus === 'default' && (
+                        <IonBadge style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, backgroundColor: '#FFFBEB', color: '#92400E', border: '1px solid #FDE68A' }}>
+                          ⚠ Requiere Permiso
+                        </IonBadge>
+                      )}
+                      {notificationStatus === 'unsupported' && (
+                        <IonBadge style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, backgroundColor: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1' }}>
+                          No soportado en este entorno
+                        </IonBadge>
+                      )}
+                    </div>
+                  </div>
+                </IonCardHeader>
+
+                <IonCardContent style={{ paddingTop: '12px' }}>
+                  {notificationStatus === 'denied' && (
+                    <div style={{
+                      backgroundColor: '#FEF2F2',
+                      border: '1px solid #F87171',
+                      borderRadius: '10px',
+                      padding: '12px 16px',
+                      marginBottom: '16px',
+                      fontSize: '13px',
+                      color: '#991B1B',
+                      lineHeight: '1.5'
+                    }}>
+                      <strong>Atención:</strong> Las notificaciones están bloqueadas en tu navegador. Para recibirlas:
+                      <ol style={{ margin: '6px 0 0 18px', padding: 0 }}>
+                        <li>Haz clic en el ícono del candado o configuración al lado izquierdo de la URL (barra de direcciones).</li>
+                        <li>Busca la opción <strong>Notificaciones</strong> y cámbiala a <strong>Permitir</strong>.</li>
+                        <li>Recarga la página para aplicar los cambios.</li>
+                      </ol>
+                    </div>
+                  )}
+
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                    gap: '12px',
+                    marginTop: '8px'
+                  }}>
+                    {notificationStatus !== 'granted' && (
+                      <button
+                        onClick={handleActivatePush}
+                        disabled={isActivatingNotifications || notificationStatus === 'denied'}
+                        style={{
+                          backgroundColor: '#10B981',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '12px 18px',
+                          fontSize: '14px',
+                          fontWeight: 700,
+                          cursor: notificationStatus === 'denied' ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          opacity: notificationStatus === 'denied' ? 0.6 : 1,
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                        }}
+                      >
+                        <IonIcon icon={notificationsOutline} style={{ fontSize: '18px' }} />
+                        {isActivatingNotifications ? 'Activando...' : 'Activar Notificaciones'}
+                      </button>
+                    )}
+
+                    <button
+                      onClick={handleTestPush}
+                      disabled={isTestingNotifications}
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        color: '#0F172A',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '10px',
+                        padding: '12px 18px',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                      }}
+                    >
+                      <IonIcon icon={notificationsOutline} style={{ fontSize: '18px', color: '#10B981' }} />
+                      {isTestingNotifications ? 'Enviando...' : 'Enviar Alerta de Prueba'}
+                    </button>
+
+                    <button
+                      onClick={() => playNotificationSound()}
+                      style={{
+                        backgroundColor: '#F8FAFC',
+                        color: '#475569',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '10px',
+                        padding: '12px 18px',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <IonIcon icon={volumeHighOutline} style={{ fontSize: '18px', color: '#059669' }} />
+                      Probar Sonido de Timbre
+                    </button>
+                  </div>
                 </IonCardContent>
               </IonCard>
             </IonCol>
@@ -1834,33 +2058,53 @@ const SettingsPage: React.FC = () => {
                 {reportMethod !== SaaSPaymentMethod.BINANCE ? (
                   <div style={{ marginBottom: '14px' }}>
                     <IonLabel style={{ fontWeight: 700, fontSize: '13px', color: '#334155', display: 'block', marginBottom: '6px' }}>
-                      Monto Transferido en Bolívares (Bs):
+                      Monto a Reportar en Bolívares (Bs):
                     </IonLabel>
-                    <IonInput
-                      type="number"
-                      min="1"
-                      step="0.01"
-                      value={reportAmountBs}
-                      onIonInput={(e) => handleAmountBsChange(parseFloat(e.detail.value || '0'))}
-                      style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px 12px' }}
-                    />
+                    <div
+                      style={{
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
+                        Bs. {reportAmountBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#059669', backgroundColor: '#ecfdf5', padding: '3px 8px', borderRadius: '6px' }}>
+                        ${reportAmountUsd.toFixed(2)} USD
+                      </span>
+                    </div>
                     <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-                      💡 Equivale a <strong>${reportAmountUsd.toFixed(2)} USD</strong> calculados a Tasa Oficial de <strong>Bs. {exchangeRate.toFixed(2)}</strong>.
+                      💡 Monto fijo calculado a Tasa Oficial de <strong>Bs. {exchangeRate.toFixed(2)}</strong>.
                     </div>
                   </div>
                 ) : (
                   <div style={{ marginBottom: '14px' }}>
                     <IonLabel style={{ fontWeight: 700, fontSize: '13px', color: '#334155', display: 'block', marginBottom: '6px' }}>
-                      Monto Transferido en USDT ($):
+                      Monto a Reportar en USDT ($):
                     </IonLabel>
-                    <IonInput
-                      type="number"
-                      min="1"
-                      step="0.01"
-                      value={reportAmountUsd}
-                      onIonInput={(e) => handleAmountUsdChange(parseFloat(e.detail.value || '0'))}
-                      style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px 12px' }}
-                    />
+                    <div
+                      style={{
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
+                        ${reportAmountUsd.toFixed(2)} USDT
+                      </span>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#854d0e', backgroundColor: '#fef9c3', padding: '3px 8px', borderRadius: '6px' }}>
+                        Cuota Fija
+                      </span>
+                    </div>
                   </div>
                 )}
 

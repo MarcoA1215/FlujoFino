@@ -92,6 +92,10 @@ export class NotificationsService {
     let sent = 0;
     for (const sub of subs) {
       try {
+        if (!sub.endpoint.startsWith('http://') && !sub.endpoint.startsWith('https://')) {
+          this.logger.log(`Skipping non-webpush endpoint for admin sub ${sub.id}`);
+          continue;
+        }
         await webpush.sendNotification(
           {
             endpoint: sub.endpoint,
@@ -167,6 +171,10 @@ export class NotificationsService {
 
     let sent = 0;
     for (const sub of subs) {
+      if (!sub.endpoint.startsWith('http://') && !sub.endpoint.startsWith('https://')) {
+        this.logger.log(`Skipping non-webpush endpoint for sub ${sub.id}`);
+        continue;
+      }
       const pushSubscription = {
         endpoint: sub.endpoint,
         keys: {
@@ -191,6 +199,34 @@ export class NotificationsService {
       }
     }
     return sent;
+  }
+
+  async sendTestNotification(
+    identifier?: string,
+    negocioId?: string,
+  ): Promise<{ sent: number; message: string }> {
+    const payload = {
+      title: '🔔 ¡Prueba de Notificación Exitosa!',
+      body: 'FinoWork está configurado correctamente para enviarte alertas.',
+      data: {
+        url: '/',
+        type: 'TEST_NOTIFICATION',
+      },
+    };
+
+    let sent = 0;
+    if (negocioId) {
+      sent += await this.sendNotificationToNegocio(negocioId, payload, ['ADMIN', 'CAJERO', 'SUPERADMIN']);
+    }
+    if (identifier) {
+      sent += await this.sendNotificationToIdentifier(identifier, payload);
+    }
+    return {
+      sent,
+      message: sent > 0
+        ? `Notificación de prueba enviada exitosamente a ${sent} dispositivo(s).`
+        : `No se encontraron suscripciones activas para este usuario/negocio en este momento.`,
+    };
   }
 
   async notifySuperAdmin(payload: { title: string; body: string; data?: any }): Promise<number> {

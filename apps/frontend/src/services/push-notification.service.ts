@@ -36,7 +36,7 @@ export function playNotificationSound(): void {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(587.33, ctx.currentTime);
     osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
     osc.connect(gain);
     gain.connect(ctx.destination);
@@ -47,24 +47,55 @@ export function playNotificationSound(): void {
   }
 }
 
-async function subscribeWebPush(
+export type NotificationPermissionState = 'granted' | 'denied' | 'default' | 'unsupported';
+
+export function getNotificationPermission(): NotificationPermissionState {
+  if (Capacitor.isNativePlatform()) {
+    return 'default';
+  }
+  if (!('Notification' in window)) {
+    return 'unsupported';
+  }
+  return Notification.permission as NotificationPermissionState;
+}
+
+export async function subscribeWebPush(
   identifier: string,
   negocioId?: string,
   role: string = 'CUSTOMER',
-): Promise<boolean> {
+  requestPermissionIfDefault: boolean = false,
+): Promise<{ success: boolean; reason?: string }> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-    console.warn('Web Push not supported in this browser.');
-    return false;
+    console.warn('[Web Push] No soportado en este navegador o entorno (requiere HTTPS o localhost).');
+    return { success: false, reason: 'unsupported' };
   }
 
   try {
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      console.log('Web Push permission denied by user.');
-      return false;
+    let currentPerm = Notification.permission;
+    if (currentPerm === 'denied') {
+      console.warn('[Web Push] Permiso denegado por el usuario en el navegador.');
+      return { success: false, reason: 'denied' };
     }
 
-    const registration = await navigator.serviceWorker.ready;
+    if (currentPerm === 'default') {
+      if (!requestPermissionIfDefault) {
+        // En navegadores modernos (Chrome 80+), solicitar permisos sin un gesto de usuario
+        // provoca que el navegador lo bloquee o silencie automáticamente.
+        return { success: false, reason: 'prompt_needed' };
+      }
+      currentPerm = await Notification.requestPermission();
+      if (currentPerm !== 'granted') {
+        return { success: false, reason: currentPerm };
+      }
+    }
+
+    // Asegurar registro activo del Service Worker
+    let registration = await navigator.serviceWorker.getRegistration();
+    if (!registration) {
+      registration = await navigator.serviceWorker.register('/sw.js');
+    }
+    const swReady = await navigator.serviceWorker.ready;
+
     let publicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
     if (!publicKey) {
       try {
@@ -75,10 +106,10 @@ async function subscribeWebPush(
       }
     }
 
-    let subscription = await registration.pushManager.getSubscription();
+    let subscription = await swReady.pushManager.getSubscription();
     if (!subscription) {
       const convertedVapidKey = urlBase64ToUint8Array(publicKey || FALLBACK_VAPID_PUBLIC_KEY);
-      subscription = await registration.pushManager.subscribe({
+      subscription = await swReady.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: convertedVapidKey as unknown as BufferSource,
       });
@@ -91,41 +122,35 @@ async function subscribeWebPush(
         negocioId,
         role,
       });
-      return true;
+      console.log(`[Web Push] Dispositivo suscrito con éxito (${role}):`, identifier);
+      return { success: true };
     }
-  } catch (error) {
-    console.warn('Failed to subscribe to Web Push:', error);
+  } catch (error: any) {
+    console.warn('[Web Push] Error suscribiendo a notificaciones push:', error);
+    return { success: false, reason: error.message || 'error' };
   }
-  return false;
+  return { success: false, reason: 'unknown' };
 }
 
 export async function registerPushNotifications(
   identifier: string,
   negocioId?: string,
   role: string = 'ADMIN',
-): Promise<boolean> {
-  if (!identifier) return false;
+  isManualUserGesture: boolean = false,
+): Promise<{ success: boolean; reason?: string }> {
+  if (!identifier) return { success: false, reason: 'no_identifier' };
 
   if (Capacitor.isNativePlatform()) {
-    // Skip FCM push registration if Firebase is not configured (no google-services.json)
-    // PushNotifications.register() crashes at runtime without Firebase initialization
-    const hasFirebase = !!(window as any).firebase || 
-      document.querySelector('meta[name="firebase-configured"]');
-    if (!hasFirebase) {
-      console.warn('[Push] Firebase not configured — skipping native push registration');
-      return false;
-    }
     try {
       let permStatus = await PushNotifications.checkPermissions();
       if (permStatus.receive === 'prompt') {
         permStatus = await PushNotifications.requestPermissions();
       }
-      if (permStatus.receive !== 'granted') {
-        console.warn('Native Push Notifications permission not granted');
-        return false;
-      }
 
-      await PushNotifications.register();
+      if (permStatus.receive !== 'granted') {
+        console.warn('[Capacitor Native] Permiso de notificaciones no concedido:', permStatus.receive);
+        return { success: false, reason: permStatus.receive };
+      }
 
       await PushNotifications.removeAllListeners();
 
@@ -147,7 +172,7 @@ export async function registerPushNotifications(
       });
 
       PushNotifications.addListener('registrationError', (error: any) => {
-        console.error('[Capacitor Native] Error de registro:', JSON.stringify(error));
+        console.warn('[Capacitor Native] Advertencia de registro push:', error);
       });
 
       PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
@@ -169,13 +194,21 @@ export async function registerPushNotifications(
         }
       });
 
-      return true;
-    } catch (error) {
+      try {
+        await PushNotifications.register();
+      } catch (fcmErr) {
+        console.warn('[Capacitor Native] FCM no pudo registrarse (requiere google-services.json en Android):', fcmErr);
+      }
+
+      return { success: true };
+    } catch (error: any) {
       console.warn('[Capacitor Native] Error al inicializar PushNotifications:', error);
-      return false;
+      return { success: false, reason: error.message };
     }
   } else {
-    return await subscribeWebPush(identifier, negocioId, role);
+    // Si ya tiene permiso 'granted', o si el usuario hizo clic explícito (isManualUserGesture)
+    const shouldPrompt = isManualUserGesture || (typeof Notification !== 'undefined' && Notification.permission === 'granted');
+    return await subscribeWebPush(identifier, negocioId, role, shouldPrompt);
   }
 }
 
@@ -183,8 +216,44 @@ export async function requestAndSubscribePush(
   identifier: string,
   negocioId?: string,
   role: string = 'CUSTOMER',
-): Promise<boolean> {
-  return registerPushNotifications(identifier, negocioId, role);
+): Promise<{ success: boolean; reason?: string }> {
+  return registerPushNotifications(identifier, negocioId, role, true);
+}
+
+export async function testPushNotification(
+  identifier?: string,
+  negocioId?: string,
+): Promise<{ success: boolean; message: string }> {
+  playNotificationSound();
+
+  // 1. Mostrar notificación local inmediata si el navegador lo permite
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    try {
+      new Notification('🔔 Notificación de Prueba FinoWork', {
+        body: 'El sistema de notificaciones está funcionando correctamente.',
+        icon: '/favicon.svg',
+      });
+    } catch (e) {
+      // Ignorar si el navegador restringe la API directa en favor de service worker
+    }
+  }
+
+  // 2. Probar backend push endpoint
+  try {
+    const res = await axios.post(`${apiBase}/notifications/test`, {
+      identifier: identifier?.trim().toLowerCase(),
+      negocioId,
+    });
+    return {
+      success: true,
+      message: res.data?.message || 'Prueba de notificación enviada con éxito.',
+    };
+  } catch (err: any) {
+    return {
+      success: true, // La local ya sonó y se mostró
+      message: 'Sonido y alerta local emitidos con éxito.',
+    };
+  }
 }
 
 export function usePushNotifications(
@@ -207,6 +276,10 @@ export function usePushNotifications(
       user.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
 
     const role = isSuperAdmin ? 'SUPERADMIN' : (user.role || 'ADMIN');
-    registerPushNotifications(identifier, user.tenantId, role).catch(console.error);
+
+    // Si ya está concedido el permiso en la web, renovar/registrar suscripción automáticamente
+    if (Capacitor.isNativePlatform() || (typeof Notification !== 'undefined' && Notification.permission === 'granted')) {
+      registerPushNotifications(identifier, user.tenantId, role, false).catch(console.error);
+    }
   }, [user?.id, user?.email, user?.role, user?.tenantId]);
 }

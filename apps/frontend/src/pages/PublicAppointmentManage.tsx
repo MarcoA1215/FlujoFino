@@ -40,6 +40,7 @@ import {
 } from 'ionicons/icons';
 import axios from 'axios';
 import { BankSelect } from '../components/BankSelect';
+import { CustomerNotificationPrompt } from '../components/CustomerNotificationPrompt';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -535,6 +536,17 @@ const PublicAppointmentManage: React.FC = () => {
                         🎉 Tu cita se encuentra totalmente pagada.
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Web Push Notification Prompt for Customers */}
+                {!isPastOrClosed && (
+                  <div style={{ marginTop: '12px', marginBottom: '16px' }}>
+                    <CustomerNotificationPrompt
+                      tenantId={appointment.tenantId}
+                      identifier={appointment.customerPhone || appointment.customerDocument || appointment.customerEmail}
+                      type="booking"
+                    />
                   </div>
                 )}
 

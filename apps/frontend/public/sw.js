@@ -1,3 +1,11 @@
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('push', (event) => {
   let data = {};
   if (event.data) {
@@ -16,7 +24,8 @@ self.addEventListener('push', (event) => {
     data: {
       url: (data.data && data.data.url) || data.url || '/',
     },
-    vibrate: [100, 50, 100],
+    vibrate: [200, 100, 200],
+    tag: data.data?.type || 'finowork-notification',
   };
 
   event.waitUntil(self.registration.showNotification(title, options));

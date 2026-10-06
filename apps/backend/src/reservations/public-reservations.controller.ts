@@ -16,6 +16,7 @@ import { Order } from '../entities/order.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { CustomersService } from '../customers/customers.service';
 import { StorageService } from '../storage/storage.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { isTenantSuspendedOrExpired } from '../utils/tenant-status';
 
 export class CreatePublicReservationDto {
@@ -101,6 +102,7 @@ export class PublicReservationsController {
     private readonly reservationsService: ReservationsService,
     private readonly customersService: CustomersService,
     private readonly storageService: StorageService,
+    private readonly notificationsService: NotificationsService,
     @InjectRepository(Tenant) private tenantRepo: Repository<Tenant>
   ) {}
 
@@ -456,6 +458,13 @@ export class PublicReservationsController {
       }
     } catch (orderErr) {
       console.error('Error auto-creating linked order for reservation:', orderErr);
+    }
+
+    // Notificar al negocio / administradores en tiempo real vía Push
+    try {
+      await this.notificationsService.notifyNewReservation(id, finalReservation);
+    } catch (notifyErr) {
+      console.error('Error notifying admins of new reservation:', notifyErr);
     }
 
     return finalReservation;

@@ -36,6 +36,7 @@ import { UserRole, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
 import { useContext, useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { usePushNotifications } from './hooks/usePushNotifications';
+import { NotificationPermissionBanner } from './components/NotificationPermissionBanner';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -266,6 +267,7 @@ const MainLayout: React.FC = () => {
           ⚡ Modo Sin Conexión: Visualizando agenda, clientes y catálogo guardados localmente.
         </div>
       )}
+      {!isPublicRoute && !isExpiredRoute && <NotificationPermissionBanner />}
       <IonSplitPane contentId="main" when={!isPublicRoute && !isExpiredRoute && (user?.tenantId || isSuperAdmin || isPromotor) ? 'md' : false}>
         {!isPublicRoute && !isExpiredRoute && <Menu />}
         <IonRouterOutlet id="main">
