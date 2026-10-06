@@ -1,5 +1,5 @@
 import { TenantPlanType, TenantStatus, UpdateTenantPlanDTO } from '@finowork/shared-types';
-import { IsEnum, IsNumber, IsOptional } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class UpdateTenantPlanDto implements UpdateTenantPlanDTO {
   @IsOptional()
@@ -17,4 +17,8 @@ export class UpdateTenantPlanDto implements UpdateTenantPlanDTO {
   @IsOptional()
   @IsNumber()
   basePrice?: number;
+
+  @IsOptional()
+  @IsString()
+  referredByTenantId?: string | null;
 }

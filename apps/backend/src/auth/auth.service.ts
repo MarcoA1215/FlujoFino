@@ -416,7 +416,8 @@ export class AuthService {
           }
         } else {
           const referrerTenant = await queryRunner.manager.createQueryBuilder(Tenant, 't')
-            .where('t.referral_code = :code', { code: inputCode })
+            .where('UPPER(t.referral_code) = :code', { code: inputCode })
+            .orWhere('CAST(t.id AS VARCHAR) = :codeId', { codeId: body.referralCode.trim() })
             .getOne();
           if (referrerTenant) {
             referredByTenantId = referrerTenant.id;
@@ -429,8 +430,8 @@ export class AuthService {
         trial_ends_at: trialEndsAt,
         base_price: basePrice,
         referral_code: myReferralCode,
-        referred_by_tenant_id: referredByTenantId || undefined,
-        promoterId: promoterId || undefined,
+        referred_by_tenant_id: referredByTenantId || body.referredByTenantId || null,
+        promoterId: promoterId || body.promoterId || null,
       });
       const savedTenant = await queryRunner.manager.save(Tenant, tenant);
 

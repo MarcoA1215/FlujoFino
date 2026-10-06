@@ -126,6 +126,7 @@ const SuperAdminDashboard: React.FC = () => {
   const [editStatus, setEditStatus] = useState<TenantStatus>(TenantStatus.TRIAL);
   const [editBasePrice, setEditBasePrice] = useState<number>(20);
   const [extendDaysToAdd, setExtendDaysToAdd] = useState<number>(0);
+  const [editReferredByTenantId, setEditReferredByTenantId] = useState<string | null>(null);
   const [isSavingPlan, setIsSavingPlan] = useState(false);
 
   // Reject payment modal
@@ -300,6 +301,7 @@ const SuperAdminDashboard: React.FC = () => {
     setEditStatus(t.status);
     setEditBasePrice(t.basePrice);
     setExtendDaysToAdd(0);
+    setEditReferredByTenantId(t.referredByTenantId || null);
   };
 
   const handleSavePlan = async () => {
@@ -311,6 +313,7 @@ const SuperAdminDashboard: React.FC = () => {
         status: editStatus,
         basePrice: Number(editBasePrice) || 20,
         extendDays: Number(extendDaysToAdd) || undefined,
+        referredByTenantId: editReferredByTenantId,
       };
 
       await apiClient.patch(`/superadmin/tenants/${selectedTenant.id}/plan`, payload);
@@ -1303,6 +1306,28 @@ const SuperAdminDashboard: React.FC = () => {
                         onIonInput={(e) => setEditBasePrice(parseFloat(e.detail.value || '20'))}
                         style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px 12px' }}
                       />
+                    </div>
+
+                    <div style={{ marginBottom: '16px' }}>
+                      <IonLabel style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a', display: 'block', marginBottom: '6px' }}>
+                        Referido Por (Negocio Anfitrión):
+                      </IonLabel>
+                      <IonSelect
+                        value={editReferredByTenantId || ''}
+                        onIonChange={(e) => setEditReferredByTenantId(e.detail.value ? e.detail.value : null)}
+                        interface="action-sheet"
+                        placeholder="Sin referidor asignado"
+                        style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 14px' }}
+                      >
+                        <IonSelectOption value="">(Ninguno / Sin Referidor)</IonSelectOption>
+                        {tenants
+                          .filter((item) => item.id !== selectedTenant.id)
+                          .map((item) => (
+                            <IonSelectOption key={item.id} value={item.id}>
+                              {item.name} {item.referralCode ? `(${item.referralCode})` : ''}
+                            </IonSelectOption>
+                          ))}
+                      </IonSelect>
                     </div>
 
                     <div style={{ marginBottom: '20px' }}>

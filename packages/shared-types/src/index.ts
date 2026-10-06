@@ -405,6 +405,7 @@ export interface UpdateTenantPlanDTO {
   status?: TenantStatus;
   extendDays?: number;
   basePrice?: number;
+  referredByTenantId?: string | null;
 }
 
 export interface MySubscriptionDTO {

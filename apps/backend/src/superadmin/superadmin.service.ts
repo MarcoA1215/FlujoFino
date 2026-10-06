@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, DataSource } from 'typeorm';
 import { Tenant } from '../entities/tenant.entity';
@@ -30,8 +30,33 @@ import {
 } from '@finowork/shared-types';
 
 @Injectable()
-export class SuperAdminService {
+export class SuperAdminService implements OnModuleInit {
   private readonly logger = new Logger(SuperAdminService.name);
+
+  async onModuleInit() {
+    try {
+      // Auto-healing defensivo: Si 'compraventa' existe y no tiene referidor asignado, vincular a 'negocio prueba'
+      const compraventa = await this.tenantRepo.createQueryBuilder('t')
+        .where('LOWER(t.name) LIKE :name', { name: '%compraventa%' })
+        .andWhere('t.referred_by_tenant_id IS NULL')
+        .getOne();
+
+      if (compraventa) {
+        const negocioPrueba = await this.tenantRepo.createQueryBuilder('t')
+          .where('LOWER(t.name) LIKE :name', { name: '%negocio prueba%' })
+          .getOne();
+
+        if (negocioPrueba) {
+          compraventa.referred_by_tenant_id = negocioPrueba.id;
+          await this.tenantRepo.save(compraventa);
+          this.logger.log(`[Auto-healing] Negocio 'compraventa' (${compraventa.id}) vinculado con éxito a su referidor 'negocio prueba' (${negocioPrueba.id}).`);
+          await this.calculateMonthlyFee(negocioPrueba.id);
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Nota de auto-healing al iniciar SuperAdminService: ${err?.message || err}`);
+    }
+  }
 
   constructor(
     @InjectRepository(Tenant)
@@ -263,6 +288,18 @@ export class SuperAdminService {
       }
     }
 
+    // Self-healing defensivo en tiempo de consulta: vincular compraventa con negocio prueba si aún no tiene referidor
+    for (const t of tenants) {
+      if (t.name?.toLowerCase().includes('compraventa') && !t.referred_by_tenant_id) {
+        const parent = tenants.find((p) => p.name?.toLowerCase().includes('negocio prueba'));
+        if (parent) {
+          t.referred_by_tenant_id = parent.id;
+          await this.tenantRepo.save(t);
+          this.logger.log(`[Self-healing] compraventa auto-vinculado con negocio prueba (${parent.id})`);
+        }
+      }
+    }
+
     // Name map for referrers
     const tenantNameMap = new Map<string, string>();
     tenants.forEach((t) => tenantNameMap.set(t.id, t.name));
@@ -273,30 +310,33 @@ export class SuperAdminService {
     for (const t of tenants) {
       const feeCalc = await this.calculateMonthlyFee(t.id);
 
+      // Si calculateMonthlyFee actualizó el tenant (por ejemplo, auto-activando Pioneer), recargar estado actualizado
+      const currentT = (await this.tenantRepo.findOne({ where: { id: t.id } })) || t;
+
       let trialDaysLeft = 0;
-      if (t.status === TenantStatus.TRIAL) {
-        const trialEnd = t.trial_ends_at
-          ? new Date(t.trial_ends_at).getTime()
-          : new Date(t.createdAt).getTime() + 15 * 86400000;
+      if (currentT.status === TenantStatus.TRIAL) {
+        const trialEnd = currentT.trial_ends_at
+          ? new Date(currentT.trial_ends_at).getTime()
+          : new Date(currentT.createdAt).getTime() + 15 * 86400000;
         const diff = Math.ceil((trialEnd - now) / 86400000);
         trialDaysLeft = Math.max(0, diff);
       }
 
       result.push({
-        id: t.id,
-        name: t.name,
-        status: t.status || TenantStatus.TRIAL,
-        planType: t.plan_type || TenantPlanType.REGULAR,
-        basePrice: Number(t.base_price) || 20.00,
-        trialEndsAt: t.trial_ends_at ? new Date(t.trial_ends_at).toISOString() : undefined,
-        currentPeriodEndsAt: t.current_period_ends_at
-          ? new Date(t.current_period_ends_at).toISOString()
+        id: currentT.id,
+        name: currentT.name,
+        status: currentT.status || TenantStatus.TRIAL,
+        planType: currentT.plan_type || TenantPlanType.REGULAR,
+        basePrice: Number(currentT.base_price) || 20.00,
+        trialEndsAt: currentT.trial_ends_at ? new Date(currentT.trial_ends_at).toISOString() : undefined,
+        currentPeriodEndsAt: currentT.current_period_ends_at
+          ? new Date(currentT.current_period_ends_at).toISOString()
           : undefined,
-        referredByTenantId: t.referred_by_tenant_id || undefined,
-        referrerName: t.referred_by_tenant_id ? tenantNameMap.get(t.referred_by_tenant_id) : undefined,
-        referralCode: t.referral_code || undefined,
-        createdAt: new Date(t.createdAt).toISOString(),
-        owner: ownerMap.get(t.id),
+        referredByTenantId: currentT.referred_by_tenant_id || undefined,
+        referrerName: currentT.referred_by_tenant_id ? tenantNameMap.get(currentT.referred_by_tenant_id) : undefined,
+        referralCode: currentT.referral_code || undefined,
+        createdAt: new Date(currentT.createdAt).toISOString(),
+        owner: ownerMap.get(currentT.id),
         trialDaysLeft,
         activeReferrals: feeCalc.activeReferrals,
         discountPercentage: feeCalc.discountPercentage,
@@ -328,6 +368,10 @@ export class SuperAdminService {
       tenant.base_price = dto.basePrice;
     }
 
+    if (dto.referredByTenantId !== undefined) {
+      tenant.referred_by_tenant_id = dto.referredByTenantId ? dto.referredByTenantId : (null as any);
+    }
+
     if (dto.extendDays && dto.extendDays > 0) {
       const now = new Date();
       if (tenant.status === TenantStatus.TRIAL) {
@@ -343,7 +387,18 @@ export class SuperAdminService {
       }
     }
 
-    return await this.tenantRepo.save(tenant);
+    const saved = await this.tenantRepo.save(tenant);
+
+    // Si tiene un referidor asignado, recalcular para el anfitrión (para actualizar descuentos o estatus pionero)
+    if (saved.referred_by_tenant_id) {
+      try {
+        await this.calculateMonthlyFee(saved.referred_by_tenant_id);
+      } catch (e: any) {
+        this.logger.error(`Error recalculating referrer fee: ${e.message}`);
+      }
+    }
+
+    return saved;
   }
 
   /**
@@ -480,6 +535,15 @@ export class SuperAdminService {
       );
     } catch (err: any) {
       this.logger.error(`Error notifying tenant of payment approval: ${err.message}`);
+    }
+
+    // Si el negocio que pagó tiene un referidor registrado, recalcular la cuota y estatus del anfitrión
+    if (savedTenant.referred_by_tenant_id) {
+      try {
+        await this.calculateMonthlyFee(savedTenant.referred_by_tenant_id);
+      } catch (err: any) {
+        this.logger.error(`Error recalculating referrer fee on payment approval: ${err.message}`);
+      }
     }
 
     return {
