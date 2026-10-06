@@ -43,10 +43,10 @@ export const SubscriptionWarningBanner: React.FC = () => {
         <IonIcon icon={warningOutline} style={{ fontSize: '1.2rem', color: '#d97706' }} />
         <span>
           {daysLeft === 0 ? (
-            <>⚠️ Tu período de prueba vence hoy</>
+            <>⚠️ {subscription.status === 'TRIAL' ? 'Tu período de prueba' : 'Tu suscripción mensual'} vence hoy</>
           ) : (
             <>
-              ⚠️ Tu período de prueba vence en <strong>{daysLeft} {daysLeft === 1 ? 'día' : 'días'}</strong>.
+              ⚠️ {subscription.status === 'TRIAL' ? 'Tu período de prueba' : 'Tu suscripción mensual'} vence en <strong>{daysLeft} {daysLeft === 1 ? 'día' : 'días'}</strong>.
             </>
           )}
         </span>

@@ -472,7 +472,7 @@ const SettingsPage: React.FC = () => {
                     <p style={{ color: '#475569', fontSize: '14px', lineHeight: '1.5', margin: '0 0 16px 0' }}>
                       {subscription.planType === TenantPlanType.PIONEER ? (
                         <>
-                          ¡Tu negocio forma parte de las cuentas <strong>Pioneras</strong> de FinoWork! Invita a <strong>2 negocios</strong> que activen su suscripción y tendrás el sistema <strong>100% GRATIS de por vida ($0/mes)</strong>.
+                          ¡Tu negocio forma parte de las cuentas <strong>Pioneras</strong> de FinoWork! Mantén al menos <strong>2 negocios referidos activos</strong> con suscripción y tu cuota mensual será <strong>100% BONIFICADA ($0/mes)</strong>. Si alguno no renueva y bajas de 2 referidos activos al final de mes, el sistema volverá a tu cuota regular.
                         </>
                       ) : (
                         <>

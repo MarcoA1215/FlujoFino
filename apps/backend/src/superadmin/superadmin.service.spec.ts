@@ -1,4 +1,4 @@
-﻿import { Test, TestingModule } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { SuperAdminService } from './superadmin.service';
@@ -217,7 +217,7 @@ describe('SuperAdminService', () => {
       expect(fee.discountPercentage).toBe(100);
       expect(fee.finalFee).toBe(0);
 
-      // Validates auto-activation in DB with 1 year extension
+      // Validates auto-activation in DB with 30 days monthly extension
       expect(tenantRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
           id: 'tenant-2',
@@ -226,6 +226,9 @@ describe('SuperAdminService', () => {
           current_period_ends_at: expect.any(Date),
         }),
       );
+      const savedTenant = tenantRepo.save.mock.calls[0][0];
+      const diffDays = Math.round((savedTenant.current_period_ends_at.getTime() - Date.now()) / 86400000);
+      expect(diffDays).toBe(30);
     });
 
     it('validates that a REGULAR tenant gets 10% per referral topado al 50% y con piso dinámico basePrice * 0.5 (probando 5, 8 y 10 referidos)', async () => {

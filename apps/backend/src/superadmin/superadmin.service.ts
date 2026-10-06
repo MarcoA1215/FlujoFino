@@ -89,16 +89,27 @@ export class SuperAdminService {
         discountPercentage = 100;
         finalFee = 0;
 
-        // Auto-activación y renovación bonificada anual si está en TRIAL o PAST_DUE
-        if (tenant.status === TenantStatus.TRIAL || tenant.status === TenantStatus.PAST_DUE) {
+        // Auto-activación y renovación bonificada mensual (30 días) si está en TRIAL, PAST_DUE o si su periodo ya venció
+        const now = Date.now();
+        const periodExpired = !tenant.current_period_ends_at || new Date(tenant.current_period_ends_at).getTime() <= now;
+
+        if (tenant.status === TenantStatus.TRIAL || tenant.status === TenantStatus.PAST_DUE || periodExpired) {
           tenant.status = TenantStatus.ACTIVE;
           tenant.isActive = true;
-          tenant.current_period_ends_at = new Date(Date.now() + 365 * 86400000);
+          tenant.current_period_ends_at = new Date(now + 30 * 86400000);
           await this.tenantRepo.save(tenant);
         }
       } else {
         discountPercentage = 0;
         finalFee = basePrice;
+
+        // Si bajó de 2 referidos activos y tenía una fecha lejana (ej. por extensiones previas de 365 días),
+        // ajustar para que expire al término de un ciclo mensual de 30 días normal (a lo sumo 30 días desde hoy)
+        const now = Date.now();
+        if (tenant.current_period_ends_at && new Date(tenant.current_period_ends_at).getTime() > now + 30 * 86400000) {
+          tenant.current_period_ends_at = new Date(now + 30 * 86400000);
+          await this.tenantRepo.save(tenant);
+        }
       }
     } else {
       // REGULAR plan: 10% por referido activo, topado estrictamente al 50%
