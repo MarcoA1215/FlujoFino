@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { Reservation } from '../entities/reservation.entity';
 import { Order } from '../entities/order.entity';
 import { ReservationStatus, PaymentStatus } from '@finowork/shared-types';
@@ -77,8 +77,9 @@ export class ReservationsService {
     }
   }
 
-  async validateSlotOverlap(tenantId: string, date: string, time: string, serviceId?: string, serviceName?: string, excludeId?: string, employeeId?: string) {
-    const qb = this.repo.createQueryBuilder('res')
+  async validateSlotOverlap(tenantId: string, date: string, time: string, serviceId?: string, serviceName?: string, excludeId?: string, employeeId?: string, manager?: EntityManager) {
+    const resRepo = manager ? manager.getRepository(Reservation) : this.repo;
+    const qb = resRepo.createQueryBuilder('res')
       .where('res.tenantId = :tenantId', { tenantId })
       .andWhere('res.date = :date', { date })
       .andWhere('res.status IN (:...statuses)', { statuses: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] });
@@ -91,11 +92,12 @@ export class ReservationsService {
     }
     const existing = await qb.getMany();
 
-    const settingsRepo = this.repo.manager.getRepository('Settings');
+    const em = manager || this.repo.manager;
+    const settingsRepo = em.getRepository('Settings');
     const settings: any = await settingsRepo.findOne({ where: { tenantId } });
     const interval = Number(settings?.slotInterval) || 30;
 
-    const productRepo = this.repo.manager.getRepository('Product');
+    const productRepo = em.getRepository('Product');
     const products: any[] = await productRepo.find({ where: { tenantId } });
     const productMap = new Map(products.map(p => [p.id, p]));
     const productNameMap = new Map(products.map(p => [p.name.trim().toLowerCase(), p]));
@@ -226,38 +228,40 @@ export class ReservationsService {
   }
 
   async create(tenantId: string, dto: any) {
-    if (dto.date && dto.time && !dto.force) {
-      const duration = await this.calculateServiceDuration(tenantId, dto.serviceId, dto.serviceName);
-      await this.validateBusinessHours(tenantId, dto.date, dto.time, duration);
-      await this.validateSlotOverlap(tenantId, dto.date, dto.time, dto.serviceId, dto.serviceName, undefined, dto.employeeId);
-    }
-    if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
-    if (dto.totalAmount !== undefined && dto.totalAmount < 0) throw new BadRequestException('El monto total no puede ser negativo');
-    
-    const reservation = new Reservation();
-    Object.assign(reservation, dto);
-    reservation.tenantId = tenantId;
-
-    if (dto.customerName && dto.customerPhone && !dto.customerId) {
-      try {
-        const customer = await this.customersService.findOrCreateOrUpdate(tenantId, {
-          name: dto.customerName,
-          phone: dto.customerPhone,
-          identification: dto.identification
-        });
-        reservation.customerId = customer.id;
-        if (!reservation.identification && customer.identification) {
-          reservation.identification = customer.identification;
-        }
-      } catch (err) {
-        console.error('Customer sync error in ReservationsService.create:', err);
+    return this.repo.manager.transaction(async (manager) => {
+      if (dto.date && dto.time && !dto.force) {
+        const duration = await this.calculateServiceDuration(tenantId, dto.serviceId, dto.serviceName);
+        await this.validateBusinessHours(tenantId, dto.date, dto.time, duration);
+        await this.validateSlotOverlap(tenantId, dto.date, dto.time, dto.serviceId, dto.serviceName, undefined, dto.employeeId, manager);
       }
-    }
+      if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
+      if (dto.totalAmount !== undefined && dto.totalAmount < 0) throw new BadRequestException('El monto total no puede ser negativo');
+      
+      const reservation = new Reservation();
+      Object.assign(reservation, dto);
+      reservation.tenantId = tenantId;
 
-    delete (reservation as any).abonosTotal; // Security: do not allow setting abonos directly
-    delete (reservation as any).abonosHistory;
-    this.recalculatePaymentStatus(reservation);
-    return this.repo.save(reservation);
+      if (dto.customerName && dto.customerPhone && !dto.customerId) {
+        try {
+          const customer = await this.customersService.findOrCreateOrUpdate(tenantId, {
+            name: dto.customerName,
+            phone: dto.customerPhone,
+            identification: dto.identification
+          });
+          reservation.customerId = customer.id;
+          if (!reservation.identification && customer.identification) {
+            reservation.identification = customer.identification;
+          }
+        } catch (err) {
+          console.error('Customer sync error in ReservationsService.create:', err);
+        }
+      }
+
+      delete (reservation as any).abonosTotal; // Security: do not allow setting abonos directly
+      delete (reservation as any).abonosHistory;
+      this.recalculatePaymentStatus(reservation);
+      return manager.save(Reservation, reservation);
+    });
   }
 
   async update(tenantId: string, id: string, dto: any) {

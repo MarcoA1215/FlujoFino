@@ -109,7 +109,7 @@ describe('ProductionService', () => {
       expect(comboProduct.stock).toBe(7);
 
       // 4. Se debe haber disparado la asignación automática FIFO
-      expect(mockOrdersService.autoAllocatePhysicalStock).toHaveBeenCalledWith(tenantId);
+      expect(mockOrdersService.autoAllocatePhysicalStock).toHaveBeenCalledWith(tenantId, expect.anything());
     });
   });
 

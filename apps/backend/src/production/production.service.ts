@@ -219,7 +219,7 @@ export class ProductionService {
       });
       await manager.save(ProductionBatch, batch);
 
-      await this.ordersService.autoAllocatePhysicalStock(tenantId);
+      await this.ordersService.autoAllocatePhysicalStock(tenantId, manager);
 
       return {
         product: updatedProduct,

@@ -228,6 +228,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
       const response = await apiClient.post('/orders/sync-offline', { orders: pending });
       const syncedIds: string[] = response.data?.syncedOfflineIds || [];
+      const failedOrders: Array<{ offlineId: string; error: string }> = response.data?.failedOrders || [];
 
       if (syncedIds.length > 0) {
         await offlineDb.offlineOrders.bulkDelete(syncedIds);
@@ -238,7 +239,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           color: 'success'
         });
         if (onRefresh) onRefresh();
-      } else {
+      }
+
+      if (failedOrders.length > 0) {
+        await refreshPendingCount();
+        const firstErr = failedOrders[0]?.error || 'Error desconocido';
+        presentToast({
+          message: `⚠️ ${failedOrders.length} venta(s) no se pudieron sincronizar: ${firstErr}`,
+          duration: 5000,
+          color: 'warning'
+        });
+      } else if (syncedIds.length === 0) {
         presentToast({ message: 'No se procesaron ventas para sincronizar', duration: 2500, color: 'medium' });
       }
     } catch (err: any) {

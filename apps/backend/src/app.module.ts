@@ -54,9 +54,16 @@ import { SalaryAdvancesModule } from './salary-advances/salary-advances.module';
 import { DeliveriesModule } from './deliveries/deliveries.module';
 import { InvestmentsModule } from './investments/investments.module';
 import { PromotersModule } from './promoters/promoters.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { SentryModule } from '@sentry/nestjs/setup';
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 120,
+    }]),
     AuthModule,
     UsersModule,
     ConfigModule.forRoot({
@@ -95,6 +102,7 @@ import { PromotersModule } from './promoters/promoters.module';
   controllers: [AppController],
   providers: [
     AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: TenantStatusGuard },
     { provide: APP_GUARD, useClass: RolesGuard },

@@ -30,4 +30,10 @@ export class AppController {
     const rate = await this.settingsService.getExchangeRate(req?.user?.tenantId);
     return { ...rate, rate: rate.exchangeRateBs };
   }
+
+  @Public()
+  @Get('debug-sentry')
+  debugSentry() {
+    throw new Error('Test Sentry Error from FinoWork!');
+  }
 }

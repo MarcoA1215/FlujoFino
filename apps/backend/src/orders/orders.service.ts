@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
-import { DataSource, Between, In, Not, MoreThanOrEqual } from 'typeorm';
+import { DataSource, Between, In, Not, MoreThanOrEqual, EntityManager } from 'typeorm';
 import { IsOptional, IsArray, IsString, IsNumber, IsBoolean } from 'class-validator';
 import { Order, SplitPaymentItem } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
@@ -989,7 +989,11 @@ export class OrdersService {
         }
       }
 
-      if (status === OrderStatus.DELIVERED) {
+      const wasDelivered = order.status === OrderStatus.DELIVERED;
+      const isBecomingDelivered = status === OrderStatus.DELIVERED && !wasDelivered;
+      const isRevertingFromDelivered = wasDelivered && status !== OrderStatus.DELIVERED && status !== OrderStatus.CANCELED;
+
+      if (isBecomingDelivered) {
         const itemProductIds = Array.from(new Set((order.items || []).map(i => i.productId).filter(Boolean)));
         const products = itemProductIds.length > 0 ? await manager.find(Product, {
           where: { tenantId, id: In(itemProductIds) },
@@ -1017,6 +1021,35 @@ export class OrdersService {
                     throw new BadRequestException('Falta stock físico para entregar');
                   }
                   product.physicalStock -= item.quantity;
+                  await manager.save(Product, product);
+                }
+              }
+          }
+        }
+      }
+
+      if (isRevertingFromDelivered) {
+        const itemProductIds = Array.from(new Set((order.items || []).map(i => i.productId).filter(Boolean)));
+        const products = itemProductIds.length > 0 ? await manager.find(Product, {
+          where: { tenantId, id: In(itemProductIds) },
+          relations: { comboItems: { component: true } }
+        }) : [];
+        const productMap = new Map(products.map(p => [p.id, p]));
+
+        for (const item of order.items) {
+          const product = productMap.get(item.productId);
+          if (product) {
+            if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
+              for (const ci of product.comboItems) {
+                if (ci.component) {
+                  ci.component.physicalStock += (item.quantity * ci.quantity);
+                  await manager.save(Product, ci.component);
+                }
+              }
+            } else if (!product.isCombo || product.isPreAssembled) {
+                const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
+                if (!isService) {
+                  product.physicalStock += item.quantity;
                   await manager.save(Product, product);
                 }
               }
@@ -1130,7 +1163,6 @@ export class OrdersService {
         }
       }
 
-      const wasDelivered = order.status === OrderStatus.DELIVERED;
       order.status = status;
       const savedResult = await manager.save(Order, order);
       if (!wasDelivered && status === OrderStatus.DELIVERED && savedResult.customerId && savedResult.paymentStatus !== PaymentStatus.PAID) {
@@ -1172,9 +1204,9 @@ export class OrdersService {
     return this.createOrder(tenantId, dto);
   }
 
-  async autoAllocatePhysicalStock(tenantId: string) {
+  async autoAllocatePhysicalStock(tenantId: string, externalManager?: EntityManager) {
     // This is the intelligent FIFO routing system
-    return this.dataSource.transaction(async (manager) => {
+    const run = async (manager: EntityManager) => {
       // 1. Get all active orders (PENDING and PREPARING) ordered by creation date (FIFO)
       const activeOrders = await manager.find(Order, {
         where: [
@@ -1256,7 +1288,9 @@ export class OrdersService {
       }
 
       return { success: true, processedOrders: activeOrders.length, statusChanges: changes };
-    });
+    };
+
+    return externalManager ? run(externalManager) : this.dataSource.transaction(run);
   }
 
   async editOrder(tenantId: string, id: string, dto: CreateOrderDto, authUserId?: string, authUserRole?: UserRole | string) {
@@ -1322,6 +1356,9 @@ export class OrdersService {
               if(cItem.component) {
                 cItem.component.stockQuantity += (quantity * cItem.quantity * multiplier);
                 cItem.component.stock = cItem.component.stockQuantity;
+                if (order.status === OrderStatus.DELIVERED) {
+                  cItem.component.physicalStock += (quantity * cItem.quantity * multiplier);
+                }
                 await manager.save(Product, cItem.component);
               }
             }
@@ -1337,6 +1374,9 @@ export class OrdersService {
             if (!isService) {
               product.stockQuantity += (quantity * multiplier);
               product.stock = product.stockQuantity;
+              if (order.status === OrderStatus.DELIVERED) {
+                product.physicalStock += (quantity * multiplier);
+              }
               await manager.save(Product, product);
             }
           }
@@ -2021,7 +2061,10 @@ export class OrdersService {
 
   async syncOfflineOrders(tenantId: string, orders: any[], userId?: string) {
     const syncedOfflineIds: string[] = [];
+    const failedOrders: Array<{ offlineId: string; error: string }> = [];
+
     for (const item of orders || []) {
+      const offlineId = item.offlineId || item.id || 'desconocido';
       try {
         const payload = item.payload || item;
         if (!payload.offlineCreatedAt && (item.createdAt || item.offlineCreatedAt)) {
@@ -2035,11 +2078,16 @@ export class OrdersService {
         if (item.offlineId) {
           syncedOfflineIds.push(item.offlineId);
         }
-      } catch (err) {
-        console.error('Error syncing single offline order:', err);
+      } catch (err: any) {
+        const errMsg = err?.message || 'Error al procesar la venta en servidor';
+        console.error(`Error syncing single offline order ${offlineId}:`, errMsg);
+        failedOrders.push({
+          offlineId,
+          error: errMsg,
+        });
       }
     }
-    return { success: true, syncedOfflineIds };
+    return { success: true, syncedOfflineIds, failedOrders };
   }
 
   async confirmSupplier(tenantId: string, orderId: string): Promise<Order> {

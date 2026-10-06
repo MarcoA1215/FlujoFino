@@ -511,4 +511,55 @@ describe('OrdersService', () => {
       expect(mockCustomersService.incrementVisits).toHaveBeenCalledWith(tenantId, customerId);
     });
   });
+
+  describe('OrderStatus DELIVERED Idempotency', () => {
+    it('NO debe descontar physicalStock por segunda vez si la orden ya estaba en DELIVERED', async () => {
+      const tenantId = 'tenant-123';
+      const orderId = 'ord-delivered-1';
+      const prodId = 'prod-1';
+
+      const existingOrder: any = {
+        id: orderId,
+        tenantId,
+        status: OrderStatus.DELIVERED,
+        items: [{ productId: prodId, quantity: 2 }],
+      };
+
+      const product: any = {
+        id: prodId,
+        name: 'Hamburguesa',
+        physicalStock: 10,
+        stockQuantity: 10,
+      };
+
+      mockManager.findOne.mockResolvedValue(existingOrder);
+      mockManager.find.mockResolvedValue([product]);
+      mockManager.save.mockImplementation((entityClass: any, entity?: any) => Promise.resolve(entity || entityClass));
+
+      await service.updateOrderStatus(tenantId, orderId, OrderStatus.DELIVERED);
+
+      // El stock físico no debe haberse alterado porque la orden ya estaba en DELIVERED
+      expect(product.physicalStock).toBe(10);
+    });
+  });
+
+  describe('Offline Sync Error Reporting', () => {
+    it('debe recolectar failedOrders con el mensaje de error cuando una orden offline falla', async () => {
+      const tenantId = 'tenant-123';
+      const invalidOrders = [
+        {
+          offlineId: 'off-invalid-1',
+          payload: { items: [] }, // Vacío -> arrojara BadRequestException
+        },
+      ];
+
+      const res = await service.syncOfflineOrders(tenantId, invalidOrders);
+
+      expect(res.success).toBe(true);
+      expect(res.syncedOfflineIds).toHaveLength(0);
+      expect(res.failedOrders).toHaveLength(1);
+      expect(res.failedOrders[0].offlineId).toBe('off-invalid-1');
+      expect(res.failedOrders[0].error).toContain('El carrito no puede estar vacío');
+    });
+  });
 });

@@ -361,8 +361,8 @@ describe('Auditoría Integral de los 8 Casos Críticos de Negocio', () => {
       const access = {
         tenantId: 'tenant-1',
         role: 'CAJERO',
-        entryTime: '08:00',
-        exitTime: '17:00',
+        entryTime: '02:00',
+        exitTime: '04:00',
       };
 
       mockSettingsRepo.findOne.mockResolvedValue({ tenantId: 'tenant-1', requireApprovalAlways: false });

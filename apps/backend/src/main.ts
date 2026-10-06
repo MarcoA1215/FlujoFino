@@ -1,7 +1,9 @@
+import './instrument';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -21,10 +23,13 @@ async function bootstrap() {
     httpAdapter.disable('x-powered-by');
   }
 
-  // Global Validation & Sanitization Pipe
+  // Global Exception Filter
+  app.useGlobalFilters(new AllExceptionsFilter());
+
+  // Global Validation & Sanitization Pipe (Production hardened)
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: false,
+      whitelist: true,
       transform: true,
       forbidUnknownValues: false,
     }),

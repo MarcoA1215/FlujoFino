@@ -20,6 +20,28 @@ export class SettingsService implements OnModuleInit {
   private lastSyncSlot = '';
 
   async onModuleInit() {
+    // Migración defensiva autocurativa (idempotente) para evitar caídas si DB_SYNCHRONIZE está desactivado en producción
+    try {
+      await this.settingsRepo.query(`
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "endOfDayOffsetHours" integer DEFAULT 0;
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "themePrimaryColor" character varying;
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "themeHeaderColor" character varying;
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingMaxAdvanceDays" integer DEFAULT 365;
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingRequireDeposit" boolean DEFAULT false;
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingDepositPercentage" numeric(5,2) DEFAULT 0;
+        
+        ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "abonosTotal" numeric(12,4) DEFAULT 0;
+        ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "abonosHistory" jsonb;
+        ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "rescheduleStatus" character varying;
+        ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "originalTime" character varying;
+        ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "originalDate" character varying;
+        ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "imageUrl" text;
+        ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "orderId" character varying;
+      `);
+    } catch (migrationErr: any) {
+      this.logger.warn(`Nota de autocuración de esquema al iniciar: ${migrationErr?.message || migrationErr}`);
+    }
+
     const exists = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
     if (!exists) {
       await this.settingsRepo.save({
