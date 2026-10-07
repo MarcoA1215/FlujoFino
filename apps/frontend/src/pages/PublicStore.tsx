@@ -475,6 +475,7 @@ const PublicStore: React.FC = () => {
                       paymentOption === 'BINANCE' ? binanceRef.trim() : undefined),
         pagoMovilBank: originBank || undefined,
         transferBank: (paymentOption === 'TRANSFER' && originBank) ? originBank : undefined,
+        paymentMethod: paymentOption,
         exchangeRate,
         amountBs: grandTotalBs,
         items: cart.map((i) => ({

@@ -23,12 +23,18 @@ export class SettingsService implements OnModuleInit {
     // Migración defensiva autocurativa (idempotente) para evitar caídas si DB_SYNCHRONIZE está desactivado en producción
     try {
       await this.settingsRepo.query(`
+        -- Configuración y reservas previas
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "endOfDayOffsetHours" integer DEFAULT 0;
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "themePrimaryColor" character varying;
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "themeHeaderColor" character varying;
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingMaxAdvanceDays" integer DEFAULT 365;
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingRequireDeposit" boolean DEFAULT false;
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingDepositPercentage" numeric(5,2) DEFAULT 0;
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "exchangeRateMode" character varying DEFAULT 'BCV';
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "manualExchangeRate" numeric(12,4);
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "currencySymbol" character varying DEFAULT 'Bs.';
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "ratesCache" jsonb;
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "featureDelivery" boolean DEFAULT true;
         
         ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "abonosTotal" numeric(12,4) DEFAULT 0;
         ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "abonosHistory" jsonb;
@@ -37,6 +43,63 @@ export class SettingsService implements OnModuleInit {
         ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "originalDate" character varying;
         ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "imageUrl" text;
         ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "orderId" character varying;
+        ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "paymentReported" boolean DEFAULT false;
+        ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "paymentProofUrl" character varying;
+        ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "paymentRejectedReason" character varying;
+
+        -- Columnas de Pedidos (Order)
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "paymentReported" boolean NOT NULL DEFAULT false;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "paymentProofUrl" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "paymentRejectedReason" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "splitPayments" jsonb;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "driverId" uuid;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "linkedReservationId" character varying;
+        CREATE INDEX IF NOT EXISTS "IDX_8bde46c5c57a69f2cb02d02b17" ON "order" ("linkedReservationId");
+
+        -- Columnas de accesos y personal
+        ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "roles" text DEFAULT '';
+        ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "lunch_start" character varying;
+        ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "lunch_end" character varying;
+
+        -- Tenants y Promotores
+        ALTER TABLE "tenant" ADD COLUMN IF NOT EXISTS "promoterId" uuid;
+
+        CREATE TABLE IF NOT EXISTS "promoters" (
+          "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+          "userId" uuid NOT NULL,
+          "code" character varying(50) NOT NULL,
+          "pagoMovilPhone" character varying,
+          "pagoMovilCedula" character varying,
+          "pagoMovilBank" character varying,
+          "binancePayId" character varying,
+          "isActive" boolean NOT NULL DEFAULT true,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+          "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+          CONSTRAINT "UQ_e866e887a1e5fba414f2f896b28" UNIQUE ("userId"),
+          CONSTRAINT "UQ_9c0a80fbc6cb93bfb63c899bad1" UNIQUE ("code"),
+          CONSTRAINT "PK_7ab4bd7b1b1efeb3d2f8efc180f" PRIMARY KEY ("id")
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS "IDX_9c0a80fbc6cb93bfb63c899bad" ON "promoters" ("code");
+
+        CREATE TABLE IF NOT EXISTS "promoter_commissions" (
+          "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+          "promoterId" uuid NOT NULL,
+          "tenantId" uuid NOT NULL,
+          "type" character varying(30) NOT NULL DEFAULT 'ACTIVATION',
+          "amountUSD" numeric(10,2) NOT NULL,
+          "saasPaymentReportId" uuid,
+          "status" character varying(30) NOT NULL DEFAULT 'PENDING',
+          "paidAt" TIMESTAMP,
+          "paymentReference" character varying,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+          CONSTRAINT "PK_5f1075c7d007c7917cb4ddafe66" PRIMARY KEY ("id")
+        );
+
+        -- Usuarios
+        ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "name" character varying;
+        ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_email_verified" boolean NOT NULL DEFAULT false;
+        ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verification_code" character varying(6);
+        ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verification_expires_at" TIMESTAMP;
       `);
     } catch (migrationErr: any) {
       this.logger.warn(`Nota de autocuración de esquema al iniciar: ${migrationErr?.message || migrationErr}`);

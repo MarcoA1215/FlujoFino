@@ -3,7 +3,7 @@ import { IonButton, IonIcon } from '@ionic/react';
 import { cardOutline, warningOutline } from 'ionicons/icons';
 import { SubscriptionContext } from '../context/SubscriptionContext';
 import { AuthContext } from '../context/AuthContext';
-import { UserRole, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
+import { UserRole, DEFAULT_SUPERADMIN_EMAIL, TenantStatus } from '@finowork/shared-types';
 
 export const SubscriptionWarningBanner: React.FC = () => {
   const { user } = useContext(AuthContext);

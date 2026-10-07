@@ -19,8 +19,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'FinoWork';
   const options = {
     body: data.body || 'Tienes una nueva notificación.',
-    icon: data.icon || '/favicon.svg',
-    badge: data.badge || '/favicon.svg',
+    icon: data.icon || '/assets/logo-192.png',
+    badge: data.badge || '/favicon-32.png',
     data: {
       url: (data.data && data.data.url) || data.url || '/',
     },
