@@ -419,6 +419,7 @@ export class SuperAdminService implements OnModuleInit {
       reference: r.reference,
       status: r.status,
       rejectReason: r.reject_reason || undefined,
+      months: r.months || 1,
       createdAt: new Date(r.created_at).toISOString(),
     }));
   }
@@ -439,6 +440,8 @@ export class SuperAdminService implements OnModuleInit {
     let savedTenant: Tenant;
     let savedReport: SaaSPaymentReport;
     let generatedCommission: PromoterCommission | null = null;
+    let monthsToExtend = 1;
+    let daysToExtend = 30;
 
     try {
       const report = await queryRunner.manager.findOne(SaaSPaymentReport, {
@@ -459,13 +462,16 @@ export class SuperAdminService implements OnModuleInit {
         throw new NotFoundException(`Negocio asociado no encontrado`);
       }
 
-      // Extend current_period_ends_at by 30 days
+      // Extend current_period_ends_at dynamically based on reported months
       const now = new Date();
       const baseDate = tenant.current_period_ends_at && new Date(tenant.current_period_ends_at) > now
         ? new Date(tenant.current_period_ends_at)
         : now;
 
-      tenant.current_period_ends_at = new Date(baseDate.getTime() + 30 * 86400000);
+      monthsToExtend = report.months && report.months > 0 ? report.months : 1;
+      daysToExtend = monthsToExtend === 12 ? 365 : monthsToExtend * 30;
+
+      tenant.current_period_ends_at = new Date(baseDate.getTime() + daysToExtend * 86400000);
       tenant.status = TenantStatus.ACTIVE;
       tenant.isActive = true;
 
@@ -521,11 +527,12 @@ export class SuperAdminService implements OnModuleInit {
     }
 
     try {
+      const periodLabel = monthsToExtend === 12 ? '1 año (365 días)' : `${monthsToExtend} mes(es) (${daysToExtend} días)`;
       await this.notificationsService.sendNotificationToNegocio(
         savedTenant.id,
         {
           title: '¡Pago de Suscripción Aprobado! 🎉',
-          body: 'Tu cuota mensual ha sido verificada. Tu suscripción se extendió por 30 días.',
+          body: `Tu pago de suscripción ha sido verificado. Tu acceso se extendió por ${periodLabel}.`,
           data: { url: '/settings' },
         },
         ['ADMIN'],
@@ -543,9 +550,10 @@ export class SuperAdminService implements OnModuleInit {
       }
     }
 
+    const durationLabel = monthsToExtend === 12 ? '365 días (1 año)' : `${daysToExtend} días (${monthsToExtend} mes${monthsToExtend > 1 ? 'es' : ''})`;
     return {
       success: true,
-      message: `Pago de $${savedReport.amount} aprobado con éxito. Periodo de ${savedTenant.name} extendido 30 días hasta el ${savedTenant.current_period_ends_at.toLocaleDateString('es-VE')}.`,
+      message: `Pago de $${savedReport.amount} aprobado con éxito. Periodo de ${savedTenant.name} extendido ${durationLabel} hasta el ${savedTenant.current_period_ends_at.toLocaleDateString('es-VE')}.`,
       tenant: savedTenant,
       commission: generatedCommission,
     };
@@ -594,6 +602,7 @@ export class SuperAdminService implements OnModuleInit {
     exchange_rate?: number;
     payment_method: any;
     reference: string;
+    months?: number;
   }): Promise<SaaSPaymentReport> {
     if (!data.amount || data.amount <= 0) {
       throw new BadRequestException('El monto debe ser mayor a 0');
@@ -602,14 +611,33 @@ export class SuperAdminService implements OnModuleInit {
       throw new BadRequestException('La referencia de pago es obligatoria');
     }
 
+    const cleanReference = data.reference.trim();
+
+    // Validar que la referencia bancaria no esté ya registrada en estado pendiente o aprobada
+    const existingReport = await this.paymentReportRepo.findOne({
+      where: {
+        reference: cleanReference,
+        status: In([SaaSPaymentStatus.PENDING, SaaSPaymentStatus.APPROVED]),
+      },
+    });
+
+    if (existingReport) {
+      throw new BadRequestException(
+        `La referencia "${cleanReference}" ya fue registrada previamente y está pendiente o aprobada.`
+      );
+    }
+
+    const months = data.months && data.months > 0 ? Number(data.months) : 1;
+
     const report = this.paymentReportRepo.create({
       tenant_id: tenantId,
       amount: data.amount,
       amount_bs: data.amount_bs || null,
       exchange_rate: data.exchange_rate || null,
       payment_method: data.payment_method,
-      reference: data.reference.trim(),
+      reference: cleanReference,
       status: SaaSPaymentStatus.PENDING,
+      months,
     });
 
     const saved = await this.paymentReportRepo.save(report);
@@ -618,11 +646,11 @@ export class SuperAdminService implements OnModuleInit {
       const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
       const storeName = tenant?.name || 'Un negocio';
       const formattedAmount = Number(data.amount).toFixed(2);
-      const ref = data.reference.trim();
+      const periodLabel = months === 12 ? '1 año' : `${months} mes${months > 1 ? 'es' : ''}`;
 
       await this.notificationsService.notifySuperAdmin({
         title: '¡Nuevo Pago de Suscripción Reportado!',
-        body: `${storeName} reportó $${formattedAmount} USD (Ref: ${ref}). Toca para revisar y aprobar.`,
+        body: `${storeName} reportó $${formattedAmount} USD (${periodLabel}, Ref: ${cleanReference}). Toca para revisar y aprobar.`,
         data: {
           url: '/platform-admin?tab=payments',
           reportId: saved.id,

@@ -40,6 +40,7 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
 
   const defaultFee = initialAmountUsd || subscription?.finalFee || 20;
 
+  const [selectedMonths, setSelectedMonths] = useState<number>(1);
   const [reportAmountUsd, setReportAmountUsd] = useState<number>(defaultFee);
   const [reportAmountBs, setReportAmountBs] = useState<number>(
     Math.round(defaultFee * exchangeRate * 100) / 100
@@ -49,8 +50,18 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
   const [reportBank, setReportBank] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
+  const calculateAmountForMonths = (m: number) => {
+    const fee = initialAmountUsd || subscription?.finalFee || 20;
+    if (m === 12) {
+      // 1 Año: 2 meses gratis (paga 10 meses)
+      return Math.round(fee * 10 * 100) / 100;
+    }
+    return Math.round(fee * m * 100) / 100;
+  };
+
   useEffect(() => {
     if (isOpen) {
+      setSelectedMonths(1);
       const fee = initialAmountUsd || subscription?.finalFee || 20;
       setReportAmountUsd(fee);
       setReportAmountBs(Math.round(fee * exchangeRate * 100) / 100);
@@ -59,6 +70,12 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
     }
   }, [isOpen, initialAmountUsd, subscription?.finalFee, exchangeRate]);
 
+  useEffect(() => {
+    const calculatedUsd = calculateAmountForMonths(selectedMonths);
+    setReportAmountUsd(calculatedUsd);
+    setReportAmountBs(Math.round(calculatedUsd * exchangeRate * 100) / 100);
+  }, [selectedMonths, initialAmountUsd, subscription?.finalFee, exchangeRate]);
+
   const copyField = (text?: string, label?: string) => {
     if (!text) return;
     navigator.clipboard?.writeText(text);
@@ -66,6 +83,7 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
     if (!reportAmountUsd || reportAmountUsd <= 0) {
       return presentToast({ message: 'El monto debe ser mayor a 0', duration: 3000, color: 'warning' });
     }
@@ -89,6 +107,7 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
         exchange_rate: isBs ? Number(exchangeRate) : undefined,
         payment_method: reportMethod,
         reference: fullRef,
+        months: selectedMonths,
       });
 
       presentToast({
@@ -371,6 +390,79 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
             <h4 style={{ margin: '0 0 14px 0', fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>
               📝 Registrar Comprobante de Pago
             </h4>
+
+            {/* Selector de Período a Pagar */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+                Periodo de Suscripción a Pagar:
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
+                <div
+                  onClick={() => setSelectedMonths(1)}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    border: selectedMonths === 1 ? '2px solid #10b981' : '1px solid #cbd5e1',
+                    background: selectedMonths === 1 ? '#ecfdf5' : '#ffffff',
+                    cursor: 'pointer',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: '13px', color: selectedMonths === 1 ? '#065f46' : '#1e293b' }}>
+                    1 Mes (Mensual)
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                    ${calculateAmountForMonths(1).toFixed(2)} USD
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setSelectedMonths(3)}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    border: selectedMonths === 3 ? '2px solid #10b981' : '1px solid #cbd5e1',
+                    background: selectedMonths === 3 ? '#ecfdf5' : '#ffffff',
+                    cursor: 'pointer',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: '13px', color: selectedMonths === 3 ? '#065f46' : '#1e293b' }}>
+                    3 Meses (Trimestral)
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                    ${calculateAmountForMonths(3).toFixed(2)} USD
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setSelectedMonths(12)}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    border: selectedMonths === 12 ? '2px solid #10b981' : '1px solid #cbd5e1',
+                    background: selectedMonths === 12 ? '#ecfdf5' : '#ffffff',
+                    cursor: 'pointer',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+                    <span style={{ fontWeight: 800, fontSize: '13px', color: selectedMonths === 12 ? '#065f46' : '#1e293b' }}>
+                      1 Año (12 Meses)
+                    </span>
+                    <span style={{ background: '#fef08a', color: '#854d0e', fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
+                      🎁 2 Meses Gratis
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                    ${calculateAmountForMonths(12).toFixed(2)} USD{' '}
+                    <span style={{ textDecoration: 'line-through', color: '#94a3b8', fontSize: '11px' }}>
+                      ${((initialAmountUsd || subscription?.finalFee || 20) * 12).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <IonItem lines="none" style={{ '--background': '#f8fafc', borderRadius: '8px', marginBottom: '12px' }}>
               <IonLabel position="stacked" style={{ fontWeight: 700 }}>

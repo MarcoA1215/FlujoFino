@@ -20,4 +20,9 @@ export class ReportPaymentDto {
   @IsString()
   @IsNotEmpty({ message: 'La referencia de pago es obligatoria' })
   reference: string;
+
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  months?: number;
 }

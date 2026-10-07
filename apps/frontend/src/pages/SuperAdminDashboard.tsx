@@ -338,19 +338,23 @@ const SuperAdminDashboard: React.FC = () => {
   };
 
   const handleApprovePayment = async (payment: SaaSPaymentReportDTO) => {
+    const months = payment.months || 1;
+    const days = months === 12 ? 365 : months * 30;
+    const periodLabel = months === 12 ? 'Anual (1 Año)' : `${months} Mes${months > 1 ? 'es' : ''}`;
+
     presentAlert({
-      header: 'Aprobar Pago Mensual',
-      subHeader: `${payment.tenantName || 'Negocio'} - $${payment.amount.toFixed(2)}`,
-      message: `¿Confirmas que recibiste el pago (Ref: ${payment.reference})? Se extenderán +30 días a su suscripción y su negocio quedará ACTIVO.`,
+      header: `Aprobar Pago • ${periodLabel}`,
+      subHeader: `${payment.tenantName || 'Negocio'} - $${payment.amount.toFixed(2)} USD`,
+      message: `¿Confirmas que recibiste el pago (Ref: ${payment.reference})? Se extenderán +${days} días a su suscripción y su negocio quedará ACTIVO.`,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         {
-          text: 'Aprobar (+30 días)',
+          text: `Aprobar (+${days} días)`,
           handler: async () => {
             try {
               const res = await apiClient.post(`/superadmin/payments/${payment.id}/approve`);
               presentToast({
-                message: res.data.message || 'Pago aprobado y suscripción extendida 30 días.',
+                message: res.data.message || `Pago aprobado y suscripción extendida ${days} días.`,
                 duration: 3500,
                 color: 'success',
               });
@@ -420,108 +424,221 @@ const SuperAdminDashboard: React.FC = () => {
 
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar color="primary">
+      <IonHeader className="ion-no-border">
+        <IonToolbar style={{ '--background': '#ffffff', borderBottom: '1px solid #e2e8f0' } as React.CSSProperties}>
           <IonButtons slot="start">
-            <IonMenuButton />
+            <IonMenuButton style={{ color: '#0f172a' }} />
           </IonButtons>
-          <IonTitle style={{ fontWeight: 700 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              <IonIcon icon={shieldCheckmarkOutline} />
-              SuperAdmin • Plataforma SaaS FinoWork
-            </span>
+          <IonTitle>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+              <div
+                style={{
+                  background: '#ecfdf5',
+                  color: '#059669',
+                  borderRadius: '8px',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid #d1fae5',
+                }}
+              >
+                <IonIcon icon={shieldCheckmarkOutline} style={{ fontSize: '18px' }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: 800, fontSize: '16px', color: '#0f172a' }}>
+                  SuperAdmin
+                </span>
+                <span style={{ color: '#cbd5e1' }}>•</span>
+                <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
+                  Plataforma SaaS FinoWork
+                </span>
+              </div>
+            </div>
           </IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={loadData} disabled={loading} title="Actualizar datos">
+            <IonButton onClick={loadData} disabled={loading} title="Actualizar datos" style={{ color: '#64748b' }}>
               <IonIcon icon={refreshOutline} slot="icon-only" />
             </IonButton>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
 
-      <IonContent className="ion-padding" style={{ backgroundColor: '#f1f5f9' }}>
+      <IonContent className="ion-padding" style={{ backgroundColor: '#f8fafc' }}>
         {/* KPI Cards Header */}
         <IonGrid style={{ padding: 0, marginBottom: '16px' }}>
           <IonRow>
+            {/* Total Negocios */}
             <IonCol size="12" sizeSm="6" sizeMd="2.4">
-              <IonCard style={{ margin: 0, borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
-                <IonCardContent style={{ padding: '14px' }}>
-                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '14px',
+                  border: '1px solid #e2e8f0',
+                  padding: '16px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  height: '100%',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Total Negocios
+                  </span>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#eff6ff', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <IonIcon icon={businessOutline} style={{ fontSize: '16px' }} />
                   </div>
-                  <div style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
-                    {totalTenants}
-                  </div>
-                </IonCardContent>
-              </IonCard>
+                </div>
+                <div style={{ fontSize: '26px', fontWeight: 900, color: '#0f172a' }}>
+                  {totalTenants}
+                </div>
+              </div>
             </IonCol>
 
+            {/* Negocios Activos */}
             <IonCol size="12" sizeSm="6" sizeMd="2.4">
-              <IonCard style={{ margin: 0, borderRadius: '12px', borderLeft: '4px solid #10b981' }}>
-                <IonCardContent style={{ padding: '14px' }}>
-                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '14px',
+                  border: '1px solid #e2e8f0',
+                  padding: '16px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  height: '100%',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Negocios Activos
+                  </span>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <IonIcon icon={checkmarkCircleOutline} style={{ fontSize: '16px' }} />
                   </div>
-                  <div style={{ fontSize: '26px', fontWeight: 800, color: '#10b981', marginTop: '4px' }}>
-                    {activeTenants}
-                  </div>
-                </IonCardContent>
-              </IonCard>
+                </div>
+                <div style={{ fontSize: '26px', fontWeight: 900, color: '#10b981' }}>
+                  {activeTenants}
+                </div>
+              </div>
             </IonCol>
 
+            {/* En Periodo de Prueba */}
             <IonCol size="12" sizeSm="6" sizeMd="2.4">
-              <IonCard style={{ margin: 0, borderRadius: '12px', borderLeft: '4px solid #f59e0b' }}>
-                <IonCardContent style={{ padding: '14px' }}>
-                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
-                    En Periodo de Prueba
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '14px',
+                  border: '1px solid #e2e8f0',
+                  padding: '16px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  height: '100%',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    En Periodo Prueba
+                  </span>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#fef3c7', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <IonIcon icon={timeOutline} style={{ fontSize: '16px' }} />
                   </div>
-                  <div style={{ fontSize: '26px', fontWeight: 800, color: '#f59e0b', marginTop: '4px' }}>
-                    {trialTenants}
-                  </div>
-                </IonCardContent>
-              </IonCard>
+                </div>
+                <div style={{ fontSize: '26px', fontWeight: 900, color: '#f59e0b' }}>
+                  {trialTenants}
+                </div>
+              </div>
             </IonCol>
 
+            {/* Pagos Pendientes */}
             <IonCol size="12" sizeSm="6" sizeMd="2.4">
-              <IonCard style={{ margin: 0, borderRadius: '12px', borderLeft: `4px solid ${pendingCount > 0 ? '#ef4444' : '#94a3b8'}` }}>
-                <IonCardContent style={{ padding: '14px' }}>
-                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>Pagos Pendientes</span>
-                    {pendingCount > 0 && <IonBadge color="danger">{pendingCount}</IonBadge>}
+              <div
+                style={{
+                  background: pendingCount > 0 ? '#fffdfd' : '#ffffff',
+                  borderRadius: '14px',
+                  border: pendingCount > 0 ? '1px solid #fecaca' : '1px solid #e2e8f0',
+                  padding: '16px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  height: '100%',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Pagos Pendientes
+                    </span>
+                    {pendingCount > 0 && (
+                      <span style={{ background: '#fee2e2', color: '#b91c1c', fontSize: '10px', fontWeight: 800, padding: '1px 6px', borderRadius: '10px' }}>
+                        {pendingCount}
+                      </span>
+                    )}
                   </div>
-                  <div style={{ fontSize: '26px', fontWeight: 800, color: pendingCount > 0 ? '#ef4444' : '#0f172a', marginTop: '4px' }}>
-                    {pendingCount}
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <IonIcon icon={cashOutline} style={{ fontSize: '16px' }} />
                   </div>
-                </IonCardContent>
-              </IonCard>
+                </div>
+                <div style={{ fontSize: '26px', fontWeight: 900, color: pendingCount > 0 ? '#ef4444' : '#0f172a' }}>
+                  {pendingCount}
+                </div>
+              </div>
             </IonCol>
 
+            {/* Facturación Estimada */}
             <IonCol size="12" sizeSm="6" sizeMd="2.4">
-              <IonCard style={{ margin: 0, borderRadius: '12px', borderLeft: '4px solid #8b5cf6' }}>
-                <IonCardContent style={{ padding: '14px' }}>
-                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '14px',
+                  border: '1px solid #e2e8f0',
+                  padding: '16px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  height: '100%',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Facturación Estimada
+                  </span>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#f3e8ff', color: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <IonIcon icon={walletOutline} style={{ fontSize: '16px' }} />
                   </div>
-                  <div style={{ fontSize: '26px', fontWeight: 800, color: '#8b5cf6', marginTop: '4px' }}>
-                    ${estimatedRevenue.toFixed(2)}
-                  </div>
-                </IonCardContent>
-              </IonCard>
+                </div>
+                <div style={{ fontSize: '26px', fontWeight: 900, color: '#8b5cf6' }}>
+                  ${estimatedRevenue.toFixed(2)}
+                </div>
+              </div>
             </IonCol>
           </IonRow>
         </IonGrid>
 
-        {/* Tab Switcher */}
-        <div style={{ background: '#ffffff', borderRadius: '12px', padding: '6px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <IonSegment value={activeTab} onIonChange={(e) => setActiveTab(e.detail.value as any)}>
+        {/* Tab Switcher con scroll horizontal suave sin truncamiento */}
+        <div style={{ background: '#ffffff', borderRadius: '12px', padding: '6px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
+          <IonSegment value={activeTab} onIonChange={(e) => setActiveTab(e.detail.value as any)} scrollable={true}>
             <IonSegmentButton value="tenants">
-              <IonLabel style={{ fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <IonLabel style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <IonIcon icon={businessOutline} />
-                Negocios y Suscripciones ({totalTenants})
+                Negocios ({totalTenants})
               </IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="payments">
-              <IonLabel style={{ fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <IonLabel style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <IonIcon icon={cashOutline} />
                 Aprobación de Pagos
                 {pendingCount > 0 && (
@@ -532,21 +649,21 @@ const SuperAdminDashboard: React.FC = () => {
               </IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="promoters">
-              <IonLabel style={{ fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <IonLabel style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <IonIcon icon={medalOutline} />
-                Promotores y Comisiones ({promoters.length})
+                Promotores ({promoters.length})
               </IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="config">
-              <IonLabel style={{ fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <IonLabel style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <IonIcon icon={walletOutline} />
-                Cuentas de Cobro SaaS
+                Cuentas de Cobro
               </IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="support">
-              <IonLabel style={{ fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <IonLabel style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <IonIcon icon={mailOutline} />
-                Mensajes de Soporte
+                Soporte
                 {supportMessages.length > 0 && (
                   <IonBadge color="primary" style={{ fontSize: '11px', marginLeft: '4px' }}>
                     {supportMessages.length}
@@ -766,13 +883,30 @@ const SuperAdminDashboard: React.FC = () => {
                     <IonCol size="12" sizeMd="6" key={p.id}>
                       <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderTop: '4px solid #f59e0b' }}>
                         <IonCardHeader style={{ paddingBottom: '8px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <IonCardTitle style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                            <IonCardTitle style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', textTransform: 'capitalize' }}>
                               {p.tenantName || 'Negocio Registrado'}
                             </IonCardTitle>
-                            <IonBadge color="warning" style={{ fontSize: '11px', textTransform: 'uppercase' }}>
-                              PENDIENTE
-                            </IonBadge>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {p.months === 12 && (
+                                <span style={{ fontSize: '11px', fontWeight: 800, background: '#fef3c7', color: '#92400e', padding: '3px 8px', borderRadius: '6px' }}>
+                                  ⭐ ANUAL (1 AÑO)
+                                </span>
+                              )}
+                              {p.months === 3 && (
+                                <span style={{ fontSize: '11px', fontWeight: 800, background: '#e0f2fe', color: '#0369a1', padding: '3px 8px', borderRadius: '6px' }}>
+                                  TRIMESTRAL (3 MESES)
+                                </span>
+                              )}
+                              {(!p.months || p.months === 1) && (
+                                <span style={{ fontSize: '11px', fontWeight: 800, background: '#f1f5f9', color: '#475569', padding: '3px 8px', borderRadius: '6px' }}>
+                                  MENSUAL (1 MES)
+                                </span>
+                              )}
+                              <IonBadge color="warning" style={{ fontSize: '11px', textTransform: 'uppercase' }}>
+                                PENDIENTE
+                              </IonBadge>
+                            </div>
                           </div>
                           <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
                             📅 Reportado: {new Date(p.createdAt).toLocaleString('es-VE')}
@@ -825,7 +959,7 @@ const SuperAdminDashboard: React.FC = () => {
                               onClick={() => handleApprovePayment(p)}
                             >
                               <IonIcon icon={checkmarkCircleOutline} slot="start" />
-                              Aprobar (+30 días)
+                              Aprobar (+{p.months === 12 ? '365 días' : `${(p.months || 1) * 30} días`})
                             </IonButton>
 
                             <IonButton

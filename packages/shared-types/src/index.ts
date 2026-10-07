@@ -373,6 +373,7 @@ export interface SaaSPaymentReportDTO {
   reference: string;
   status: SaaSPaymentStatus;
   rejectReason?: string;
+  months?: number;
   createdAt: string;
 }
 

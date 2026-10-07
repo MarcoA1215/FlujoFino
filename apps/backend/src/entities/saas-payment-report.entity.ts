@@ -1,4 +1,4 @@
-﻿import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Tenant } from './tenant.entity';
 import { SaaSPaymentMethod, SaaSPaymentStatus } from '@finowork/shared-types';
@@ -41,6 +41,9 @@ export class SaaSPaymentReport {
 
   @Column({ type: 'text', nullable: true })
   reject_reason: string | null;
+
+  @Column({ type: 'int', default: 1, nullable: true })
+  months: number;
 
   @CreateDateColumn()
   created_at: Date;
