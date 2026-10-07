@@ -1154,7 +1154,7 @@ const PublicStore: React.FC = () => {
                             >
                               Agotado
                             </div>
-                          ) : !product.isService ? (
+                          ) : !product.isService && !isProductMadeToOrder(product) ? (
                             <div
                               style={{
                                 position: 'absolute',
@@ -1268,7 +1268,7 @@ const PublicStore: React.FC = () => {
                                 size="small"
                                 color="primary"
                                 onClick={() => handleUpdateQuantity(product.id, 1)}
-                                disabled={!product.isService && product.availabilityType !== 'BAJO_ENCARGO' && !product.isSupplierPreorder && inCart.quantity >= getAvailableStock(product)}
+                                disabled={!product.isService && !isProductMadeToOrder(product) && product.availabilityType !== 'BAJO_ENCARGO' && !product.isSupplierPreorder && inCart.quantity >= getAvailableStock(product)}
                                 style={{ margin: 0, height: '32px', width: '32px' }}
                               >
                                 <IonIcon slot="icon-only" icon={addOutline} />
@@ -1278,7 +1278,7 @@ const PublicStore: React.FC = () => {
                             <IonButton
                               size="small"
                               color={product.isSupplierPreorder ? 'tertiary' : product.availabilityType === 'BAJO_ENCARGO' ? 'warning' : 'primary'}
-                              disabled={product.isOutOfStock && !product.isSupplierPreorder && product.availabilityType !== 'BAJO_ENCARGO'}
+                              disabled={product.isOutOfStock && !product.isSupplierPreorder && product.availabilityType !== 'BAJO_ENCARGO' && !isProductMadeToOrder(product)}
                               onClick={() => handleAddToCart(product)}
                               style={{ margin: 0, borderRadius: '8px', fontWeight: 'bold' }}
                             >
@@ -1406,7 +1406,7 @@ const PublicStore: React.FC = () => {
                           <span style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 'bold' }}>
                             ${item.product.salePrice.toFixed(2)} c/u (${lineTotal.toFixed(2)})
                           </span>
-                          {!item.product.isService && (
+                          {!item.product.isService && !isProductMadeToOrder(item.product) && (
                             <span
                               style={{
                                 fontSize: '0.75rem',
@@ -1419,6 +1419,19 @@ const PublicStore: React.FC = () => {
                               {item.quantity > getAvailableStock(item.product)
                                 ? `⚠️ Excede stock disponible (${getAvailableStock(item.product)})`
                                 : `Disponible: ${getAvailableStock(item.product)}`}
+                            </span>
+                          )}
+                          {isProductMadeToOrder(item.product) && (
+                            <span
+                              style={{
+                                fontSize: '0.75rem',
+                                color: '#059669',
+                                display: 'block',
+                                marginTop: '2px',
+                                fontWeight: '500',
+                              }}
+                            >
+                              👨‍🍳 Preparado al momento
                             </span>
                           )}
                         </div>
@@ -1441,7 +1454,7 @@ const PublicStore: React.FC = () => {
                             size="small"
                             fill="outline"
                             color="primary"
-                            disabled={!item.product.isService && item.quantity >= getAvailableStock(item.product)}
+                            disabled={!item.product.isService && !isProductMadeToOrder(item.product) && item.quantity >= getAvailableStock(item.product)}
                             onClick={() => handleUpdateQuantity(item.product.id, 1)}
                             style={{ height: '30px', width: '30px', margin: 0 }}
                           >
