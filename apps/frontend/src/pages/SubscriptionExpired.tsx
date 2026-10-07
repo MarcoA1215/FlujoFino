@@ -124,12 +124,33 @@ const SubscriptionExpired: React.FC = () => {
   );
   const waUrl = `https://wa.me/${supportPhone}?text=${waMessage}`;
 
+  const isSuspended = subscription?.status === 'SUSPENDED';
+  const isPastDue = subscription?.status === 'PAST_DUE';
+  const isTrial = subscription?.status === 'TRIAL';
+
+  const cardBorderColor = isSuspended ? '#64748b' : isPastDue ? '#ef4444' : '#f59e0b';
+  const iconBg = isSuspended ? '#f1f5f9' : isPastDue ? '#fee2e2' : '#fef3c7';
+  const iconColor = isSuspended ? '#475569' : isPastDue ? '#dc2626' : '#d97706';
+  const iconEmoji = isSuspended ? '🚫' : isPastDue ? '⚠️' : '🔒';
+
+  const titleText = isSuspended
+    ? 'Acceso Temporalmente Suspendido'
+    : isPastDue
+    ? 'Suscripción Vencida (Pago Pendiente)'
+    : 'Tu período de prueba ha concluido';
+
+  const descriptionText = isSuspended
+    ? 'Tu negocio se encuentra suspendido. Por favor comunícate con administración a través del botón de soporte o regulariza tu pago para restablecer el servicio.'
+    : isPastDue
+    ? 'La mensualidad de tu suscripción ha vencido. Para reactivar de inmediato el punto de venta, inventario y tus portales públicos, realiza y reporta tu pago a continuación.'
+    : 'Tus 15 días de prueba gratuita han concluido. Para continuar disfrutando de todas las herramientas de FinoWork, activa tu plan mensual reportando tu pago a continuación.';
+
   return (
     <IonPage>
       <IonHeader>
-        <IonToolbar color="danger">
+        <IonToolbar color={isSuspended ? 'medium' : isPastDue ? 'danger' : 'warning'}>
           <IonTitle style={{ fontWeight: 800, fontSize: '1.1rem' }}>
-            Suscripción Requerida - FinoWork
+            {isSuspended ? 'Cuenta Suspendida - FinoWork' : isPastDue ? 'Pago Pendiente - FinoWork' : 'Suscripción Requerida - FinoWork'}
           </IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={() => logout()} title="Cerrar sesión">
@@ -145,11 +166,11 @@ const SubscriptionExpired: React.FC = () => {
           <div
             style={{
               background: '#ffffff',
-              border: '2px solid #ef4444',
+              border: `2px solid ${cardBorderColor}`,
               borderRadius: '16px',
               padding: '24px 20px',
               textAlign: 'center',
-              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.08)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.06)',
               marginBottom: '20px',
             }}
           >
@@ -158,8 +179,8 @@ const SubscriptionExpired: React.FC = () => {
                 width: '64px',
                 height: '64px',
                 borderRadius: '50%',
-                backgroundColor: '#fee2e2',
-                color: '#dc2626',
+                backgroundColor: iconBg,
+                color: iconColor,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -167,7 +188,25 @@ const SubscriptionExpired: React.FC = () => {
                 fontSize: '32px',
               }}
             >
-              🔒
+              {iconEmoji}
+            </div>
+
+            <div style={{ marginBottom: '8px' }}>
+              {isSuspended && (
+                <span style={{ background: '#64748b', color: '#fff', padding: '4px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 800 }}>
+                  ESTADO: SUSPENDIDO
+                </span>
+              )}
+              {isPastDue && (
+                <span style={{ background: '#ef4444', color: '#fff', padding: '4px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 800 }}>
+                  ESTADO: VENCIDO / PAGO ATRASADO
+                </span>
+              )}
+              {isTrial && (
+                <span style={{ background: '#f59e0b', color: '#fff', padding: '4px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 800 }}>
+                  ESTADO: PRUEBA FINALIZADA
+                </span>
+              )}
             </div>
 
             <h1
@@ -178,7 +217,7 @@ const SubscriptionExpired: React.FC = () => {
                 margin: '0 0 10px 0',
               }}
             >
-              Tu período de prueba ha concluido
+              {titleText}
             </h1>
 
             <div
@@ -205,8 +244,7 @@ const SubscriptionExpired: React.FC = () => {
             </div>
 
             <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0, lineHeight: 1.5 }}>
-              Para reactivar inmediatamente el punto de venta, inventario y tus portales públicos, realiza el pago de
-              tu cuota mensual y regístralo a continuación.
+              {descriptionText}
             </p>
           </div>
 

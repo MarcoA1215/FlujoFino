@@ -28,12 +28,14 @@ export class TenantStatusGuard implements CanActivate {
     const tenantId = user.tenantId;
     if (!tenantId) return true;
 
-    // Rutas permitidas aún cuando el tenant esté suspendido/vencido (para que pueda pagar y cambiar de negocio)
+    // Rutas permitidas aún cuando el tenant esté suspendido/vencido (para que pueda pagar, consultar su deuda y cambiar de negocio)
     const url = request.originalUrl || request.url || '';
     const exemptPaths = [
-      '/superadmin/payments/report',
+      '/superadmin/my-subscription',
       '/superadmin/saas-subscription',
+      '/superadmin/payments/report',
       '/superadmin/platform-config',
+      '/settings/exchange-rate',
       '/auth/select-workspace',
       '/auth/switch-mode',
       '/auth/me',

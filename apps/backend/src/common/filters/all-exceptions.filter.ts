@@ -24,6 +24,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: any = 'Ocurrió un error inesperado en el servidor';
     let errorType = 'InternalServerError';
+    let code: string | undefined = undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -31,6 +32,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (typeof res === 'object' && res !== null) {
         message = (res as any).message || (res as any).error || exception.message;
         errorType = (res as any).error || exception.name;
+        code = (res as any).code;
       } else {
         message = res || exception.message;
         errorType = exception.name;
@@ -68,13 +70,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     if (!response.headersSent) {
-      response.status(status).json({
+      const responsePayload: any = {
         statusCode: status,
         error: errorType,
         message: Array.isArray(message) ? message : [message],
         timestamp: new Date().toISOString(),
         path: request.url,
-      });
+      };
+      if (code) {
+        responsePayload.code = code;
+      }
+      response.status(status).json(responsePayload);
     }
   }
 }

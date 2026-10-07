@@ -86,6 +86,13 @@ export class PublicStoreController {
     });
 
     const storeProducts = nonServiceProducts.map((p) => {
+      const isFoodOrPrepared = 
+        !p.isPreAssembled ||
+        p.product_type === 'FORMULA' ||
+        Boolean(p.category && /comida|alimento|hamburguesa|snack|bebida|preparad|postre|restaurante/i.test(p.category));
+
+      const isMadeToOrder = Boolean(isFoodOrPrepared && (!p.isPreAssembled || p.product_type === 'FORMULA' || (p.category && /comida|alimento/i.test(p.category))));
+
       let availableStock = Math.max(0, Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.stockQuantity || 0)));
       if (p.isCombo && !p.isPreAssembled && p.comboItems && p.comboItems.length > 0) {
         let minAvail = Infinity;
@@ -98,7 +105,13 @@ export class PublicStoreController {
       } else if (p.physicalStock !== undefined && p.physicalStock !== null && availableStock > p.physicalStock) {
         availableStock = Math.max(0, Number(p.physicalStock));
       }
-      const isUnderDemand = p.availabilityType === 'BAJO_ENCARGO' || Boolean(p.isSupplierPreorder);
+
+      // Si es un producto preparado al momento / comida y no maneja stock rígido prefabricado, no limitar a 0 o 1
+      if (isMadeToOrder && availableStock <= 1) {
+        availableStock = 99;
+      }
+
+      const isUnderDemand = p.availabilityType === 'BAJO_ENCARGO' || Boolean(p.isSupplierPreorder) || isMadeToOrder;
 
       return {
         id: p.id,
@@ -117,6 +130,10 @@ export class PublicStoreController {
         isSupplierPreorder: Boolean(p.isSupplierPreorder),
         isService: false,
         isOutOfStock: isUnderDemand ? false : availableStock <= 0,
+        product_type: p.product_type,
+        isCombo: Boolean(p.isCombo),
+        isPreAssembled: Boolean(p.isPreAssembled),
+        isMadeToOrder,
       };
     });
 
@@ -235,7 +252,13 @@ export class PublicStoreController {
         hasUnderDemand = true;
       }
 
-      const isExemptFromStock = product.isSupplierPreorder || product.availabilityType === 'BAJO_ENCARGO';
+      const isFoodOrPrepared = 
+        !product.isPreAssembled ||
+        product.product_type === 'FORMULA' ||
+        Boolean(product.category && /comida|alimento|hamburguesa|snack|bebida|preparad|postre|restaurante/i.test(product.category));
+      const isMadeToOrder = Boolean(isFoodOrPrepared && (!product.isPreAssembled || product.product_type === 'FORMULA' || (product.category && /comida|alimento/i.test(product.category))));
+
+      const isExemptFromStock = product.isSupplierPreorder || product.availabilityType === 'BAJO_ENCARGO' || isMadeToOrder;
       if (!isExemptFromStock) {
         let availableStock = Math.max(0, Number(product.stock !== undefined && product.stock !== null ? product.stock : (product.stockQuantity || 0)));
         if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {

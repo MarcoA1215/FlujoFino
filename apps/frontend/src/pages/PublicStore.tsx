@@ -63,10 +63,24 @@ interface StoreProduct {
   isOutOfStock: boolean;
   availabilityType?: 'INMEDIATO' | 'BAJO_ENCARGO';
   isSupplierPreorder?: boolean;
+  product_type?: string;
+  isCombo?: boolean;
+  isPreAssembled?: boolean;
+  isMadeToOrder?: boolean;
 }
 
-const getAvailableStock = (p: StoreProduct) =>
-  Math.max(0, Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.stockQuantity || 0)));
+const isProductMadeToOrder = (p: StoreProduct) => {
+  if (p.isMadeToOrder) return true;
+  if (p.isPreAssembled === false) return true;
+  if (p.product_type === 'FORMULA') return true;
+  if (p.category && /comida|alimento|hamburguesa|snack|bebida|preparad|postre|restaurante/i.test(p.category)) return true;
+  return false;
+};
+
+const getAvailableStock = (p: StoreProduct) => {
+  if (isProductMadeToOrder(p)) return 999;
+  return Math.max(0, Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.stockQuantity || 0)));
+};
 
 interface DeliveryZone {
   id: string;
@@ -302,7 +316,7 @@ const PublicStore: React.FC = () => {
   const hasSupplierPreorder = useMemo(() => cart.some((i) => i.product.isSupplierPreorder), [cart]);
 
   const handleAddToCart = (product: StoreProduct) => {
-    const isExempt = product.availabilityType === 'BAJO_ENCARGO' || product.isSupplierPreorder;
+    const isExempt = product.availabilityType === 'BAJO_ENCARGO' || product.isSupplierPreorder || isProductMadeToOrder(product);
     if (product.isOutOfStock && !isExempt) {
       presentToast({
         message: 'Este producto está agotado por el momento.',
@@ -354,7 +368,7 @@ const PublicStore: React.FC = () => {
       return;
     }
 
-    const isExempt = item.product.availabilityType === 'BAJO_ENCARGO' || item.product.isSupplierPreorder;
+    const isExempt = item.product.availabilityType === 'BAJO_ENCARGO' || item.product.isSupplierPreorder || isProductMadeToOrder(item.product);
     const availableStock = getAvailableStock(item.product);
 
     // Check inventory cap on increase
@@ -400,7 +414,7 @@ const PublicStore: React.FC = () => {
     }
 
     for (const item of cart) {
-      const isExempt = item.product.availabilityType === 'BAJO_ENCARGO' || item.product.isSupplierPreorder;
+      const isExempt = item.product.availabilityType === 'BAJO_ENCARGO' || item.product.isSupplierPreorder || isProductMadeToOrder(item.product);
       const avail = getAvailableStock(item.product);
       if (!isExempt && !item.product.isService && item.quantity > avail) {
         presentToast({

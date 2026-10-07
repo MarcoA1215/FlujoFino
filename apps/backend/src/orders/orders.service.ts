@@ -441,8 +441,14 @@ export class OrdersService {
             }
           } else if (!product.isCombo || product.isPreAssembled) {
             const isService = product.is_service || product.category === 'Servicios' || Boolean(product.durationMinutes);
+            const isFoodOrPrepared = 
+              !product.isPreAssembled ||
+              product.product_type === 'FORMULA' ||
+              Boolean(product.category && /comida|alimento|hamburguesa|snack|bebida|preparad|postre|restaurante/i.test(product.category));
+            const isMadeToOrder = Boolean(isFoodOrPrepared && (!product.isPreAssembled || product.product_type === 'FORMULA' || (product.category && /comida|alimento/i.test(product.category))));
+
             const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
-            if (!isService && currentStock < itemDto.quantity) {
+            if (isMadeToOrder || (!isService && currentStock < itemDto.quantity)) {
               requiresPreparation = true;
             }
           }
@@ -629,7 +635,13 @@ export class OrdersService {
               }
             } else if (!product.isCombo || product.isPreAssembled) {
               const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
-              if (!isService) {
+              const isFoodOrPrepared = 
+                !product.isPreAssembled ||
+                product.product_type === 'FORMULA' ||
+                Boolean(product.category && /comida|alimento|hamburguesa|snack|bebida|preparad|postre|restaurante/i.test(product.category));
+              const isMadeToOrder = Boolean(isFoodOrPrepared && (!product.isPreAssembled || product.product_type === 'FORMULA' || (product.category && /comida|alimento/i.test(product.category))));
+
+              if (!isService && !isMadeToOrder) {
                 const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
                 const isBajoEncargo = product.availabilityType === 'BAJO_ENCARGO';
                 if (currentStock < itemDto.quantity && !isBajoEncargo) {

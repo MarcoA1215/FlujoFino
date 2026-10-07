@@ -78,7 +78,15 @@ apiClient.interceptors.response.use(
     }
 
     // Redirección si la suscripción del tenant está vencida o suspendida (403)
-    if (error.response?.status === 403 && error.response?.data?.code === 'TENANT_SUSPENDED_OR_EXPIRED') {
+    const errorDataStr = JSON.stringify(error.response?.data || '');
+    const isSuspendedOrExpired =
+      error.response?.status === 403 &&
+      (error.response?.data?.code === 'TENANT_SUSPENDED_OR_EXPIRED' ||
+        errorDataStr.includes('TENANT_SUSPENDED_OR_EXPIRED') ||
+        errorDataStr.includes('período de prueba o suscripción ha concluido') ||
+        errorDataStr.includes('se encuentra suspendido'));
+
+    if (isSuspendedOrExpired) {
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/subscription-expired') && !window.location.pathname.startsWith('/select-workspace')) {
         window.location.href = '/subscription-expired';
       }
