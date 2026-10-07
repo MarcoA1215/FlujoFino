@@ -1,12 +1,16 @@
 import { Tenant } from '../entities/tenant.entity';
-import { TenantStatus, TenantPlanType } from '@finowork/shared-types';
+import { TenantStatus } from '@finowork/shared-types';
 
 export function isTenantSuspendedOrExpired(tenant: Tenant): boolean {
   if (!tenant.isActive) return true;
-  if (tenant.status === TenantStatus.SUSPENDED || tenant.status === TenantStatus.PAST_DUE) {
+  // Solo SUSPENDIDO bloquea totalmente el acceso a la plataforma.
+  // PAST_DUE (Vencido) mantiene acceso a la app con alerta y días de gracia.
+  if (tenant.status === TenantStatus.SUSPENDED) {
     return true;
   }
-
+  if (tenant.status === TenantStatus.PAST_DUE) {
+    return false;
+  }
 
   const now = Date.now();
   if (tenant.status === TenantStatus.TRIAL) {
@@ -15,9 +19,7 @@ export function isTenantSuspendedOrExpired(tenant: Tenant): boolean {
       : new Date(tenant.createdAt).getTime() + 15 * 86400000;
     return now > trialEnd;
   }
-  if (tenant.status === TenantStatus.ACTIVE && tenant.current_period_ends_at) {
-    return now > new Date(tenant.current_period_ends_at).getTime();
-  }
+
   return false;
 }
 

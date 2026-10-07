@@ -226,14 +226,11 @@ export class SuperAdminService implements OnModuleInit {
     }
 
     const isPioneerFree = updatedTenant.plan_type === TenantPlanType.PIONEER && feeCalc.activeReferrals >= 2;
-    const isExpired =
-      !updatedTenant.isActive ||
-      (!isPioneerFree && (
-        updatedTenant.status === TenantStatus.SUSPENDED ||
-        updatedTenant.status === TenantStatus.PAST_DUE ||
-        (updatedTenant.status === TenantStatus.TRIAL && trialDaysLeft <= 0) ||
-        (updatedTenant.status === TenantStatus.ACTIVE && daysLeft <= 0 && !!updatedTenant.current_period_ends_at)
-      ));
+    // Solo SUSPENDIDO, inactivo o prueba finalizada bloquean totalmente (isExpired).
+    // PAST_DUE (Vencido) tiene días de gracia y NO bloquea la navegación de la app.
+    const isSuspended = !updatedTenant.isActive || updatedTenant.status === TenantStatus.SUSPENDED;
+    const isTrialExpired = !isPioneerFree && updatedTenant.status === TenantStatus.TRIAL && trialDaysLeft <= 0;
+    const isExpired = isSuspended || isTrialExpired;
 
     return {
       tenantId: updatedTenant.id,
