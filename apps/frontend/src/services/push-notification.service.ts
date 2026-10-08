@@ -47,11 +47,13 @@ export function playNotificationSound(): void {
   }
 }
 
+export const IS_NATIVE_FCM_ENABLED = false;
+
 export type NotificationPermissionState = 'granted' | 'denied' | 'default' | 'unsupported';
 
 export function getNotificationPermission(): NotificationPermissionState {
   if (Capacitor.isNativePlatform()) {
-    return 'default';
+    return IS_NATIVE_FCM_ENABLED ? 'default' : 'unsupported';
   }
   if (!('Notification' in window)) {
     return 'unsupported';
@@ -141,6 +143,10 @@ export async function registerPushNotifications(
   if (!identifier) return { success: false, reason: 'no_identifier' };
 
   if (Capacitor.isNativePlatform()) {
+    if (!IS_NATIVE_FCM_ENABLED) {
+      console.info('[Capacitor Native] Push Notifications nativas desactivadas (requiere google-services.json en Android).');
+      return { success: false, reason: 'fcm_not_configured' };
+    }
     try {
       let permStatus = await PushNotifications.checkPermissions();
       if (permStatus.receive === 'prompt') {
@@ -276,6 +282,11 @@ export function usePushNotifications(
       user.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
 
     const role = isSuperAdmin ? 'SUPERADMIN' : (user.role || 'ADMIN');
+
+    // En Capacitor nativo solo registrar si FCM está configurado, para evitar crashes nativos
+    if (Capacitor.isNativePlatform() && !IS_NATIVE_FCM_ENABLED) {
+      return;
+    }
 
     // Si ya está concedido el permiso en la web, renovar/registrar suscripción automáticamente
     if (Capacitor.isNativePlatform() || (typeof Notification !== 'undefined' && Notification.permission === 'granted')) {

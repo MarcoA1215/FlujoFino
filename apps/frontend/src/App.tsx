@@ -38,6 +38,7 @@ import { ReportPaymentModal } from './components/ReportPaymentModal';
 import { UserRole, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
 import { useContext, useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { NotificationPermissionBanner } from './components/NotificationPermissionBanner';
 
@@ -63,7 +64,12 @@ const HomeRedirector: React.FC = () => {
   const { isExpired, isLoading: isSubLoading } = useContext(SubscriptionContext);
 
   if (isLoading || isSubLoading) return null;
-  if (!isAuthenticated) return <LandingPage />;
+  if (!isAuthenticated) {
+    if (Capacitor.isNativePlatform()) {
+      return <Navigate to="/login" replace />;
+    }
+    return <LandingPage />;
+  }
 
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
   if (isSuperAdmin) {
@@ -285,7 +291,7 @@ const MainLayout: React.FC = () => {
         <Route path="/tienda/:tenantId" element={<PublicStore />} />
         <Route path="/appointment/:id" element={<PublicAppointmentManage />} />
         <Route path="/subscription-expired" element={<ExpiredPaywallRoute />} />
-        <Route path="/landing" element={<LandingPage />} />
+        <Route path="/landing" element={Capacitor.isNativePlatform() ? <Navigate to="/login" replace /> : <LandingPage />} />
         <Route path="/terms" element={<TermsAndConditions />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/" element={<HomeRedirector />} />

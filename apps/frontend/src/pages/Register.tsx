@@ -48,6 +48,7 @@ const Register: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
@@ -73,9 +74,9 @@ const Register: React.FC = () => {
       return;
     }
 
-    if (!acceptedTerms) {
+    if (!acceptedTerms || !acceptedPrivacy) {
       presentToast({
-        message: 'Debes leer y aceptar los Términos y Condiciones y la Política de Privacidad para registrar tu negocio.',
+        message: 'Debes leer y aceptar tanto los Términos y Condiciones como la Política de Privacidad para registrar tu negocio.',
         duration: 4000,
         color: 'warning'
       });
@@ -95,7 +96,8 @@ const Register: React.FC = () => {
         featureCustomerSchedules,
         featureRecipes,
         featureBuySell,
-        acceptedTerms: true
+        acceptedTerms: true,
+        acceptedPrivacy: true
       });
       // Auto login
       login(res.data.access_token, res.data.user, res.data.workspaces);
@@ -241,11 +243,12 @@ const Register: React.FC = () => {
                     </IonItem>
                   </IonCard>
 
+                  {/* Casilla 1: Términos y Condiciones */}
                   <div
                     style={{
                       marginTop: '16px',
-                      marginBottom: '16px',
-                      padding: '14px',
+                      marginBottom: '10px',
+                      padding: '12px 14px',
                       borderRadius: '12px',
                       background: '#F8FAFC',
                       border: acceptedTerms ? '1px solid #10B981' : '1px solid #E2E8F0',
@@ -283,7 +286,36 @@ const Register: React.FC = () => {
                       >
                         Términos y Condiciones
                       </button>{' '}
-                      y la{' '}
+                      de FinoWork.
+                    </div>
+                  </div>
+
+                  {/* Casilla 2: Política de Privacidad */}
+                  <div
+                    style={{
+                      marginBottom: '16px',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      background: '#F8FAFC',
+                      border: acceptedPrivacy ? '1px solid #10B981' : '1px solid #E2E8F0',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '12px',
+                      transition: 'border-color 0.2s ease'
+                    }}
+                  >
+                    <IonCheckbox
+                      checked={acceptedPrivacy}
+                      onIonChange={e => setAcceptedPrivacy(e.detail.checked)}
+                      style={{
+                        marginTop: '2px',
+                        '--size': '20px',
+                        '--checkbox-background-checked': '#10B981',
+                        '--border-color-checked': '#10B981'
+                      } as any}
+                    />
+                    <div style={{ fontSize: '13px', color: '#334155', lineHeight: '1.45', flex: 1 }}>
+                      He leído y acepto la{' '}
                       <button
                         type="button"
                         onClick={() => setShowPrivacyModal(true)}
@@ -311,10 +343,10 @@ const Register: React.FC = () => {
                     <IonButton
                       expand="block"
                       onClick={handleRegister}
-                      disabled={!acceptedTerms}
+                      disabled={!acceptedTerms || !acceptedPrivacy}
                       style={{
                         flex: 2,
-                        '--background': acceptedTerms ? '#10B981' : undefined
+                        '--background': (acceptedTerms && acceptedPrivacy) ? '#10B981' : undefined
                       } as any}
                     >
                       Finalizar <IonIcon slot="end" icon={checkmarkDoneOutline} />
@@ -381,7 +413,7 @@ const Register: React.FC = () => {
               <div style={{ marginTop: '24px', paddingBottom: '30px', textAlign: 'center' }}>
                 <IonButton
                   onClick={() => {
-                    setAcceptedTerms(true);
+                    setAcceptedPrivacy(true);
                     setShowPrivacyModal(false);
                   }}
                   style={{ '--background': '#10B981' } as any}

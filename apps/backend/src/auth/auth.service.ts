@@ -368,7 +368,7 @@ export class AuthService {
       throw new BadRequestException('Todos los campos obligatorios deben ser completados');
     }
 
-    if (!body.acceptedTerms) {
+    if (!body.acceptedTerms || (body.acceptedPrivacy === false)) {
       throw new BadRequestException('Debes aceptar los Términos y Condiciones y la Política de Privacidad para registrar tu negocio. Si estás utilizando la aplicación móvil, por favor descarga e instala la última versión de la app.');
     }
 

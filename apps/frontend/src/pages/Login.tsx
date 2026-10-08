@@ -18,6 +18,7 @@ import {
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import { useIonRouter } from '@ionic/react';
+import { Capacitor } from '@capacitor/core';
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -368,27 +369,33 @@ const Login: React.FC = () => {
                 </div>
 
                 <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #e2e8f0', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
-                  <a
-                    href="/FinoWork.apk"
-                    download="FinoWork.apk"
-                    style={{
-                      color: '#0f172a',
-                      fontWeight: '700',
-                      textDecoration: 'none',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <span>🤖</span> Descargar APK para Android
-                  </a>
+                  {!Capacitor.isNativePlatform() && (
+                    <a
+                      href="/FinoWork.apk"
+                      download="FinoWork.apk"
+                      style={{
+                        color: '#0f172a',
+                        fontWeight: '700',
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <span>🤖</span> Descargar APK para Android
+                    </a>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', color: '#94a3b8' }}>
                     <a href="/terms" style={{ color: '#64748b', textDecoration: 'none' }}>Términos</a>
                     <span>•</span>
                     <a href="/privacy" style={{ color: '#64748b', textDecoration: 'none' }}>Privacidad</a>
-                    <span>•</span>
-                    <a href="/landing" style={{ color: '#64748b', textDecoration: 'none' }}>Inicio</a>
+                    {!Capacitor.isNativePlatform() && (
+                      <>
+                        <span>•</span>
+                        <a href="/landing" style={{ color: '#64748b', textDecoration: 'none' }}>Inicio</a>
+                      </>
+                    )}
                   </div>
                 </div>
               </IonCardContent>
