@@ -88,10 +88,17 @@ export const PrivacyContent: React.FC = () => {
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          7. Contacto
+          7. Uso de Cookies y Almacenamiento Local (Sin Rastreo Publicitario)
+        </h2>
+        <p>
+          FinoWork <strong>no utiliza cookies de seguimiento publicitario ni comercializa perfiles de navegación con redes de anuncios</strong>. Empleamos exclusivamente tecnologías de almacenamiento técnico local en el navegador y en el dispositivo móvil (tales como <em>localStorage</em>, <em>sessionStorage</em> e <em>IndexedDB</em>) que son estrictamente indispensables para mantener su sesión iniciada de manera segura y permitir que el punto de venta (POS) y catálogo sigan operando sin conexión a internet (Modo Offline).
+        </p>
+
+        <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
+          8. Contacto y Soporte de Privacidad
         </h2>
         <p style={{ margin: 0 }}>
-          Si tiene alguna inquietud respecto al tratamiento de sus datos, comuníquese directamente con nuestro canal de atención oficial vía WhatsApp o a través del centro de soporte de FinoWork.
+          Si tiene alguna inquietud respecto al tratamiento de sus datos o desea ejercer sus derechos de acceso, rectificación o supresión, comuníquese directamente con nuestro canal de atención oficial vía WhatsApp o a través del centro de soporte de FinoWork.
         </p>
       </div>
     </div>

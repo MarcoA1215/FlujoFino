@@ -70,7 +70,25 @@ export const TermsContent: React.FC = () => {
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          4. Propiedad y Confidencialidad de los Datos
+          4. Propiedad Intelectual, Código Fuente y Prohibición de Ingeniería Inversa
+        </h2>
+        <p>
+          Todos los derechos de propiedad intelectual, marcas, logotipos, nombres comerciales (incluyendo la marca <strong>FinoWork</strong>), diseños de interfaz, arquitectura de software, bases de datos, código fuente, código objeto y el instalador APK (<strong>FinoWork.apk</strong>) son y seguirán siendo de la titularidad exclusiva y legítima de los creadores y desarrolladores de FinoWork.
+        </p>
+        <p>
+          El pago de la suscripción mensual otorga únicamente una licencia temporal de uso bajo la modalidad SaaS. En ningún momento constituye una venta, cesión ni transferencia de derechos de autor ni de propiedad sobre el software. Queda expresamente prohibido al Usuario y a cualquier tercero:
+        </p>
+        <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
+          <li>Descompilar, desensamblar, desofuscar, realizar ingeniería inversa o intentar obtener el código fuente del software o del APK por cualquier medio.</li>
+          <li>Copiar, clonar, reproducir, sublicenciar, revender, arrendar o comercializar la plataforma o cualquiera de sus módulos a terceros.</li>
+          <li>Modificar, crear obras derivadas o suprimir avisos de derechos de autor, marcas registradas o leyendas de propiedad insertas en el sistema.</li>
+        </ul>
+        <p>
+          Cualquier sugerencia, idea, propuesta de funcionalidad o retroalimentación (feedback) que el Usuario proporcione para la mejora del sistema se considerará no confidencial y pasará a ser de propiedad exclusiva de FinoWork, sin que ello genere derecho a compensación económica, regalías o reclamo de co-autoría sobre las características implementadas.
+        </p>
+
+        <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
+          5. Propiedad y Confidencialidad de los Datos del Negocio
         </h2>
         <p>
           <strong>El Negocio es el único y exclusivo propietario de sus datos:</strong> catálogo de productos, recetas, precios, datos de clientes, historiales de ventas y reportes contables.
@@ -80,7 +98,22 @@ export const TermsContent: React.FC = () => {
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          5. Responsabilidad Operativa, Comercial y Fiscal (Escudo Fiscal y Tasas de Cambio)
+          6. Uso Lícito y Prohibición de Actividades Ilícitas
+        </h2>
+        <p>
+          El Usuario se compromete de manera irrevocable a utilizar la Plataforma exclusivamente para fines comerciales lícitos y legítimos. Queda terminantemente prohibido utilizar FinoWork para:
+        </p>
+        <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
+          <li>Registrar, inventariar, vender o distribuir sustancias controladas, estupefacientes, armas, artículos robados o mercancías de contrabando.</li>
+          <li>Facilitar, registrar o encubrir operaciones de legitimación de capitales (lavado de dinero), financiamiento al terrorismo o fraude financiero.</li>
+          <li>Llevar contabilidad ilícita o incurrir en prácticas destinadas a estafar a consumidores o evadir a las autoridades.</li>
+        </ul>
+        <p>
+          FinoWork se reserva el derecho de suspender o rescindir inmediatamente el acceso y cancelar la cuenta de cualquier comercio ante indicios fundamentados de infracción legal, sin derecho a indemnización ni reembolso, y cooperará con las autoridades competentes si existiere orden judicial o requerimiento legal fundado.
+        </p>
+
+        <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
+          7. Responsabilidad Operativa, Comercial y Fiscal (Escudo Fiscal y Tasas de Cambio)
         </h2>
         <p>
           El Usuario reconoce y acepta que FinoWork es una herramienta tecnológica de asistencia operativa y administrativa. El Negocio es el único y exclusivo responsable de:
@@ -96,7 +129,17 @@ export const TermsContent: React.FC = () => {
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          6. Disponibilidad del Servicio y Modo Offline
+          8. Seguridad de Cuentas y Abuso Técnico de la Plataforma
+        </h2>
+        <p>
+          El titular del Comercio es enteramente responsable de mantener la confidencialidad de las cuentas y credenciales de acceso creadas para sus cajeros, cocineros, repartidores y administradores. Cualquier operación efectuada con sus credenciales se presumirá realizada por personal autorizado del Comercio.
+        </p>
+        <p>
+          Queda expresamente prohibido ejecutar pruebas de penetración no autorizadas, ataques de denegación de servicio (DDoS), inyecciones de código, extracción automatizada masiva (scraping) o cualquier acción técnica que sobrecargue o vulnere los servidores o redes de FinoWork.
+        </p>
+
+        <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
+          9. Disponibilidad del Servicio y Modo Offline (SLA As-Is)
         </h2>
         <p>
           FinoWork se esfuerza por mantener la máxima disponibilidad, pero el servicio se proporciona "tal cual" (As-Is). No garantizamos un tiempo de actividad ininterrumpido y no somos responsables por lucro cesante, pérdida de ventas o daños derivados por caídas del servidor o fallas de red.
@@ -106,21 +149,45 @@ export const TermsContent: React.FC = () => {
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          7. Programa de Promotores de Calle
+          10. Suspensión, Cancelación y Retención de Datos tras Impago
+        </h2>
+        <p>
+          Al vencer el período de prueba gratuita o la mensualidad activa, la cuenta pasará al estado de suspensión operativa preventiva hasta la regularización del pago.
+        </p>
+        <p>
+          <strong>Política de Retención y Cortesía:</strong> FinoWork conservará la base de datos histórica del comercio por un lapso de <strong>45 días calendario</strong> posteriores a la fecha de vencimiento. Durante dicho plazo, el Comercio podrá reactivar su acceso cancelando la mensualidad o solicitar formalmente una exportación de sus datos. Transcurrido el plazo de 45 días sin reactivación ni solicitud, FinoWork se reserva la facultad de depurar o eliminar de forma definitiva los datos del sistema para optimizar los recursos del servidor, sin responsabilidad de custodia indefinida.
+        </p>
+
+        <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
+          11. Límite de Responsabilidad Financiera
+        </h2>
+        <p>
+          En la máxima medida permitida por la ley aplicable, la responsabilidad económica total y acumulada de FinoWork frente al Usuario por cualquier daño, perjuicio, reclamo o acción contractual o extracontractual estará estrictamente limitada a la suma total efectivamente pagada por el Usuario a FinoWork en el último mes de suscripción inmediatamente anterior al hecho que dio origen al reclamo.
+        </p>
+
+        <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
+          12. Programa de Promotores de Calle
         </h2>
         <p>
           El programa de Promotores de FinoWork constituye una relación estrictamente comercial y mercantil basada en referidos. Bajo ninguna circunstancia crea una relación laboral, de dependencia, subordinación o sociedad entre el Promotor y FinoWork. FinoWork no retiene impuestos sobre comisiones, siendo la declaración y pago de estos responsabilidad exclusiva del Promotor.
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          8. Modificaciones a los Términos
+          13. Legislación Aplicable y Resolución de Controversias
+        </h2>
+        <p>
+          Los presentes Términos se rigen e interpretan conforme a las leyes de la República Bolivariana de Venezuela. Cualquier controversia, desacuerdo o reclamación derivada de la prestación del servicio se procurará resolver en primera instancia mediante negociación amistosa y de buena fe entre las partes. En caso de no alcanzarse un acuerdo, las partes se someten a la jurisdicción de los tribunales competentes de la sede de operaciones de FinoWork.
+        </p>
+
+        <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
+          14. Modificaciones a los Términos
         </h2>
         <p>
           FinoWork se reserva el derecho de actualizar los presentes Términos periódicamente para reflejar mejoras operativas o exigencias legales. Cualquier cambio sustancial será notificado oportunamente a través de la interfaz del sistema o por correo electrónico.
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          9. Contacto y Soporte
+          15. Contacto y Soporte
         </h2>
         <p style={{ margin: 0 }}>
           Para cualquier duda, aclaratoria o soporte relacionado con estos Términos, comuníquese con el canal oficial de atención a través de nuestro soporte por WhatsApp o al correo de soporte de la plataforma.
