@@ -38,6 +38,7 @@ import {
   copyOutline,
   refreshOutline,
   checkmarkDoneOutline,
+  searchOutline,
 } from 'ionicons/icons';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
@@ -135,7 +136,86 @@ const PublicStore: React.FC = () => {
   const [liveOrderStatus, setLiveOrderStatus] = useState<string | null>(null);
   const [livePaymentStatus, setLivePaymentStatus] = useState<string>('PENDING');
 
+  // Track Order Modal state
+  const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
+  const [trackOrderCode, setTrackOrderCode] = useState('');
+  const [trackPhone, setTrackPhone] = useState('');
+  const [isTrackingLoading, setIsTrackingLoading] = useState(false);
+  const [trackError, setTrackError] = useState<string | null>(null);
+
   const getOrderStorageKey = (tid?: string) => `finowork_active_order_${tid || tenantId}`;
+
+  const handleTrackOrder = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanCode = trackOrderCode.trim();
+    const cleanPh = trackPhone.trim();
+
+    if (!cleanCode) {
+      setTrackError('Por favor ingresa tu código de pedido (ej: #3A4B5C6D)');
+      return;
+    }
+    if (!cleanPh) {
+      setTrackError('Por favor ingresa tu teléfono registrado (o los últimos 4 dígitos)');
+      return;
+    }
+
+    try {
+      setIsTrackingLoading(true);
+      setTrackError(null);
+      const res = await axios.post(`${apiBase}/public/store/tenant/${tenantId}/track`, {
+        orderCode: cleanCode,
+        phone: cleanPh,
+      });
+
+      if (res.data?.orderId || res.data?.id) {
+        const orderIdVal = res.data.orderId || res.data.id;
+        const fullOrder = {
+          ...res.data,
+          orderId: orderIdVal,
+          orderNumber: res.data.orderNumber || orderIdVal.slice(0, 8).toUpperCase(),
+          items: (res.data.items || []).map((it: any) => ({
+            quantity: it.quantity,
+            product: it.product || { name: 'Producto', salePrice: 0 },
+          })),
+          grandTotalUSD: Number(res.data.grandTotalUSD || res.data.totalAmount || 0),
+          grandTotalBs: Number(res.data.grandTotalBs || res.data.amountBs || 0),
+          deliveryFeeUSD: Number(res.data.deliveryFeeUSD || 0),
+          customerAddress: res.data.customerAddress || '',
+          customerCedula: res.data.customerCedula || res.data.identification || '',
+        };
+
+        setActiveOrderMini(fullOrder);
+        try {
+          localStorage.setItem(getOrderStorageKey(), JSON.stringify(fullOrder));
+        } catch (err) {}
+
+        setOrderResult(fullOrder);
+        setLiveOrderStatus(fullOrder.status);
+        setLivePaymentStatus(fullOrder.paymentStatus || 'PENDING');
+
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.set('orderId', orderIdVal);
+          window.history.replaceState({}, '', url.toString());
+        } catch (err) {}
+
+        setIsTrackModalOpen(false);
+        setTrackOrderCode('');
+        setTrackPhone('');
+        presentToast({
+          message: `¡Pedido #${fullOrder.orderNumber} localizado con éxito!`,
+          duration: 3000,
+          color: 'success',
+          position: 'top',
+        });
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'No se encontró ningún pedido con esos datos o el teléfono no coincide.';
+      setTrackError(msg);
+    } finally {
+      setIsTrackingLoading(false);
+    }
+  };
 
   const loadOrderDetails = async (orderId: string, showConfirmationScreen: boolean = true) => {
     try {
@@ -1046,6 +1126,17 @@ const PublicStore: React.FC = () => {
         <IonToolbar style={{ ['--background' as any]: headerColor, color: '#fff' }}>
           <IonTitle style={{ fontWeight: 'bold' }}>{storeData?.tenant?.name || 'Tienda Online'}</IonTitle>
           <IonButtons slot="end">
+            <IonButton
+              fill="clear"
+              onClick={() => {
+                setTrackError(null);
+                setIsTrackModalOpen(true);
+              }}
+              title="Rastrear mi pedido"
+              style={{ color: '#fff' }}
+            >
+              <IonIcon slot="icon-only" icon={searchOutline} style={{ fontSize: '1.45rem' }} />
+            </IonButton>
             {storeData?.settings?.companyPhone && (
               <IonButton
                 fill="clear"
@@ -1192,9 +1283,36 @@ const PublicStore: React.FC = () => {
               Catálogo de productos disponibles para retiro o delivery
             </p>
           </div>
-          <IonBadge color="light" style={{ fontSize: '0.95rem', padding: '8px 12px', border: '1px solid #cbd5e1' }}>
-            Tasa BCV: <b>Bs. {exchangeRate.toFixed(2)}</b>
-          </IonBadge>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <IonBadge color="light" style={{ fontSize: '0.95rem', padding: '8px 12px', border: '1px solid #cbd5e1' }}>
+              Tasa BCV: <b>Bs. {exchangeRate.toFixed(2)}</b>
+            </IonBadge>
+            <button
+              type="button"
+              onClick={() => {
+                setTrackError(null);
+                setIsTrackModalOpen(true);
+              }}
+              style={{
+                backgroundColor: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                padding: '7px 12px',
+                fontSize: '0.84rem',
+                fontWeight: 700,
+                color: '#1e293b',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+            >
+              <span>🔍</span> Rastrear Pedido
+            </button>
+          </div>
         </div>
 
         {/* Navigation Switcher if Business has both Store & Booking */}
@@ -2163,6 +2281,194 @@ const PublicStore: React.FC = () => {
                 </IonButton>
               </div>
             )}
+          </IonContent>
+        </IonModal>
+
+        {/* Modal de Rastrear Pedido */}
+        <IonModal
+          isOpen={isTrackModalOpen}
+          onDidDismiss={() => {
+            setIsTrackModalOpen(false);
+            setTrackError(null);
+          }}
+        >
+          <IonHeader>
+            <IonToolbar style={{ ['--background' as any]: headerColor, color: '#fff' }}>
+              <IonTitle style={{ fontWeight: 'bold' }}>🔍 Rastrear mi Pedido</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setIsTrackModalOpen(false)} style={{ color: '#fff' }}>
+                  <IonIcon icon={closeOutline} />
+                </IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding" style={{ ['--background' as any]: '#f8fafc' }}>
+            <div style={{ maxWidth: '480px', margin: '20px auto 40px auto' }}>
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '16px',
+                  padding: '24px 20px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                }}
+              >
+                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                  <div
+                    style={{
+                      width: '54px',
+                      height: '54px',
+                      borderRadius: '50%',
+                      backgroundColor: '#ecfdf5',
+                      color: '#10b981',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '26px',
+                      marginBottom: '10px',
+                    }}
+                  >
+                    📡
+                  </div>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 6px 0', color: '#0f172a' }}>
+                    Consulta el Estado de tu Pedido
+                  </h2>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+                    Ingresa el código que recibiste al comprar y tu número de teléfono para validar tu identidad.
+                  </p>
+                </div>
+
+                {trackError && (
+                  <div
+                    style={{
+                      backgroundColor: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      color: '#991b1b',
+                      borderRadius: '10px',
+                      padding: '12px 14px',
+                      fontSize: '0.85rem',
+                      marginBottom: '18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <span>⚠️</span>
+                    <span>{trackError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleTrackOrder}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        color: '#1e293b',
+                        marginBottom: '6px',
+                      }}
+                    >
+                      Código de Pedido:
+                    </label>
+                    <input
+                      type="text"
+                      value={trackOrderCode}
+                      onChange={(e) => {
+                        setTrackOrderCode(e.target.value.toUpperCase());
+                        if (trackError) setTrackError(null);
+                      }}
+                      placeholder="Ejemplo: #3A4B5C6D"
+                      style={{
+                        width: '100%',
+                        height: '42px',
+                        padding: '0 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        backgroundColor: '#ffffff',
+                        fontSize: '0.95rem',
+                        fontWeight: 600,
+                        color: '#0f172a',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        boxSizing: 'border-box',
+                        outline: 'none',
+                      }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                      Los 8 caracteres de tu comprobante o WhatsApp (ej. 3A4B5C6D).
+                    </span>
+                  </div>
+
+                  <div style={{ marginBottom: '22px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        color: '#1e293b',
+                        marginBottom: '6px',
+                      }}
+                    >
+                      Teléfono Registrado:
+                    </label>
+                    <input
+                      type="tel"
+                      value={trackPhone}
+                      onChange={(e) => {
+                        setTrackPhone(e.target.value);
+                        if (trackError) setTrackError(null);
+                      }}
+                      placeholder="Ej: 04121234567 o últimos 4 dígitos"
+                      style={{
+                        width: '100%',
+                        height: '42px',
+                        padding: '0 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        backgroundColor: '#ffffff',
+                        fontSize: '0.95rem',
+                        color: '#0f172a',
+                        boxSizing: 'border-box',
+                        outline: 'none',
+                      }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                      🔒 Candado de seguridad: solo tú puedes ver el estado de tu pedido.
+                    </span>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isTrackingLoading}
+                    style={{
+                      width: '100%',
+                      height: '46px',
+                      borderRadius: '10px',
+                      backgroundColor: '#10b981',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '0.95rem',
+                      fontWeight: 700,
+                      cursor: isTrackingLoading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)',
+                    }}
+                  >
+                    {isTrackingLoading ? (
+                      <IonSpinner name="crescent" color="light" style={{ width: '22px', height: '22px' }} />
+                    ) : (
+                      <>
+                        <span>Consultar Estado</span> ↗
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
           </IonContent>
         </IonModal>
       </IonContent>

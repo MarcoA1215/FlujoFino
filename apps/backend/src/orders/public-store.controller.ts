@@ -356,13 +356,82 @@ export class PublicStoreController {
 
   @Get('order/:orderId')
   async getPublicOrderStatus(@Param('orderId') orderId: string) {
-    const order = await this.orderRepo.findOne({
+    let order = await this.orderRepo.findOne({
       where: { id: orderId },
       relations: { items: { product: true } },
     });
+
+    if (!order) {
+      const clean = orderId.trim().replace(/^#/, '').toLowerCase();
+      if (clean.length >= 6) {
+        order = await this.orderRepo
+          .createQueryBuilder('order')
+          .leftJoinAndSelect('order.items', 'items')
+          .leftJoinAndSelect('items.product', 'product')
+          .where('LOWER(order.id) LIKE :prefix', { prefix: `${clean}%` })
+          .orderBy('order.createdAt', 'DESC')
+          .getOne();
+      }
+    }
+
     if (!order) {
       throw new NotFoundException('Pedido no encontrado');
     }
+
+    return this.formatOrderResponse(order);
+  }
+
+  @Throttle({ default: { limit: 6, ttl: 60000 } })
+  @Post('tenant/:id/track')
+  async trackOrder(
+    @Param('id') token: string,
+    @Body() body: { orderCode?: string; phone?: string }
+  ) {
+    let tenantId: string;
+    try {
+      tenantId = decodeTenantId(token);
+    } catch {
+      throw new NotFoundException('Tienda no encontrada');
+    }
+
+    const cleanCode = (body.orderCode || '').trim().replace(/^#/, '').toLowerCase();
+    const cleanPhone = (body.phone || '').trim().replace(/\D/g, '');
+
+    if (!cleanCode || cleanCode.length < 6) {
+      throw new BadRequestException('Ingresa un código de pedido válido de al menos 6 u 8 caracteres (ej: #A1B2C3D4)');
+    }
+
+    if (!cleanPhone || cleanPhone.length < 4) {
+      throw new BadRequestException('Ingresa el número de teléfono (o los últimos 4 dígitos) registrado en la orden para verificar tu identidad');
+    }
+
+    const order = await this.orderRepo
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.items', 'items')
+      .leftJoinAndSelect('items.product', 'product')
+      .where('order.tenantId = :tenantId', { tenantId })
+      .andWhere('LOWER(order.id) LIKE :prefix', { prefix: `${cleanCode}%` })
+      .orderBy('order.createdAt', 'DESC')
+      .getOne();
+
+    if (!order) {
+      throw new NotFoundException('No encontramos ningún pedido con ese código en esta tienda.');
+    }
+
+    const orderPhoneDigits = (order.customerPhone || '').replace(/\D/g, '');
+    const matchesPhone =
+      orderPhoneDigits.endsWith(cleanPhone) ||
+      orderPhoneDigits.includes(cleanPhone) ||
+      cleanPhone.endsWith(orderPhoneDigits);
+
+    if (!matchesPhone) {
+      throw new NotFoundException('El número de teléfono no coincide con el registrado en este pedido.');
+    }
+
+    return this.formatOrderResponse(order);
+  }
+
+  private formatOrderResponse(order: Order) {
     return {
       id: order.id,
       orderId: order.id,
