@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   IonModal,
   IonHeader,
@@ -11,8 +11,10 @@ import {
   IonSpinner,
   useIonToast
 } from '@ionic/react';
-import { closeOutline, logoWhatsapp, refreshOutline, walletOutline, cardOutline, phonePortraitOutline } from 'ionicons/icons';
+import { closeOutline, logoWhatsapp, refreshOutline, walletOutline, cardOutline, phonePortraitOutline, swapHorizontalOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
+import { BuyUsdModal } from './BuyUsdModal';
+import type { TreasurySummary } from '../types';
 
 interface DailyCashCloseModalProps {
   isOpen: boolean;
@@ -22,6 +24,7 @@ interface DailyCashCloseModalProps {
 export const DailyCashCloseModal: React.FC<DailyCashCloseModalProps> = ({ isOpen, onClose }) => {
   const [cashSummary, setCashSummary] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [showBuyUsdModal, setShowBuyUsdModal] = useState(false);
   const [presentToast] = useIonToast();
 
   const fetchDailySummary = async () => {
@@ -42,6 +45,29 @@ export const DailyCashCloseModal: React.FC<DailyCashCloseModalProps> = ({ isOpen
       fetchDailySummary();
     }
   }, [isOpen]);
+
+  const treasuryFromDaily: TreasurySummary = useMemo(() => {
+    const netCash = Number(cashSummary?.netCashUSD !== undefined ? cashSummary.netCashUSD : ((cashSummary?.totalCashUSD || 0) - (cashSummary?.totalCashChangeUSD || 0) - (cashSummary?.totalCashExpensesUSD || 0)));
+    const punto = Number(cashSummary?.totalPuntoBs || 0);
+    const pm = Number(cashSummary?.totalPagoMovilBs || 0);
+    const pmChange = Number(cashSummary?.totalPagoMovilChangeBs || 0);
+    const bankBs = Math.max(0, punto + pm - pmChange);
+    const rate = Number(cashSummary?.exchangeRate || 40.0);
+
+    return {
+      cashUSD: netCash,
+      bankBs,
+      puntoBs: punto,
+      pagoMovilBs: pm,
+      transferBs: 0,
+      exchangeRate: rate,
+      currencySymbol: cashSummary?.currencySymbol || 'Bs.',
+      bankBsEquivalentUSD: rate > 0 ? Number((bankBs / rate).toFixed(2)) : 0,
+      totalRealUSD: Number((netCash + (rate > 0 ? bankBs / rate : 0)).toFixed(2)),
+      totalExchangedUSD: 0,
+      totalExchangedBs: 0,
+    };
+  }, [cashSummary]);
 
   const copyCashReportToWhatsApp = () => {
     if (!cashSummary) return;
@@ -191,6 +217,33 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
                 </div>
               </div>
 
+              {/* Botón Comprar USD / Cambiar Bolívares a Divisas */}
+              <div style={{ marginBottom: '14px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowBuyUsdModal(true)}
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#ECFDF5',
+                    color: '#047857',
+                    border: '1.5px solid #10B981',
+                    borderRadius: '12px',
+                    padding: '11px 16px',
+                    fontSize: '13px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.1)',
+                  }}
+                >
+                  <IonIcon icon={swapHorizontalOutline} style={{ fontSize: '18px' }} />
+                  <span>Comprar USD / Proteger Bolívares en Divisas</span>
+                </button>
+              </div>
+
               {/* Sección de Egresos y Vales de Caja */}
               {Number(cashSummary.totalCashExpensesUSD || 0) > 0 && (
                 <div style={{ background: '#FEF2F2', borderRadius: '16px', border: '1px solid #FECACA', padding: '14px 16px', marginBottom: '14px' }}>
@@ -314,6 +367,13 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
           )}
         </div>
       </IonContent>
+
+      <BuyUsdModal
+        isOpen={showBuyUsdModal}
+        onClose={() => setShowBuyUsdModal(false)}
+        treasury={treasuryFromDaily}
+        onSuccess={fetchDailySummary}
+      />
     </IonModal>
   );
 };

@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Request, UseGuards } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -13,6 +13,23 @@ export class DashboardController {
   @Roles(UserRole.ADMIN)
   getSummary(@Request() req: any) {
     return this.dashboardService.getSummary(req.user.tenantId);
+  }
+
+  @Get('treasury')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  getTreasury(@Request() req: any) {
+    return this.dashboardService.getTreasurySummary(req.user.tenantId);
+  }
+
+  @Post('buy-usd')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  buyUsd(
+    @Request() req: any,
+    @Body() dto: { amountBs: number; amountUSD: number; notes?: string; destination?: string }
+  ) {
+    return this.dashboardService.buyUsd(req.user.tenantId, dto);
   }
 }
 

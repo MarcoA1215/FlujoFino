@@ -48,6 +48,7 @@ import { SalaryAdvance } from './entities/salary-advance.entity';
 import { Investment } from './entities/investment.entity';
 import { Promoter } from './entities/promoter.entity';
 import { PromoterCommission } from './entities/promoter-commission.entity';
+import { CashExchange } from './entities/cash-exchange.entity';
 import { SuperAdminModule } from './superadmin/superadmin.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SalaryAdvancesModule } from './salary-advances/salary-advances.module';
@@ -75,7 +76,7 @@ import { SentryModule } from '@sentry/nestjs/setup';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
-        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription, SalaryAdvance, Investment, Promoter, PromoterCommission],
+        entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription, SalaryAdvance, Investment, Promoter, PromoterCommission, CashExchange],
         synchronize: configService.get<string>('DB_SYNCHRONIZE') !== undefined
           ? configService.get<string>('DB_SYNCHRONIZE') === 'true'
           : true,

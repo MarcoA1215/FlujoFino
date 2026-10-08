@@ -113,6 +113,31 @@ export type DashboardSummary = {
   totalExternalInvestment?: number;
   totalConsolidatedReinvestment?: number;
   payrollExpenses?: number;
+  treasury?: TreasurySummary;
+};
+
+export type TreasurySummary = {
+  cashUSD: number;
+  bankBs: number;
+  puntoBs: number;
+  pagoMovilBs: number;
+  transferBs: number;
+  exchangeRate: number;
+  currencySymbol: string;
+  bankBsEquivalentUSD: number;
+  totalRealUSD: number;
+  totalExchangedUSD: number;
+  totalExchangedBs: number;
+  exchangeHistory?: Array<{
+    id: string;
+    amountBs: number;
+    amountUSD: number;
+    exchangeRate: number;
+    operationType: string;
+    destination?: string;
+    notes?: string;
+    createdAt: string;
+  }>;
 };
 
 

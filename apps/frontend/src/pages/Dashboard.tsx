@@ -16,7 +16,8 @@ import {
   alertCircleOutline,
   calendarOutline,
   peopleOutline,
-  cardOutline
+  cardOutline,
+  swapHorizontalOutline,
 } from 'ionicons/icons';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { apiClient } from '../api/client';
@@ -24,6 +25,7 @@ import { AuthContext } from '../context/AuthContext';
 import type { DashboardSummary } from '../types';
 import AppHeader from '../components/AppHeader';
 import InvestmentModal from '../components/InvestmentModal';
+import { BuyUsdModal } from '../components/BuyUsdModal';
 
 const Dashboard: React.FC = () => {
   const { user } = useContext(AuthContext);
@@ -31,6 +33,7 @@ const Dashboard: React.FC = () => {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [settings, setSettings] = useState<any>({});
   const [showInvestmentModal, setShowInvestmentModal] = useState(false);
+  const [showBuyUsdModal, setShowBuyUsdModal] = useState(false);
   const [presentToast] = useIonToast();
 
   const fetchSummary = async () => {
@@ -144,6 +147,136 @@ const Dashboard: React.FC = () => {
             </div>
           ) : (
             <div>
+              {/* Sección de Tesorería y Fondos Reales */}
+              {summary.treasury && (
+                <div
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '16px',
+                    border: '1px solid #E2E8F0',
+                    padding: '16px 18px',
+                    marginBottom: '20px',
+                    boxShadow: 'var(--ff-shadow-sm)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>🏛️</span> Tesorería y Fondos Reales
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748B' }}>
+                        Dinero exacto disponible en cada cuenta sin distorsión por la tasa
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowBuyUsdModal(true)}
+                      style={{
+                        backgroundColor: '#10B981',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '10px',
+                        padding: '8px 14px',
+                        fontSize: '12px',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)',
+                      }}
+                    >
+                      <IonIcon icon={swapHorizontalOutline} style={{ fontSize: '16px' }} />
+                      <span>Comprar USD / Proteger Bs</span>
+                    </button>
+                  </div>
+
+                  {/* Las dos cajas reales: USD Efectivo vs Bancos Bolívares */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+                    {/* Gaveta Efectivo USD */}
+                    <div
+                      style={{
+                        backgroundColor: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '12px',
+                        padding: '14px 16px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          💵 Gaveta Física (Efectivo USD)
+                        </div>
+                        <div style={{ fontSize: '22px', fontWeight: '900', color: '#047857', marginTop: '2px' }}>
+                          ${(summary.treasury.cashUSD || 0).toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+                          Billetes reales en caja
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '10px',
+                          backgroundColor: '#ECFDF5',
+                          color: '#10B981',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '20px',
+                        }}
+                      >
+                        💵
+                      </div>
+                    </div>
+
+                    {/* Bancos Bolívares */}
+                    <div
+                      style={{
+                        backgroundColor: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '12px',
+                        padding: '14px 16px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          🏦 Bancos (Punto + Pago Móvil)
+                        </div>
+                        <div style={{ fontSize: '22px', fontWeight: '900', color: '#0F172A', marginTop: '2px' }}>
+                          {summary.treasury.currencySymbol || 'Bs.'} {Number(summary.treasury.bankBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+                          Equiv. al cambio: <b>${(summary.treasury.bankBsEquivalentUSD || 0).toFixed(2)}</b> (Tasa {Number(summary.treasury.exchangeRate || 0).toFixed(2)})
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '10px',
+                          backgroundColor: '#EFF6FF',
+                          color: '#3B82F6',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '20px',
+                        }}
+                      >
+                        🏦
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Main KPIs (Cards) */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '20px' }}>
                 
@@ -385,6 +518,13 @@ const Dashboard: React.FC = () => {
         onClose={() => setShowInvestmentModal(false)}
         onSuccess={() => fetchSummary()}
         defaultExchangeRate={settings?.exchangeRateBs}
+      />
+
+      <BuyUsdModal
+        isOpen={showBuyUsdModal}
+        onClose={() => setShowBuyUsdModal(false)}
+        treasury={summary?.treasury || null}
+        onSuccess={() => fetchSummary()}
       />
     </IonPage>
   );
