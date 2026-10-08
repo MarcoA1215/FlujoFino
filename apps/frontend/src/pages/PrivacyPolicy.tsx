@@ -70,6 +70,9 @@ export const PrivacyContent: React.FC = () => {
         <p>
           <strong>FinoWork no vende, no alquila y no comparte bases de datos con terceros con fines publicitarios, mercadológicos o comerciales bajo ninguna circunstancia.</strong> Los datos de sus ventas y clientes son de estricta titularidad de su negocio.
         </p>
+        <p>
+          <strong>Excepción de Infraestructura:</strong> FinoWork utiliza proveedores de infraestructura en la nube de terceros (ej. servidores web, bases de datos, envío de correos) estrictamente para alojar y operar la plataforma. Estos proveedores procesan la información bajo protocolos de seguridad y acuerdos de confidencialidad, sin adquirir derechos de propiedad ni autorización para usar los datos con fines publicitarios ajenos al servicio.
+        </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
           5. Seguridad y Almacenamiento
@@ -88,6 +91,12 @@ export const PrivacyContent: React.FC = () => {
         </h2>
         <p>
           El Usuario titular de la cuenta tiene derecho a consultar, rectificar o solicitar la exportación o supresión definitiva de los datos de su negocio en cualquier momento mediante solicitud formal a nuestro equipo de soporte.
+        </p>
+        <p>
+          Dado que FinoWork actúa como procesador técnico, si un cliente final de un Negocio (comprador) solicita la eliminación de sus datos, FinoWork redirigirá dicha solicitud al titular del Comercio correspondiente para que este ejecute la acción desde su panel administrativo.
+        </p>
+        <p>
+          En caso de que el Usuario solicite la supresión definitiva de su cuenta, los datos activos serán eliminados inmediatamente del sistema de producción. Sin embargo, copias residuales cifradas podrán permanecer en nuestras copias de seguridad automatizadas (backups) por un período máximo de 30 días con fines de recuperación ante desastres, tras lo cual serán destruidas irreversiblemente.
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>

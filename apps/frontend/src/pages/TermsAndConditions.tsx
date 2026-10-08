@@ -71,6 +71,9 @@ export const TermsContent: React.FC = () => {
         <p>
           FinoWork ofrece 15 días de prueba gratuita para garantizar que el sistema se adapta a las necesidades del Comercio. Por consiguiente, una vez procesado el pago de la suscripción mensual o anual, no se emitirán reembolsos parciales ni totales por cancelación anticipada o falta de uso del sistema.
         </p>
+        <p>
+          FinoWork se reserva el derecho de modificar las tarifas de suscripción (actualmente $20 USD). Cualquier cambio en las tarifas será notificado al Usuario con al menos treinta (30) días de anticipación y aplicará a partir de su siguiente ciclo de facturación.
+        </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
           4. Propiedad Intelectual, Código Fuente y Titularidad Exclusiva
@@ -141,7 +144,7 @@ export const TermsContent: React.FC = () => {
           El titular del Comercio es enteramente responsable de mantener la confidencialidad de las cuentas y credenciales de acceso creadas para sus cajeros, cocineros, repartidores y administradores. Cualquier operación efectuada con sus credenciales se presumirá realizada por personal autorizado del Comercio.
         </p>
         <p>
-          Queda expresamente prohibido ejecutar pruebas de penetración no autorizadas, ataques de denegación de servicio (DDoS), inyecciones de código, extracción automatizada masiva (scraping) o cualquier acción técnica que sobrecargue o vulnere los servidores o redes de FinoWork.
+          Queda expresamente prohibido ejecutar pruebas de penetración no autorizadas, ataques de denegación de servicio (DDoS), inyecciones de código, extracción automatizada masiva (scraping) o cualquier acción técnica que sobrecargue o vulnere los servidores o redes de FinoWork. El incumplimiento de esta cláusula será causal de rescisión inmediata del contrato y cierre definitivo de la cuenta sin derecho a reembolso, reservándose FinoWork el derecho a ejercer las acciones legales correspondientes.
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
@@ -182,14 +185,14 @@ export const TermsContent: React.FC = () => {
           13. Legislación Aplicable y Resolución de Controversias
         </h2>
         <p>
-          Los presentes Términos se rigen e interpretan conforme a las leyes de la República Bolivariana de Venezuela. Cualquier controversia, desacuerdo o reclamación derivada de la prestación del servicio se procurará resolver en primera instancia mediante negociación amistosa y de buena fe entre las partes. En caso de no alcanzarse un acuerdo, las partes se someten a la jurisdicción de los tribunales competentes de la sede de operaciones de FinoWork.
+          Los presentes Términos se rigen e interpretan conforme a las leyes de la República Bolivariana de Venezuela. Cualquier controversia, desacuerdo o reclamación derivada de la prestación del servicio se procurará resolver en primera instancia mediante negociación amistosa y de buena fe entre las partes. En caso de no alcanzarse un acuerdo, las partes se someten a la jurisdicción de los tribunales competentes de la ciudad de Barinas, Estado Barinas, Venezuela.
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
           14. Modificaciones a los Términos
         </h2>
         <p>
-          FinoWork se reserva el derecho de actualizar los presentes Términos periódicamente para reflejar mejoras operativas o exigencias legales. Cualquier cambio sustancial será notificado oportunamente a través de la interfaz del sistema o por correo electrónico.
+          FinoWork se reserva el derecho de actualizar los presentes Términos periódicamente para reflejar mejoras operativas o exigencias legales. Cualquier cambio sustancial en los términos o en las tarifas de suscripción será notificado oportunamente a través de la interfaz del sistema o por correo electrónico con al menos treinta (30) días de anticipación.
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
