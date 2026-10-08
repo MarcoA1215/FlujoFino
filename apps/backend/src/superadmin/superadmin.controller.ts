@@ -15,6 +15,7 @@ import { UpdateTenantPlanDto } from './dto/update-tenant-plan.dto';
 import { ReportPaymentDto } from './dto/report-payment.dto';
 import { UpdatePlatformConfigDto } from './dto/update-platform-config.dto';
 import { CreatePromoterDto } from './dto/create-promoter.dto';
+import { UpdateSuperAdminProfileDto } from './dto/update-superadmin-profile.dto';
 
 @Controller('superadmin')
 export class SuperAdminController {
@@ -115,6 +116,21 @@ export class SuperAdminController {
     @Body('paymentReference') paymentReference: string,
   ) {
     return await this.superadminService.payPromoterCommission(id, paymentReference);
+  }
+
+  @Get('profile')
+  @UseGuards(SuperAdminGuard)
+  async getProfile(@Req() req: any) {
+    return await this.superadminService.getSuperAdminProfile(req.user.id);
+  }
+
+  @Patch('profile')
+  @UseGuards(SuperAdminGuard)
+  async updateProfile(
+    @Req() req: any,
+    @Body() body: UpdateSuperAdminProfileDto,
+  ) {
+    return await this.superadminService.updateSuperAdminProfile(req.user.id, body);
   }
 }
 

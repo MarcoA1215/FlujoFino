@@ -49,6 +49,8 @@ import {
   medalOutline,
   checkmarkDoneOutline,
   personAddOutline,
+  keyOutline,
+  lockClosedOutline,
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import {
@@ -133,15 +135,27 @@ const SuperAdminDashboard: React.FC = () => {
   const [rejectPaymentId, setRejectPaymentId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState<string>('');
 
+  // SuperAdmin Profile & Security
+  const [superAdminProfile, setSuperAdminProfile] = useState<{ username: string; email: string; name?: string }>({
+    username: '',
+    email: '',
+    name: '',
+  });
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+
   const loadData = async () => {
     try {
       setLoading(true);
-      const [tenantsRes, paymentsRes, supportRes, configRes, promotersRes] = await Promise.all([
+      const [tenantsRes, paymentsRes, supportRes, configRes, promotersRes, profileRes] = await Promise.all([
         apiClient.get<SuperAdminTenantDTO[]>('/superadmin/tenants'),
         apiClient.get<SaaSPaymentReportDTO[]>('/superadmin/payments'),
         apiClient.get<any[]>('/feedback/platform'),
         apiClient.get<PlatformConfigDTO>('/superadmin/platform-config'),
         apiClient.get<SuperAdminPromoterDTO[]>('/superadmin/promoters').catch(() => ({ data: [] })),
+        apiClient.get<any>('/superadmin/profile').catch(() => ({ data: null })),
       ]);
       setTenants(tenantsRes.data || []);
       setPendingPayments(paymentsRes.data || []);
@@ -149,6 +163,13 @@ const SuperAdminDashboard: React.FC = () => {
       setPromoters(promotersRes.data || []);
       if (configRes.data) {
         setPlatformConfig(configRes.data);
+      }
+      if (profileRes?.data) {
+        setSuperAdminProfile({
+          username: profileRes.data.username || '',
+          email: profileRes.data.email || '',
+          name: profileRes.data.name || '',
+        });
       }
     } catch (err: any) {
       presentToast({
@@ -283,6 +304,54 @@ const SuperAdminDashboard: React.FC = () => {
       });
     } finally {
       setIsSavingConfig(false);
+    }
+  };
+
+  const handleUpdateSuperAdminProfile = async () => {
+    if (!superAdminProfile.email || !superAdminProfile.username) {
+      presentToast({ message: 'El correo y usuario son requeridos', duration: 3000, color: 'warning' });
+      return;
+    }
+    if (newPassword) {
+      if (newPassword.length < 6) {
+        presentToast({ message: 'La nueva contraseña debe tener al menos 6 caracteres', duration: 3000, color: 'warning' });
+        return;
+      }
+      if (newPassword !== confirmNewPassword) {
+        presentToast({ message: 'Las contraseñas nuevas no coinciden', duration: 3000, color: 'warning' });
+        return;
+      }
+      if (!currentPassword) {
+        presentToast({ message: 'Debes ingresar tu contraseña actual para confirmar el cambio', duration: 3000, color: 'warning' });
+        return;
+      }
+    }
+
+    try {
+      setIsUpdatingProfile(true);
+      const res = await apiClient.patch('/superadmin/profile', {
+        username: superAdminProfile.username,
+        email: superAdminProfile.email,
+        name: superAdminProfile.name,
+        currentPassword: currentPassword || undefined,
+        newPassword: newPassword || undefined,
+      });
+      presentToast({
+        message: res.data?.message || 'Credenciales de SuperAdmin actualizadas con éxito.',
+        duration: 3500,
+        color: 'success',
+      });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (err: any) {
+      presentToast({
+        message: 'Error al actualizar credenciales: ' + (err.response?.data?.message || err.message),
+        duration: 4000,
+        color: 'danger',
+      });
+    } finally {
+      setIsUpdatingProfile(false);
     }
   };
 
@@ -1320,6 +1389,182 @@ const SuperAdminDashboard: React.FC = () => {
                   </>
                 )}
               </IonButton>
+            </div>
+
+            {/* SECCIÓN SEGURIDAD Y CREDENCIALES DEL SUPERADMIN */}
+            <div style={{ background: '#ffffff', borderRadius: '16px', padding: '24px', marginTop: '28px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <IonIcon icon={shieldCheckmarkOutline} style={{ fontSize: '24px', color: '#10b981' }} />
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  Mi Cuenta y Seguridad SuperAdmin
+                </h3>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '13px', margin: '0 0 20px 0', lineHeight: '1.5' }}>
+                Actualiza tu correo de contacto oficial (puedes usar tu Gmail personal sin necesidad de dominio propio), tu nombre de usuario y tu contraseña de acceso a la plataforma.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                    Nombre del SuperAdmin
+                  </label>
+                  <input
+                    type="text"
+                    value={superAdminProfile.name || ''}
+                    onChange={(e) => setSuperAdminProfile({ ...superAdminProfile, name: e.target.value })}
+                    placeholder="Ej. Marco Ávila"
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      border: '1px solid #cbd5e1',
+                      background: '#f8fafc',
+                      fontSize: '14px',
+                      color: '#0f172a',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                    Usuario de Acceso *
+                  </label>
+                  <input
+                    type="text"
+                    value={superAdminProfile.username}
+                    onChange={(e) => setSuperAdminProfile({ ...superAdminProfile, username: e.target.value })}
+                    placeholder="superadmin"
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      border: '1px solid #cbd5e1',
+                      background: '#f8fafc',
+                      fontSize: '14px',
+                      color: '#0f172a',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                    Correo Electrónico Oficial (Gmail / Personal) *
+                  </label>
+                  <input
+                    type="email"
+                    value={superAdminProfile.email}
+                    onChange={(e) => setSuperAdminProfile({ ...superAdminProfile, email: e.target.value })}
+                    placeholder="tu_correo@gmail.com"
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      border: '1px solid #cbd5e1',
+                      background: '#f8fafc',
+                      fontSize: '14px',
+                      color: '#0f172a',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                    💡 Con este correo podrás iniciar sesión directamente como SuperAdmin de la plataforma.
+                  </span>
+                </div>
+              </div>
+
+              {/* CAMBIO DE CONTRASEÑA */}
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#1e293b', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <IonIcon icon={keyOutline} style={{ color: '#64748b' }} />
+                  Cambiar Contraseña (Opcional)
+                </h4>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px 0' }}>
+                  Deja estos campos en blanco si solo deseas actualizar tu correo o nombre.
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                      Contraseña Actual
+                    </label>
+                    <input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="••••••••"
+                      style={{
+                        width: '100%',
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        fontSize: '14px',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                      Nueva Contraseña
+                    </label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      style={{
+                        width: '100%',
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        fontSize: '14px',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                      Confirmar Nueva Contraseña
+                    </label>
+                    <input
+                      type="password"
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      placeholder="Repite la nueva contraseña"
+                      style={{
+                        width: '100%',
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        fontSize: '14px',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <IonButton
+                  className="ff-btn-primary"
+                  onClick={handleUpdateSuperAdminProfile}
+                  disabled={isUpdatingProfile}
+                  style={{ fontWeight: 800 }}
+                >
+                  {isUpdatingProfile ? <IonSpinner name="crescent" /> : (
+                    <>
+                      <IonIcon icon={lockClosedOutline} slot="start" />
+                      Guardar Mis Credenciales
+                    </>
+                  )}
+                </IonButton>
+              </div>
             </div>
           </div>
         )}

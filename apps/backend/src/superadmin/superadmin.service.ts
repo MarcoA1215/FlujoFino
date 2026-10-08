@@ -10,6 +10,7 @@ import { Promoter } from '../entities/promoter.entity';
 import { PromoterCommission } from '../entities/promoter-commission.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpdatePlatformConfigDto } from './dto/update-platform-config.dto';
+import { UpdateSuperAdminProfileDto } from './dto/update-superadmin-profile.dto';
 import * as bcrypt from 'bcryptjs';
 import {
   TenantPlanType,
@@ -980,6 +981,70 @@ export class SuperAdminService implements OnModuleInit {
       totalCommissionsUSD: 0,
       commissions: [],
       createdAt: savedPromoter.createdAt ? savedPromoter.createdAt.toISOString() : new Date().toISOString(),
+    };
+  }
+
+  async getSuperAdminProfile(userId: string) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    };
+  }
+
+  async updateSuperAdminProfile(userId: string, dto: UpdateSuperAdminProfileDto) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    if (dto.username && dto.username.trim() !== user.username) {
+      const cleanUsername = dto.username.trim().toLowerCase();
+      const existing = await this.userRepo.findOne({ where: { username: cleanUsername } });
+      if (existing && existing.id !== user.id) {
+        throw new BadRequestException('El nombre de usuario ya está en uso por otra cuenta');
+      }
+      user.username = cleanUsername;
+    }
+
+    if (dto.email && dto.email.trim() !== user.email) {
+      const cleanEmail = dto.email.trim().toLowerCase();
+      const existing = await this.userRepo.findOne({ where: { email: cleanEmail } });
+      if (existing && existing.id !== user.id) {
+        throw new BadRequestException('El correo electrónico ya está en uso por otra cuenta');
+      }
+      user.email = cleanEmail;
+    }
+
+    if (dto.name !== undefined) {
+      user.name = dto.name.trim();
+    }
+
+    if (dto.newPassword) {
+      if (!dto.currentPassword) {
+        throw new BadRequestException('Debes ingresar tu contraseña actual para confirmar el cambio');
+      }
+      const isMatch = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+      if (!isMatch) {
+        throw new BadRequestException('La contraseña actual es incorrecta');
+      }
+      user.passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    }
+
+    await this.userRepo.save(user);
+
+    return {
+      success: true,
+      message: 'Credenciales de SuperAdmin actualizadas correctamente',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
     };
   }
 }
