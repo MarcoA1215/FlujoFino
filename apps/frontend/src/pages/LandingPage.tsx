@@ -469,7 +469,7 @@ const LandingPage: React.FC = () => {
                   Citas y Reservaciones de Clientes
                 </h3>
                 <p style={{ fontSize: '14px', color: '#64748B', lineHeight: '1.5', margin: 0 }}>
-                  Agenda turnos, gestiona estilistas o especialistas, asigna tiempos de servicio y envía confirmaciones para barberías, spas o clínicas.
+                  Agenda turnos, gestiona especialistas o personal, asigna tiempos de servicio y ofrece enlace público de reserva para barberías, spas o consultorios.
                 </p>
               </div>
 
@@ -535,7 +535,7 @@ const LandingPage: React.FC = () => {
                   Reportes Financieros y Cierre de Caja
                 </h3>
                 <p style={{ fontSize: '14px', color: '#64748B', lineHeight: '1.5', margin: 0 }}>
-                  Cortes X y Z, control de turnos de cajeros, conciliación de pagos (efectivo, pago móvil, tarjeta) y márgenes de ganancia neta.
+                  Arqueo de caja diario, control de turnos de cajeros, conciliación de pagos (efectivo, pago móvil, transferencias) y balance de ventas.
                 </p>
               </div>
 
@@ -657,7 +657,7 @@ const LandingPage: React.FC = () => {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <IonIcon icon={checkmarkCircle} style={{ color: '#10B981', fontSize: '18px', flexShrink: 0 }} />
-                      <span>Gestión de Delivery y Comandas</span>
+                      <span>Gestión de Delivery y pantalla de Cocina</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <IonIcon icon={checkmarkCircle} style={{ color: '#10B981', fontSize: '18px', flexShrink: 0 }} />
