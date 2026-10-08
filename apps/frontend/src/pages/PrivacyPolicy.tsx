@@ -29,10 +29,13 @@ export const PrivacyContent: React.FC = () => {
 
       <div className="ff-card" style={{ background: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.04)', marginBottom: '24px' }}>
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', marginTop: 0 }}>
-          1. Compromiso de Confidencialidad
+          1. Responsable del Tratamiento y Compromiso de Confidencialidad
         </h2>
         <p>
-          En <strong>FinoWork</strong> respetamos y protegemos la privacidad de los negocios suscritos y de sus clientes finales. Esta Política de Privacidad describe cómo recolectamos, utilizamos, almacenamos y resguardamos la información cuando usted utiliza nuestra plataforma web, aplicación móvil Android y servicios asociados.
+          El responsable legal y técnico del tratamiento de los datos recopilados a través de la plataforma <strong>FinoWork</strong> (versión web y aplicación móvil Android) es <strong>Marco David Avila Pinto</strong>, titular de la Cédula de Identidad N° <strong>V-31.075.846</strong> (en adelante "el Responsable" o "FinoWork").
+        </p>
+        <p>
+          Respetamos y protegemos la privacidad de los negocios suscritos y de sus clientes finales. Esta Política de Privacidad describe de manera transparente cómo recolectamos, utilizamos, almacenamos y resguardamos la información comercial y operativa cuando usted utiliza nuestros servicios.
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
@@ -100,6 +103,10 @@ export const PrivacyContent: React.FC = () => {
         <p style={{ margin: 0 }}>
           Si tiene alguna inquietud respecto al tratamiento de sus datos o desea ejercer sus derechos de acceso, rectificación o supresión, comuníquese directamente con nuestro canal de atención oficial vía WhatsApp o a través del centro de soporte de FinoWork.
         </p>
+
+        <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
+          © 2026 Marco David Avila Pinto (C.I. V-31.075.846) • Todos los derechos reservados • Plataforma FinoWork
+        </div>
       </div>
     </div>
   );

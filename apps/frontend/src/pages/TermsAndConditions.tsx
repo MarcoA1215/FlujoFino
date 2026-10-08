@@ -29,10 +29,13 @@ export const TermsContent: React.FC = () => {
 
       <div className="ff-card" style={{ background: '#ffffff', borderRadius: '16px', padding: '28px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.04)', marginBottom: '24px' }}>
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', marginTop: 0 }}>
-          1. Aceptación de los Términos
+          1. Aceptación de los Términos y Partes Contratantes
         </h2>
         <p>
-          Al crear una cuenta, registrar su negocio o utilizar la plataforma <strong>FinoWork</strong> (en adelante "el Servicio" o "la Plataforma"), usted (en adelante "el Usuario" o "el Negocio") declara ser mayor de edad, tener la facultad legal para representar a su empresa o emprendimiento y acepta expresamente quedar vinculado por los presentes Términos y Condiciones, así como por nuestra Política de Privacidad.
+          Los presentes Términos y Condiciones regulan la relación contractual entre <strong>Marco David Avila Pinto</strong>, titular de la Cédula de Identidad N° <strong>V-31.075.846</strong>, actuando bajo la denominación comercial <strong>FinoWork</strong> (en adelante "el Prestador", "el Desarrollador" o "FinoWork"), y cualquier persona natural o jurídica que cree una cuenta, registre un negocio o utilice la plataforma web, aplicación móvil Android y servicios asociados (en adelante "el Usuario" o "el Negocio").
+        </p>
+        <p>
+          Al registrarse o acceder al Servicio, el Usuario declara ser mayor de edad, tener plena capacidad jurídica y legal para vincularse y representar a su comercio, y acepta expresamente quedar obligado por los presentes Términos y por nuestra Política de Privacidad.
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
@@ -70,21 +73,24 @@ export const TermsContent: React.FC = () => {
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          4. Propiedad Intelectual, Código Fuente y Prohibición de Ingeniería Inversa
+          4. Propiedad Intelectual, Código Fuente y Titularidad Exclusiva
         </h2>
         <p>
-          Todos los derechos de propiedad intelectual, marcas, logotipos, nombres comerciales (incluyendo la marca <strong>FinoWork</strong>), diseños de interfaz, arquitectura de software, bases de datos, código fuente, código objeto y el instalador APK (<strong>FinoWork.apk</strong>) son y seguirán siendo de la titularidad exclusiva y legítima de los creadores y desarrolladores de FinoWork.
+          Todos los derechos morales y patrimoniales de autor, propiedad intelectual, marcas, logotipos, nombres comerciales (incluyendo la marca comercial <strong>FinoWork</strong>), diseños de interfaz de usuario, esquemas de bases de datos, algoritmos, arquitectura de software, código fuente, código objeto y el instalador de la aplicación móvil (<strong>FinoWork.apk</strong>) son y seguirán siendo de la autoría y titularidad exclusiva y legítima de <strong>Marco David Avila Pinto (C.I. V-31.075.846)</strong>.
         </p>
         <p>
-          El pago de la suscripción mensual otorga únicamente una licencia temporal de uso bajo la modalidad SaaS. En ningún momento constituye una venta, cesión ni transferencia de derechos de autor ni de propiedad sobre el software. Queda expresamente prohibido al Usuario y a cualquier tercero:
+          Bajo ninguna circunstancia la contratación del servicio, el pago de cuotas de suscripción mensual ni el acceso temporal a la plataforma constituirá una venta, cesión, enajenación ni renuncia de derechos de autor ni de propiedad intelectual sobre el software. Ningún tercero, colaborador o cliente podrá arrogarse derechos de autoría, co-autoría, sociedad o explotación no autorizada sobre FinoWork.
+        </p>
+        <p>
+          Queda terminantemente prohibido al Usuario y a cualquier tercero:
         </p>
         <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
-          <li>Descompilar, desensamblar, desofuscar, realizar ingeniería inversa o intentar obtener el código fuente del software o del APK por cualquier medio.</li>
-          <li>Copiar, clonar, reproducir, sublicenciar, revender, arrendar o comercializar la plataforma o cualquiera de sus módulos a terceros.</li>
-          <li>Modificar, crear obras derivadas o suprimir avisos de derechos de autor, marcas registradas o leyendas de propiedad insertas en el sistema.</li>
+          <li>Descompilar, desensamblar, desofuscar, realizar ingeniería inversa o intentar extraer el código fuente del software web o del paquete instalador APK por cualquier medio tecnológico.</li>
+          <li>Copiar, clonar, reproducir, sublicenciar, revender, arrendar o explotar comercialmente la plataforma o cualquiera de sus módulos a terceros sin autorización escrita expresa del titular.</li>
+          <li>Modificar, crear obras derivadas o suprimir menciones de derechos de autor, marcas registradas o avisos legales de titularidad insertos en el sistema.</li>
         </ul>
         <p>
-          Cualquier sugerencia, idea, propuesta de funcionalidad o retroalimentación (feedback) que el Usuario proporcione para la mejora del sistema se considerará no confidencial y pasará a ser de propiedad exclusiva de FinoWork, sin que ello genere derecho a compensación económica, regalías o reclamo de co-autoría sobre las características implementadas.
+          Cualquier sugerencia, idea, propuesta de funcionalidad o retroalimentación (feedback) que el Usuario proporcione para la mejora del sistema se considerará no confidencial y pasará a ser de propiedad exclusiva de Marco David Avila Pinto / FinoWork, sin que ello genere derecho a compensación económica, regalías o reclamo de co-autoría sobre las características implementadas.
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
@@ -192,6 +198,10 @@ export const TermsContent: React.FC = () => {
         <p style={{ margin: 0 }}>
           Para cualquier duda, aclaratoria o soporte relacionado con estos Términos, comuníquese con el canal oficial de atención a través de nuestro soporte por WhatsApp o al correo de soporte de la plataforma.
         </p>
+
+        <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
+          © 2026 Marco David Avila Pinto (C.I. V-31.075.846) • Todos los derechos reservados • Plataforma FinoWork
+        </div>
       </div>
     </div>
   );
