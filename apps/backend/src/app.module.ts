@@ -78,7 +78,7 @@ import { SentryModule } from '@sentry/nestjs/setup';
         entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription, SalaryAdvance, Investment, Promoter, PromoterCommission],
         synchronize: configService.get<string>('DB_SYNCHRONIZE') !== undefined
           ? configService.get<string>('DB_SYNCHRONIZE') === 'true'
-          : configService.get<string>('NODE_ENV') !== 'production',
+          : true,
       }),
       inject: [ConfigService],
     }),
