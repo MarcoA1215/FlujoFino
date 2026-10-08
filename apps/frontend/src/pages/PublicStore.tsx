@@ -131,8 +131,56 @@ const PublicStore: React.FC = () => {
   // Submission & Tracking state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderResult, setOrderResult] = useState<any | null>(null);
+  const [activeOrderMini, setActiveOrderMini] = useState<any | null>(null);
   const [liveOrderStatus, setLiveOrderStatus] = useState<string | null>(null);
   const [livePaymentStatus, setLivePaymentStatus] = useState<string>('PENDING');
+
+  const getOrderStorageKey = (tid?: string) => `finowork_active_order_${tid || tenantId}`;
+
+  const loadOrderDetails = async (orderId: string, showConfirmationScreen: boolean = true) => {
+    try {
+      const res = await axios.get(`${apiBase}/public/store/order/${orderId}`);
+      if (res.data?.orderId || res.data?.id) {
+        const orderIdVal = res.data.orderId || res.data.id;
+        const fullOrder = {
+          ...res.data,
+          orderId: orderIdVal,
+          orderNumber: res.data.orderNumber || orderIdVal.slice(0, 8).toUpperCase(),
+          items: (res.data.items || []).map((it: any) => ({
+            quantity: it.quantity,
+            product: it.product || { name: 'Producto', salePrice: 0 },
+          })),
+          grandTotalUSD: Number(res.data.grandTotalUSD || res.data.totalAmount || 0),
+          grandTotalBs: Number(res.data.grandTotalBs || res.data.amountBs || 0),
+          deliveryFeeUSD: Number(res.data.deliveryFeeUSD || 0),
+          customerAddress: res.data.customerAddress || '',
+          customerCedula: res.data.customerCedula || res.data.identification || '',
+        };
+
+        setActiveOrderMini(fullOrder);
+        try {
+          localStorage.setItem(getOrderStorageKey(), JSON.stringify(fullOrder));
+        } catch (e) {}
+
+        if (showConfirmationScreen) {
+          setOrderResult(fullOrder);
+          setLiveOrderStatus(fullOrder.status);
+          setLivePaymentStatus(fullOrder.paymentStatus || 'PENDING');
+          try {
+            const url = new URL(window.location.href);
+            if (url.searchParams.get('orderId') !== orderIdVal) {
+              url.searchParams.set('orderId', orderIdVal);
+              window.history.replaceState({}, '', url.toString());
+            }
+          } catch (e) {}
+        }
+        return fullOrder;
+      }
+    } catch (err) {
+      console.warn('No se pudo cargar el pedido:', err);
+    }
+    return null;
+  };
 
   const fetchStore = async () => {
     try {
@@ -175,6 +223,26 @@ const PublicStore: React.FC = () => {
   useEffect(() => {
     if (tenantId) {
       fetchStore();
+
+      // Check if URL specifies orderId to restore confirmation view, or check localStorage
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlOrderId = urlParams.get('orderId');
+
+      if (urlOrderId) {
+        loadOrderDetails(urlOrderId, true);
+      } else {
+        try {
+          const saved = localStorage.getItem(getOrderStorageKey(tenantId));
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && (parsed.orderId || parsed.id)) {
+              const oid = parsed.orderId || parsed.id;
+              setActiveOrderMini(parsed);
+              loadOrderDetails(oid, false);
+            }
+          }
+        } catch (e) {}
+      }
     }
   }, [tenantId]);
 
@@ -211,6 +279,21 @@ const PublicStore: React.FC = () => {
 
         if (newPayStatus) {
           setLivePaymentStatus(newPayStatus);
+        }
+
+        if (res.data) {
+          setActiveOrderMini((prev: any) => {
+            const updated = {
+              ...prev,
+              ...res.data,
+              status: newStatus || prev?.status,
+              paymentStatus: newPayStatus || prev?.paymentStatus,
+            };
+            try {
+              localStorage.setItem(getOrderStorageKey(), JSON.stringify(updated));
+            } catch (e) {}
+            return updated;
+          });
         }
 
         if (newStatus && newStatus !== currentStatus) {
@@ -486,15 +569,38 @@ const PublicStore: React.FC = () => {
       };
 
       const res = await axios.post(`${apiBase}/public/store/tenant/${tenantId}/order`, payload);
-      setOrderResult({
+      const createdOrderData = {
         ...res.data,
-        items: [...cart],
+        orderId: res.data.orderId,
+        orderNumber: res.data.orderNumber,
+        items: cart.map((i) => ({
+          quantity: i.quantity,
+          product: {
+            id: i.product.id,
+            name: i.product.name,
+            salePrice: i.product.salePrice,
+          },
+        })),
         deliveryMethod,
         deliveryFeeUSD,
         grandTotalUSD,
         grandTotalBs,
         notes: finalNotes,
-      });
+        customerAddress: deliveryMethod === 'DELIVERY' ? customerAddress.trim() : '',
+        customerCedula: customerCedula.trim() || '',
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+      };
+
+      setOrderResult(createdOrderData);
+      setActiveOrderMini(createdOrderData);
+
+      try {
+        localStorage.setItem(getOrderStorageKey(), JSON.stringify(createdOrderData));
+        const url = new URL(window.location.href);
+        url.searchParams.set('orderId', res.data.orderId);
+        window.history.replaceState({}, '', url.toString());
+      } catch (e) {}
 
       // Save customer info in LocalStorage for next time
       try {
@@ -535,10 +641,13 @@ const PublicStore: React.FC = () => {
     if (!orderResult || !storeData) return;
     const isPreorder = orderResult.status === 'SOLICITUD_ENCARGO';
     const phone = storeData.settings?.companyPhone?.replace(/\D/g, '') || '';
+    const cedulaVal = orderResult.customerCedula || customerCedula.trim();
+    const addressVal = orderResult.customerAddress || customerAddress.trim();
+
     const lines = [
       isPreorder ? `📋 *SOLICITUD DE ENCARGO #${orderResult.orderNumber}*` : `🛍️ *COMPROBANTE DE PEDIDO #${orderResult.orderNumber}*`,
       `👤 *Cliente:* ${orderResult.customerName}`,
-      customerCedula.trim() ? `🪪 *Cédula:* ${customerCedula.trim()}` : '',
+      cedulaVal ? `🪪 *Cédula:* ${cedulaVal}` : '',
       `📞 *Teléfono:* ${orderResult.customerPhone}`,
       `📦 *Entrega:* ${orderResult.deliveryMethod === 'DELIVERY' ? '🛵 Delivery a Domicilio' : '🏪 Retiro en Tienda'}`,
     ].filter(Boolean);
@@ -549,30 +658,33 @@ const PublicStore: React.FC = () => {
       } catch (e) {}
     }
 
-    if (orderResult.deliveryMethod === 'DELIVERY' && customerAddress) {
-      lines.push(`📍 *Dirección:* ${customerAddress}`);
+    if (orderResult.deliveryMethod === 'DELIVERY' && addressVal) {
+      lines.push(`📍 *Dirección:* ${addressVal}`);
     }
 
     lines.push('', '🛒 *PRODUCTOS:*');
-    orderResult.items.forEach((item: CartItem) => {
-      lines.push(`• ${item.quantity}x ${item.product.name} - $${(item.product.salePrice * item.quantity).toFixed(2)}`);
+    (orderResult.items || []).forEach((item: any) => {
+      lines.push(`• ${item.quantity}x ${item.product?.name || 'Producto'} - $${((item.product?.salePrice || 0) * item.quantity).toFixed(2)}`);
     });
 
     if (orderResult.deliveryFeeUSD > 0) {
-      lines.push(`🛵 *Delivery:* $${orderResult.deliveryFeeUSD.toFixed(2)}`);
+      lines.push(`🛵 *Delivery:* $${Number(orderResult.deliveryFeeUSD).toFixed(2)}`);
     }
 
-    lines.push(
-      '',
-      `💵 *TOTAL:* $${orderResult.grandTotalUSD.toFixed(2)} / Bs. ${orderResult.grandTotalBs.toFixed(2)}`
-    );
+    const totalUSD = Number(orderResult.grandTotalUSD || 0).toFixed(2);
+    const totalBs = Number(orderResult.grandTotalBs || 0).toFixed(2);
+    lines.push('', `💵 *TOTAL:* $${totalUSD} / Bs. ${totalBs}`);
 
-    if (paymentOption === 'PAGO_MOVIL' && pagoMovilRef) {
-      lines.push(`📱 *Ref. Pago Móvil:* ${pagoMovilRef}${originBank ? ` (${originBank})` : ''}`);
-    } else if (paymentOption === 'TRANSFER' && transferRef) {
-      lines.push(`🏦 *Ref. Transferencia:* ${transferRef}${originBank ? ` (${originBank})` : ''}`);
-    } else if (paymentOption === 'BINANCE' && binanceRef) {
-      lines.push(`🟡 *ID Binance Pay:* ${binanceRef}`);
+    const refPM = orderResult.pagoMovilRef || pagoMovilRef;
+    const refTrans = orderResult.transferRef || transferRef;
+    const refBin = orderResult.binanceRef || binanceRef;
+
+    if (refPM) {
+      lines.push(`📱 *Ref. Pago Móvil:* ${refPM}${originBank ? ` (${originBank})` : ''}`);
+    } else if (refTrans) {
+      lines.push(`🏦 *Ref. Transferencia:* ${refTrans}${originBank ? ` (${originBank})` : ''}`);
+    } else if (refBin) {
+      lines.push(`🟡 *ID Binance Pay:* ${refBin}`);
     } else if (paymentOption === 'USD') {
       lines.push(`💵 *Método:* Efectivo Divisas (USD)`);
     } else if (paymentOption === 'WHATSAPP') {
@@ -828,10 +940,10 @@ const PublicStore: React.FC = () => {
                 <span style={{ color: '#64748b' }}>Cliente:</span>
                 <span style={{ fontWeight: '600' }}>{orderResult.customerName}</span>
               </div>
-              {customerCedula.trim() && (
+              {(orderResult.customerCedula || customerCedula.trim()) && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <span style={{ color: '#64748b' }}>Cédula:</span>
-                  <span style={{ fontWeight: '600' }}>{customerCedula.trim()}</span>
+                  <span style={{ fontWeight: '600' }}>{orderResult.customerCedula || customerCedula.trim()}</span>
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -844,6 +956,33 @@ const PublicStore: React.FC = () => {
                   {orderResult.deliveryMethod === 'DELIVERY' ? '🛵 Delivery a Domicilio' : '🏪 Retiro en Tienda'}
                 </span>
               </div>
+              {orderResult.deliveryMethod === 'DELIVERY' && (orderResult.customerAddress || customerAddress.trim()) && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ color: '#64748b' }}>Dirección:</span>
+                  <span style={{ fontWeight: '500', color: '#1e293b', textAlign: 'right', maxWidth: '65%' }}>
+                    {orderResult.customerAddress || customerAddress.trim()}
+                  </span>
+                </div>
+              )}
+              {orderResult.items && orderResult.items.length > 0 && (
+                <div style={{ borderTop: '1px dashed #e2e8f0', marginTop: '10px', paddingTop: '10px', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Productos Solicitados:
+                  </div>
+                  {orderResult.items.map((it: any, idx: number) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px', color: '#334155' }}>
+                      <span>{it.quantity}x {it.product?.name || 'Producto'}</span>
+                      <span style={{ fontWeight: 600 }}>${((it.product?.salePrice || 0) * it.quantity).toFixed(2)}</span>
+                    </div>
+                  ))}
+                  {Number(orderResult.deliveryFeeUSD) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px', color: '#334155' }}>
+                      <span>Costo de Delivery</span>
+                      <span style={{ fontWeight: 600 }}>${Number(orderResult.deliveryFeeUSD).toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
               {orderResult.notes && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
                   <span style={{ color: '#64748b' }}>Detalle:</span>
@@ -855,7 +994,7 @@ const PublicStore: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: '4px' }}>
                 <span style={{ fontWeight: 'bold' }}>Total a pagar:</span>
                 <span style={{ fontWeight: 'bold', color: '#16a34a', fontSize: '1.1rem' }}>
-                  ${orderResult.grandTotalUSD.toFixed(2)} (Bs. {orderResult.grandTotalBs.toFixed(2)})
+                  ${Number(orderResult.grandTotalUSD || 0).toFixed(2)} (Bs. {Number(orderResult.grandTotalBs || 0).toFixed(2)})
                 </span>
               </div>
             </div>
@@ -884,10 +1023,15 @@ const PublicStore: React.FC = () => {
               onClick={() => {
                 setOrderResult(null);
                 setLiveOrderStatus(null);
+                try {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('orderId');
+                  window.history.replaceState({}, '', url.toString());
+                } catch (e) {}
                 fetchStore();
               }}
             >
-              Hacer otro pedido
+              Hacer otro pedido / Ver catálogo
             </IonButton>
           </div>
         </IonContent>
@@ -935,6 +1079,96 @@ const PublicStore: React.FC = () => {
       </IonHeader>
 
       <IonContent fullscreen className="ion-padding" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        {/* Banner Persistente de Pedido Activo */}
+        {activeOrderMini && !orderResult && (
+          <div
+            style={{
+              backgroundColor: '#ecfdf5',
+              border: '1.5px solid #10b981',
+              borderRadius: '12px',
+              padding: '12px 16px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '10px',
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.08)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '50%',
+                  backgroundColor: '#10b981',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px',
+                  flexShrink: 0,
+                }}
+              >
+                📡
+              </div>
+              <div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#065f46' }}>
+                  Pedido activo #{activeOrderMini.orderNumber || (activeOrderMini.orderId || activeOrderMini.id || '').slice(0, 8).toUpperCase()}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#047857', fontWeight: 600 }}>
+                  Estado: {getStatusLabel(activeOrderMini.status || 'PENDING')}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => loadOrderDetails(activeOrderMini.orderId || activeOrderMini.id, true)}
+                style={{
+                  backgroundColor: '#10b981',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '8px 14px',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)',
+                }}
+              >
+                <span>Ver Seguimiento</span> ↗
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveOrderMini(null);
+                  try {
+                    localStorage.removeItem(getOrderStorageKey());
+                  } catch (e) {}
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#059669',
+                  fontSize: '18px',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  lineHeight: 1,
+                }}
+                title="Cerrar aviso"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Banner / Store Info */}
         <div
           style={{

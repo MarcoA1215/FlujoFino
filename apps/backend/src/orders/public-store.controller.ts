@@ -358,30 +358,14 @@ export class PublicStoreController {
   async getPublicOrderStatus(@Param('orderId') orderId: string) {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
-      select: {
-        id: true,
-        status: true,
-        paymentStatus: true,
-        paymentReported: true,
-        paymentProofUrl: true,
-        paymentRejectedReason: true,
-        pagoMovilRef: true,
-        transferRef: true,
-        binanceRef: true,
-        customerName: true,
-        customerPhone: true,
-        totalAmount: true,
-        amountBs: true,
-        deliveryMethod: true,
-        createdAt: true,
-        notes: true,
-      },
+      relations: { items: { product: true } },
     });
     if (!order) {
       throw new NotFoundException('Pedido no encontrado');
     }
     return {
       id: order.id,
+      orderId: order.id,
       orderNumber: order.id.slice(0, 8).toUpperCase(),
       status: order.status,
       paymentStatus: order.paymentStatus,
@@ -392,11 +376,25 @@ export class PublicStoreController {
       transferRef: order.transferRef,
       binanceRef: order.binanceRef,
       customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      identification: order.identification || order.pagoMovilCedula || '',
+      customerCedula: order.identification || order.pagoMovilCedula || '',
       totalAmount: order.totalAmount,
+      grandTotalUSD: Number(order.totalAmount),
       amountBs: order.amountBs,
+      grandTotalBs: Number(order.amountBs),
       deliveryMethod: order.deliveryMethod,
+      customerAddress: order.customerAddress,
       createdAt: order.createdAt,
       notes: order.notes,
+      items: (order.items || []).map((i) => ({
+        quantity: i.quantity,
+        product: {
+          id: i.productId,
+          name: i.product?.name || 'Producto',
+          salePrice: Number(i.unitPrice),
+        },
+      })),
     };
   }
 }
