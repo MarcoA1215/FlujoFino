@@ -730,7 +730,7 @@ const LandingPage: React.FC = () => {
                 Probar 15 Días Gratis
               </button>
               <a
-                href="https://wa.me/584141234567?text=Hola,%20deseo%20más%20información%20sobre%20FinoWork"
+                href={`https://wa.me/${import.meta.env.VITE_SUPPORT_WHATSAPP || '584145652381'}?text=${encodeURIComponent('Hola, deseo más información sobre FinoWork')}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
