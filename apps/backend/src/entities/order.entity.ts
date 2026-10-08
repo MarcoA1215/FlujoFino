@@ -209,6 +209,10 @@ export class Order {
   @Column({ nullable: true })
   linkedReservationId?: string;
 
+  @Index()
+  @Column({ nullable: true })
+  offlineId?: string;
+
   @BeforeInsert()
   @BeforeUpdate()
   syncDriverAssignment() {

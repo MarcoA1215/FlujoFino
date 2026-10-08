@@ -187,6 +187,7 @@ const Pos: React.FC = () => {
       setProducts(res.data);
       if (res.data && res.data.length > 0) {
         try {
+          await offlineDb.cachedProducts.clear();
           await offlineDb.cachedProducts.bulkPut(res.data);
         } catch (e) {}
       }
@@ -898,6 +899,20 @@ const Pos: React.FC = () => {
 
           await offlineDb.offlineOrders.add(offlineOrder);
 
+          // Descontar inmediatamente el stock en memoria y en la base de datos local
+          setProducts(prevProducts => {
+            const updated = prevProducts.map(p => {
+              const itemInCart = cart.find(ci => (ci.product?.id || (ci as any).productId) === p.id);
+              if (!itemInCart) return p;
+              const qty = Number(itemInCart.quantity) || 1;
+              const newStock = Math.max(0, (p.stockQuantity ?? 0) - qty);
+              const newPhysical = Math.max(0, (p.physicalStock ?? 0) - qty);
+              return { ...p, stockQuantity: newStock, physicalStock: newPhysical };
+            });
+            offlineDb.cachedProducts.bulkPut(updated).catch(() => {});
+            return updated;
+          });
+
           presentToast({
             message: '✓ Venta guardada localmente (Modo Offline)',
             duration: 3000,
@@ -989,6 +1004,18 @@ const Pos: React.FC = () => {
             synced: false
           };
           await offlineDb.offlineOrders.add(offlineOrder);
+          setProducts(prevProducts => {
+            const updated = prevProducts.map(p => {
+              const itemInCart = cart.find(ci => (ci.product?.id || (ci as any).productId) === p.id);
+              if (!itemInCart) return p;
+              const qty = Number(itemInCart.quantity) || 1;
+              const newStock = Math.max(0, (p.stockQuantity ?? 0) - qty);
+              const newPhysical = Math.max(0, (p.physicalStock ?? 0) - qty);
+              return { ...p, stockQuantity: newStock, physicalStock: newPhysical };
+            });
+            offlineDb.cachedProducts.bulkPut(updated).catch(() => {});
+            return updated;
+          });
           presentToast({
             message: 'Fallo de conexión: Pedido guardado localmente en Modo Offline',
             duration: 3500,

@@ -127,7 +127,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   };
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (localStorage.getItem('flujofino_simulating_offline') !== 'true') {
+        setTimeout(() => {
+          syncPendingOrders(true);
+        }, 1500);
+      }
+    };
     const handleOffline = () => setIsOnline(false);
 
     const handleSettingsUpdated = (e: any) => {
@@ -147,7 +154,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
     let isMounted = true;
     const safeRefresh = async () => {
-      if (isMounted) await refreshPendingCount();
+      if (isMounted) {
+        await refreshPendingCount();
+        if (navigator.onLine && localStorage.getItem('flujofino_simulating_offline') !== 'true') {
+          try {
+            const count = await offlineDb.offlineOrders.count();
+            if (count > 0) {
+              await syncPendingOrders(true);
+            }
+          } catch (e) {}
+        }
+      }
     };
 
     safeRefresh();
@@ -213,16 +230,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     }
   };
 
-  const syncPendingOrders = async () => {
+  const syncPendingOrders = async (silent: boolean = false) => {
     if (isSimulatingOffline || !navigator.onLine) {
-      presentToast({ message: 'No hay conexión a internet activa', duration: 2500, color: 'warning' });
+      if (!silent) presentToast({ message: 'No hay conexión a internet activa', duration: 2500, color: 'warning' });
       return;
     }
+    if (isSyncing) return;
     try {
       const pending = await offlineDb.offlineOrders.toArray();
       if (!pending || pending.length === 0) {
         setPendingOfflineCount(0);
-        presentToast({ message: 'No hay ventas pendientes por sincronizar', duration: 2000, color: 'light' });
+        if (!silent) presentToast({ message: 'No hay ventas pendientes por sincronizar', duration: 2000, color: 'light' });
         return;
       }
       setIsSyncing(true);
@@ -235,7 +253,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         await offlineDb.offlineOrders.bulkDelete(syncedIds);
         await refreshPendingCount();
         presentToast({
-          message: `✓ ${syncedIds.length} venta(s) sincronizada(s) con éxito con el servidor`,
+          message: `✓ ${syncedIds.length} venta(s) offline sincronizada(s) con éxito con el servidor`,
           duration: 3000,
           color: 'success'
         });
@@ -250,16 +268,18 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           duration: 5000,
           color: 'warning'
         });
-      } else if (syncedIds.length === 0) {
+      } else if (syncedIds.length === 0 && !silent) {
         presentToast({ message: 'No se procesaron ventas para sincronizar', duration: 2500, color: 'medium' });
       }
     } catch (err: any) {
       console.error('Error sincronizando órdenes offline:', err);
-      presentToast({
-        message: 'Error al sincronizar con el servidor: ' + (err.response?.data?.message || err.message),
-        duration: 3500,
-        color: 'danger'
-      });
+      if (!silent) {
+        presentToast({
+          message: 'Error al sincronizar con el servidor: ' + (err.response?.data?.message || err.message),
+          duration: 3500,
+          color: 'danger'
+        });
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -423,7 +443,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             {pendingOfflineCount > 0 && (
               <div
                 className="ff-pill ff-pill-interactive ff-pill-sync"
-                onClick={syncPendingOrders}
+                onClick={() => syncPendingOrders(false)}
                 title="Sincronizar ventas con el servidor"
               >
                 {isSyncing ? (

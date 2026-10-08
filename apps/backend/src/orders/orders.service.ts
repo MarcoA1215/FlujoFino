@@ -62,6 +62,10 @@ export class CreateOrderDto {
 
   @IsOptional()
   @IsString()
+  offlineId?: string;
+
+  @IsOptional()
+  @IsString()
   employeeId?: string;
 
   @IsOptional()
@@ -561,6 +565,7 @@ export class OrdersService {
         changeRef: dto.changeRef,
         amountBs: dto.amountBs,
         exchangeRate: orderExchangeRate,
+        offlineId: dto.offlineId || undefined,
         createdAt: orderCreatedAt,
         abonosTotal: dto.initialAbono || 0,
         abonosHistory: (dto.initialAbono && dto.initialAbono > 0) ? [{ id: Date.now().toString(), amount: dto.initialAbono, date: new Date().toISOString() }] : []
@@ -2081,6 +2086,16 @@ export class OrdersService {
         const payload = item.payload || item;
         if (!payload.offlineCreatedAt && (item.createdAt || item.offlineCreatedAt)) {
           payload.offlineCreatedAt = item.offlineCreatedAt || item.createdAt;
+        }
+        if (item.offlineId) {
+          payload.offlineId = item.offlineId;
+          const existing = await this.dataSource.getRepository(Order).findOne({
+            where: { tenantId, offlineId: item.offlineId },
+          });
+          if (existing) {
+            syncedOfflineIds.push(item.offlineId);
+            continue;
+          }
         }
         if (payload.editingOrderId) {
           await this.editOrder(tenantId, payload.editingOrderId, payload, userId);

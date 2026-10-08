@@ -543,7 +543,7 @@ describe('OrdersService', () => {
     });
   });
 
-  describe('Offline Sync Error Reporting', () => {
+  describe('Offline Sync Error Reporting & Idempotency', () => {
     it('debe recolectar failedOrders con el mensaje de error cuando una orden offline falla', async () => {
       const tenantId = 'tenant-123';
       const invalidOrders = [
@@ -560,6 +560,28 @@ describe('OrdersService', () => {
       expect(res.failedOrders).toHaveLength(1);
       expect(res.failedOrders[0].offlineId).toBe('off-invalid-1');
       expect(res.failedOrders[0].error).toContain('El carrito no puede estar vacío');
+    });
+
+    it('debe reconocer órdenes previamente sincronizadas por offlineId sin duplicarlas (idempotencia)', async () => {
+      const tenantId = 'tenant-123';
+      const existingOfflineId = 'off-existing-999';
+
+      mockOrderRepo.findOne.mockResolvedValueOnce({
+        id: 'ord-db-1',
+        tenantId,
+        offlineId: existingOfflineId,
+      });
+
+      const res = await service.syncOfflineOrders(tenantId, [
+        {
+          offlineId: existingOfflineId,
+          payload: { customerName: 'Cliente Reintentado' },
+        },
+      ]);
+
+      expect(res.success).toBe(true);
+      expect(res.syncedOfflineIds).toContain(existingOfflineId);
+      expect(res.failedOrders).toHaveLength(0);
     });
   });
 });
