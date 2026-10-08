@@ -273,6 +273,48 @@ const Dashboard: React.FC = () => {
                         🏦
                       </div>
                     </div>
+
+                    {/* Billetera Digital USDT / Binance si tiene saldo */}
+                    {(summary.treasury.digitalUSD || 0) > 0 && (
+                      <div
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          border: '1px solid #E2E8F0',
+                          borderRadius: '12px',
+                          padding: '14px 16px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            🟡 Digital (Binance / USDT)
+                          </div>
+                          <div style={{ fontSize: '22px', fontWeight: '900', color: '#D97706', marginTop: '2px' }}>
+                            ${(summary.treasury.digitalUSD || 0).toFixed(2)}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+                            En cuentas digitales/cripto
+                          </div>
+                        </div>
+                        <div
+                          style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '10px',
+                            backgroundColor: '#FEF3C7',
+                            color: '#D97706',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '20px',
+                          }}
+                        >
+                          🟡
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

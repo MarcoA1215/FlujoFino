@@ -51,7 +51,9 @@ export const DailyCashCloseModal: React.FC<DailyCashCloseModalProps> = ({ isOpen
     const punto = Number(cashSummary?.totalPuntoBs || 0);
     const pm = Number(cashSummary?.totalPagoMovilBs || 0);
     const pmChange = Number(cashSummary?.totalPagoMovilChangeBs || 0);
-    const bankBs = Math.max(0, punto + pm - pmChange);
+    const totalExBs = Number(cashSummary?.totalExchangedBs || 0);
+    const totalExUsd = Number(cashSummary?.totalExchangedUSD || 0);
+    const bankBs = Math.max(0, punto + pm - pmChange - totalExBs);
     const rate = Number(cashSummary?.exchangeRate || 40.0);
 
     return {
@@ -64,15 +66,16 @@ export const DailyCashCloseModal: React.FC<DailyCashCloseModalProps> = ({ isOpen
       currencySymbol: cashSummary?.currencySymbol || 'Bs.',
       bankBsEquivalentUSD: rate > 0 ? Number((bankBs / rate).toFixed(2)) : 0,
       totalRealUSD: Number((netCash + (rate > 0 ? bankBs / rate : 0)).toFixed(2)),
-      totalExchangedUSD: 0,
-      totalExchangedBs: 0,
+      totalExchangedUSD: totalExUsd,
+      totalExchangedBs: totalExBs,
+      exchangeHistory: cashSummary?.exchangesList || [],
     };
   }, [cashSummary]);
 
   const copyCashReportToWhatsApp = () => {
     if (!cashSummary) return;
     const currencySymbol = cashSummary.currencySymbol || 'Bs.';
-    const netCash = Number(cashSummary.netCashUSD !== undefined ? cashSummary.netCashUSD : ((cashSummary.totalCashUSD || 0) - (cashSummary.totalCashChangeUSD || 0) - (cashSummary.totalCashExpensesUSD || 0)));
+    const netCash = Number(cashSummary.netCashUSD !== undefined ? cashSummary.netCashUSD : ((cashSummary?.totalCashUSD || 0) - (cashSummary?.totalCashChangeUSD || 0) - (cashSummary?.totalCashExpensesUSD || 0)));
     const text = `📊 *CIERRE DE CAJA / ARQUEO DIARIO*
 📅 Fecha: ${cashSummary.date}
 💱 Tasa BCV: ${currencySymbol} ${Number(cashSummary.exchangeRate || 0).toFixed(2)}
@@ -81,11 +84,11 @@ export const DailyCashCloseModal: React.FC<DailyCashCloseModalProps> = ({ isOpen
 • Efectivo Cobrado Ventas: $${Number(cashSummary.totalCashUSD || 0).toFixed(2)}
 • (-) Vueltos entregados: -$${Number(cashSummary.totalCashChangeUSD || 0).toFixed(2)}
 • (-) Egresos / Vales de caja: -$${Number(cashSummary.totalCashExpensesUSD || 0).toFixed(2)}
-👉 *= EFECTIVO NETO EN GAVETA:* $${netCash.toFixed(2)}
+${Number(cashSummary.totalExchangedCashUSD || 0) > 0 ? `• (+) USD Ingresados por Compra/Cambio: +$${Number(cashSummary.totalExchangedCashUSD).toFixed(2)}\n` : ''}👉 *= EFECTIVO NETO EN GAVETA:* $${netCash.toFixed(2)}
 
 💳 *PUNTO DE VENTA (${currencySymbol}):* ${currencySymbol} ${Number(cashSummary.totalPuntoBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (equiv. $${Number(cashSummary.totalPuntoUSD || 0).toFixed(2)})
 📱 *PAGO MÓVIL (${currencySymbol}):* ${currencySymbol} ${Number(cashSummary.totalPagoMovilBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (equiv. $${Number(cashSummary.totalPagoMovilUSD || 0).toFixed(2)})
-💰 *TOTAL INGRESOS COBRADOS:* $${Number(cashSummary.totalPaidUSD || 0).toFixed(2)}
+${Number(cashSummary.totalExchangedBs || 0) > 0 ? `💱 *BS CONVERTIDOS A DIVISAS HOY:* -${currencySymbol} ${Number(cashSummary.totalExchangedBs).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (+$${Number(cashSummary.totalExchangedUSD || 0).toFixed(2)} USD)\n` : ''}💰 *TOTAL INGRESOS COBRADOS:* $${Number(cashSummary.totalPaidUSD || 0).toFixed(2)}
 ⏳ *PENDIENTE POR COBRAR:* $${Number(cashSummary.totalPendingUSD || 0).toFixed(2)}
 📈 *VENTAS TOTALES DEL DÍA:* $${Number(cashSummary.totalSalesUSD || 0).toFixed(2)}
 
@@ -243,6 +246,23 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
                   <span>Comprar USD / Proteger Bolívares en Divisas</span>
                 </button>
               </div>
+
+              {/* Conversión a Divisas Registrada Hoy */}
+              {Number(cashSummary.totalExchangedBs || 0) > 0 && (
+                <div style={{ background: '#ECFDF5', borderRadius: '16px', border: '1px solid #A7F3D0', padding: '14px 16px', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: '#065F46' }}>
+                      💱 Conversión a Divisas Registrada Hoy
+                    </div>
+                    <span style={{ color: '#047857', fontSize: '13px', fontWeight: '900' }}>
+                      +${Number(cashSummary.totalExchangedUSD || 0).toFixed(2)} USD
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#047857' }}>
+                    Se cambiaron <b>{cashSummary.currencySymbol || 'Bs.'} {Number(cashSummary.totalExchangedBs).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> de los cobros bancarios para protegerlos en dólares.
+                  </div>
+                </div>
+              )}
 
               {/* Sección de Egresos y Vales de Caja */}
               {Number(cashSummary.totalCashExpensesUSD || 0) > 0 && (

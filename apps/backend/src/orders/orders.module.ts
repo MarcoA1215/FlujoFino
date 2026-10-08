@@ -10,6 +10,7 @@ import { Tenant } from '../entities/tenant.entity';
 import { Settings } from '../entities/settings.entity';
 import { DeliveryZone } from '../entities/delivery-zone.entity';
 import { OrderItemMedia } from '../entities/order-item-media.entity';
+import { CashExchange } from '../entities/cash-exchange.entity';
 import { StorageModule } from '../storage/storage.module';
 import { CustomersModule } from '../customers/customers.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -26,6 +27,7 @@ import { SettingsModule } from '../settings/settings.module';
       Tenant,
       Settings,
       DeliveryZone,
+      CashExchange,
     ]),
     NotificationsModule,
     StorageModule,

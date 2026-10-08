@@ -13,6 +13,7 @@ import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Settings } from '../entities/settings.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
 import { Reservation } from '../entities/reservation.entity';
+import { CashExchange } from '../entities/cash-exchange.entity';
 
 export const roundCurrency = (val: number | string | undefined | null): number => {
   return Math.round((Number(val) || 0) * 100) / 100;
@@ -1995,10 +1996,53 @@ export class OrdersService {
       });
     }
 
+    const exchangeRepo = this.dataSource.getRepository(CashExchange);
+    let exchanges: CashExchange[] = [];
+    if (typeof exchangeRepo.createQueryBuilder === 'function') {
+      exchanges = await exchangeRepo
+        .createQueryBuilder('ex')
+        .where('ex.tenantId = :tenantId', { tenantId })
+        .andWhere(
+          `(ex.createdAt AT TIME ZONE 'America/Caracas' - (:offsetHours * INTERVAL '1 hour'))::date = :targetDate::date`,
+          { offsetHours, targetDate: targetDateStr }
+        )
+        .orderBy('ex.createdAt', 'DESC')
+        .getMany();
+    } else {
+      exchanges = (await exchangeRepo.find({ where: { tenantId } } as any)) || [];
+    }
+
+    let totalExchangedBs = 0;
+    let totalExchangedUSD = 0;
+    let totalExchangedCashUSD = 0;
+    const exchangesList: any[] = [];
+
+    for (const ex of exchanges) {
+      const bs = Number(ex.amountBs || 0);
+      const usd = Number(ex.amountUSD || 0);
+      if (ex.operationType === 'BUY_USD') {
+        totalExchangedBs += bs;
+        totalExchangedUSD += usd;
+        if (ex.destination === 'CASH_USD' || !ex.destination) {
+          totalExchangedCashUSD += usd;
+        }
+      }
+      exchangesList.push({
+        id: ex.id,
+        amountBs: bs,
+        amountUSD: usd,
+        exchangeRate: Number(ex.exchangeRate),
+        operationType: ex.operationType,
+        destination: ex.destination,
+        notes: ex.notes,
+        createdAt: ex.createdAt,
+      });
+    }
+
     baseCash = Number(baseCash.toFixed(2));
     totalCashReceivedUSD = Number((totalCashReceivedUSD + baseCash).toFixed(2));
     totalCashUSD = Number((totalCashUSD + baseCash).toFixed(2));
-    const netCashUSD = Number((totalCashUSD - totalCashChangeUSD - totalCashExpensesUSD).toFixed(2));
+    const netCashUSD = Number((totalCashUSD - totalCashChangeUSD - totalCashExpensesUSD + totalExchangedCashUSD).toFixed(2));
 
     // Agrupación de estadísticas por repartidor (Delivery Tracking)
     const driverStatsMap: Record<string, {
@@ -2072,6 +2116,10 @@ export class OrdersService {
       pagoMovilList,
       puntoList,
       vueltosList,
+      totalExchangedBs: Number(totalExchangedBs.toFixed(2)),
+      totalExchangedUSD: Number(totalExchangedUSD.toFixed(2)),
+      totalExchangedCashUSD: Number(totalExchangedCashUSD.toFixed(2)),
+      exchangesList,
       recentOrders: recentOrders.slice(0, 15),
     };
   }

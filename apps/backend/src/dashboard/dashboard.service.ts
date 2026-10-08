@@ -317,6 +317,7 @@ export class DashboardService {
 
     let cashUSDIn = 0;
     let cashUSDOut = 0;
+    let digitalUSDIn = 0;
     let puntoBs = 0;
     let pagoMovilBs = 0;
     let transferBs = 0;
@@ -324,6 +325,8 @@ export class DashboardService {
 
     for (const o of orders) {
       if (o.status === OrderStatus.CANCELED) continue;
+      // Solo contar cobros que hayan sido pagados total o parcialmente
+      if (o.paymentStatus !== PaymentStatus.PAID && o.paymentStatus !== PaymentStatus.PARTIAL) continue;
 
       const orderRate = Number(o.exchangeRate) > 0 ? Number(o.exchangeRate) : rate;
 
@@ -356,6 +359,8 @@ export class DashboardService {
             transferBs += amtBs;
           } else if (['USD', 'CASH', 'CASH_USD', 'EFECTIVO'].includes(method)) {
             cashUSDIn += effectiveUsd;
+          } else if (['BINANCE', 'BINANCE_USDT', 'USDT', 'ZELLE'].includes(method)) {
+            digitalUSDIn += effectiveUsd;
           }
         }
       } else {
@@ -374,12 +379,16 @@ export class DashboardService {
             transferBs += amtBs;
           } else if (['USD', 'CASH', 'CASH_USD', 'EFECTIVO'].includes(method)) {
             cashUSDIn += amtUsd;
+          } else if (['BINANCE', 'BINANCE_USDT', 'USDT', 'ZELLE'].includes(method)) {
+            digitalUSDIn += amtUsd;
           }
         } else if (o.paymentStatus === PaymentStatus.PARTIAL && Number(o.abonosTotal) > 0) {
           const abonos = Number(o.abonosTotal);
           const abonosBs = Number(o.amountBs) > 0 ? Number(o.amountBs) : Number((abonos * orderRate).toFixed(2));
-          if (['USD', 'CASH'].includes(method)) {
+          if (['USD', 'CASH', 'CASH_USD', 'EFECTIVO'].includes(method)) {
             cashUSDIn += abonos;
+          } else if (['BINANCE', 'BINANCE_USDT', 'USDT', 'ZELLE'].includes(method)) {
+            digitalUSDIn += abonos;
           } else if (['PAGO_MOVIL'].includes(method)) {
             pagoMovilBs += abonosBs;
           } else if (['PUNTO'].includes(method)) {
@@ -413,26 +422,39 @@ export class DashboardService {
     })) || [];
 
     let totalExchangedBsOut = 0;
-    let totalExchangedUSDIn = 0;
+    let totalExchangedCashUSDIn = 0;
+    let totalExchangedDigitalUSDIn = 0;
 
     for (const ex of exchanges) {
+      const bs = Number(ex.amountBs || 0);
+      const usd = Number(ex.amountUSD || 0);
       if (ex.operationType === 'BUY_USD') {
-        totalExchangedBsOut += Number(ex.amountBs || 0);
-        totalExchangedUSDIn += Number(ex.amountUSD || 0);
+        totalExchangedBsOut += bs;
+        if (ex.destination === 'BINANCE_USDT') {
+          totalExchangedDigitalUSDIn += usd;
+        } else {
+          totalExchangedCashUSDIn += usd;
+        }
       } else if (ex.operationType === 'SELL_USD') {
-        totalExchangedBsOut -= Number(ex.amountBs || 0);
-        totalExchangedUSDIn -= Number(ex.amountUSD || 0);
+        totalExchangedBsOut -= bs;
+        if (ex.destination === 'BINANCE_USDT') {
+          totalExchangedDigitalUSDIn -= usd;
+        } else {
+          totalExchangedCashUSDIn -= usd;
+        }
       }
     }
 
-    const netCashUSD = Number((cashUSDIn - cashUSDOut - cashExpensesUSD + totalExchangedUSDIn).toFixed(2));
+    const netCashUSD = Number((cashUSDIn - cashUSDOut - cashExpensesUSD + totalExchangedCashUSDIn).toFixed(2));
+    const netDigitalUSD = Number((digitalUSDIn + totalExchangedDigitalUSDIn).toFixed(2));
     const totalBankBsIn = Number((puntoBs + pagoMovilBs + transferBs).toFixed(2));
     const netBankBs = Number((totalBankBsIn - bsOut - bankExpensesBs - totalExchangedBsOut).toFixed(2));
     const bankBsEquivalentUSD = rate > 0 ? Number((netBankBs / rate).toFixed(2)) : 0;
-    const totalRealUSD = Number((netCashUSD + bankBsEquivalentUSD).toFixed(2));
+    const totalRealUSD = Number((netCashUSD + netDigitalUSD + bankBsEquivalentUSD).toFixed(2));
 
     return {
       cashUSD: netCashUSD,
+      digitalUSD: netDigitalUSD,
       bankBs: netBankBs,
       puntoBs: Number(puntoBs.toFixed(2)),
       pagoMovilBs: Number(pagoMovilBs.toFixed(2)),
@@ -441,7 +463,7 @@ export class DashboardService {
       currencySymbol: settings?.currencySymbol || 'Bs.',
       bankBsEquivalentUSD,
       totalRealUSD,
-      totalExchangedUSD: Number(totalExchangedUSDIn.toFixed(2)),
+      totalExchangedUSD: Number((totalExchangedCashUSDIn + totalExchangedDigitalUSDIn).toFixed(2)),
       totalExchangedBs: Number(totalExchangedBsOut.toFixed(2)),
       exchangeHistory: exchanges.slice(0, 15).map(e => ({
         id: e.id,

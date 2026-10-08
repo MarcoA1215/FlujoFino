@@ -118,6 +118,7 @@ export type DashboardSummary = {
 
 export type TreasurySummary = {
   cashUSD: number;
+  digitalUSD?: number;
   bankBs: number;
   puntoBs: number;
   pagoMovilBs: number;
