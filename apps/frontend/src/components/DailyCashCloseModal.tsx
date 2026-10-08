@@ -11,9 +11,10 @@ import {
   IonSpinner,
   useIonToast
 } from '@ionic/react';
-import { closeOutline, logoWhatsapp, refreshOutline, walletOutline, cardOutline, phonePortraitOutline, swapHorizontalOutline } from 'ionicons/icons';
+import { closeOutline, logoWhatsapp, refreshOutline, walletOutline, cardOutline, phonePortraitOutline, swapHorizontalOutline, cashOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { BuyUsdModal } from './BuyUsdModal';
+import { FondoCajaModal } from './FondoCajaModal';
 import type { TreasurySummary } from '../types';
 
 interface DailyCashCloseModalProps {
@@ -25,6 +26,7 @@ export const DailyCashCloseModal: React.FC<DailyCashCloseModalProps> = ({ isOpen
   const [cashSummary, setCashSummary] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [showBuyUsdModal, setShowBuyUsdModal] = useState(false);
+  const [showFondoCajaModal, setShowFondoCajaModal] = useState(false);
   const [presentToast] = useIonToast();
 
   const fetchDailySummary = async () => {
@@ -81,7 +83,7 @@ export const DailyCashCloseModal: React.FC<DailyCashCloseModalProps> = ({ isOpen
 💱 Tasa BCV: ${currencySymbol} ${Number(cashSummary.exchangeRate || 0).toFixed(2)}
 
 💵 *ARQUEO EFECTIVO USD (GAVETA FÍSICA):*
-• Efectivo Cobrado Ventas: $${Number(cashSummary.totalCashUSD || 0).toFixed(2)}
+${Number(cashSummary.baseCash || cashSummary.fondoDeCaja || 0) > 0 ? `• (+) Base Inicial / Fondo de Gaveta: +$${Number(cashSummary.baseCash || cashSummary.fondoDeCaja).toFixed(2)}\n` : ''}• Efectivo Cobrado Ventas: $${Number(cashSummary.totalCashUSD || 0).toFixed(2)}
 • (-) Vueltos entregados: -$${Number(cashSummary.totalCashChangeUSD || 0).toFixed(2)}
 • (-) Egresos / Vales de caja: -$${Number(cashSummary.totalCashExpensesUSD || 0).toFixed(2)}
 ${Number(cashSummary.totalExchangedCashUSD || 0) > 0 ? `• (+) USD Ingresados por Compra/Cambio: +$${Number(cashSummary.totalExchangedCashUSD).toFixed(2)}\n` : ''}👉 *= EFECTIVO NETO EN GAVETA:* $${netCash.toFixed(2)}
@@ -150,6 +152,50 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
                 </div>
               </div>
 
+              {/* Banner Fondo de Caja / Base Inicial */}
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '16px',
+                  border: '1px solid #E2E8F0',
+                  padding: '12px 16px',
+                  marginBottom: '14px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  boxShadow: 'var(--ff-shadow-sm)',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
+                    💵 Base Inicial de Gaveta (Fondo para Cambio)
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: '900', color: Number(cashSummary.baseCash || cashSummary.fondoDeCaja || 0) > 0 ? '#047857' : '#0F172A', marginTop: '1px' }}>
+                    ${Number(cashSummary.baseCash || cashSummary.fondoDeCaja || 0).toFixed(2)} USD
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFondoCajaModal(true)}
+                  style={{
+                    backgroundColor: '#ECFDF5',
+                    color: '#047857',
+                    border: '1px solid #A7F3D0',
+                    borderRadius: '10px',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <IonIcon icon={cashOutline} style={{ fontSize: '16px' }} />
+                  <span>{Number(cashSummary.baseCash || cashSummary.fondoDeCaja || 0) > 0 ? '+ Añadir a Base' : 'Declarar Base Inicial'}</span>
+                </button>
+              </div>
+
               {/* 3 Main Currency Cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', marginBottom: '14px' }}>
                 {/* Cash USD */}
@@ -164,6 +210,12 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
                     ${Number(cashSummary.netCashUSD !== undefined ? cashSummary.netCashUSD : ((cashSummary.totalCashUSD || 0) - (cashSummary.totalCashChangeUSD || 0) - (cashSummary.totalCashExpensesUSD || 0))).toFixed(2)}
                   </div>
                   <div style={{ fontSize: '11px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '3px', borderTop: '1px dashed #CBD5E1', paddingTop: '8px' }}>
+                    {Number(cashSummary.baseCash || cashSummary.fondoDeCaja || 0) > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#047857' }}>
+                        <span>(+) Base inicial de caja:</span>
+                        <span style={{ fontWeight: '700' }}>+${Number(cashSummary.baseCash || cashSummary.fondoDeCaja).toFixed(2)}</span>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>Efectivo Cobrado Ventas:</span>
                       <span style={{ fontWeight: '600', color: '#0F172A' }}>+${Number(cashSummary.totalCashUSD || 0).toFixed(2)}</span>
@@ -392,6 +444,13 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
         isOpen={showBuyUsdModal}
         onClose={() => setShowBuyUsdModal(false)}
         treasury={treasuryFromDaily}
+        onSuccess={fetchDailySummary}
+      />
+
+      <FondoCajaModal
+        isOpen={showFondoCajaModal}
+        onClose={() => setShowFondoCajaModal(false)}
+        currencySymbol={cashSummary?.currencySymbol}
         onSuccess={fetchDailySummary}
       />
     </IonModal>

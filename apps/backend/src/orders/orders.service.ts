@@ -272,15 +272,23 @@ export class OrdersService {
     return saved;
   }
 
-  async registerFondoCaja(tenantId: string, amount: number, description?: string) {
-    if (!amount || amount <= 0) {
+  async registerFondoCaja(tenantId: string, amount: number, description?: string, currency: 'USD' | 'BS' = 'USD') {
+    if (!amount || Number(amount) <= 0) {
       throw new BadRequestException('El monto del fondo de caja debe ser mayor a 0');
     }
+    const currentExchangeRateObj = typeof this.settingsService?.getExchangeRate === 'function' ? await this.settingsService.getExchangeRate(tenantId) : null;
+    const rate = Number(currentExchangeRateObj?.exchangeRateBs || (typeof this.settingsService?.getEffectiveRate === 'function' ? await this.settingsService.getEffectiveRate(tenantId) : 40.0));
+
+    const amtUSD = currency === 'BS' ? (rate > 0 ? Number(amount) / rate : Number(amount)) : Number(amount);
+    const desc = description?.trim() || (currency === 'BS'
+      ? `Fondo de Caja: Bs. ${Number(amount).toFixed(2)} (equiv. $${amtUSD.toFixed(2)})`
+      : `Fondo de Caja: $${Number(amount).toFixed(2)}`);
+
     const repo = this.dataSource.getRepository(OperatingExpense);
     const expense = repo.create({
       tenantId,
-      amount: Number(amount),
-      description: description?.trim() || 'Apertura de Gaveta (Fondo de Caja)',
+      amount: Number(amtUSD.toFixed(2)),
+      description: desc,
       category: 'FONDO_CAJA',
       paymentMethod: 'CASH',
     });

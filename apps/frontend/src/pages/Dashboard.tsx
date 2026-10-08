@@ -18,6 +18,7 @@ import {
   peopleOutline,
   cardOutline,
   swapHorizontalOutline,
+  settingsOutline,
 } from 'ionicons/icons';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { apiClient } from '../api/client';
@@ -26,6 +27,7 @@ import type { DashboardSummary } from '../types';
 import AppHeader from '../components/AppHeader';
 import InvestmentModal from '../components/InvestmentModal';
 import { BuyUsdModal } from '../components/BuyUsdModal';
+import { InitialTreasuryModal } from '../components/InitialTreasuryModal';
 
 const Dashboard: React.FC = () => {
   const { user } = useContext(AuthContext);
@@ -34,6 +36,7 @@ const Dashboard: React.FC = () => {
   const [settings, setSettings] = useState<any>({});
   const [showInvestmentModal, setShowInvestmentModal] = useState(false);
   const [showBuyUsdModal, setShowBuyUsdModal] = useState(false);
+  const [showInitialTreasuryModal, setShowInitialTreasuryModal] = useState(false);
   const [presentToast] = useIonToast();
 
   const fetchSummary = async () => {
@@ -169,27 +172,50 @@ const Dashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setShowBuyUsdModal(true)}
-                      style={{
-                        backgroundColor: '#10B981',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '10px',
-                        padding: '8px 14px',
-                        fontSize: '12px',
-                        fontWeight: '800',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)',
-                      }}
-                    >
-                      <IonIcon icon={swapHorizontalOutline} style={{ fontSize: '16px' }} />
-                      <span>Comprar USD / Proteger Bs</span>
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowInitialTreasuryModal(true)}
+                        style={{
+                          backgroundColor: '#F1F5F9',
+                          color: '#334155',
+                          border: '1px solid #CBD5E1',
+                          borderRadius: '10px',
+                          padding: '8px 12px',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <IonIcon icon={settingsOutline} style={{ fontSize: '15px' }} />
+                        <span>Saldo Inicial</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowBuyUsdModal(true)}
+                        style={{
+                          backgroundColor: '#10B981',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '8px 14px',
+                          fontSize: '12px',
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)',
+                        }}
+                      >
+                        <IonIcon icon={swapHorizontalOutline} style={{ fontSize: '16px' }} />
+                        <span>Comprar USD / Proteger Bs</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Las dos cajas reales: USD Efectivo vs Bancos Bolívares */}
@@ -565,6 +591,13 @@ const Dashboard: React.FC = () => {
       <BuyUsdModal
         isOpen={showBuyUsdModal}
         onClose={() => setShowBuyUsdModal(false)}
+        treasury={summary?.treasury || null}
+        onSuccess={() => fetchSummary()}
+      />
+
+      <InitialTreasuryModal
+        isOpen={showInitialTreasuryModal}
+        onClose={() => setShowInitialTreasuryModal(false)}
         treasury={summary?.treasury || null}
         onSuccess={() => fetchSummary()}
       />

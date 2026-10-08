@@ -445,10 +445,14 @@ export class DashboardService {
       }
     }
 
-    const netCashUSD = Number((cashUSDIn - cashUSDOut - cashExpensesUSD + totalExchangedCashUSDIn).toFixed(2));
-    const netDigitalUSD = Number((digitalUSDIn + totalExchangedDigitalUSDIn).toFixed(2));
+    const initialCash = Number(settings?.initialCashUSD || 0);
+    const initialBank = Number(settings?.initialBankBs || 0);
+    const initialDigital = Number(settings?.initialDigitalUSD || 0);
+
+    const netCashUSD = Number((initialCash + cashUSDIn - cashUSDOut - cashExpensesUSD + totalExchangedCashUSDIn).toFixed(2));
+    const netDigitalUSD = Number((initialDigital + digitalUSDIn + totalExchangedDigitalUSDIn).toFixed(2));
     const totalBankBsIn = Number((puntoBs + pagoMovilBs + transferBs).toFixed(2));
-    const netBankBs = Number((totalBankBsIn - bsOut - bankExpensesBs - totalExchangedBsOut).toFixed(2));
+    const netBankBs = Number((initialBank + totalBankBsIn - bsOut - bankExpensesBs - totalExchangedBsOut).toFixed(2));
     const bankBsEquivalentUSD = rate > 0 ? Number((netBankBs / rate).toFixed(2)) : 0;
     const totalRealUSD = Number((netCashUSD + netDigitalUSD + bankBsEquivalentUSD).toFixed(2));
 
@@ -456,6 +460,9 @@ export class DashboardService {
       cashUSD: netCashUSD,
       digitalUSD: netDigitalUSD,
       bankBs: netBankBs,
+      initialCashUSD: initialCash,
+      initialBankBs: initialBank,
+      initialDigitalUSD: initialDigital,
       puntoBs: Number(puntoBs.toFixed(2)),
       pagoMovilBs: Number(pagoMovilBs.toFixed(2)),
       transferBs: Number(transferBs.toFixed(2)),
@@ -507,6 +514,32 @@ export class DashboardService {
       success: true,
       message: `Compra de $${usd.toFixed(2)} registrada exitosamente a tasa ${effectiveRate}`,
       exchange,
+      treasury: await this.getTreasurySummary(tenantId),
+    };
+  }
+
+  async setInitialTreasury(
+    tenantId: string,
+    dto: { initialCashUSD: number; initialBankBs: number; initialDigitalUSD?: number }
+  ) {
+    let settings = await this.settingsRepo.findOne({ where: { tenantId } });
+    if (!settings) {
+      settings = this.settingsRepo.create({
+        id: tenantId,
+        tenantId,
+        exchangeRateBs: 40.0,
+      });
+    }
+
+    settings.initialCashUSD = Math.max(0, Number(dto.initialCashUSD || 0));
+    settings.initialBankBs = Math.max(0, Number(dto.initialBankBs || 0));
+    settings.initialDigitalUSD = Math.max(0, Number(dto.initialDigitalUSD || 0));
+
+    await this.settingsRepo.save(settings);
+
+    return {
+      success: true,
+      message: 'Saldos iniciales de tesorería guardados correctamente',
       treasury: await this.getTreasurySummary(tenantId),
     };
   }

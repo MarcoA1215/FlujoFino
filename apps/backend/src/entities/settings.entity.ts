@@ -138,6 +138,16 @@ export class Settings {
   @Column({ nullable: true })
   themeHeaderColor: string;
 
+  // --- Saldo Inicial de Tesorería al iniciar en FinoWork ---
+  @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  initialCashUSD: number;
+
+  @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  initialBankBs: number;
+
+  @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  initialDigitalUSD: number;
+
   @ManyToOne(() => Tenant)
   @JoinColumn({ name: 'tenantId' })
   tenant: Tenant;

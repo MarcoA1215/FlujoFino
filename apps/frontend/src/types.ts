@@ -120,6 +120,9 @@ export type TreasurySummary = {
   cashUSD: number;
   digitalUSD?: number;
   bankBs: number;
+  initialCashUSD?: number;
+  initialBankBs?: number;
+  initialDigitalUSD?: number;
   puntoBs: number;
   pagoMovilBs: number;
   transferBs: number;

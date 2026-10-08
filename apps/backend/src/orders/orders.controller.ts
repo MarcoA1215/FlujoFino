@@ -90,9 +90,10 @@ export class OrdersController {
   registerFondoCaja(
     @Request() req: any,
     @Body('amount') amount: number,
-    @Body('description') description?: string
+    @Body('description') description?: string,
+    @Body('currency') currency?: 'USD' | 'BS',
   ) {
-    return this.ordersService.registerFondoCaja(req.user.tenantId, amount, description);
+    return this.ordersService.registerFondoCaja(req.user.tenantId, amount, description, currency);
   }
 
   @Patch(':id/status')

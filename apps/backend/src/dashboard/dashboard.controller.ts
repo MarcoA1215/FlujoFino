@@ -31,5 +31,15 @@ export class DashboardController {
   ) {
     return this.dashboardService.buyUsd(req.user.tenantId, dto);
   }
+
+  @Post('initial-treasury')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  setInitialTreasury(
+    @Request() req: any,
+    @Body() dto: { initialCashUSD: number; initialBankBs: number; initialDigitalUSD?: number }
+  ) {
+    return this.dashboardService.setInitialTreasury(req.user.tenantId, dto);
+  }
 }
 
