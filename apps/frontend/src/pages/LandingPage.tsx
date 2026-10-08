@@ -269,7 +269,7 @@ const LandingPage: React.FC = () => {
                 Instala FinoWork directamente en tu teléfono o tablet
               </h2>
               <p style={{ color: '#94A3B8', fontSize: '14px', lineHeight: '1.6', margin: '0 0 18px 0' }}>
-                Lleva el control de tu caja, cobra desde cualquier mesa o mostrador e imprime comprobantes. Descarga el paquete oficial APK e instálalo en segundos.
+                Lleva el control de tu caja, cobra al instante desde cualquier mesa o mostrador incluso sin internet. Descarga el paquete oficial APK e instálalo en segundos.
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', color: '#CBD5E1', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -403,7 +403,7 @@ const LandingPage: React.FC = () => {
                   Punto de Venta Ultra Rápido (POS)
                 </h3>
                 <p style={{ fontSize: '14px', color: '#64748B', lineHeight: '1.5', margin: 0 }}>
-                  Factura en segundos, maneja multimoneda (USD y moneda local), cálculo de vuelto exacto, descuentos y emisión de comandas e impresiones térmicas.
+                  Cobra en segundos, maneja multimoneda (USD y moneda local), cálculo de vuelto exacto, descuentos y registro de ventas incluso sin internet.
                 </p>
               </div>
 
