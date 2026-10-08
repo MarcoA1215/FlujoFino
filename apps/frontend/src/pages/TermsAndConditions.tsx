@@ -65,6 +65,9 @@ export const TermsContent: React.FC = () => {
         <p>
           En caso de impago o mora tras cumplirse el período de gracia, el acceso a las funciones operativas del negocio quedará pausado preventivamente hasta la regularización de la cuenta, sin que ello implique la pérdida inmediata de su información histórica.
         </p>
+        <p>
+          FinoWork ofrece 15 días de prueba gratuita para garantizar que el sistema se adapta a las necesidades del Comercio. Por consiguiente, una vez procesado el pago de la suscripción mensual o anual, no se emitirán reembolsos parciales ni totales por cancelación anticipada o falta de uso del sistema.
+        </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
           4. Propiedad y Confidencialidad de los Datos
@@ -77,7 +80,7 @@ export const TermsContent: React.FC = () => {
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          5. Responsabilidad Operativa, Comercial y Fiscal
+          5. Responsabilidad Operativa, Comercial y Fiscal (Escudo Fiscal y Tasas de Cambio)
         </h2>
         <p>
           El Usuario reconoce y acepta que FinoWork es una herramienta tecnológica de asistencia operativa y administrativa. El Negocio es el único y exclusivo responsable de:
@@ -88,23 +91,36 @@ export const TermsContent: React.FC = () => {
           <li>La calidad, idoneidad e higiene de los productos o alimentos manufacturados y despachados.</li>
           <li>El resguardo de sus credenciales de acceso (usuario y contraseña) asignadas a su personal y colaboradores.</li>
         </ul>
+        <p>
+          FinoWork provee herramientas de cálculo y sincronización de tasas de cambio (ej. BCV, Paralelo) de manera estrictamente referencial. El Comercio es única y exclusivamente responsable de verificar, aprobar y aplicar la tasa de cambio final en sus cobros, asumiendo toda responsabilidad legal, penal o administrativa ante las autoridades competentes (ej. SUNDDE) por la fijación de precios.
+        </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
           6. Disponibilidad del Servicio y Modo Offline
         </h2>
         <p>
-          FinoWork procura una disponibilidad del servicio del 99.5%. La Plataforma incorpora tecnología de almacenamiento local (IndexedDB) para permitir que la caja registradora continúe cobrando ventas ante interrupciones de internet. No obstante, FinoWork no se hace responsable por fallas derivadas de cortes de energía locales, daños en hardware de terceros o caídas masivas de proveedores de telecomunicaciones.
+          FinoWork se esfuerza por mantener la máxima disponibilidad, pero el servicio se proporciona "tal cual" (As-Is). No garantizamos un tiempo de actividad ininterrumpido y no somos responsables por lucro cesante, pérdida de ventas o daños derivados por caídas del servidor o fallas de red.
+        </p>
+        <p>
+          La Plataforma incorpora tecnología de almacenamiento local (IndexedDB) para permitir que la caja registradora continúe cobrando ventas ante interrupciones de internet. No obstante, FinoWork no se hace responsable por fallas derivadas de cortes de energía locales, daños en hardware de terceros o caídas masivas de proveedores de telecomunicaciones.
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          7. Modificaciones a los Términos
+          7. Programa de Promotores de Calle
+        </h2>
+        <p>
+          El programa de Promotores de FinoWork constituye una relación estrictamente comercial y mercantil basada en referidos. Bajo ninguna circunstancia crea una relación laboral, de dependencia, subordinación o sociedad entre el Promotor y FinoWork. FinoWork no retiene impuestos sobre comisiones, siendo la declaración y pago de estos responsabilidad exclusiva del Promotor.
+        </p>
+
+        <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
+          8. Modificaciones a los Términos
         </h2>
         <p>
           FinoWork se reserva el derecho de actualizar los presentes Términos periódicamente para reflejar mejoras operativas o exigencias legales. Cualquier cambio sustancial será notificado oportunamente a través de la interfaz del sistema o por correo electrónico.
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          8. Contacto y Soporte
+          9. Contacto y Soporte
         </h2>
         <p style={{ margin: 0 }}>
           Para cualquier duda, aclaratoria o soporte relacionado con estos Términos, comuníquese con el canal oficial de atención a través de nuestro soporte por WhatsApp o al correo de soporte de la plataforma.
