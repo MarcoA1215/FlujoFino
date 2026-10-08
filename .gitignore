@@ -47,3 +47,6 @@ build/
 # Repomix dumps
 repomix-backend.xml
 repomix-frontend.xml
+
+# Root APK duplicate (served from apps/frontend/public/FinoWork.apk)
+/FinoWork.apk
