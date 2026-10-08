@@ -35,6 +35,15 @@ export class SuperAdminService implements OnModuleInit {
 
   async onModuleInit() {
     try {
+      // Auto-healing defensivo de la tabla saas_payment_reports
+      await this.paymentReportRepo.query(`
+        ALTER TABLE "saas_payment_reports" ADD COLUMN IF NOT EXISTS "months" integer DEFAULT 1;
+      `);
+    } catch (err: any) {
+      this.logger.warn(`Nota de auto-healing para saas_payment_reports: ${err?.message || err}`);
+    }
+
+    try {
       // Auto-healing defensivo: Si 'compraventa' existe y no tiene referidor asignado, vincular a 'negocio prueba'
       const compraventa = await this.tenantRepo.createQueryBuilder('t')
         .where('LOWER(t.name) LIKE :name', { name: '%compraventa%' })
@@ -640,7 +649,24 @@ export class SuperAdminService implements OnModuleInit {
       months,
     });
 
-    const saved = await this.paymentReportRepo.save(report);
+    let saved: SaaSPaymentReport;
+    try {
+      saved = await this.paymentReportRepo.save(report);
+    } catch (saveErr: any) {
+      // Si la columna "months" no existe aún en la BD (ej. en despliegues sin reinicio previo), autocuramos la tabla en caliente
+      if (saveErr?.message?.includes('months') || saveErr?.driverError?.message?.includes('months')) {
+        this.logger.warn(`Columna 'months' no detectada al guardar reporte. Aplicando ALTER TABLE en caliente...`);
+        try {
+          await this.paymentReportRepo.query(`ALTER TABLE "saas_payment_reports" ADD COLUMN IF NOT EXISTS "months" integer DEFAULT 1;`);
+          saved = await this.paymentReportRepo.save(report);
+        } catch (retryErr: any) {
+          this.logger.error(`Fallo al reintentar guardar con columna months: ${retryErr.message}`);
+          throw retryErr;
+        }
+      } else {
+        throw saveErr;
+      }
+    }
 
     try {
       const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });

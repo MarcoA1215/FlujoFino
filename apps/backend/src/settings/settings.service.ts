@@ -100,6 +100,9 @@ export class SettingsService implements OnModuleInit {
         ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_email_verified" boolean NOT NULL DEFAULT false;
         ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verification_code" character varying(6);
         ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verification_expires_at" TIMESTAMP;
+
+        -- Pagos SaaS
+        ALTER TABLE "saas_payment_reports" ADD COLUMN IF NOT EXISTS "months" integer DEFAULT 1;
       `);
     } catch (migrationErr: any) {
       this.logger.warn(`Nota de autocuración de esquema al iniciar: ${migrationErr?.message || migrationErr}`);
