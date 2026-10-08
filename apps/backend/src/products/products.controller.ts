@@ -8,6 +8,7 @@ import { AddStockDto } from './dto/add-stock.dto';
 import { ConvertProductTypeDto } from './dto/convert-product-type.dto';
 
 import { StorageService } from '../storage/storage.service';
+import { safeImageUploadOptions } from '../common/utils/multer-options';
 
 @Controller('products')
 export class ProductsController {
@@ -17,7 +18,7 @@ export class ProductsController {
   ) {}
 
   @Post(':id/image')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', safeImageUploadOptions))
   async uploadImage(@Request() req: any, @Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('File is required');
     

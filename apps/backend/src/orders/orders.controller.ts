@@ -2,6 +2,7 @@ import { Controller, Request, Get, Post, Body, Param, Patch, Delete, Put, UseInt
 import { FileInterceptor } from '@nestjs/platform-express';
 import { OrdersService, CreateOrderDto, UpdatePaymentDto } from './orders.service';
 import { StorageService } from '../storage/storage.service';
+import { safeImageUploadOptions } from '../common/utils/multer-options';
 import { OrderStatus, UserRole } from '@finowork/shared-types';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -29,7 +30,7 @@ export class OrdersController {
   ) {}
 
   @Post('items/:itemId/media')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', safeImageUploadOptions))
   async uploadMedia(@Request() req: any, @Param('itemId') itemId: string, @UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('File is required');
     

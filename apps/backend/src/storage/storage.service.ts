@@ -77,12 +77,22 @@ export class StorageService {
       const customPublicUrl = this.configService.get<string>('S3_PUBLIC_URL');
       
       if (customPublicUrl) {
-        return `${customPublicUrl.replace(/\/$/, '')}/${this.bucket}/${fileName}`;
+        const cleanBase = customPublicUrl.replace(/\/$/, '');
+        if (cleanBase.includes('r2.dev') || cleanBase.endsWith(`/${this.bucket}`) || cleanBase.endsWith(this.bucket)) {
+          return `${cleanBase}/${fileName}`;
+        }
+        return `${cleanBase}/${this.bucket}/${fileName}`;
       }
 
       if (endpoint.includes('storage.supabase.co')) {
         const supabaseHost = endpoint.replace('/storage/v1/s3', '');
         return `${supabaseHost}/storage/v1/object/public/${this.bucket}/${fileName}`;
+      }
+
+      if (endpoint.includes('r2.cloudflarestorage.com')) {
+        console.warn(
+          '⚠️ ADVERTENCIA: Se subió un archivo a Cloudflare R2 pero S3_PUBLIC_URL no está configurada en .env. El endpoint privado de R2 no es accesible públicamente sin autenticación S3.'
+        );
       }
 
       return `${endpoint.replace(/\/$/, '')}/${this.bucket}/${fileName}`;

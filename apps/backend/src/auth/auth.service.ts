@@ -364,11 +364,35 @@ export class AuthService {
   }
 
   async registerTenant(body: any) {
+    if (!body.username || !body.password || !body.email || !body.tenantName) {
+      throw new BadRequestException('Todos los campos obligatorios deben ser completados');
+    }
+
+    const masterEmail = (process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN_EMAIL).toLowerCase();
+    if (body.email && body.email.trim().toLowerCase() === masterEmail) {
+      throw new BadRequestException('Este correo electrónico está reservado por el sistema.');
+    }
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
+      const cleanUsername = body.username.trim().toLowerCase();
+      const cleanEmail = body.email.trim().toLowerCase();
+
+      const existingUser = await queryRunner.manager.createQueryBuilder(User, 'u')
+        .where('LOWER(u.username) = :u', { u: cleanUsername })
+        .orWhere('LOWER(u.email) = :e', { e: cleanEmail })
+        .getOne();
+
+      if (existingUser) {
+        if (existingUser.username?.toLowerCase() === cleanUsername) {
+          throw new BadRequestException('El nombre de usuario ya se encuentra registrado.');
+        }
+        throw new BadRequestException('El correo electrónico ya se encuentra registrado.');
+      }
+
       // Consultar PlatformConfig ('default') para sincronizar valores globales
       const platformConfig = await queryRunner.manager.findOne(PlatformConfig, { where: { id: 'default' } });
       const trialDays = platformConfig?.defaultTrialDays ?? 15;

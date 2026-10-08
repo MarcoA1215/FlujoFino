@@ -62,7 +62,7 @@ import { SentryModule } from '@sentry/nestjs/setup';
     SentryModule.forRoot(),
     ThrottlerModule.forRoot([{
       ttl: 60000,
-      limit: 120,
+      limit: 300,
     }]),
     AuthModule,
     UsersModule,

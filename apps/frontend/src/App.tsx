@@ -297,6 +297,7 @@ const MainLayout: React.FC = () => {
         <Route path="/feedback" element={<PrivateRoute><FeedbackPage /></PrivateRoute>} />
         <Route path="/promoter" element={<PromoterRoute><PromoterDashboard /></PromoterRoute>} />
         <Route path="/platform-admin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
+        <Route path="*" element={<HomeRedirector />} />
       </IonRouterOutlet>
       </IonSplitPane>
       <BottomNav />

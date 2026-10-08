@@ -5,7 +5,7 @@ import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Tenant } from '../entities/tenant.entity';
 import { AccessRequest, AccessRequestStatus } from '../entities/access-request.entity';
-import { UserRole } from '@finowork/shared-types';
+import { UserRole, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 
@@ -18,18 +18,34 @@ export class UsersService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Create default admin if no users exist
+    // Create default accounts if no users exist
     const count = await this.usersRepo.count();
     if (count === 0) {
       const hash = await bcrypt.hash('admin123', 10);
       const admin = this.usersRepo.create({
         username: 'admin',
+        name: 'Administrador Demo',
         email: 'admin@finowork.com',
         passwordHash: hash,
         role: UserRole.ADMIN,
+        isEmailVerified: true,
       });
       await this.usersRepo.save(admin);
       console.log('Default admin user created: admin / admin123');
+
+      const superAdminEmail = (process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN_EMAIL).toLowerCase();
+      const superPassword = process.env.SUPERADMIN_PASSWORD || 'SuperAdmin2026!';
+      const superHash = await bcrypt.hash(superPassword, 10);
+      const superAdmin = this.usersRepo.create({
+        username: 'superadmin',
+        name: 'Super Administrador',
+        email: superAdminEmail,
+        passwordHash: superHash,
+        role: UserRole.SUPERADMIN,
+        isEmailVerified: true,
+      });
+      await this.usersRepo.save(superAdmin);
+      console.log(`🛡️ SuperAdmin inicial creado: ${superAdminEmail}`);
     }
   }
 

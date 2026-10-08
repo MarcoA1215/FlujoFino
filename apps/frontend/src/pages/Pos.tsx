@@ -1520,8 +1520,18 @@ const Pos: React.FC = () => {
                           value={deliveryZoneId}
                           placeholder="Selecciona zona de envío..."
                           onIonChange={e => setDeliveryZoneId(e.detail.value)}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-slate-800 text-sm"
-                          style={{ '--padding-start': '6px', '--padding-end': '6px', minHeight: '42px', width: '100%', maxWidth: '100%' } as any}
+                          style={{
+                            '--padding-start': '10px',
+                            '--padding-end': '10px',
+                            minHeight: '42px',
+                            width: '100%',
+                            maxWidth: '100%',
+                            backgroundColor: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '10px',
+                            fontSize: '14px',
+                            color: '#1e293b',
+                          } as any}
                         >
                           <IonSelectOption value="">Selecciona zona de envío...</IonSelectOption>
                           {deliveryZones.map(zone => (
@@ -1540,8 +1550,18 @@ const Pos: React.FC = () => {
                           value={deliveryUserId}
                           placeholder="Sin asignar / A convenir"
                           onIonChange={e => setDeliveryUserId(e.detail.value)}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-slate-800 text-sm"
-                          style={{ '--padding-start': '6px', '--padding-end': '6px', minHeight: '42px', width: '100%', maxWidth: '100%' } as any}
+                          style={{
+                            '--padding-start': '10px',
+                            '--padding-end': '10px',
+                            minHeight: '42px',
+                            width: '100%',
+                            maxWidth: '100%',
+                            backgroundColor: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '10px',
+                            fontSize: '14px',
+                            color: '#1e293b',
+                          } as any}
                         >
                           <IonSelectOption value="">Sin asignar / A convenir</IonSelectOption>
                           {employees
@@ -1620,8 +1640,17 @@ const Pos: React.FC = () => {
                         value={employeeId}
                         placeholder="Sin asignar"
                         onIonChange={e => setEmployeeId(e.detail.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-slate-800 text-sm"
-                        style={{ '--padding-start': '0px', '--padding-end': '0px', minHeight: '44px' } as any}
+                        style={{
+                          '--padding-start': '10px',
+                          '--padding-end': '10px',
+                          minHeight: '44px',
+                          width: '100%',
+                          backgroundColor: '#f8fafc',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '10px',
+                          fontSize: '14px',
+                          color: '#1e293b',
+                        } as any}
                       >
                         <IonSelectOption value="">Sin asignar</IonSelectOption>
                         {employees.map(emp => (

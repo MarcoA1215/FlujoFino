@@ -530,7 +530,6 @@ const Reservations: React.FC = () => {
             <img 
               src="/assets/logo.png" 
               alt="FinoWork" 
-              className="w-12 h-12 rounded-2xl object-cover shadow-sm" 
               style={{ width: '42px', height: '42px', borderRadius: '12px', objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
             />
           </div>

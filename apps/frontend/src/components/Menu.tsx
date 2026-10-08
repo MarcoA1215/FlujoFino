@@ -280,7 +280,6 @@ const Menu: React.FC = () => {
           <img 
             src="/assets/logo.png" 
             alt={APP_NAME} 
-            className="w-12 h-12 rounded-2xl object-cover shadow-sm" 
             style={{ width: '48px', height: '48px', borderRadius: '16px', objectFit: 'cover', marginBottom: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.12)' }}
           />
           

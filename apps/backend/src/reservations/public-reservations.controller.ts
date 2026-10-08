@@ -18,6 +18,7 @@ import { CustomersService } from '../customers/customers.service';
 import { StorageService } from '../storage/storage.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { isTenantSuspendedOrExpired } from '../utils/tenant-status';
+import { safeImageUploadOptions } from '../common/utils/multer-options';
 
 export class CreatePublicReservationDto {
   @IsString()
@@ -107,7 +108,7 @@ export class PublicReservationsController {
   ) {}
 
   @Post('appointment/upload-proof')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', safeImageUploadOptions))
   async uploadProof(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('Archivo requerido');
     const url = await this.storageService.uploadFile(file, `public-proofs`);

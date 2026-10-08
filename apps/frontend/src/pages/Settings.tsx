@@ -474,7 +474,6 @@ const SettingsPage: React.FC = () => {
 
                         <IonButton
                           fill="outline"
-                          className="border border-slate-300 text-slate-700"
                           style={{
                             flex: 1,
                             minWidth: '160px',
