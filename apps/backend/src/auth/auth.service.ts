@@ -369,7 +369,7 @@ export class AuthService {
     }
 
     if (!body.acceptedTerms) {
-      throw new BadRequestException('Debes aceptar los Términos y Condiciones y la Política de Privacidad para registrar tu negocio.');
+      throw new BadRequestException('Debes aceptar los Términos y Condiciones y la Política de Privacidad para registrar tu negocio. Si estás utilizando la aplicación móvil, por favor descarga e instala la última versión de la app.');
     }
 
     const masterEmail = (process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN_EMAIL).toLowerCase();
