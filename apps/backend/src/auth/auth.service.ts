@@ -368,6 +368,10 @@ export class AuthService {
       throw new BadRequestException('Todos los campos obligatorios deben ser completados');
     }
 
+    if (!body.acceptedTerms) {
+      throw new BadRequestException('Debes aceptar los Términos y Condiciones y la Política de Privacidad para registrar tu negocio.');
+    }
+
     const masterEmail = (process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN_EMAIL).toLowerCase();
     if (body.email && body.email.trim().toLowerCase() === masterEmail) {
       throw new BadRequestException('Este correo electrónico está reservado por el sistema.');

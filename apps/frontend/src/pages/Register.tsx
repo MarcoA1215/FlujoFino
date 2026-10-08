@@ -1,9 +1,41 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonButton, useIonToast, IonToggle, IonText, IonIcon } from '@ionic/react';
-import { informationCircleOutline, arrowBackOutline, arrowForwardOutline, checkmarkDoneOutline, giftOutline } from 'ionicons/icons';
+import {
+  IonPage,
+  IonContent,
+  IonCard,
+  IonCardHeader,
+  IonCardTitle,
+  IonCardContent,
+  IonItem,
+  IonLabel,
+  IonInput,
+  IonButton,
+  useIonToast,
+  IonToggle,
+  IonText,
+  IonIcon,
+  IonCheckbox,
+  IonModal,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonButtons
+} from '@ionic/react';
+import {
+  informationCircleOutline,
+  arrowBackOutline,
+  arrowForwardOutline,
+  checkmarkDoneOutline,
+  giftOutline,
+  closeOutline,
+  shieldCheckmarkOutline,
+  documentTextOutline
+} from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import { useIonRouter } from '@ionic/react';
+import { TermsContent } from './TermsAndConditions';
+import { PrivacyContent } from './PrivacyPolicy';
 
 const Register: React.FC = () => {
   const [step, setStep] = useState(1);
@@ -15,6 +47,9 @@ const Register: React.FC = () => {
   const [identification, setIdentification] = useState('');
   const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -37,6 +72,15 @@ const Register: React.FC = () => {
       presentToast({ message: 'Por favor, llena los datos de la empresa, correo y usuario.', duration: 3000, color: 'warning' });
       return;
     }
+
+    if (!acceptedTerms) {
+      presentToast({
+        message: 'Debes leer y aceptar los Términos y Condiciones y la Política de Privacidad para registrar tu negocio.',
+        duration: 4000,
+        color: 'warning'
+      });
+      return;
+    }
     
     try {
       const res = await apiClient.post('/auth/register', {
@@ -50,7 +94,8 @@ const Register: React.FC = () => {
         referralCode: referralCode.trim() || undefined,
         featureCustomerSchedules,
         featureRecipes,
-        featureBuySell
+        featureBuySell,
+        acceptedTerms: true
       });
       // Auto login
       login(res.data.access_token, res.data.user, res.data.workspaces);
@@ -196,11 +241,82 @@ const Register: React.FC = () => {
                     </IonItem>
                   </IonCard>
 
+                  <div
+                    style={{
+                      marginTop: '16px',
+                      marginBottom: '16px',
+                      padding: '14px',
+                      borderRadius: '12px',
+                      background: '#F8FAFC',
+                      border: acceptedTerms ? '1px solid #10B981' : '1px solid #E2E8F0',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '12px',
+                      transition: 'border-color 0.2s ease'
+                    }}
+                  >
+                    <IonCheckbox
+                      checked={acceptedTerms}
+                      onIonChange={e => setAcceptedTerms(e.detail.checked)}
+                      style={{
+                        marginTop: '2px',
+                        '--size': '20px',
+                        '--checkbox-background-checked': '#10B981',
+                        '--border-color-checked': '#10B981'
+                      } as any}
+                    />
+                    <div style={{ fontSize: '13px', color: '#334155', lineHeight: '1.45', flex: 1 }}>
+                      He leído y acepto los{' '}
+                      <button
+                        type="button"
+                        onClick={() => setShowTermsModal(true)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          color: '#10B981',
+                          fontWeight: '600',
+                          textDecoration: 'underline',
+                          cursor: 'pointer',
+                          fontSize: '13px'
+                        }}
+                      >
+                        Términos y Condiciones
+                      </button>{' '}
+                      y la{' '}
+                      <button
+                        type="button"
+                        onClick={() => setShowPrivacyModal(true)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          color: '#10B981',
+                          fontWeight: '600',
+                          textDecoration: 'underline',
+                          cursor: 'pointer',
+                          fontSize: '13px'
+                        }}
+                      >
+                        Política de Privacidad
+                      </button>{' '}
+                      de FinoWork.
+                    </div>
+                  </div>
+
                   <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                     <IonButton expand="block" fill="outline" onClick={() => setStep(1)} style={{ flex: 1 }}>
                       <IonIcon slot="start" icon={arrowBackOutline} /> Atrás
                     </IonButton>
-                    <IonButton expand="block" onClick={handleRegister} style={{ flex: 2 }}>
+                    <IonButton
+                      expand="block"
+                      onClick={handleRegister}
+                      disabled={!acceptedTerms}
+                      style={{
+                        flex: 2,
+                        '--background': acceptedTerms ? '#10B981' : undefined
+                      } as any}
+                    >
                       Finalizar <IonIcon slot="end" icon={checkmarkDoneOutline} />
                     </IonButton>
                   </div>
@@ -209,6 +325,74 @@ const Register: React.FC = () => {
             </IonCardContent>
           </IonCard>
         </div>
+
+        {/* Modal Términos y Condiciones */}
+        <IonModal isOpen={showTermsModal} onDidDismiss={() => setShowTermsModal(false)}>
+          <IonHeader>
+            <IonToolbar style={{ '--background': '#0F172A', '--color': '#FFFFFF' } as any}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '12px' }}>
+                <IonIcon icon={documentTextOutline} style={{ color: '#10B981', fontSize: '20px' }} />
+                <IonTitle style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: 'bold' }}>Términos y Condiciones</IonTitle>
+              </div>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setShowTermsModal(false)} style={{ color: '#FFFFFF' }}>
+                  <IonIcon icon={closeOutline} />
+                </IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding" style={{ '--background': '#F8FAFC' } as any}>
+            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+              <TermsContent />
+              <div style={{ marginTop: '24px', paddingBottom: '30px', textAlign: 'center' }}>
+                <IonButton
+                  onClick={() => {
+                    setAcceptedTerms(true);
+                    setShowTermsModal(false);
+                  }}
+                  style={{ '--background': '#10B981' } as any}
+                >
+                  <IonIcon slot="start" icon={checkmarkDoneOutline} />
+                  Aceptar y Continuar
+                </IonButton>
+              </div>
+            </div>
+          </IonContent>
+        </IonModal>
+
+        {/* Modal Política de Privacidad */}
+        <IonModal isOpen={showPrivacyModal} onDidDismiss={() => setShowPrivacyModal(false)}>
+          <IonHeader>
+            <IonToolbar style={{ '--background': '#0F172A', '--color': '#FFFFFF' } as any}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '12px' }}>
+                <IonIcon icon={shieldCheckmarkOutline} style={{ color: '#10B981', fontSize: '20px' }} />
+                <IonTitle style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: 'bold' }}>Política de Privacidad</IonTitle>
+              </div>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setShowPrivacyModal(false)} style={{ color: '#FFFFFF' }}>
+                  <IonIcon icon={closeOutline} />
+                </IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding" style={{ '--background': '#F8FAFC' } as any}>
+            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+              <PrivacyContent />
+              <div style={{ marginTop: '24px', paddingBottom: '30px', textAlign: 'center' }}>
+                <IonButton
+                  onClick={() => {
+                    setAcceptedTerms(true);
+                    setShowPrivacyModal(false);
+                  }}
+                  style={{ '--background': '#10B981' } as any}
+                >
+                  <IonIcon slot="start" icon={checkmarkDoneOutline} />
+                  Aceptar y Continuar
+                </IonButton>
+              </div>
+            </div>
+          </IonContent>
+        </IonModal>
       </IonContent>
     </IonPage>
   );

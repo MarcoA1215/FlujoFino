@@ -25,6 +25,9 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import DeliveryPanel from './pages/DeliveryPanel';
 import SubscriptionExpired from './pages/SubscriptionExpired';
 import PromoterDashboard from './pages/PromoterDashboard';
+import LandingPage from './pages/LandingPage';
+import TermsAndConditions from './pages/TermsAndConditions';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { SubscriptionProvider, SubscriptionContext } from './context/SubscriptionContext';
 import { ImageViewerProvider } from './context/ImageViewerContext';
@@ -60,7 +63,7 @@ const HomeRedirector: React.FC = () => {
   const { isExpired, isLoading: isSubLoading } = useContext(SubscriptionContext);
 
   if (isLoading || isSubLoading) return null;
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <LandingPage />;
 
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
   if (isSuperAdmin) {
@@ -242,7 +245,13 @@ const MainLayout: React.FC = () => {
   const isPublicRoute = location.pathname.startsWith('/book') || 
                         location.pathname.startsWith('/store') || 
                         location.pathname.startsWith('/tienda') || 
-                        location.pathname.startsWith('/appointment');
+                        location.pathname.startsWith('/appointment') ||
+                        location.pathname === '/landing' ||
+                        location.pathname === '/terms' ||
+                        location.pathname === '/privacy' ||
+                        location.pathname === '/login' ||
+                        location.pathname === '/register' ||
+                        (location.pathname === '/' && !user);
   const isExpiredRoute = location.pathname === '/subscription-expired';
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
   const isPromotor = user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR';
@@ -276,6 +285,9 @@ const MainLayout: React.FC = () => {
         <Route path="/tienda/:tenantId" element={<PublicStore />} />
         <Route path="/appointment/:id" element={<PublicAppointmentManage />} />
         <Route path="/subscription-expired" element={<ExpiredPaywallRoute />} />
+        <Route path="/landing" element={<LandingPage />} />
+        <Route path="/terms" element={<TermsAndConditions />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/" element={<HomeRedirector />} />
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/register" element={<RegisterRoute />} />
