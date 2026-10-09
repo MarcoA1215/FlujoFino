@@ -140,7 +140,7 @@ describe('ProductsService & Accounting Immutability Suite', () => {
 
       // El registro histórico de la orden previa no debe mutar
       expect(orderItem.unitCost).toBe(2.50);
-      expect(orderItem.unitCost * orderItem.quantity!).toBe(10.00);
+      expect(orderItem.unitCost! * orderItem.quantity!).toBe(10.00);
       expect(orderItem.unitCost).not.toBe(product.estimatedCost);
     });
   });

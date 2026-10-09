@@ -210,7 +210,7 @@ describe('Auditoría Integral de los 8 Casos Críticos de Negocio', () => {
         exchangeRate: orderRate,
         amountBs: 7 * orderRate,
         createdAt: new Date(),
-        status: OrderStatus.COMPLETED,
+        status: OrderStatus.DELIVERED,
       };
 
       mockOrderRepo.find.mockResolvedValue([crossOrder]);
@@ -395,7 +395,7 @@ describe('Auditoría Integral de los 8 Casos Críticos de Negocio', () => {
         paymentStatus: PaymentStatus.PAID,
         paymentMethod: 'PAGO_MOVIL',
         createdAt: new Date(),
-        status: OrderStatus.COMPLETED,
+        status: OrderStatus.DELIVERED,
       };
 
       // 2. Tarde: El dueño cambia la tasa a 1.000 Bs en Settings
