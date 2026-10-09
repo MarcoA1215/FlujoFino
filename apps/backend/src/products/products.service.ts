@@ -112,7 +112,7 @@ export class ProductsService {
       ...dto,
       stock: isServiceVal ? 0 : stockVal,
       stockQuantity: isServiceVal ? 0 : stockVal,
-      physicalStock: isServiceVal ? 0 : stockVal,
+      physicalStock: isServiceVal ? 0 : (dto.physicalStock !== undefined ? dto.physicalStock : stockVal),
       cost: costVal,
       estimatedCost: costVal,
       is_service: isServiceVal,
@@ -154,6 +154,9 @@ export class ProductsService {
         product.stock = dto.stock;
         product.stockQuantity = dto.stock;
         product.physicalStock = dto.stock;
+      }
+      if (dto.physicalStock !== undefined) {
+        product.physicalStock = dto.physicalStock;
       }
       if (dto.cost !== undefined) {
         product.cost = dto.cost;

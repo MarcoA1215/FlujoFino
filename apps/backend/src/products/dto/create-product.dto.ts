@@ -13,6 +13,10 @@ export class CreateProductDto {
   @IsOptional() @IsNumber() cost?: number;
   @IsOptional() @IsNumber() stock?: number;
   @IsOptional() @IsNumber() stockQuantity?: number;
+  @IsOptional() @IsNumber() physicalStock?: number;
+  @IsOptional() @IsString() availabilityType?: 'INMEDIATO' | 'BAJO_ENCARGO';
+  @IsOptional() @IsBoolean() isSupplierPreorder?: boolean;
+  @IsOptional() @IsArray() images?: string[];
   @IsOptional() @IsBoolean() is_service?: boolean;
   @IsOptional() @IsString() product_type?: string;
 }
