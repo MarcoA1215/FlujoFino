@@ -85,13 +85,11 @@ export class PublicStoreController {
       return true;
     });
 
-    const storeProducts = nonServiceProducts.map((p) => {
-      const isFoodOrPrepared = 
-        !p.isPreAssembled ||
-        p.product_type === 'FORMULA' ||
-        Boolean(p.category && /comida|alimento|hamburguesa|snack|bebida|preparad|postre|restaurante/i.test(p.category));
-
-      const isMadeToOrder = Boolean(isFoodOrPrepared && (!p.isPreAssembled || p.product_type === 'FORMULA' || (p.category && /comida|alimento/i.test(p.category))));
+      const isFoodCategory = Boolean(p.category && /comida|alimento|hamburguesa|snack|bebida|preparad|postre|restaurante/i.test(p.category));
+      const hasRecipe = Boolean(p.recipe && p.recipe.length > 0);
+      const isFormula = p.product_type === 'FORMULA';
+      const isFoodOrPrepared = (hasRecipe && !p.isPreAssembled) || isFormula || (isFoodCategory && !p.isPreAssembled);
+      const isMadeToOrder = isFoodOrPrepared;
 
       let availableStock = Math.max(0, Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.stockQuantity || 0)));
       if (p.isCombo && !p.isPreAssembled && p.comboItems && p.comboItems.length > 0) {
@@ -252,11 +250,11 @@ export class PublicStoreController {
         hasUnderDemand = true;
       }
 
-      const isFoodOrPrepared = 
-        !product.isPreAssembled ||
-        product.product_type === 'FORMULA' ||
-        Boolean(product.category && /comida|alimento|hamburguesa|snack|bebida|preparad|postre|restaurante/i.test(product.category));
-      const isMadeToOrder = Boolean(isFoodOrPrepared && (!product.isPreAssembled || product.product_type === 'FORMULA' || (product.category && /comida|alimento/i.test(product.category))));
+      const isFoodCategory = Boolean(product.category && /comida|alimento|hamburguesa|snack|bebida|preparad|postre|restaurante/i.test(product.category));
+      const hasRecipe = Boolean(product.recipe && product.recipe.length > 0);
+      const isFormula = product.product_type === 'FORMULA';
+      const isFoodOrPrepared = (hasRecipe && !product.isPreAssembled) || isFormula || (isFoodCategory && !product.isPreAssembled);
+      const isMadeToOrder = isFoodOrPrepared;
 
       const isExemptFromStock = product.isSupplierPreorder || product.availabilityType === 'BAJO_ENCARGO' || isMadeToOrder;
       if (!isExemptFromStock) {

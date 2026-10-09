@@ -457,11 +457,11 @@ export class OrdersService {
             }
           } else if (!product.isCombo || product.isPreAssembled) {
             const isService = product.is_service || product.category === 'Servicios' || Boolean(product.durationMinutes);
-            const isFoodOrPrepared = 
-              !product.isPreAssembled ||
-              product.product_type === 'FORMULA' ||
-              Boolean(product.category && /comida|alimento|hamburguesa|snack|bebida|preparad|postre|restaurante/i.test(product.category));
-            const isMadeToOrder = Boolean(isFoodOrPrepared && (!product.isPreAssembled || product.product_type === 'FORMULA' || (product.category && /comida|alimento/i.test(product.category))));
+            const isFoodCategory = Boolean(product.category && /comida|alimento|hamburguesa|snack|bebida|preparad|postre|restaurante/i.test(product.category));
+            const hasRecipe = Boolean(product.recipe && product.recipe.length > 0);
+            const isFormula = product.product_type === 'FORMULA';
+            const isFoodOrPrepared = (hasRecipe && !product.isPreAssembled) || isFormula || (isFoodCategory && !product.isPreAssembled);
+            const isMadeToOrder = isFoodOrPrepared;
 
             const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
             if (isMadeToOrder || (!isService && currentStock < itemDto.quantity)) {
@@ -664,11 +664,11 @@ export class OrdersService {
               }
             } else if (!product.isCombo || product.isPreAssembled) {
               const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
-              const isFoodOrPrepared = 
-                !product.isPreAssembled ||
-                product.product_type === 'FORMULA' ||
-                Boolean(product.category && /comida|alimento|hamburguesa|snack|bebida|preparad|postre|restaurante/i.test(product.category));
-              const isMadeToOrder = Boolean(isFoodOrPrepared && (!product.isPreAssembled || product.product_type === 'FORMULA' || (product.category && /comida|alimento/i.test(product.category))));
+              const isFoodCategory = Boolean(product.category && /comida|alimento|hamburguesa|snack|bebida|preparad|postre|restaurante/i.test(product.category));
+              const hasRecipe = Boolean(product.recipe && product.recipe.length > 0);
+              const isFormula = product.product_type === 'FORMULA';
+              const isFoodOrPrepared = (hasRecipe && !product.isPreAssembled) || isFormula || (isFoodCategory && !product.isPreAssembled);
+              const isMadeToOrder = isFoodOrPrepared;
 
               if (!isService && !isMadeToOrder) {
                 const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;

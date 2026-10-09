@@ -20,6 +20,7 @@ describe('OrdersService', () => {
   let mockManager: any;
   let mockDataSource: any;
   let mockCustomersService: any;
+  let mockSettingsService: any;
 
   beforeEach(async () => {
     mockOrderRepo = {
@@ -64,9 +65,10 @@ describe('OrdersService', () => {
       incrementVisits: jest.fn().mockResolvedValue(undefined),
     };
 
-    const mockSettingsService = {
+    mockSettingsService = {
       getEffectiveRate: jest.fn().mockResolvedValue(50.0),
       getExchangeRate: jest.fn().mockResolvedValue({ exchangeRateBs: 50.0, currencySymbol: 'Bs.' }),
+      getSettings: jest.fn().mockResolvedValue({ allowNegativeStock: false }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -582,6 +584,190 @@ describe('OrdersService', () => {
       expect(res.success).toBe(true);
       expect(res.syncedOfflineIds).toContain(existingOfflineId);
       expect(res.failedOrders).toHaveLength(0);
+    });
+  });
+
+  describe('allowNegativeStock & Por Producir Flow', () => {
+    it('cuando allowNegativeStock es FALSE, bloquea la venta con BadRequestException si el producto no tiene suficiente stock', async () => {
+      const tenantId = 'tenant-stock-1';
+      mockSettingsService.getSettings.mockResolvedValue({ allowNegativeStock: false });
+
+      const prod = {
+        id: 'prod-item-1',
+        name: 'Camisa Formal',
+        stock: 2,
+        stockQuantity: 2,
+        is_service: false,
+        category: 'Ropa',
+        salePrice: 20,
+      };
+
+      mockManager.find.mockImplementation((entity: any) => {
+        if (entity === Product || entity?.name === 'Product') return Promise.resolve([prod]);
+        return Promise.resolve([]);
+      });
+
+      const orderDto: any = {
+        customerName: 'Cliente Retail',
+        paymentStatus: PaymentStatus.PAID,
+        paymentMethod: 'USD',
+        items: [{ productId: 'prod-item-1', quantity: 5, unitPrice: 20 }], // Pide 5, solo hay 2
+      };
+
+      await expect(service.createOrder(tenantId, orderDto)).rejects.toThrow(
+        /Stock insuficiente para "Camisa Formal"/
+      );
+    });
+
+    it('cuando allowNegativeStock es TRUE, permite la venta y reduce el stock a negativo (-3) para registrarlo como "Por producir"', async () => {
+      const tenantId = 'tenant-stock-1';
+      mockSettingsService.getSettings.mockResolvedValue({ allowNegativeStock: true });
+
+      const prod = {
+        id: 'prod-item-1',
+        name: 'Camisa Formal a Medida',
+        stock: 2,
+        stockQuantity: 2,
+        is_service: false,
+        category: 'Ropa',
+        salePrice: 20,
+      };
+
+      mockManager.find.mockImplementation((entity: any) => {
+        if (entity === Product || entity?.name === 'Product') return Promise.resolve([prod]);
+        return Promise.resolve([]);
+      });
+
+      const orderDto: any = {
+        customerName: 'Cliente Bajo Demanda',
+        paymentStatus: PaymentStatus.PAID,
+        paymentMethod: 'USD',
+        items: [{ productId: 'prod-item-1', quantity: 5, unitPrice: 20 }], // Pide 5, stock inicial 2
+      };
+
+      const result = await service.createOrder(tenantId, orderDto);
+
+      expect(result).toBeDefined();
+      // 2 - 5 = -3 (en frontend esto se muestra como "Por producir: 3")
+      expect(prod.stock).toBe(-3);
+      expect(prod.stockQuantity).toBe(-3);
+      expect(mockManager.save).toHaveBeenCalledWith(Product, prod);
+    });
+
+    it('cuando allowNegativeStock es FALSE, bloquea si los insumos de receta (RawMaterial) son insuficientes', async () => {
+      const tenantId = 'tenant-stock-1';
+      mockSettingsService.getSettings.mockResolvedValue({ allowNegativeStock: false });
+
+      const rawHarina = {
+        id: 'rm-harina',
+        name: 'Harina de Trigo',
+        stockQuantity: 1, // Solo hay 1 kg
+        costPerUnit: 1.0,
+      };
+
+      const pizza = {
+        id: 'prod-pizza',
+        name: 'Pizza Familiar',
+        salePrice: 15,
+        recipe: [
+          { rawMaterial: rawHarina, quantity: 1 }, // Requiere 1 kg por pizza
+        ],
+      };
+
+      mockManager.find.mockImplementation((entity: any) => {
+        if (entity === Product || entity?.name === 'Product') return Promise.resolve([pizza]);
+        return Promise.resolve([]);
+      });
+
+      const orderDto: any = {
+        customerName: 'Cliente Pizzeria',
+        paymentStatus: PaymentStatus.PAID,
+        paymentMethod: 'USD',
+        items: [{ productId: 'prod-pizza', quantity: 3, unitPrice: 15 }], // Pide 3 pizzas = 3 kg harina (solo hay 1)
+      };
+
+      await expect(service.createOrder(tenantId, orderDto)).rejects.toThrow(
+        /Stock insuficiente para el insumo "Harina de Trigo"/
+      );
+    });
+
+    it('cuando allowNegativeStock es TRUE, descuenta la materia prima a negativo (-2) permitiendo venta bajo demanda', async () => {
+      const tenantId = 'tenant-stock-1';
+      mockSettingsService.getSettings.mockResolvedValue({ allowNegativeStock: true });
+
+      const rawHarina = {
+        id: 'rm-harina',
+        name: 'Harina de Trigo',
+        stockQuantity: 1,
+        costPerUnit: 1.0,
+      };
+
+      const pizza = {
+        id: 'prod-pizza',
+        name: 'Pizza Familiar',
+        salePrice: 15,
+        recipe: [
+          { rawMaterial: rawHarina, quantity: 1 },
+        ],
+      };
+
+      mockManager.find.mockImplementation((entity: any) => {
+        if (entity === Product || entity?.name === 'Product') return Promise.resolve([pizza]);
+        return Promise.resolve([]);
+      });
+
+      const orderDto: any = {
+        customerName: 'Cliente Pizzeria',
+        paymentStatus: PaymentStatus.PAID,
+        paymentMethod: 'USD',
+        items: [{ productId: 'prod-pizza', quantity: 3, unitPrice: 15 }],
+      };
+
+      const result = await service.createOrder(tenantId, orderDto);
+
+      expect(result).toBeDefined();
+      // 1 - 3 = -2 kg de harina
+      expect(rawHarina.stockQuantity).toBe(-2);
+      expect(mockManager.save).toHaveBeenCalledWith(RawMaterial, rawHarina);
+    });
+
+    it('cuando allowNegativeStock es FALSE, bloquea si un componente de combo no tiene suficiente stock', async () => {
+      const tenantId = 'tenant-stock-1';
+      mockSettingsService.getSettings.mockResolvedValue({ allowNegativeStock: false });
+
+      const compGaseosa = {
+        id: 'prod-gaseosa',
+        name: 'Gaseosa 500ml',
+        stockQuantity: 1, // Solo hay 1
+        stock: 1,
+      };
+
+      const combo = {
+        id: 'combo-almuerzo',
+        name: 'Combo Almuerzo',
+        isCombo: true,
+        isPreAssembled: false,
+        salePrice: 10,
+        comboItems: [
+          { component: compGaseosa, quantity: 1 },
+        ],
+      };
+
+      mockManager.find.mockImplementation((entity: any) => {
+        if (entity === Product || entity?.name === 'Product') return Promise.resolve([combo]);
+        return Promise.resolve([]);
+      });
+
+      const orderDto: any = {
+        customerName: 'Cliente Combo',
+        paymentStatus: PaymentStatus.PAID,
+        paymentMethod: 'USD',
+        items: [{ productId: 'combo-almuerzo', quantity: 2, unitPrice: 10 }], // Requiere 2 gaseosas
+      };
+
+      await expect(service.createOrder(tenantId, orderDto)).rejects.toThrow(
+        /Stock insuficiente para el componente "Gaseosa 500ml"/
+      );
     });
   });
 });

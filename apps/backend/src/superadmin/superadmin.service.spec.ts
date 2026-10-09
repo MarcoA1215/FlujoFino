@@ -512,4 +512,53 @@ describe('SuperAdminService', () => {
       ).rejects.toThrow('Ya existe un usuario con este correo electrónico o nombre de usuario');
     });
   });
+
+  describe('payPromoterCommission', () => {
+    it('throws BadRequestException if paymentReference is missing or empty', async () => {
+      await expect(service.payPromoterCommission('comm-1', '   ')).rejects.toThrow(
+        'La referencia de pago es obligatoria'
+      );
+    });
+
+    it('throws NotFoundException if commission does not exist', async () => {
+      commissionRepo.findOne.mockResolvedValue(null);
+      await expect(service.payPromoterCommission('non-existent', 'REF-12345')).rejects.toThrow(
+        /no encontrada/
+      );
+    });
+
+    it('throws BadRequestException if commission is already in PAID status', async () => {
+      commissionRepo.findOne.mockResolvedValue({
+        id: 'comm-paid-1',
+        status: PromoterCommissionStatus.PAID,
+      });
+      await expect(service.payPromoterCommission('comm-paid-1', 'REF-12345')).rejects.toThrow(
+        'Esta comisión ya fue pagada previamente'
+      );
+    });
+
+    it('successfully transitions commission to PAID and records paidAt and paymentReference', async () => {
+      const mockCommission = {
+        id: 'comm-pending-1',
+        amountUSD: 10.00,
+        status: PromoterCommissionStatus.PENDING,
+        paidAt: null,
+        paymentReference: null,
+      };
+      commissionRepo.findOne.mockResolvedValue(mockCommission);
+      commissionRepo.save.mockImplementation((c: any) => Promise.resolve(c));
+
+      const result = await service.payPromoterCommission('comm-pending-1', 'PAGO-MOVIL-REF-9988');
+
+      expect(result.status).toBe(PromoterCommissionStatus.PAID);
+      expect(result.paymentReference).toBe('PAGO-MOVIL-REF-9988');
+      expect(result.paidAt).toBeInstanceOf(Date);
+      expect(commissionRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: PromoterCommissionStatus.PAID,
+          paymentReference: 'PAGO-MOVIL-REF-9988',
+        })
+      );
+    });
+  });
 });

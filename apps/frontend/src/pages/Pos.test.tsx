@@ -54,5 +54,36 @@ describe('Caja Registradora (POS) - Lógica de Rentabilidad y Descuentos', () =>
       expect(lossAmount > 0).toBe(true); // Se pintaría de rojo la alerta de advertencia!
     });
   });
+
+  describe('Formateo de Stock y Modo Bajo Demanda ("Por producir")', () => {
+    const getStockLabel = (pStock: number, isService: boolean = false, duration?: number) => {
+      if (isService) {
+        return duration ? `⏱️ ${duration}m` : 'Servicio';
+      }
+      return pStock < 0
+        ? `Por producir: ${Math.abs(pStock)}`
+        : (pStock === 0 ? 'Agotado' : `Stock: ${pStock}`);
+    };
+
+    it('debe mostrar "Por producir: 15" cuando el stock es negativo (-15)', () => {
+      const label = getStockLabel(-15);
+      expect(label).toBe('Por producir: 15');
+    });
+
+    it('debe mostrar "Agotado" cuando el stock es estrictamente 0', () => {
+      const label = getStockLabel(0);
+      expect(label).toBe('Agotado');
+    });
+
+    it('debe mostrar "Stock: 25" cuando el stock es positivo', () => {
+      const label = getStockLabel(25);
+      expect(label).toBe('Stock: 25');
+    });
+
+    it('debe respetar si es un servicio mostrando tiempo o etiqueta Servicio', () => {
+      expect(getStockLabel(-10, true, 45)).toBe('⏱️ 45m');
+      expect(getStockLabel(0, true)).toBe('Servicio');
+    });
+  });
 });
 
