@@ -77,9 +77,7 @@ import { SentryModule } from '@sentry/nestjs/setup';
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
         entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription, SalaryAdvance, Investment, Promoter, PromoterCommission, CashExchange],
-        synchronize: configService.get<string>('DB_SYNCHRONIZE') !== undefined
-          ? configService.get<string>('DB_SYNCHRONIZE') === 'true'
-          : true,
+        synchronize: configService.get<string>('DB_SYNCHRONIZE') === 'true',
       }),
       inject: [ConfigService],
     }),

@@ -8,7 +8,7 @@ import { Tenant } from '../entities/tenant.entity';
 import { Settings } from '../entities/settings.entity';
 import { Reservation } from '../entities/reservation.entity';
 import { Product } from '../entities/product.entity';
-import { ReservationStatus, PaymentStatus, DeliveryMethod, OrderStatus } from '@finowork/shared-types';
+import { ReservationStatus, PaymentStatus, DeliveryMethod, OrderStatus, UserRole } from '@finowork/shared-types';
 import { decodeTenantId } from '../utils/tenant-crypto';
 import { Public } from '../auth/public.decorator';
 import { OrderItem } from '../entities/order-item.entity';
@@ -175,7 +175,14 @@ export class PublicReservationsController {
         order: { user: { username: 'ASC' } }
       });
       staff = accesses
-        .filter(a => !!a.user)
+        .filter(a => {
+          if (!a.user) return false;
+          const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
+            ? a.roles
+            : [a.role || a.user.role].filter(Boolean);
+          const isExclusivelyNonStaff = userRoles.length > 0 && userRoles.every(r => r === UserRole.DELIVERY || r === UserRole.OPERATIVO);
+          return !isExclusivelyNonStaff;
+        })
         .map(a => {
           const rawName = (a.user.name && a.user.name.trim()) ? a.user.name.trim() : '';
           const cleanUsername = (a.user.username || '')

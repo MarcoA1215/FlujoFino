@@ -1,4 +1,4 @@
-﻿import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { TenantPlanType, TenantStatus } from '@finowork/shared-types';
 import { Promoter } from './promoter.entity';
@@ -11,9 +11,11 @@ export class Tenant {
   @Column()
   name: string;
 
+  @Index()
   @Column({ default: true })
   isActive: boolean;
 
+  @Index()
   @Column({
     type: 'varchar',
     default: TenantStatus.TRIAL,

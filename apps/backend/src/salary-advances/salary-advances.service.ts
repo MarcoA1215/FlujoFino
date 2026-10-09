@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { SalaryAdvance, SalaryAdvanceStatus } from '../entities/salary-advance.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
 import { User } from '../entities/user.entity';
 import { Settings } from '../entities/settings.entity';
+import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { CreateSalaryAdvanceDto } from './dto/create-salary-advance.dto';
 
 @Injectable()
@@ -19,12 +20,25 @@ export class SalaryAdvancesService {
     @InjectRepository(Settings)
     private readonly settingsRepo: Repository<Settings>,
     private readonly dataSource: DataSource,
+    @Optional()
+    @InjectRepository(UserTenantAccess)
+    private readonly accessRepo?: Repository<UserTenantAccess>,
   ) {}
 
   async create(tenantId: string, dto: CreateSalaryAdvanceDto): Promise<SalaryAdvance> {
     const user = await this.userRepo.findOne({ where: { id: dto.userId } });
     if (!user) {
       throw new NotFoundException('Empleado no encontrado');
+    }
+
+    const accessRepository = this.accessRepo || (this.dataSource.getRepository ? this.dataSource.getRepository(UserTenantAccess) : null);
+    if (accessRepository) {
+      const access = await accessRepository.findOne({
+        where: { userId: dto.userId, tenantId, isActive: true },
+      });
+      if (!access) {
+        throw new BadRequestException('El empleado no pertenece a este negocio');
+      }
     }
 
     let rate = dto.exchangeRate;

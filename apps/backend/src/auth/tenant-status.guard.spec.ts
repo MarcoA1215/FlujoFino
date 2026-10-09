@@ -48,13 +48,30 @@ describe('TenantStatusGuard', () => {
     expect(result).toBe(true);
   });
 
-  it('should allow access for exempt payment routes even if tenant is suspended', async () => {
+  it('should allow access immediately if tenantId is not a valid UUID (literal space)', async () => {
     const context: any = {
       getHandler: () => ({}),
       getClass: () => ({}),
       switchToHttp: () => ({
         getRequest: () => ({
-          user: { role: 'ADMIN', tenantId: 'tenant-1' },
+          user: { role: 'PROMOTER', tenantId: 'promoter-space' },
+          url: '/orders',
+        }),
+      }),
+    };
+    const result = await guard.canActivate(context);
+    expect(result).toBe(true);
+    expect(mockTenantRepo.findOne).not.toHaveBeenCalled();
+  });
+
+  it('should allow access for exempt payment routes even if tenant is suspended', async () => {
+    const validUuid = '11111111-1111-1111-1111-111111111111';
+    const context: any = {
+      getHandler: () => ({}),
+      getClass: () => ({}),
+      switchToHttp: () => ({
+        getRequest: () => ({
+          user: { role: 'ADMIN', tenantId: validUuid },
           url: '/superadmin/payments/report',
         }),
       }),
@@ -64,8 +81,9 @@ describe('TenantStatusGuard', () => {
   });
 
   it('should throw ForbiddenException if tenant is suspended', async () => {
+    const validUuid = '11111111-1111-1111-1111-111111111111';
     mockTenantRepo.findOne.mockResolvedValue({
-      id: 'tenant-1',
+      id: validUuid,
       isActive: true,
       status: TenantStatus.SUSPENDED,
     });
@@ -75,7 +93,7 @@ describe('TenantStatusGuard', () => {
       getClass: () => ({}),
       switchToHttp: () => ({
         getRequest: () => ({
-          user: { role: 'ADMIN', tenantId: 'tenant-1' },
+          user: { role: 'ADMIN', tenantId: validUuid },
           url: '/orders',
         }),
       }),
@@ -85,8 +103,9 @@ describe('TenantStatusGuard', () => {
   });
 
   it('should allow access if tenant is active', async () => {
+    const validUuid = '11111111-1111-1111-1111-111111111111';
     mockTenantRepo.findOne.mockResolvedValue({
-      id: 'tenant-1',
+      id: validUuid,
       isActive: true,
       status: TenantStatus.ACTIVE,
       current_period_ends_at: new Date(Date.now() + 864000000).toISOString(),
@@ -97,7 +116,7 @@ describe('TenantStatusGuard', () => {
       getClass: () => ({}),
       switchToHttp: () => ({
         getRequest: () => ({
-          user: { role: 'ADMIN', tenantId: 'tenant-1' },
+          user: { role: 'ADMIN', tenantId: validUuid },
           url: '/orders',
         }),
       }),

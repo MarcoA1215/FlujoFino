@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
@@ -11,10 +12,29 @@ const securityHeaders = {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('@ionic') || id.includes('ionicons')) {
+            return 'vendor-ionic';
+          }
+          if (id.includes('@sentry')) {
+            return 'vendor-sentry';
+          }
+        },
+      },
+    },
+  },
   server: {
     headers: securityHeaders,
   },
   preview: {
     headers: securityHeaders,
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/setupTests.ts'],
   },
 })

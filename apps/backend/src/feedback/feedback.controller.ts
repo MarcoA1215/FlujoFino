@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Post, Body, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Request, UseGuards } from '@nestjs/common';
 import { FeedbackService } from './feedback.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -23,7 +23,7 @@ export class FeedbackController {
   // Global/SuperAdmin view of platform feedbacks
   @Get('platform')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Roles(UserRole.SUPERADMIN)
   getPlatformFeedbacks() {
     return this.feedbackService.getPlatformFeedbacks();
   }

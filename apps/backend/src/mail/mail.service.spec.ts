@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Logger } from '@nestjs/common';
 import { MailService } from './mail.service';
 import * as nodemailer from 'nodemailer';
 
@@ -72,6 +73,9 @@ describe('MailService', () => {
   });
 
   it('si transporter.sendMail arroja un error en el transporte real, debe capturarlo en el catch y retornar false', async () => {
+    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
     mockConfigService = {
       get: jest.fn((key: string) => {
         if (key === 'MAIL_USER') return 'user@domain.com';
@@ -94,5 +98,8 @@ describe('MailService', () => {
     const result = await service.sendVerificationCode('user@domain.com', '123456');
 
     expect(result).toBe(false);
+
+    errorSpy.mockRestore();
+    logSpy.mockRestore();
   });
 });

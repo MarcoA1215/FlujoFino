@@ -95,7 +95,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const refreshPendingCount = async () => {
     try {
-      const count = await offlineDb.offlineOrders.count();
+      const allOrders = await offlineDb.offlineOrders.toArray();
+      const count = allOrders.filter(o => o.status !== 'failed').length;
       setPendingOfflineCount(count);
     } catch (err) {
       console.error('Error counting offline orders:', err);
@@ -158,8 +159,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         await refreshPendingCount();
         if (navigator.onLine && localStorage.getItem('flujofino_simulating_offline') !== 'true') {
           try {
-            const count = await offlineDb.offlineOrders.count();
-            if (count > 0) {
+            const allOrders = await offlineDb.offlineOrders.toArray();
+            const pendingCount = allOrders.filter(o => o.status !== 'failed').length;
+            if (pendingCount > 0) {
               await syncPendingOrders(true);
             }
           } catch (e) {}
@@ -230,17 +232,28 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     }
   };
 
-  const syncPendingOrders = async (silent: boolean = false) => {
+  const syncPendingOrders = async (silent: boolean = false, retryFailed: boolean = false) => {
     if (isSimulatingOffline || !navigator.onLine) {
       if (!silent) presentToast({ message: 'No hay conexión a internet activa', duration: 2500, color: 'warning' });
       return;
     }
     if (isSyncing) return;
     try {
-      const pending = await offlineDb.offlineOrders.toArray();
+      const allOrders = await offlineDb.offlineOrders.toArray();
+      const pending = retryFailed
+        ? allOrders
+        : allOrders.filter(o => o.status !== 'failed');
+
       if (!pending || pending.length === 0) {
+        const failedCount = allOrders.filter(o => o.status === 'failed').length;
         setPendingOfflineCount(0);
-        if (!silent) presentToast({ message: 'No hay ventas pendientes por sincronizar', duration: 2000, color: 'light' });
+        if (!silent) {
+          if (failedCount > 0) {
+            presentToast({ message: `No hay órdenes pendientes normales. (${failedCount} venta(s) marcada(s) con error previo)`, duration: 3500, color: 'warning' });
+          } else {
+            presentToast({ message: 'No hay ventas pendientes por sincronizar', duration: 2000, color: 'light' });
+          }
+        }
         return;
       }
       setIsSyncing(true);
@@ -261,10 +274,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       }
 
       if (failedOrders.length > 0) {
+        for (const failed of failedOrders) {
+          const existing = await offlineDb.offlineOrders.get(failed.offlineId);
+          if (existing) {
+            await offlineDb.offlineOrders.update(failed.offlineId, {
+              status: 'failed',
+              syncError: failed.error || 'Error en servidor',
+              retryCount: (existing.retryCount || 0) + 1,
+            });
+          }
+        }
         await refreshPendingCount();
         const firstErr = failedOrders[0]?.error || 'Error desconocido';
         presentToast({
-          message: `⚠️ ${failedOrders.length} venta(s) no se pudieron sincronizar: ${firstErr}`,
+          message: `⚠️ ${failedOrders.length} venta(s) no se pudieron sincronizar y fueron marcadas con error: ${firstErr}`,
           duration: 5000,
           color: 'warning'
         });

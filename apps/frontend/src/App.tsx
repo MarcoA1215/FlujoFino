@@ -1,33 +1,8 @@
-import { IonApp, IonRouterOutlet, IonSplitPane, setupIonicReact } from '@ionic/react';
+import { IonApp, IonRouterOutlet, IonSplitPane, IonSpinner, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import { Navigate, Route, useLocation } from 'react-router-dom';
+import { useContext, useEffect, useState, lazy, Suspense } from 'react';
 import Menu from './components/Menu';
-import Dashboard from './pages/Dashboard';
-import RawMaterials from './pages/RawMaterials';
-import Products from './pages/Products';
-import Production from './pages/Production';
-import Calculator from './pages/Calculator';
-import Pos from './pages/Pos';
-import Orders from './pages/Orders';
-import DeliveryZones from './pages/DeliveryZones';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Users from './pages/Users';
-import SettingsPage from './pages/Settings';
-import SelectWorkspace from './pages/SelectWorkspace';
-import Reservations from './pages/Reservations';
-import Customers from './pages/Customers';
-import PublicBooking from './pages/PublicBooking';
-import PublicStore from './pages/PublicStore';
-import PublicAppointmentManage from './pages/PublicAppointmentManage';
-import FeedbackPage from './pages/Feedback';
-import SuperAdminDashboard from './pages/SuperAdminDashboard';
-import DeliveryPanel from './pages/DeliveryPanel';
-import SubscriptionExpired from './pages/SubscriptionExpired';
-import PromoterDashboard from './pages/PromoterDashboard';
-import LandingPage from './pages/LandingPage';
-import TermsAndConditions from './pages/TermsAndConditions';
-import PrivacyPolicy from './pages/PrivacyPolicy';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { SubscriptionProvider, SubscriptionContext } from './context/SubscriptionContext';
 import { ImageViewerProvider } from './context/ImageViewerContext';
@@ -36,11 +11,52 @@ import { SettingsProvider } from './context/SettingsContext';
 import { LoadingOverlay } from './components/common/LoadingOverlay';
 import { ReportPaymentModal } from './components/ReportPaymentModal';
 import { UserRole, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
-import { useContext, useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { NotificationPermissionBanner } from './components/NotificationPermissionBanner';
+
+// Code Splitting / Lazy Loading de páginas para optimización de bundle
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const RawMaterials = lazy(() => import('./pages/RawMaterials'));
+const Products = lazy(() => import('./pages/Products'));
+const Production = lazy(() => import('./pages/Production'));
+const Calculator = lazy(() => import('./pages/Calculator'));
+const Pos = lazy(() => import('./pages/Pos'));
+const Orders = lazy(() => import('./pages/Orders'));
+const DeliveryZones = lazy(() => import('./pages/DeliveryZones'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Users = lazy(() => import('./pages/Users'));
+const SettingsPage = lazy(() => import('./pages/Settings'));
+const SelectWorkspace = lazy(() => import('./pages/SelectWorkspace'));
+const Reservations = lazy(() => import('./pages/Reservations'));
+const Customers = lazy(() => import('./pages/Customers'));
+const PublicBooking = lazy(() => import('./pages/PublicBooking'));
+const PublicStore = lazy(() => import('./pages/PublicStore'));
+const PublicAppointmentManage = lazy(() => import('./pages/PublicAppointmentManage'));
+const FeedbackPage = lazy(() => import('./pages/Feedback'));
+const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
+const DeliveryPanel = lazy(() => import('./pages/DeliveryPanel'));
+const SubscriptionExpired = lazy(() => import('./pages/SubscriptionExpired'));
+const PromoterDashboard = lazy(() => import('./pages/PromoterDashboard'));
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+
+const PageFallback: React.FC = () => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '60vh',
+    flexDirection: 'column',
+    gap: '12px'
+  }}>
+    <IonSpinner name="crescent" color="primary" />
+    <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 500 }}>Cargando módulo...</span>
+  </div>
+);
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -68,7 +84,11 @@ const HomeRedirector: React.FC = () => {
     if (Capacitor.isNativePlatform()) {
       return <Navigate to="/login" replace />;
     }
-    return <LandingPage />;
+    return (
+      <Suspense fallback={<PageFallback />}>
+        <LandingPage />
+      </Suspense>
+    );
   }
 
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
@@ -99,14 +119,22 @@ const LoginRoute: React.FC = () => {
   if (isLoading) return null;
   const hasPending = !!localStorage.getItem('pendingAccessRequestId');
   if (isAuthenticated && !hasPending) return <HomeRedirector />;
-  return <Login />;
+  return (
+    <Suspense fallback={<PageFallback />}>
+      <Login />
+    </Suspense>
+  );
 };
 
 const RegisterRoute: React.FC = () => {
   const { isAuthenticated, isLoading } = useContext(AuthContext);
   if (isLoading) return null;
   if (isAuthenticated) return <HomeRedirector />;
-  return <Register />;
+  return (
+    <Suspense fallback={<PageFallback />}>
+      <Register />
+    </Suspense>
+  );
 };
 
 export const getRoleDefaultPath = (role?: UserRole | string): string => {
@@ -149,7 +177,7 @@ const PrivateRoute: React.FC<{ children: React.ReactNode; allowedRoles?: UserRol
     }
   }
 
-  return <>{children}</>;
+  return <Suspense fallback={<PageFallback />}>{children}</Suspense>;
 };
 
 const ExpiredPaywallRoute: React.FC = () => {
@@ -168,7 +196,11 @@ const ExpiredPaywallRoute: React.FC = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  return <SubscriptionExpired />;
+  return (
+    <Suspense fallback={<PageFallback />}>
+      <SubscriptionExpired />
+    </Suspense>
+  );
 };
 
 const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -177,7 +209,7 @@ const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
   if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
-  return <>{children}</>;
+  return <Suspense fallback={<PageFallback />}>{children}</Suspense>;
 };
 
 const PromoterRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -189,7 +221,7 @@ const PromoterRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   if (!isSuperAdmin && !isPromotor) {
     return <Navigate to="/dashboard" replace />;
   }
-  return <>{children}</>;
+  return <Suspense fallback={<PageFallback />}>{children}</Suspense>;
 };
 
 const App: React.FC = () => {
@@ -216,7 +248,9 @@ const App: React.FC = () => {
                 <LoadingOverlay />
                 <IonReactRouter>
                   <ErrorBoundary>
-                    <MainLayout />
+                    <Suspense fallback={<PageFallback />}>
+                      <MainLayout />
+                    </Suspense>
                   </ErrorBoundary>
                 </IonReactRouter>
               </IonApp>
@@ -286,14 +320,14 @@ const MainLayout: React.FC = () => {
       <IonSplitPane contentId="main" when={!isPublicRoute && !isExpiredRoute && (user?.tenantId || isSuperAdmin || isPromotor) ? 'md' : false}>
         {!isPublicRoute && !isExpiredRoute && <Menu />}
         <IonRouterOutlet id="main">
-        <Route path="/book/:tenantId" element={<PublicBooking />} />
-        <Route path="/store/:tenantId" element={<PublicStore />} />
-        <Route path="/tienda/:tenantId" element={<PublicStore />} />
-        <Route path="/appointment/:id" element={<PublicAppointmentManage />} />
+        <Route path="/book/:tenantId" element={<Suspense fallback={<PageFallback />}><PublicBooking /></Suspense>} />
+        <Route path="/store/:tenantId" element={<Suspense fallback={<PageFallback />}><PublicStore /></Suspense>} />
+        <Route path="/tienda/:tenantId" element={<Suspense fallback={<PageFallback />}><PublicStore /></Suspense>} />
+        <Route path="/appointment/:id" element={<Suspense fallback={<PageFallback />}><PublicAppointmentManage /></Suspense>} />
         <Route path="/subscription-expired" element={<ExpiredPaywallRoute />} />
-        <Route path="/landing" element={Capacitor.isNativePlatform() ? <Navigate to="/login" replace /> : <LandingPage />} />
-        <Route path="/terms" element={<TermsAndConditions />} />
-        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/landing" element={Capacitor.isNativePlatform() ? <Navigate to="/login" replace /> : <Suspense fallback={<PageFallback />}><LandingPage /></Suspense>} />
+        <Route path="/terms" element={<Suspense fallback={<PageFallback />}><TermsAndConditions /></Suspense>} />
+        <Route path="/privacy" element={<Suspense fallback={<PageFallback />}><PrivacyPolicy /></Suspense>} />
         <Route path="/" element={<HomeRedirector />} />
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/register" element={<RegisterRoute />} />

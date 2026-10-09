@@ -23,6 +23,12 @@ let activeRequestsCount = 0;
 
 export const getActiveRequestsCount = () => activeRequestsCount;
 
+export const PUBLIC_AUTH_EXEMPT_ROUTES = ['/login', '/public', '/store', '/tienda', '/book', '/appointment', '/landing', '/terms', '/privacy'];
+
+export function isExemptFromLoginRedirect(pathname: string): boolean {
+  return PUBLIC_AUTH_EXEMPT_ROUTES.some((route) => pathname.startsWith(route));
+}
+
 apiClient.interceptors.request.use(
   async (config) => {
     // Garantizar que toda petición lleve el token actual aunque defaults aún no haya sincronizado
@@ -69,11 +75,14 @@ apiClient.interceptors.response.use(
 
     // Manejo de expiración de token (401)
     if (error.response?.status === 401) {
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/public')) {
-        await Preferences.remove({ key: 'token' });
-        await Preferences.remove({ key: 'user' });
-        delete apiClient.defaults.headers.common['Authorization'];
-        window.location.href = '/login';
+      if (typeof window !== 'undefined') {
+        const isPublicRoute = isExemptFromLoginRedirect(window.location.pathname);
+        if (!isPublicRoute) {
+          await Preferences.remove({ key: 'token' });
+          await Preferences.remove({ key: 'user' });
+          delete apiClient.defaults.headers.common['Authorization'];
+          window.location.href = '/login';
+        }
       }
     }
 

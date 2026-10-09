@@ -7,6 +7,9 @@ export interface OfflineOrder {
   rateAtSale: number;
   createdAt: string; // Timestamp exacto de la venta local
   synced: boolean;
+  status?: 'pending' | 'failed' | 'synced';
+  syncError?: string;
+  retryCount?: number;
 }
 
 export class FlujoFinoOfflineDB extends Dexie {
@@ -24,6 +27,12 @@ export class FlujoFinoOfflineDB extends Dexie {
     this.version(2).stores({
       cachedProducts: 'id, name, categoryId',
       offlineOrders: 'offlineId, createdAt, synced',
+      cachedReservations: 'id, date, time, customerName, status',
+      cachedCustomers: 'id, name, phone, identification',
+    });
+    this.version(3).stores({
+      cachedProducts: 'id, name, categoryId',
+      offlineOrders: 'offlineId, createdAt, synced, status',
       cachedReservations: 'id, date, time, customerName, status',
       cachedCustomers: 'id, name, phone, identification',
     });

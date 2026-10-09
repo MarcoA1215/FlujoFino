@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { Tenant } from '../entities/tenant.entity';
 import { isTenantSuspendedOrExpired } from '../utils/tenant-status';
+import { isValidUUID } from '../utils/tenant-crypto';
 import { IS_PUBLIC_KEY } from './public.decorator';
 
 @Injectable()
@@ -26,7 +27,7 @@ export class TenantStatusGuard implements CanActivate {
     if (user.role === 'SUPERADMIN' || user.isSuperAdmin) return true;
 
     const tenantId = user.tenantId;
-    if (!tenantId) return true;
+    if (!tenantId || !isValidUUID(tenantId)) return true;
 
     // Rutas permitidas aún cuando el tenant esté suspendido/vencido (para que pueda pagar, consultar su deuda y cambiar de negocio)
     const url = request.originalUrl || request.url || '';

@@ -1,80 +1,53 @@
-﻿import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { TenantPlanType } from '@finowork/shared-types';
+import {
+  calculateSubscriptionFee,
+  calculateBsEquivalent,
+  calculateUsdEquivalent,
+  hasAtLeastOnePaymentMethodActive,
+} from './pricing';
 
 describe('SaaS Subscription & Currency Exchange Engine (Frontend Logic)', () => {
-  // Referral Engine math implementation tested in frontend
-  function calculateFrontendFee(planType: TenantPlanType, basePrice: number, activeReferrals: number) {
-    let discountPercentage = 0;
-    let finalFee = basePrice;
-
-    if (planType === TenantPlanType.PIONEER) {
-      if (activeReferrals >= 2) {
-        discountPercentage = 100;
-        finalFee = 0;
-      } else {
-        discountPercentage = 0;
-        finalFee = basePrice;
-      }
-    } else {
-      discountPercentage = Math.min(activeReferrals * 10, 50);
-      const discounted = basePrice * (1 - discountPercentage / 100);
-      const minAllowedFee = Math.round(basePrice * 0.5 * 100) / 100;
-      finalFee = Math.max(minAllowedFee, Math.round(discounted * 100) / 100);
-    }
-
-    return { discountPercentage, finalFee };
-  }
-
-  // Currency exchange calculation
-  function calculateBsEquivalent(usdAmount: number, exchangeRate: number): number {
-    return Math.round(usdAmount * exchangeRate * 100) / 100;
-  }
-
-  function calculateUsdEquivalent(bsAmount: number, exchangeRate: number): number {
-    if (exchangeRate <= 0) return 0;
-    return Math.round((bsAmount / exchangeRate) * 100) / 100;
-  }
-
-  describe('Referral Discount Calculations', () => {
+  describe('Referral Discount Calculations (calculateSubscriptionFee)', () => {
     it('PIONEER account with < 2 referrals pays full base price', () => {
-      const res0 = calculateFrontendFee(TenantPlanType.PIONEER, 20.0, 0);
+      const res0 = calculateSubscriptionFee(TenantPlanType.PIONEER, 20.0, 0);
       expect(res0.discountPercentage).toBe(0);
       expect(res0.finalFee).toBe(20.0);
 
-      const res1 = calculateFrontendFee(TenantPlanType.PIONEER, 20.0, 1);
+      const res1 = calculateSubscriptionFee(TenantPlanType.PIONEER, 20.0, 1);
       expect(res1.discountPercentage).toBe(0);
       expect(res1.finalFee).toBe(20.0);
     });
 
     it('PIONEER account with >= 2 referrals gets 100% discount ($0 fee)', () => {
-      const res2 = calculateFrontendFee(TenantPlanType.PIONEER, 20.0, 2);
+      const res2 = calculateSubscriptionFee(TenantPlanType.PIONEER, 20.0, 2);
       expect(res2.discountPercentage).toBe(100);
       expect(res2.finalFee).toBe(0);
 
-      const res5 = calculateFrontendFee(TenantPlanType.PIONEER, 20.0, 5);
+      const res5 = calculateSubscriptionFee(TenantPlanType.PIONEER, 20.0, 5);
       expect(res5.discountPercentage).toBe(100);
       expect(res5.finalFee).toBe(0);
     });
 
     it('REGULAR account receives 10% per referral up to 50%', () => {
-      const res1 = calculateFrontendFee(TenantPlanType.REGULAR, 20.0, 1);
+      const res1 = calculateSubscriptionFee(TenantPlanType.REGULAR, 20.0, 1);
       expect(res1.discountPercentage).toBe(10);
       expect(res1.finalFee).toBe(18.0);
 
-      const res3 = calculateFrontendFee(TenantPlanType.REGULAR, 20.0, 3);
+      const res3 = calculateSubscriptionFee(TenantPlanType.REGULAR, 20.0, 3);
       expect(res3.discountPercentage).toBe(30);
       expect(res3.finalFee).toBe(14.0);
 
-      const res5 = calculateFrontendFee(TenantPlanType.REGULAR, 20.0, 5);
+      const res5 = calculateSubscriptionFee(TenantPlanType.REGULAR, 20.0, 5);
       expect(res5.discountPercentage).toBe(50);
       expect(res5.finalFee).toBe(10.0);
 
-      const res9 = calculateFrontendFee(TenantPlanType.REGULAR, 20.0, 9);
+      const res9 = calculateSubscriptionFee(TenantPlanType.REGULAR, 20.0, 9);
       expect(res9.discountPercentage).toBe(50);
       expect(res9.finalFee).toBe(10.0);
 
       // Dynamic floor with custom base price
-      const resCustom = calculateFrontendFee(TenantPlanType.REGULAR, 30.0, 8);
+      const resCustom = calculateSubscriptionFee(TenantPlanType.REGULAR, 30.0, 8);
       expect(resCustom.discountPercentage).toBe(50);
       expect(resCustom.finalFee).toBe(15.0);
     });
@@ -101,25 +74,14 @@ describe('SaaS Subscription & Currency Exchange Engine (Frontend Logic)', () => 
       expect(calculateBsEquivalent(usd, rate)).toBe(expectedBs);
       expect(calculateBsEquivalent(usd, rate)).toBe(937.0);
     });
+
+    it('returns 0 when exchange rate is zero or negative', () => {
+      expect(calculateUsdEquivalent(500, 0)).toBe(0);
+      expect(calculateUsdEquivalent(500, -10)).toBe(0);
+    });
   });
 
-  describe('Payment Method Activation Rules', () => {
-    function hasAtLeastOnePaymentMethodActive(methods: {
-      cashUsd?: boolean;
-      pagoMovil?: boolean;
-      cardPos?: boolean;
-      binance?: boolean;
-      transfer?: boolean;
-    }): boolean {
-      return (
-        methods.cashUsd === true ||
-        methods.pagoMovil === true ||
-        methods.cardPos === true ||
-        methods.binance === true ||
-        methods.transfer === true
-      );
-    }
-
+  describe('Payment Method Activation Rules (hasAtLeastOnePaymentMethodActive)', () => {
     it('returns false if all payment methods are deactivated', () => {
       expect(
         hasAtLeastOnePaymentMethodActive({

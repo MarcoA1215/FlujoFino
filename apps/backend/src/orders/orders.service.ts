@@ -1,4 +1,5 @@
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { DataSource, Between, In, Not, MoreThanOrEqual, EntityManager } from 'typeorm';
 import { IsOptional, IsArray, IsString, IsNumber, IsBoolean } from 'class-validator';
 import { Order, SplitPaymentItem } from '../entities/order.entity';
@@ -148,6 +149,7 @@ export class CreateOrderDto {
   @IsOptional()
   @IsArray()
   items: {
+    id?: string;
     productId: string;
     quantity: number;
     unitPrice: number;
@@ -236,7 +238,7 @@ export class OrdersService {
   async addAbono(tenantId: string, orderId: string, amount: number, method?: string, ref?: string) {
     if (amount <= 0) throw new BadRequestException('El monto debe ser mayor a 0');
     const order = await this.dataSource.getRepository(Order).findOne({ where: { tenantId, id: orderId } });
-    if (!order) throw new Error("Order not found");
+    if (!order) throw new NotFoundException('Orden no encontrada');
 
     const restante = Math.max(0, Number((order.totalAmount - (order.abonosTotal || 0)).toFixed(2)));
     // Si no es una cuenta abierta de mesa en curso, no permitir superar el total pendiente
@@ -246,7 +248,7 @@ export class OrdersService {
 
     const history = order.abonosHistory || [];
     history.push({ 
-      id: Date.now().toString(), 
+      id: randomUUID(), 
       amount: Number(amount), 
       method: method || 'USD',
       ref: ref || undefined,
@@ -295,30 +297,63 @@ export class OrdersService {
     return repo.save(expense);
   }
 
-  async revertAbono(tenantId: string, orderId: string, index: number) {
+  async revertAbono(tenantId: string, orderId: string, abonoIdentifier: string | number) {
     const order = await this.dataSource.getRepository(Order).findOne({ where: { tenantId, id: orderId } });
-    if (!order) throw new Error("Order not found");
+    if (!order) throw new NotFoundException('Orden no encontrada');
     const history = order.abonosHistory || [];
-    if (index >= 0 && index < history.length) {
-      const removed = history.splice(index, 1)[0];
-      order.abonosHistory = history;
-      order.abonosTotal = roundCurrency(Math.max(0, (order.abonosTotal || 0) - Number(removed.amount || 0)));
-      const roundedAbonos = roundCurrency(order.abonosTotal);
-      const roundedTotal = roundCurrency(order.totalAmount);
-      if (roundedAbonos >= roundedTotal && roundedTotal > 0) {
-        order.paymentStatus = PaymentStatus.PAID;
-      } else if (roundedAbonos > 0) {
-        order.paymentStatus = PaymentStatus.PARTIAL;
-      } else {
-        order.paymentStatus = PaymentStatus.PENDING;
-      }
-      
-      return this.dataSource.getRepository(Order).save(order);
+    if (!history || history.length === 0) {
+      throw new BadRequestException('No hay historial de abonos para revertir');
     }
-    return order;
+
+    const abonoIdStr = String(abonoIdentifier);
+    let targetIndex = history.findIndex((a: any) => a.id === abonoIdStr);
+
+    // Fallback retrocompatible para registros históricos sin UUID
+    if (targetIndex === -1 && !isNaN(Number(abonoIdentifier))) {
+      const numericIndex = Number(abonoIdentifier);
+      if (history[numericIndex]) {
+        targetIndex = numericIndex;
+      }
+    }
+
+    if (targetIndex === -1) {
+      throw new NotFoundException('Abono no encontrado');
+    }
+
+    const removed = history[targetIndex];
+    const removedAmount = Number(removed.amount || 0);
+
+    // Eliminación inmutable buscando y filtrando estrictamente por el id (UUID)
+    if (removed.id) {
+      order.abonosHistory = history.filter((a: any) => a.id !== removed.id);
+    } else {
+      order.abonosHistory = history.filter((_, idx) => idx !== targetIndex);
+    }
+
+    order.abonosTotal = roundCurrency(Math.max(0, (order.abonosTotal || 0) - removedAmount));
+    const roundedAbonos = roundCurrency(order.abonosTotal);
+    const roundedTotal = roundCurrency(order.totalAmount);
+    if (roundedAbonos >= roundedTotal && roundedTotal > 0) {
+      order.paymentStatus = PaymentStatus.PAID;
+    } else if (roundedAbonos > 0) {
+      order.paymentStatus = PaymentStatus.PARTIAL;
+    } else {
+      order.paymentStatus = PaymentStatus.PENDING;
+    }
+    
+    return this.dataSource.getRepository(Order).save(order);
   }
 
-  async createOrder(tenantId: string, dto: CreateOrderDto, authUserId?: string) {
+  async createOrder(tenantId: string, dto: CreateOrderDto, authUserId?: string, authUserRole?: UserRole | string) {
+    if (dto.linkedReservationId) {
+      const existingLinkedOrder = await this.dataSource.getRepository(Order).findOne({
+        where: { tenantId, linkedReservationId: dto.linkedReservationId, status: Not(OrderStatus.CANCELED) },
+      });
+      if (existingLinkedOrder && existingLinkedOrder.paymentStatus !== PaymentStatus.PAID) {
+        return this.editOrder(tenantId, existingLinkedOrder.id, dto, authUserId, authUserRole);
+      }
+    }
+
     if (!dto.items || (dto.items.length === 0 && dto.paymentStatus !== PaymentStatus.PENDING)) {
       throw new BadRequestException('El carrito no puede estar vacío');
     }
@@ -1365,7 +1400,11 @@ export class OrdersService {
       }
 
       // Bloqueo de Robo Hormiga: No editar órdenes ya pagadas o con abonos si no es admin/superadmin
-      const isPaidOrPartial = order.paymentStatus === PaymentStatus.PAID || order.paymentStatus === PaymentStatus.PARTIAL || (order.abonosTotal && order.abonosTotal > 0);
+      // Excepción para cuentas abiertas (mesas) y reservas con abonos previos que se están liquidando/completando en caja
+      const isComandaOrReservation = !!(order.linkedReservationId || dto.linkedReservationId || order.tableNumber || dto.tableNumber);
+      const isPaidOrPartial = order.paymentStatus === PaymentStatus.PAID || (
+        !isComandaOrReservation && (order.paymentStatus === PaymentStatus.PARTIAL || (order.abonosTotal && order.abonosTotal > 0))
+      );
       if (isPaidOrPartial) {
         const userAccess = authUserRole ? null : (authUserId ? await manager.findOne(UserTenantAccess, { where: { tenantId, userId: authUserId, isActive: true } }) : null);
         const effectiveRole = authUserRole || userAccess?.role;
@@ -1376,15 +1415,25 @@ export class OrdersService {
       }
   
       const oldItemsMap = new Map<string, OrderItem>();
-      for (const item of order.items) {
-        oldItemsMap.set(item.productId, item);
-      }
-  
+      order.items.forEach((item, idx) => {
+        const key = item.id ? item.id : `${item.productId}_${idx}`;
+        oldItemsMap.set(key, item);
+      });
+
       const newItemsMap = new Map<string, any>();
-      for (const item of dto.items) {
-        newItemsMap.set(item.productId, item);
-      }
-  
+      (dto.items || []).forEach((item: any, idx: number) => {
+        let key = item.id && oldItemsMap.has(item.id) ? item.id : undefined;
+        if (!key) {
+          const oldAtIdx = order.items[idx];
+          if (oldAtIdx && oldAtIdx.productId === item.productId && !Array.from(newItemsMap.keys()).includes(oldAtIdx.id)) {
+            key = oldAtIdx.id;
+          } else {
+            key = item.id || `${item.productId}_${idx}`;
+          }
+        }
+        newItemsMap.set(key, item);
+      });
+
       let totalAmount = 0;
       let totalCost = 0;
       const discountAmount = dto.discountAmount || order.discountAmount || 0;
@@ -1448,13 +1497,13 @@ export class OrdersService {
         }
       };
 
-      for (const [productId, oldItem] of oldItemsMap.entries()) {
-        const newItem = newItemsMap.get(productId);
+      for (const [key, oldItem] of oldItemsMap.entries()) {
+        const newItem = newItemsMap.get(key);
         if (!newItem) {
           if (oldItem.deliveredQuantity > 0) {
             throw new BadRequestException('No se puede eliminar un item porque ya tiene entregas parciales');
           }
-          await adjustProductStock(productId, oldItem.quantity, false);
+          await adjustProductStock(oldItem.productId, oldItem.quantity, false);
           await manager.remove(OrderItem, oldItem);
         } else {
           if (newItem.quantity < oldItem.deliveredQuantity) {
@@ -1462,23 +1511,27 @@ export class OrdersService {
           }
           const diff = newItem.quantity - oldItem.quantity;
           if (diff > 0) {
-            await adjustProductStock(productId, diff, true);
+            await adjustProductStock(oldItem.productId, diff, true);
           } else if (diff < 0) {
-            await adjustProductStock(productId, Math.abs(diff), false);
+            await adjustProductStock(oldItem.productId, Math.abs(diff), false);
           }
   
           oldItem.quantity = newItem.quantity;
           oldItem.unitPrice = newItem.unitPrice;
           oldItem.subtotal = newItem.quantity * newItem.unitPrice;
+          oldItem.removedIngredients = newItem.removedIngredients || [];
+          oldItem.addedExtras = newItem.addedExtras || [];
+          oldItem.hasModifications = Boolean(newItem.hasModifications || (newItem.removedIngredients && newItem.removedIngredients.length > 0) || (newItem.addedExtras && newItem.addedExtras.length > 0));
           await manager.save(OrderItem, oldItem);
           
           totalAmount += oldItem.subtotal;
           totalCost += oldItem.unitCost * oldItem.quantity;
         }
       }
-  
-      for (const [productId, newItem] of newItemsMap.entries()) {
-        if (!oldItemsMap.has(productId)) {
+
+      for (const [key, newItem] of newItemsMap.entries()) {
+        if (!oldItemsMap.has(key)) {
+          const productId = newItem.productId;
           await adjustProductStock(productId, newItem.quantity, true);
           
           const product = await manager.findOne(Product, { 
@@ -1517,7 +1570,8 @@ export class OrdersService {
           }
           
           const subtotal = newItem.quantity * newItem.unitPrice;
-          const orderItem = manager.create(OrderItem, { tenantId,
+          const orderItem = manager.create(OrderItem, {
+            tenantId,
             orderId: order.id,
             productId: productId,
             productName: itemName,
@@ -1525,14 +1579,17 @@ export class OrdersService {
             unitPrice: newItem.unitPrice,
             unitCost: unitCost,
             subtotal: subtotal,
-            deliveredQuantity: 0
+            deliveredQuantity: 0,
+            removedIngredients: newItem.removedIngredients || [],
+            addedExtras: newItem.addedExtras || [],
+            hasModifications: Boolean(newItem.hasModifications || (newItem.removedIngredients && newItem.removedIngredients.length > 0) || (newItem.addedExtras && newItem.addedExtras.length > 0))
           });
           await manager.save(OrderItem, orderItem);
           totalAmount += subtotal;
           totalCost += unitCost * newItem.quantity;
         }
       }
-  
+
       let effectiveDiscountEdit = 0;
       if (dto.discountAmount !== undefined && Number(dto.discountAmount) >= 0) {
         effectiveDiscountEdit = Number(dto.discountAmount);
@@ -1605,6 +1662,82 @@ export class OrdersService {
       order.netProfit = order.totalAmount - order.deliveryFee - totalCost;
       if (dto.splitPayments !== undefined) {
         order.splitPayments = dto.splitPayments;
+      }
+      if (dto.paymentMethod !== undefined) {
+        order.paymentMethod = dto.paymentMethod;
+      }
+      if (dto.paymentStatus !== undefined) {
+        order.paymentStatus = dto.paymentStatus;
+      }
+      if (dto.usdReceived !== undefined) {
+        order.usdReceived = dto.usdReceived;
+      }
+      if (dto.changeAmount !== undefined) {
+        order.changeAmount = dto.changeAmount;
+      }
+      if (dto.changeAmountBs !== undefined) {
+        order.changeAmountBs = dto.changeAmountBs;
+      }
+      if (dto.changeMethod !== undefined) {
+        order.changeMethod = dto.changeMethod;
+      }
+      if (dto.changeRef !== undefined) {
+        order.changeRef = dto.changeRef;
+      }
+      if (dto.pagoMovilRef !== undefined) {
+        order.pagoMovilRef = dto.pagoMovilRef;
+      }
+      if (dto.pagoMovilPhone !== undefined) {
+        order.pagoMovilPhone = dto.pagoMovilPhone;
+      }
+      if (dto.pagoMovilCedula !== undefined) {
+        order.pagoMovilCedula = dto.pagoMovilCedula;
+      }
+      if (dto.pagoMovilBank !== undefined) {
+        order.pagoMovilBank = dto.pagoMovilBank;
+      }
+      if (dto.puntoRef !== undefined) {
+        order.puntoRef = dto.puntoRef;
+      }
+      if (dto.puntoBank !== undefined) {
+        order.puntoBank = dto.puntoBank;
+      }
+      if (dto.binanceRef !== undefined) {
+        order.binanceRef = dto.binanceRef;
+      }
+      if (dto.transferRef !== undefined) {
+        order.transferRef = dto.transferRef;
+      }
+      if (dto.transferBank !== undefined) {
+        order.transferBank = dto.transferBank;
+      }
+      if (dto.amountBs !== undefined) {
+        order.amountBs = dto.amountBs;
+      }
+      if (dto.exchangeRate !== undefined) {
+        order.exchangeRate = dto.exchangeRate;
+      }
+      if (dto.linkedReservationId !== undefined) {
+        order.linkedReservationId = dto.linkedReservationId;
+      }
+
+      // Sincronizar reservación vinculada si existe
+      const resId = dto.linkedReservationId || order.linkedReservationId;
+      if (resId) {
+        try {
+          const resRepo = manager.getRepository(Reservation);
+          const reservation = await resRepo.findOne({ where: { id: resId, tenantId } });
+          if (reservation) {
+            reservation.orderId = order.id;
+            if (order.paymentStatus === PaymentStatus.PAID) {
+              reservation.paymentStatus = PaymentStatus.PAID;
+              reservation.status = ReservationStatus.COMPLETED;
+            }
+            await resRepo.save(reservation);
+          }
+        } catch (resErr) {
+          console.error('Error sincronizando reserva en editOrder:', resErr);
+        }
       }
 
       // Update payment status for partial / open tab orders
@@ -1912,6 +2045,8 @@ export class OrdersService {
 
         const isPagoMovil = o.paymentMethod === 'PAGO_MOVIL' || (o.paymentMethod !== 'USD' && o.pagoMovilRef && o.pagoMovilRef.trim().length > 0);
 
+        const isTransfer = o.paymentMethod === 'TRANSFER' || Boolean(o.transferRef && o.transferRef.trim().length > 0);
+
         if (isPunto) {
           const bs = orderAmountBs;
           totalPuntoBs += bs;
@@ -1925,7 +2060,7 @@ export class OrdersService {
             amountBs: bs,
             createdAt: o.createdAt,
           });
-        } else if (isPagoMovil) {
+        } else if (isPagoMovil || isTransfer) {
           const bs = orderAmountBs;
           totalPagoMovilBs += bs;
           totalPagoMovilUSD += bs / orderRate;
@@ -1933,13 +2068,13 @@ export class OrdersService {
             orderId: o.id,
             orderNumber: o.id.slice(0, 8).toUpperCase(),
             customerName: o.customerName,
-            ref: o.pagoMovilRef,
-            bank: o.pagoMovilBank || 'Pago Móvil',
+            ref: (isTransfer ? o.transferRef : o.pagoMovilRef) || 'N/A',
+            bank: isTransfer ? (o.transferBank || 'Transferencia') : (o.pagoMovilBank || 'Pago Móvil'),
             phone: o.pagoMovilPhone || o.customerPhone,
             amountBs: bs,
             createdAt: o.createdAt,
           });
-        } else if (o.paymentStatus === PaymentStatus.PAID) {
+        } else if (o.paymentStatus === PaymentStatus.PAID && ['USD', 'CASH', 'CASH_USD', 'EFECTIVO'].includes((o.paymentMethod || '').toUpperCase())) {
           const usdIn = Number(o.usdReceived) || orderTotal;
           totalCashReceivedUSD += usdIn;
           totalCashUSD += usdIn;
@@ -2153,7 +2288,7 @@ export class OrdersService {
     };
   }
 
-  async syncOfflineOrders(tenantId: string, orders: any[], userId?: string) {
+  async syncOfflineOrders(tenantId: string, orders: any[], userId?: string, authUserRole?: UserRole | string) {
     const syncedOfflineIds: string[] = [];
     const failedOrders: Array<{ offlineId: string; error: string }> = [];
 
@@ -2175,9 +2310,9 @@ export class OrdersService {
           }
         }
         if (payload.editingOrderId) {
-          await this.editOrder(tenantId, payload.editingOrderId, payload, userId);
+          await this.editOrder(tenantId, payload.editingOrderId, payload, userId, authUserRole);
         } else {
-          await this.createOrder(tenantId, payload, userId);
+          await this.createOrder(tenantId, payload, userId, authUserRole);
         }
         if (item.offlineId) {
           syncedOfflineIds.push(item.offlineId);

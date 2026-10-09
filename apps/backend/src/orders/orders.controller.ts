@@ -22,7 +22,8 @@ export class OrdersController {
 
   @Delete(':id/abono/:index')
   revertAbono(@Request() req: any, @Param('id') id: string, @Param('index') index: string) {
-    return this.ordersService.revertAbono(req.user.tenantId, id, parseInt(index, 10));}
+    return this.ordersService.revertAbono(req.user.tenantId, id, index);
+  }
 
   constructor(
     private readonly ordersService: OrdersService,
@@ -42,12 +43,12 @@ export class OrdersController {
 
   @Post()
   createOrder(@Request() req: any, @Body() dto: CreateOrderDto) {
-    return this.ordersService.createOrder(req.user.tenantId, dto, req.user?.id);
+    return this.ordersService.createOrder(req.user.tenantId, dto, req.user?.id, req.user?.role);
   }
 
   @Post('sync-offline')
   syncOffline(@Request() req: any, @Body('orders') orders: any[]) {
-    return this.ordersService.syncOfflineOrders(req.user.tenantId, orders, req.user?.id);
+    return this.ordersService.syncOfflineOrders(req.user.tenantId, orders, req.user?.id, req.user?.role);
   }
 
   @Get()

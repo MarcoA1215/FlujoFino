@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import Pos from './Pos';
+import Pos, { getProductStockBadgeLabel, calculateProfitOrLoss } from './Pos';
 import { apiClient } from '../api/client';
 
 // Mock del cliente API para evitar llamadas reales durante el test
@@ -15,8 +15,7 @@ vi.mock('../api/client', () => ({
 }));
 
 describe('Caja Registradora (POS) - Lógica de Rentabilidad y Descuentos', () => {
-  it('Debe calcular correctamente el subtotal sin descuentos', async () => {
-    // Configurar el mock para devolver un producto de prueba
+  it('Debe inicializar y consultar productos al montar', async () => {
     const mockProducts = [
       { id: '1', name: 'Servicio VIP', salePrice: 50.00, baseCost: 10.00, stockQuantity: 5 }
     ];
@@ -27,63 +26,57 @@ describe('Caja Registradora (POS) - Lógica de Rentabilidad y Descuentos', () =>
         <Pos />
       </MemoryRouter>
     );
-    
-    // Esperar a que los productos carguen
+
     await waitFor(() => {
       expect(apiClient.get).toHaveBeenCalledWith('/products');
     });
-
-    // Simular "Agregar al carrito"
-    // En una prueba completa de React renderizado usaríamos fireEvent.click(screen.getByText('Servicio VIP'))
-    // Para simplificar, testeamos conceptualmente que el componente monte y maneje el mock.
   });
 
-  // Tests conceptuales de matemáticas
-  describe('Matemáticas de Rentabilidad Interna', () => {
+  describe('Matemáticas de Rentabilidad Interna (calculateProfitOrLoss)', () => {
     it('Debe advertir de pérdida cuando descuento > ganancia neta', () => {
       const salePrice = 50.00;
       const baseCost = 45.00; // Margen bajo de $5
-      
-      const discountAmount = 10.00; 
-      const finalTotal = salePrice - discountAmount; // $40.00
-      
-      const lossAmount = baseCost - finalTotal; // 45 - 40 = 5
-      
-      // La lógica del componente debe detectar pérdida:
+      const discountAmount = 10.00;
+
+      const { lossAmount, isLoss, finalTotal } = calculateProfitOrLoss(salePrice, baseCost, discountAmount);
+
+      expect(finalTotal).toBe(40.00);
       expect(lossAmount).toBe(5.00);
-      expect(lossAmount > 0).toBe(true); // Se pintaría de rojo la alerta de advertencia!
+      expect(isLoss).toBe(true);
+    });
+
+    it('Debe reportar ganancia positiva y no pérdida cuando el margen es saludable', () => {
+      const salePrice = 50.00;
+      const baseCost = 20.00;
+      const discountAmount = 5.00;
+
+      const { lossAmount, isLoss, netProfit } = calculateProfitOrLoss(salePrice, baseCost, discountAmount);
+
+      expect(netProfit).toBe(25.00);
+      expect(isLoss).toBe(false);
+      expect(lossAmount).toBe(0);
     });
   });
 
-  describe('Formateo de Stock y Modo Bajo Demanda ("Por producir")', () => {
-    const getStockLabel = (pStock: number, isService: boolean = false, duration?: number) => {
-      if (isService) {
-        return duration ? `⏱️ ${duration}m` : 'Servicio';
-      }
-      return pStock < 0
-        ? `Por producir: ${Math.abs(pStock)}`
-        : (pStock === 0 ? 'Agotado' : `Stock: ${pStock}`);
-    };
-
+  describe('Formateo de Stock y Modo Bajo Demanda (getProductStockBadgeLabel)', () => {
     it('debe mostrar "Por producir: 15" cuando el stock es negativo (-15)', () => {
-      const label = getStockLabel(-15);
+      const label = getProductStockBadgeLabel(-15);
       expect(label).toBe('Por producir: 15');
     });
 
     it('debe mostrar "Agotado" cuando el stock es estrictamente 0', () => {
-      const label = getStockLabel(0);
+      const label = getProductStockBadgeLabel(0);
       expect(label).toBe('Agotado');
     });
 
     it('debe mostrar "Stock: 25" cuando el stock es positivo', () => {
-      const label = getStockLabel(25);
+      const label = getProductStockBadgeLabel(25);
       expect(label).toBe('Stock: 25');
     });
 
     it('debe respetar si es un servicio mostrando tiempo o etiqueta Servicio', () => {
-      expect(getStockLabel(-10, true, 45)).toBe('⏱️ 45m');
-      expect(getStockLabel(0, true)).toBe('Servicio');
+      expect(getProductStockBadgeLabel(-10, true, 45)).toBe('⏱️ 45m');
+      expect(getProductStockBadgeLabel(0, true)).toBe('Servicio');
     });
   });
 });
-

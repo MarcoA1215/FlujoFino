@@ -126,7 +126,7 @@ export class UsersService implements OnModuleInit {
         const randomHash = await bcrypt.hash(`no_login_${Date.now()}_${Math.random()}`, 10);
 
         const user = transactionalEntityManager.create(User, {
-          username: cleanName,
+          username: generatedUsername,
           name: cleanName,
           email: generatedEmail,
           identification: data.identification || null,

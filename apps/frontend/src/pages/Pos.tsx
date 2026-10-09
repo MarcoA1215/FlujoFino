@@ -73,6 +73,23 @@ type CartItem = {
 
 type PaymentMethod = 'PENDING' | 'PAGO_MOVIL' | 'USD' | 'PUNTO' | 'BINANCE' | 'TRANSFER';
 
+export function getProductStockBadgeLabel(pStock: number, isService: boolean = false, durationMinutes?: number): string {
+  if (isService) {
+    return durationMinutes ? `⏱️ ${durationMinutes}m` : 'Servicio';
+  }
+  return pStock < 0
+    ? `Por producir: ${Math.abs(pStock)}`
+    : (pStock === 0 ? 'Agotado' : `Stock: ${pStock}`);
+}
+
+export function calculateProfitOrLoss(salePrice: number, baseCost: number, discountAmount: number = 0) {
+  const finalTotal = salePrice - discountAmount;
+  const netProfit = finalTotal - baseCost;
+  const isLoss = netProfit < 0;
+  const lossAmount = isLoss ? Math.abs(netProfit) : 0;
+  return { finalTotal, netProfit, isLoss, lossAmount };
+}
+
 const Pos: React.FC = () => {
   const { openImage } = useImageViewer();
   const { user } = useContext(AuthContext);
@@ -409,6 +426,17 @@ const Pos: React.FC = () => {
           setLinkedReservationId(resToLoad.id);
           if (resToLoad.employeeId) setEmployeeId(resToLoad.employeeId);
           
+          if (resToLoad.orderId) {
+            setEditingOrderId(resToLoad.orderId);
+          } else if (resToLoad.id) {
+            apiClient.get('/orders?limit=50').then((ordersRes: any) => {
+              const matched = ordersRes.data?.find((o: any) => o.linkedReservationId === resToLoad.id && o.paymentStatus !== PaymentStatus.PAID);
+              if (matched) {
+                setEditingOrderId(matched.id);
+              }
+            }).catch(() => {});
+          }
+
           // Si el cliente ya dio un abono al reservar, reflejarlo
           if (resToLoad.abonosTotal && Number(resToLoad.abonosTotal) > 0) {
             setInitialAbono(Number(resToLoad.abonosTotal).toString());
@@ -835,6 +863,7 @@ const Pos: React.FC = () => {
     const abonoAmount = paymentMethod === 'PENDING' ? (parseFloat(initialAbono) || 0) : 0;
 
     const payload: any = {
+      editingOrderId: editingOrderId || undefined,
       customerName: customerName.trim() || 'Cliente Mostrador',
       customerPhone: customerPhone.trim() || undefined,
       customerAddress: customerAddress.trim() || undefined,
@@ -848,6 +877,7 @@ const Pos: React.FC = () => {
         ? (abonoAmount >= totalCart ? PaymentStatus.PAID : (abonoAmount > 0 ? PaymentStatus.PARTIAL : PaymentStatus.PENDING))
         : PaymentStatus.PAID,
       items: cart.map(item => ({
+        id: item.cartItemId && !item.cartItemId.includes('_') ? item.cartItemId : (item as any).id,
         productId: item.product?.id || (item as any).productId,
         quantity: Number(item.quantity) || 1,
         unitPrice: Number(item.unitPrice || item.product?.salePrice || 0),
@@ -941,6 +971,7 @@ const Pos: React.FC = () => {
           setDiscountValue('');
           setShowCheckoutModal(false);
           setLinkedReservationId(null);
+          setEditingOrderId(null);
           return;
         } catch (dexieErr) {
           console.error('Error guardando en Dexie:', dexieErr);
@@ -1266,9 +1297,7 @@ const Pos: React.FC = () => {
                               border: pStock < 0 ? '1px solid #FDE68A' : 'none',
                             }}
                           >
-                            {isService
-                              ? (p.durationMinutes ? `⏱️ ${p.durationMinutes}m` : 'Servicio')
-                              : (pStock < 0 ? `Por producir: ${Math.abs(pStock)}` : (pStock === 0 ? 'Agotado' : `Stock: ${pStock}`))}
+                            {getProductStockBadgeLabel(pStock, isService, p.durationMinutes)}
                           </span>
 
                           {/* Circular Add Button */}

@@ -26,7 +26,7 @@ describe('OrdersService', () => {
     mockOrderRepo = {
       find: jest.fn(),
       findOne: jest.fn(),
-      save: jest.fn(),
+      save: jest.fn((ord) => Promise.resolve(ord)),
     };
 
     mockSettingsRepo = {
@@ -768,6 +768,256 @@ describe('OrdersService', () => {
       await expect(service.createOrder(tenantId, orderDto)).rejects.toThrow(
         /Stock insuficiente para el componente "Gaseosa 500ml"/
       );
+    });
+  });
+
+  describe('revertAbono con UUID y NotFoundException', () => {
+    it('debe revertir un abono buscando por id UUID de forma inmutable', async () => {
+      const tenantId = 'tenant-test';
+      const orderId = 'order-1';
+      const existingOrder: any = {
+        id: orderId,
+        tenantId,
+        totalAmount: 100,
+        abonosTotal: 60,
+        paymentStatus: PaymentStatus.PARTIAL,
+        abonosHistory: [
+          { id: 'uuid-abono-1', amount: 20, method: 'USD' },
+          { id: 'uuid-abono-2', amount: 40, method: 'USD' },
+        ],
+      };
+
+      mockOrderRepo.findOne.mockResolvedValue(existingOrder);
+
+      const result = await service.revertAbono(tenantId, orderId, 'uuid-abono-1');
+
+      expect(result.abonosTotal).toBe(40);
+      expect(result.abonosHistory).toHaveLength(1);
+      expect(result.abonosHistory[0].id).toBe('uuid-abono-2');
+      expect(result.paymentStatus).toBe(PaymentStatus.PARTIAL);
+    });
+
+    it('debe lanzar NotFoundException si el abono o la orden no existen', async () => {
+      const tenantId = 'tenant-test';
+      mockOrderRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.revertAbono(tenantId, 'non-existent', 'uuid-x')).rejects.toThrow(
+        /Orden no encontrada/
+      );
+
+      mockOrderRepo.findOne.mockResolvedValue({
+        id: 'order-1',
+        tenantId,
+        abonosHistory: [{ id: 'uuid-1', amount: 10 }],
+      });
+
+      await expect(service.revertAbono(tenantId, 'order-1', 'uuid-not-found')).rejects.toThrow(
+        /Abono no encontrado/
+      );
+    });
+  });
+
+  describe('editOrder con ítems del mismo producto y modificaciones', () => {
+    it('preserva ambos ítems diferenciados y sus modificaciones sin sobreescribir', async () => {
+      const tenantId = 'tenant-edit-1';
+      const orderId = 'order-burger-1';
+
+      const existingOrder: any = {
+        id: orderId,
+        tenantId,
+        totalAmount: 20,
+        totalCost: 8,
+        discountAmount: 0,
+        deliveryFee: 0,
+        status: OrderStatus.PENDING,
+        paymentStatus: PaymentStatus.PENDING,
+        items: [
+          {
+            id: 'item-1',
+            orderId,
+            productId: 'prod-burger',
+            productName: 'Hamburguesa',
+            quantity: 1,
+            unitPrice: 10,
+            unitCost: 4,
+            subtotal: 10,
+            deliveredQuantity: 0,
+            removedIngredients: ['cebolla'],
+            addedExtras: [],
+            hasModifications: true,
+          },
+          {
+            id: 'item-2',
+            orderId,
+            productId: 'prod-burger',
+            productName: 'Hamburguesa',
+            quantity: 1,
+            unitPrice: 10,
+            unitCost: 4,
+            subtotal: 10,
+            deliveredQuantity: 0,
+            removedIngredients: [],
+            addedExtras: [{ rawMaterialId: 'extra-tocineta', name: 'Tocineta', priceUSD: 2, quantity: 1 }],
+            hasModifications: true,
+          },
+        ],
+      };
+
+      mockManager.findOne.mockImplementation((entity: any) => {
+        if (entity === Order || entity?.name === 'Order') return Promise.resolve(existingOrder);
+        if (entity === Product || entity?.name === 'Product') {
+          return Promise.resolve({
+            id: 'prod-burger',
+            name: 'Hamburguesa',
+            salePrice: 10,
+            stockQuantity: 10,
+          });
+        }
+        return Promise.resolve(null);
+      });
+      mockManager.find.mockResolvedValue([]);
+
+      const dto: any = {
+        items: [
+          {
+            id: 'item-1',
+            productId: 'prod-burger',
+            quantity: 1,
+            unitPrice: 10,
+            removedIngredients: ['cebolla', 'tomate'],
+            hasModifications: true,
+          },
+          {
+            id: 'item-2',
+            productId: 'prod-burger',
+            quantity: 1,
+            unitPrice: 10,
+            addedExtras: [{ rawMaterialId: 'extra-tocineta', name: 'Tocineta', priceUSD: 2, quantity: 1 }],
+            hasModifications: true,
+          },
+        ],
+      };
+
+      const result = await service.editOrder(tenantId, orderId, dto);
+      expect(result).toBeDefined();
+      expect(existingOrder.items[0].removedIngredients).toEqual(['cebolla', 'tomate']);
+      expect(mockManager.remove).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createOrder con linkedReservationId (Consolidación sin duplicar)', () => {
+    it('consolida y actualiza vía editOrder si existe una orden previa vinculada en estado no pagado', async () => {
+      const tenantId = 'tenant-res-1';
+      const existingOrder: any = {
+        id: 'existing-order-res-1',
+        tenantId,
+        linkedReservationId: 'res-123',
+        status: OrderStatus.PENDING,
+        paymentStatus: PaymentStatus.PENDING,
+        totalAmount: 15,
+        items: [],
+      };
+
+      mockOrderRepo.findOne.mockResolvedValue(existingOrder);
+      const editOrderSpy = jest.spyOn(service, 'editOrder').mockResolvedValue(existingOrder as any);
+
+      const dto: any = {
+        customerName: 'Cliente Reserva',
+        linkedReservationId: 'res-123',
+        items: [{ productId: 'prod-1', quantity: 1, unitPrice: 15 }],
+      };
+
+      const result = await service.createOrder(tenantId, dto);
+      expect(editOrderSpy).toHaveBeenCalledWith(tenantId, 'existing-order-res-1', dto, undefined, undefined);
+      expect(result).toBe(existingOrder);
+      editOrderSpy.mockRestore();
+    });
+  });
+
+  describe('getDailyCashSummary separación de métodos bancarios y digitales', () => {
+    it('no debe sumar órdenes pagadas con TRANSFER o BINANCE al efectivo físico en gaveta (totalCashUSD)', async () => {
+      const tenantId = 'tenant-summary-1';
+      const dateStr = '2026-10-02';
+
+      mockSettingsRepo.findOne.mockResolvedValue({
+        tenantId,
+        exchangeRateBs: 50.0,
+      });
+
+      const transferOrder = {
+        id: 'ord-transfer',
+        tenantId,
+        totalAmount: 40,
+        paymentStatus: PaymentStatus.PAID,
+        paymentMethod: 'TRANSFER',
+        transferRef: 'TRF-12345',
+        createdAt: new Date(`${dateStr}T12:00:00Z`),
+      };
+
+      const binanceOrder = {
+        id: 'ord-binance',
+        tenantId,
+        totalAmount: 60,
+        paymentStatus: PaymentStatus.PAID,
+        paymentMethod: 'BINANCE',
+        binanceRef: 'BIN-99999',
+        createdAt: new Date(`${dateStr}T13:00:00Z`),
+      };
+
+      const cashOrder = {
+        id: 'ord-cash',
+        tenantId,
+        totalAmount: 25,
+        paymentStatus: PaymentStatus.PAID,
+        paymentMethod: 'USD',
+        usdReceived: 25,
+        createdAt: new Date(`${dateStr}T14:00:00Z`),
+      };
+
+      mockOrderRepo.find.mockResolvedValue([transferOrder, binanceOrder, cashOrder]);
+      mockExpenseRepo.find.mockResolvedValue([]);
+
+      const summary = await service.getDailyCashSummary(tenantId, dateStr);
+
+      expect(summary.totalSalesUSD).toBe(125);
+      expect(summary.totalPaidUSD).toBe(125);
+      expect(summary.totalCashUSD).toBe(25);
+      expect(summary.totalCashReceivedUSD).toBe(25);
+    });
+  });
+
+  describe('syncOfflineOrders con editingOrderId', () => {
+    it('debe llamar a editOrder cuando un ítem offline incluye payload.editingOrderId', async () => {
+      const tenantId = 'tenant-offline-edit';
+      const editOrderSpy = jest.spyOn(service, 'editOrder').mockResolvedValue({ id: 'ord-editing-1' } as any);
+      const createOrderSpy = jest.spyOn(service, 'createOrder').mockResolvedValue({ id: 'ord-new-1' } as any);
+
+      mockOrderRepo.findOne.mockResolvedValue(null);
+
+      const offlineOrders = [
+        {
+          offlineId: 'off-edit-1',
+          payload: {
+            editingOrderId: 'ord-editing-1',
+            items: [{ productId: 'p1', quantity: 1, unitPrice: 10 }],
+          },
+        },
+      ];
+
+      const res = await service.syncOfflineOrders(tenantId, offlineOrders, 'user-1', UserRole.POS);
+      expect(res.success).toBe(true);
+      expect(res.syncedOfflineIds).toContain('off-edit-1');
+      expect(editOrderSpy).toHaveBeenCalledWith(
+        tenantId,
+        'ord-editing-1',
+        expect.objectContaining({ editingOrderId: 'ord-editing-1' }),
+        'user-1',
+        UserRole.POS,
+      );
+      expect(createOrderSpy).not.toHaveBeenCalled();
+
+      editOrderSpy.mockRestore();
+      createOrderSpy.mockRestore();
     });
   });
 });

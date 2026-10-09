@@ -1,4 +1,4 @@
-﻿import { Controller, Request, Get, Post, Body, Delete, Param, UseGuards } from '@nestjs/common';
+import { Controller, Request, Get, Post, Body, Delete, Param, UseGuards } from '@nestjs/common';
 import { ProductionService } from './production.service';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -11,7 +11,7 @@ export class CreateBatchDto {
 
 @Controller('production')
 @UseGuards(RolesGuard)
-@Roles(UserRole.ADMIN, UserRole.KITCHEN)
+@Roles(UserRole.ADMIN, UserRole.KITCHEN, UserRole.INVENTORY)
 export class ProductionController {
   @Delete(':id')
   revertBatch(@Request() req: any, @Param('id') id: string) {

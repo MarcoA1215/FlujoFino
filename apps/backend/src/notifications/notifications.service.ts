@@ -15,17 +15,17 @@ export class NotificationsService {
     private readonly pushRepo: Repository<PushSubscription>,
     private readonly configService: ConfigService,
   ) {
-    this.vapidPublicKey =
-      this.configService.get<string>('VAPID_PUBLIC_KEY') ||
-      'BOVNV5aBYlzYON15tj1DdHNuR-YNYsotD3BRGgoCjIOEchUZ2C8rRd7nhDOP-Qis-x5rPKcmpdXOJ9N2hPNGsAI';
-    const privateKey =
-      this.configService.get<string>('VAPID_PRIVATE_KEY') ||
-      'lj7fJ1UKpWb3uy0U03xQigJCxPAI4QU5gEOoTUH2mJg';
+    this.vapidPublicKey = this.configService.get<string>('VAPID_PUBLIC_KEY') || '';
+    const privateKey = this.configService.get<string>('VAPID_PRIVATE_KEY') || '';
     const subject =
       this.configService.get<string>('VAPID_SUBJECT') ||
       'mailto:admin@finowork.com';
 
-    webpush.setVapidDetails(subject, this.vapidPublicKey, privateKey);
+    if (this.vapidPublicKey && privateKey) {
+      webpush.setVapidDetails(subject, this.vapidPublicKey, privateKey);
+    } else {
+      this.logger.warn('Credenciales VAPID no configuradas en entorno. Notificaciones Push deshabilitadas.');
+    }
   }
 
   getPublicKey(): { publicKey: string } {

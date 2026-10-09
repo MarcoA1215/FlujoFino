@@ -1,11 +1,12 @@
-﻿import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, Index } from 'typeorm';
 import { User } from './user.entity';
 import { Tenant } from './tenant.entity';
 import { UserRole } from '@finowork/shared-types';
 import { WorkSchedule } from './work-schedule.entity';
 
 @Entity()
+@Index(['userId', 'tenantId'])
 export class UserTenantAccess {
   @PrimaryGeneratedColumn('uuid')
   id: string;

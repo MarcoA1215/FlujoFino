@@ -6,6 +6,7 @@ import { SalaryAdvance, SalaryAdvanceStatus } from '../entities/salary-advance.e
 import { OperatingExpense } from '../entities/operating-expense.entity';
 import { User } from '../entities/user.entity';
 import { Settings } from '../entities/settings.entity';
+import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 
 describe('SalaryAdvancesService', () => {
   let service: SalaryAdvancesService;
@@ -13,6 +14,7 @@ describe('SalaryAdvancesService', () => {
   let mockExpenseRepo: any;
   let mockUserRepo: any;
   let mockSettingsRepo: any;
+  let mockAccessRepo: any;
   let mockDataSource: any;
   let mockManager: any;
 
@@ -39,6 +41,10 @@ describe('SalaryAdvancesService', () => {
       findOne: jest.fn(),
     };
 
+    mockAccessRepo = {
+      findOne: jest.fn().mockResolvedValue({ id: 'acc-1', userId: 'emp-1', tenantId: 'tenant-xyz', isActive: true }),
+    };
+
     mockManager = {
       create: jest.fn((entityClass, data) => ({ ...data })),
       save: jest.fn(async (entityOrClass, maybeData) => maybeData || entityOrClass),
@@ -55,6 +61,7 @@ describe('SalaryAdvancesService', () => {
         { provide: getRepositoryToken(OperatingExpense), useValue: mockExpenseRepo },
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
         { provide: getRepositoryToken(Settings), useValue: mockSettingsRepo },
+        { provide: getRepositoryToken(UserTenantAccess), useValue: mockAccessRepo },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
@@ -134,6 +141,16 @@ describe('SalaryAdvancesService', () => {
 
       expect(result.exchangeRate).toBe(62.0);
       expect(result.amountBS).toBe(620.0);
+    });
+
+    it('debe lanzar BadRequestException si el empleado no pertenece a este negocio', async () => {
+      const tenantId = 'tenant-xyz';
+      mockUserRepo.findOne.mockResolvedValue({ id: 'emp-3', username: 'carlos' });
+      mockAccessRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.create(tenantId, { userId: 'emp-3', amountUSD: 20 })
+      ).rejects.toThrow('El empleado no pertenece a este negocio');
     });
   });
 
