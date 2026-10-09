@@ -10,6 +10,8 @@ import { OrderItem } from '../entities/order-item.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
 import { Investment } from '../entities/investment.entity';
 import { Reservation } from '../entities/reservation.entity';
+import { CashExchange } from '../entities/cash-exchange.entity';
+import { Settings } from '../entities/settings.entity';
 
 describe('DashboardService', () => {
   let service: DashboardService;
@@ -21,6 +23,8 @@ describe('DashboardService', () => {
   let expenseRepo: any;
   let investmentRepo: any;
   let reservationRepo: any;
+  let cashExchangeRepo: any;
+  let settingsRepo: any;
 
   beforeEach(async () => {
     rawMaterialRepo = {
@@ -57,6 +61,7 @@ describe('DashboardService', () => {
       createQueryBuilder: jest.fn().mockReturnValue(createDummyQueryBuilder()),
     };
     expenseRepo = {
+      find: jest.fn().mockResolvedValue([]),
       createQueryBuilder: jest.fn().mockReturnValue(createDummyQueryBuilder()),
     };
     investmentRepo = {
@@ -65,6 +70,13 @@ describe('DashboardService', () => {
     };
     reservationRepo = {
       createQueryBuilder: jest.fn().mockReturnValue(createDummyQueryBuilder()),
+    };
+    cashExchangeRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      createQueryBuilder: jest.fn().mockReturnValue(createDummyQueryBuilder()),
+    };
+    settingsRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -101,6 +113,14 @@ describe('DashboardService', () => {
         {
           provide: getRepositoryToken(Reservation),
           useValue: reservationRepo,
+        },
+        {
+          provide: getRepositoryToken(CashExchange),
+          useValue: cashExchangeRepo,
+        },
+        {
+          provide: getRepositoryToken(Settings),
+          useValue: settingsRepo,
         },
       ],
     }).compile();
