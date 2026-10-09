@@ -105,6 +105,7 @@ interface Settings {
   slotInterval?: number;
   themePrimaryColor?: string;
   themeHeaderColor?: string;
+  allowNegativeStock?: boolean;
 }
 
   const getPublicBaseUrl = () => {
@@ -278,6 +279,7 @@ const SettingsPage: React.FC = () => {
         featureProduction: settings.featureProduction !== false,
         featureDelivery: settings.featureDelivery !== false,
         featureShowCatalog: settings.featureShowCatalog,
+        allowNegativeStock: settings.allowNegativeStock === true,
         bookingRequireService: settings.bookingRequireService,
         bookingAllowStaffSelection: settings.bookingAllowStaffSelection,
         businessHours: settings.businessHours,
@@ -1270,6 +1272,15 @@ const SettingsPage: React.FC = () => {
                     </IonLabel>
                     <IonToggle checked={settings.featureShowCatalog !== false} onIonChange={e => setSettings({...settings, featureShowCatalog: e.detail.checked})} />
                   </IonItem>
+                  <IonItem>
+                    <IonLabel className="ion-text-wrap">
+                      <h2>Permitir Pedidos sin Stock (Bajo Encargo / Demanda)</h2>
+                      <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
+                        Ideal para negocios que fabrican o surten bajo pedido (pastelerías, carpinterías, imprentas o cocina bajo demanda). En lugar de bloquear la venta, permite facturar y muestra el saldo faltante como "Por producir" en lugar de stock negativo.
+                      </p>
+                    </IonLabel>
+                    <IonToggle checked={settings.allowNegativeStock === true} onIonChange={e => setSettings({...settings, allowNegativeStock: e.detail.checked})} />
+                  </IonItem>
                 </IonCardContent>
               </IonCard>
             </IonCol>
@@ -1555,7 +1566,7 @@ const SettingsPage: React.FC = () => {
                             <div>
                               <p style={{ margin: 0, fontWeight: 700, color: '#78350f' }}>Advertencia: Color muy claro sobre fondos blancos</p>
                               <p style={{ margin: '4px 0 0 0', color: '#92400e', lineHeight: 1.4 }}>
-                                Este color tiene poco contraste contra fondos blancos. Los botones de texto, modales y enlaces podrían verse difíciles de leer. FlujoFino protegerá automáticamente los diálogos críticos, pero te recomendamos elegir un tono más oscuro o saturado para una experiencia óptima.
+                                Este color tiene poco contraste contra fondos blancos. Los botones de texto, modales y enlaces podrían verse difíciles de leer. FinoWork protegerá automáticamente los diálogos críticos, pero te recomendamos elegir un tono más oscuro o saturado para una experiencia óptima.
                               </p>
                             </div>
                           </div>
@@ -1685,7 +1696,7 @@ const SettingsPage: React.FC = () => {
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ fontSize: '13px', fontWeight: 800 }}>☰</span>
-                            <span style={{ fontSize: '13px', fontWeight: 800 }}>FlujoFino POS</span>
+                            <span style={{ fontSize: '13px', fontWeight: 800 }}>FinoWork POS</span>
                           </div>
                           <span style={{ fontSize: '12px', opacity: 0.85, fontWeight: 600 }}>Negocio</span>
                         </div>

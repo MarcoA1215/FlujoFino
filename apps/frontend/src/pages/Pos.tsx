@@ -905,8 +905,9 @@ const Pos: React.FC = () => {
               const itemInCart = cart.find(ci => (ci.product?.id || (ci as any).productId) === p.id);
               if (!itemInCart) return p;
               const qty = Number(itemInCart.quantity) || 1;
-              const newStock = Math.max(0, (p.stockQuantity ?? 0) - qty);
-              const newPhysical = Math.max(0, (p.physicalStock ?? 0) - qty);
+              const allowNegative = Boolean(settings?.allowNegativeStock);
+              const newStock = allowNegative ? ((p.stockQuantity ?? 0) - qty) : Math.max(0, (p.stockQuantity ?? 0) - qty);
+              const newPhysical = allowNegative ? ((p.physicalStock ?? 0) - qty) : Math.max(0, (p.physicalStock ?? 0) - qty);
               return { ...p, stockQuantity: newStock, physicalStock: newPhysical };
             });
             offlineDb.cachedProducts.bulkPut(updated).catch(() => {});
@@ -1009,8 +1010,9 @@ const Pos: React.FC = () => {
               const itemInCart = cart.find(ci => (ci.product?.id || (ci as any).productId) === p.id);
               if (!itemInCart) return p;
               const qty = Number(itemInCart.quantity) || 1;
-              const newStock = Math.max(0, (p.stockQuantity ?? 0) - qty);
-              const newPhysical = Math.max(0, (p.physicalStock ?? 0) - qty);
+              const allowNegative = Boolean(settings?.allowNegativeStock);
+              const newStock = allowNegative ? ((p.stockQuantity ?? 0) - qty) : Math.max(0, (p.stockQuantity ?? 0) - qty);
+              const newPhysical = allowNegative ? ((p.physicalStock ?? 0) - qty) : Math.max(0, (p.physicalStock ?? 0) - qty);
               return { ...p, stockQuantity: newStock, physicalStock: newPhysical };
             });
             offlineDb.cachedProducts.bulkPut(updated).catch(() => {});
@@ -1259,13 +1261,14 @@ const Pos: React.FC = () => {
                               fontWeight: '600',
                               padding: '3px 8px',
                               borderRadius: '6px',
-                              background: isService ? '#ECFDF5' : (pStock <= 0 ? '#FEF2F2' : '#F1F5F9'),
-                              color: isService ? '#047857' : (pStock <= 0 ? '#991B1B' : '#475569')
+                              background: isService ? '#ECFDF5' : (pStock < 0 ? '#FEF3C7' : (pStock === 0 ? '#FEF2F2' : '#F1F5F9')),
+                              color: isService ? '#047857' : (pStock < 0 ? '#B45309' : (pStock === 0 ? '#991B1B' : '#475569')),
+                              border: pStock < 0 ? '1px solid #FDE68A' : 'none',
                             }}
                           >
                             {isService
                               ? (p.durationMinutes ? `⏱️ ${p.durationMinutes}m` : 'Servicio')
-                              : (pStock <= 0 ? 'Agotado' : `Stock: ${pStock}`)}
+                              : (pStock < 0 ? `Por producir: ${Math.abs(pStock)}` : (pStock === 0 ? 'Agotado' : `Stock: ${pStock}`))}
                           </span>
 
                           {/* Circular Add Button */}

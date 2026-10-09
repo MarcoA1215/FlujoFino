@@ -603,8 +603,8 @@ const Products: React.FC = () => {
                             Disponible
                           </IonBadge>
                         ) : (
-                          <IonBadge slot="end" color={currentStock > 0 ? 'success' : 'danger'} style={{ padding: '6px 10px', fontSize: '0.85rem' }}>
-                            {currentStock > 0 ? `Stock: ${currentStock}` : 'Agotado'}
+                          <IonBadge slot="end" color={currentStock > 0 ? 'success' : (currentStock < 0 ? 'warning' : 'danger')} style={{ padding: '6px 10px', fontSize: '0.85rem' }}>
+                            {currentStock > 0 ? `Stock: ${currentStock}` : (currentStock < 0 ? `Por producir: ${Math.abs(currentStock)}` : 'Agotado')}
                           </IonBadge>
                         )}
                       </IonItem>

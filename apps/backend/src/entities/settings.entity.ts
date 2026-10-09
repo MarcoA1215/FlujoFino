@@ -101,6 +101,9 @@ export class Settings {
   @Column('boolean', { default: false })
   requireApprovalAlways: boolean;
 
+  @Column('boolean', { default: false })
+  allowNegativeStock: boolean;
+
   @Column('boolean', { default: true })
   featureShowCatalog: boolean;
 

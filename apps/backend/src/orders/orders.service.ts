@@ -328,9 +328,12 @@ export class OrdersService {
     }
     if ((dto.discountAmount || 0) < 0) throw new BadRequestException('El descuento no puede ser negativo');
 
+    const tenantSettings = typeof this.settingsService?.getSettings === 'function' ? await this.settingsService.getSettings(tenantId) : null;
+    const allowNegativeStock = Boolean(tenantSettings?.allowNegativeStock);
+
     const orderExchangeRate = (dto.exchangeRate && Number(dto.exchangeRate) > 0)
       ? Number(dto.exchangeRate)
-      : await this.settingsService.getEffectiveRate(tenantId);
+      : (tenantSettings?.exchangeRateBs ? Number(tenantSettings.exchangeRateBs) : await this.settingsService.getEffectiveRate(tenantId));
 
     return this.dataSource.transaction(async (manager) => {
       if (dto.paymentMethod === 'PAGO_MOVIL' && dto.pagoMovilRef && dto.pagoMovilRef.trim().length > 0) {
@@ -602,6 +605,9 @@ export class OrdersService {
         let unitCost = 0;
 
         if (extraMaterial) {
+          if (!allowNegativeStock && extraMaterial.stockQuantity < itemDto.quantity) {
+            throw new BadRequestException(`Stock insuficiente para el insumo "${extraMaterial.name}". Disponible: ${extraMaterial.stockQuantity}, solicitado: ${itemDto.quantity}`);
+          }
           extraMaterial.stockQuantity -= itemDto.quantity;
           await manager.save(RawMaterial, extraMaterial);
 
@@ -623,7 +629,12 @@ export class OrdersService {
             if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
               for (const ci of product.comboItems) {
                 if (ci.component) {
-                  ci.component.stockQuantity -= (itemDto.quantity * ci.quantity);
+                  const reqQty = itemDto.quantity * ci.quantity;
+                  if (!allowNegativeStock && (ci.component.stockQuantity < reqQty)) {
+                    throw new BadRequestException(`Stock insuficiente para el componente "${ci.component.name}". Disponible: ${ci.component.stockQuantity}, requerido: ${reqQty}`);
+                  }
+                  ci.component.stockQuantity -= reqQty;
+                  ci.component.stock = ci.component.stockQuantity;
                   await manager.save(Product, ci.component);
                 }
               }
@@ -635,13 +646,17 @@ export class OrdersService {
                   );
                   if (isRemoved) continue;
 
-                  ri.rawMaterial.stockQuantity -= (itemDto.quantity * ri.quantity);
+                  const reqQty = itemDto.quantity * ri.quantity;
+                  if (!allowNegativeStock && (ri.rawMaterial.stockQuantity < reqQty)) {
+                    throw new BadRequestException(`Stock insuficiente para el insumo "${ri.rawMaterial.name}". Disponible: ${ri.rawMaterial.stockQuantity}, requerido: ${reqQty}`);
+                  }
+                  ri.rawMaterial.stockQuantity -= reqQty;
                   await manager.save(RawMaterial, ri.rawMaterial);
                   const mov = manager.create(StockMovement, { tenantId,
                     rawMaterialId: ri.rawMaterial.id,
                     type: MovementType.OUT_SALE,
-                    quantity: itemDto.quantity * ri.quantity,
-                    totalCost: (itemDto.quantity * ri.quantity) * ri.rawMaterial.costPerUnit,
+                    quantity: reqQty,
+                    totalCost: reqQty * ri.rawMaterial.costPerUnit,
                     description: 'Venta de Producto: ' + product.name
                   });
                   await manager.save(StockMovement, mov);
@@ -658,10 +673,13 @@ export class OrdersService {
               if (!isService && !isMadeToOrder) {
                 const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
                 const isBajoEncargo = product.availabilityType === 'BAJO_ENCARGO';
-                if (currentStock < itemDto.quantity && !isBajoEncargo) {
+                if (!allowNegativeStock && currentStock < itemDto.quantity && !isBajoEncargo) {
                   throw new BadRequestException(`Stock insuficiente para "${product.name}". Disponible: ${currentStock}, solicitado: ${itemDto.quantity}`);
                 }
-                product.stock = Math.max(0, currentStock - itemDto.quantity);
+                const newStock = allowNegativeStock
+                  ? currentStock - itemDto.quantity
+                  : (isBajoEncargo ? Math.max(0, currentStock - itemDto.quantity) : currentStock - itemDto.quantity);
+                product.stock = newStock;
                 product.stockQuantity = product.stock;
                 await manager.save(Product, product);
               }
@@ -674,6 +692,9 @@ export class OrdersService {
                 const extraRm = await manager.findOne(RawMaterial, { where: { tenantId, id: extra.rawMaterialId } });
                 if (extraRm) {
                   const extraQty = (Number(extra.quantity) || 1) * itemDto.quantity;
+                  if (!allowNegativeStock && extraRm.stockQuantity < extraQty) {
+                    throw new BadRequestException(`Stock insuficiente para el insumo extra "${extraRm.name}". Disponible: ${extraRm.stockQuantity}, requerido: ${extraQty}`);
+                  }
                   extraRm.stockQuantity -= extraQty;
                   await manager.save(RawMaterial, extraRm);
                   const mov = manager.create(StockMovement, { tenantId,

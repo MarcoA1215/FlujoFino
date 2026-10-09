@@ -335,6 +335,7 @@ export interface SettingsDTO {
   slotInterval?: number;
   themePrimaryColor?: string;
   themeHeaderColor?: string;
+  allowNegativeStock?: boolean;
   publicToken?: string;
 }
 

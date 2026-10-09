@@ -41,11 +41,19 @@ async function bootstrap() {
     'http://localhost:3000',
     'http://localhost:3001',
     'https://flujofino.onrender.com',
+    'https://finowork.onrender.com',
     'capacitor://localhost',
     'https://localhost',   
     'ionic://localhost',    
     'http://localhost',       
   ];
+
+  if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+  }
+  if (process.env.FRONTEND_URL_APK) {
+    allowedOrigins.push(process.env.FRONTEND_URL_APK);
+  }
 
   app.enableCors({
     origin: (origin, callback) => {
@@ -53,9 +61,8 @@ async function bootstrap() {
       if (
         !origin ||
         allowedOrigins.includes(origin) ||
-        origin.endsWith('.onrender.com') ||
-        origin.endsWith('.vercel.app') ||
-        (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL)
+        (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) ||
+        (process.env.FRONTEND_URL_APK && origin === process.env.FRONTEND_URL_APK)
       ) {
         callback(null, true);
       } else {

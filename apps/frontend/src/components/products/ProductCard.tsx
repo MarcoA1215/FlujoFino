@@ -225,18 +225,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             {!isClientMode && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
                 {isResale ? (
-                  <IonBadge color={currentStock <= 0 ? 'danger' : 'success'} style={{ padding: '6px 8px', fontSize: '0.82rem', fontWeight: 'bold' }}>
-                    Stock: {currentStock}
+                  <IonBadge color={currentStock < 0 ? 'warning' : (currentStock === 0 ? 'danger' : 'success')} style={{ padding: '6px 8px', fontSize: '0.82rem', fontWeight: 'bold' }}>
+                    {currentStock < 0 ? `Por producir: ${Math.abs(currentStock)}` : `Stock: ${currentStock}`}
                   </IonBadge>
                 ) : !isService && (!p.isCombo || p.isPreAssembled) ? (
                   <>
                     {Boolean(featureProduction) && (
-                      <IonBadge color={p.physicalStock! <= 0 ? 'medium' : 'primary'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
-                        Físico: {p.physicalStock}
+                      <IonBadge color={p.physicalStock! < 0 ? 'warning' : (p.physicalStock! === 0 ? 'medium' : 'primary')} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                        {p.physicalStock! < 0 ? `Por fabricar: ${Math.abs(p.physicalStock!)}` : `Físico: ${p.physicalStock}`}
                       </IonBadge>
                     )}
-                    <IonBadge color={p.stockQuantity <= 0 ? 'medium' : 'success'} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
-                      Disp: {p.stockQuantity}
+                    <IonBadge color={p.stockQuantity < 0 ? 'warning' : (p.stockQuantity === 0 ? 'medium' : 'success')} style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                      {p.stockQuantity < 0 ? `Por producir: ${Math.abs(p.stockQuantity)}` : `Disp: ${p.stockQuantity}`}
                     </IonBadge>
                   </>
                 ) : null}

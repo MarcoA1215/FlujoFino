@@ -53,11 +53,13 @@ export const RawMaterialCard: React.FC<RawMaterialCardProps> = ({
               {m.name}
             </h2>
             <span style={
-              m.stockQuantity <= m.minStockAlert
+              m.stockQuantity < 0
+                ? { background: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A', borderRadius: '8px', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap' }
+                : m.stockQuantity <= m.minStockAlert
                 ? { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', borderRadius: '8px', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap' }
                 : { background: 'var(--theme-primary)', color: 'var(--theme-primary-contrast)', borderRadius: '8px', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap' }
             }>
-              {m.stockQuantity.toFixed(2)} {m.unit}
+              {m.stockQuantity < 0 ? `Por producir: ${Math.abs(m.stockQuantity).toFixed(2)} ${m.unit}` : `${m.stockQuantity.toFixed(2)} ${m.unit}`}
             </span>
           </div>
           

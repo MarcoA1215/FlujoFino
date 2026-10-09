@@ -35,6 +35,7 @@ export class SettingsService implements OnModuleInit {
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "currencySymbol" character varying DEFAULT 'Bs.';
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "ratesCache" jsonb;
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "featureDelivery" boolean DEFAULT true;
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "allowNegativeStock" boolean DEFAULT false;
         
         ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "abonosTotal" numeric(12,4) DEFAULT 0;
         ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "abonosHistory" jsonb;
@@ -324,6 +325,7 @@ export class SettingsService implements OnModuleInit {
     if (payload.featureBuySell !== undefined) settings.featureBuySell = payload.featureBuySell;
     if (payload.featureProduction !== undefined) settings.featureProduction = payload.featureProduction;
     if (payload.featureShowCatalog !== undefined) settings.featureShowCatalog = payload.featureShowCatalog;
+    if (payload.allowNegativeStock !== undefined) settings.allowNegativeStock = payload.allowNegativeStock;
     if (payload.bookingRequireService !== undefined) settings.bookingRequireService = payload.bookingRequireService;
     if (payload.bookingAllowStaffSelection !== undefined) settings.bookingAllowStaffSelection = payload.bookingAllowStaffSelection;
     if (payload.requireApprovalAlways !== undefined) settings.requireApprovalAlways = payload.requireApprovalAlways;
