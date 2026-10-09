@@ -209,7 +209,7 @@ const Production: React.FC = () => {
                                 No hay productos con fórmula o receta para fabricar
                               </p>
                               <p style={{ fontSize: '0.85rem', margin: 0 }}>
-                                Los productos de reventa directa y servicios están excluidos. Vincula insumos/receta a tus productos en Servicios / Productos para habilitar la producción.
+                                Los productos de reventa directa y servicios están excluidos. Vincula insumos/receta a tus productos en el Catálogo para habilitar la producción.
                               </p>
                             </div>
                           </IonCol>

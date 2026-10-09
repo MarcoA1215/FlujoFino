@@ -194,15 +194,23 @@ const Menu: React.FC = () => {
 
   const isProductionEnabled = settings.enableProduction !== undefined ? Boolean(settings.enableProduction) : (settings.featureProduction !== false);
   const isReservationsEnabled = settings.enableReservations !== undefined ? Boolean(settings.enableReservations) : Boolean(settings.featureCustomerSchedules);
+  const isRetailEnabled = settings.enableRetail !== undefined ? Boolean(settings.enableRetail) : (settings.featureBuySell !== false);
+  const isRecipesEnabled = settings.enableFormulas !== undefined ? Boolean(settings.enableFormulas) : Boolean(settings.featureRecipes);
   const isDeliveryEnabled = settings.enableDelivery !== undefined 
     ? Boolean(settings.enableDelivery) 
     : Boolean(settings.featureBuySell || settings.featureProduction || isProductionEnabled || user?.role === UserRole.DELIVERY);
-  const isRecipesEnabled = settings.enableFormulas !== undefined ? Boolean(settings.enableFormulas) : Boolean(settings.featureRecipes);
+
+  const hasProducts = isRetailEnabled || isRecipesEnabled || isProductionEnabled;
+  const productsMenuLabel = (isReservationsEnabled && hasProducts)
+    ? 'Servicios / Productos'
+    : isReservationsEnabled
+      ? 'Servicios'
+      : 'Productos';
 
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Tablero Principal', path: '/dashboard', icon: pieChartOutline, isVisible: true },
     { id: 'raw-materials', label: 'Inventario (Insumos)', path: '/raw-materials', icon: cubeOutline, isVisible: isRecipesEnabled },
-    { id: 'products', label: 'Servicios / Productos', path: '/products', icon: listOutline, isVisible: true },
+    { id: 'products', label: productsMenuLabel, path: '/products', icon: listOutline, isVisible: true },
     { id: 'production', label: 'Fórmulas / Ensamblaje', path: '/production', icon: constructOutline, isVisible: isProductionEnabled },
     { id: 'calculator', label: 'Calculadora de Costos', path: '/calculator', icon: calculatorOutline, isVisible: isRecipesEnabled },
     { id: 'pos', label: 'Caja', path: '/pos', icon: cashOutline, isVisible: true },

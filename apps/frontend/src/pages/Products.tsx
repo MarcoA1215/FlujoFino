@@ -55,9 +55,15 @@ const Products: React.FC = () => {
   const [isCreatingCombo, setIsCreatingCombo] = useState(false);
   const [selectedArchetype, setSelectedArchetype] = useState<'REVENTA' | 'FORMULA' | 'SERVICIO'>('REVENTA');
 
+  const hasServices = settings?.enableReservations !== undefined ? Boolean(settings?.enableReservations) : Boolean(settings?.featureCustomerSchedules);
+  const hasRetail = settings?.enableRetail !== undefined ? Boolean(settings?.enableRetail) : (settings?.featureBuySell !== false);
+  const hasRecipes = settings?.enableFormulas !== undefined ? Boolean(settings?.enableFormulas) : Boolean(settings?.featureRecipes);
+  const hasProduction = settings?.enableProduction !== undefined ? Boolean(settings?.enableProduction) : (settings?.featureProduction !== false);
+  const hasProducts = hasRetail || hasRecipes || hasProduction;
+
   const activeArchetypes = useMemo(() => {
     const list: { type: 'REVENTA' | 'FORMULA' | 'SERVICIO'; label: string; icon: any; buttonLabel: string }[] = [];
-    if (settings?.featureBuySell) {
+    if (hasRetail) {
       list.push({ 
         type: 'REVENTA', 
         label: 'Producto para Reventa Directa', 
@@ -65,7 +71,7 @@ const Products: React.FC = () => {
         buttonLabel: 'Nuevo Producto'
       });
     }
-    if (settings?.featureRecipes) {
+    if (hasRecipes) {
       list.push({ 
         type: 'FORMULA', 
         label: 'Producto Armable / Con Fórmula', 
@@ -73,7 +79,7 @@ const Products: React.FC = () => {
         buttonLabel: 'Nuevo Producto Armable'
       });
     }
-    if (settings?.featureCustomerSchedules) {
+    if (hasServices) {
       list.push({ 
         type: 'SERVICIO', 
         label: 'Servicio / Cita', 
@@ -90,7 +96,13 @@ const Products: React.FC = () => {
       });
     }
     return list;
-  }, [settings]);
+  }, [hasRetail, hasRecipes, hasServices]);
+
+  const catalogSubtitle = useMemo(() => {
+    if (hasServices && hasProducts) return 'Productos y Servicios';
+    if (hasServices && !hasProducts) return 'Servicios';
+    return 'Productos';
+  }, [hasServices, hasProducts]);
 
   const fetchData = async () => {
     try {
@@ -367,7 +379,7 @@ const Products: React.FC = () => {
   
   return (
     <IonPage>
-      <AppHeader title="Catálogo" subtitle="Productos y Servicios" onRefresh={fetchData} />
+      <AppHeader title="Catálogo" subtitle={catalogSubtitle} onRefresh={fetchData} />
 
       <IonContent fullscreen className="ff-has-bottom-nav" style={{ '--background': '#F8FAFC' } as any}>
         <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '16px 16px 80px 16px' }}>
@@ -552,7 +564,9 @@ const Products: React.FC = () => {
             <IonRow className="ion-margin-bottom">
               <IonCol size="12" sizeSm={settings?.featureRecipes || settings?.featureProduction !== false ? "8" : "12"} sizeMd={settings?.featureRecipes || settings?.featureProduction !== false ? "6" : "4"}>
                 <IonButton expand="block" color="primary" onClick={handleNewProductClick}>
-                  {activeArchetypes.length <= 1 ? `+ ${activeArchetypes[0].buttonLabel}` : '+ Nuevo Producto / Servicio'}
+                  {activeArchetypes.length <= 1 
+                    ? `+ ${activeArchetypes[0].buttonLabel}` 
+                    : (hasServices && hasProducts ? '+ Nuevo Producto / Servicio' : hasServices ? '+ Nuevo Servicio' : '+ Nuevo Producto')}
                 </IonButton>
               </IonCol>
               {(settings?.featureRecipes || settings?.featureProduction !== false) && (
@@ -616,10 +630,10 @@ const Products: React.FC = () => {
                   <IonRow>
                     {filteredData.map(p => (
                       <ProductCard isClientMode={isClientMode}
-                        featureRecipes={settings?.featureRecipes}
-                        featureProduction={settings?.featureProduction !== false}
-                        featureBuySell={settings?.featureBuySell}
-                        featureCustomerSchedules={settings?.featureCustomerSchedules}
+                        featureRecipes={hasRecipes}
+                        featureProduction={hasProduction}
+                        featureBuySell={hasRetail}
+                        featureCustomerSchedules={hasServices}
                         key={p.id}
                         product={p}
                         onEdit={openEditModal}
@@ -655,6 +669,7 @@ const Products: React.FC = () => {
           archetype={selectedArchetype}
           isResaleOnly={selectedArchetype === 'REVENTA'}
           users={users}
+          settings={settings}
         />
         </div>
       </IonContent>

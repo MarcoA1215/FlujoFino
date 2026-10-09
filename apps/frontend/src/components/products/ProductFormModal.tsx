@@ -13,6 +13,7 @@ import {
 } from '@ionic/react';
 import { closeOutline, checkmarkCircle, personOutline, timeOutline, pricetagOutline } from 'ionicons/icons';
 import { apiClient } from '../../api/client';
+import { useSettings } from '../../context/SettingsContext';
 import type { Product } from '../../types';
 
 interface ProductFormModalProps {
@@ -24,6 +25,7 @@ interface ProductFormModalProps {
   archetype?: 'REVENTA' | 'FORMULA' | 'SERVICIO';
   isResaleOnly?: boolean;
   users: any[];
+  settings?: any;
 }
 
 export const ProductFormModal: React.FC<ProductFormModalProps> = ({
@@ -34,7 +36,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   isCombo = false,
   archetype,
   isResaleOnly = false,
-  users
+  users,
+  settings: propSettings
 }) => {
   const [presentToast] = useIonToast();
   const [name, setName] = useState('');
@@ -49,9 +52,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [availabilityType, setAvailabilityType] = useState<'INMEDIATO' | 'BAJO_ENCARGO'>('INMEDIATO');
   const [isSupplierPreorder, setIsSupplierPreorder] = useState(false);
 
-  const [settings, setSettings] = useState<any>(() => {
+  const { settings: contextSettings } = useSettings();
+  const [localSettings, setLocalSettings] = useState<any>(() => {
     try {
-      const cached = localStorage.getItem('flujofino_cached_settings');
+      const cached = localStorage.getItem('tenant_settings') || localStorage.getItem('flujofino_cached_settings');
       if (cached) return JSON.parse(cached);
     } catch {}
     return {};
@@ -67,28 +71,42 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      apiClient.get('/users').then(res => {
-        if (Array.isArray(res.data) && res.data.length > 0) {
-          setLocalStaffUsers(res.data);
-        }
-      }).catch(() => {});
+      const req = apiClient.get('/users');
+      if (req && typeof req.then === 'function') {
+        req.then(res => {
+          if (Array.isArray(res?.data) && res.data.length > 0) {
+            setLocalStaffUsers(res.data);
+          }
+        }).catch(() => {});
+      }
     }
   }, [isOpen]);
 
   useEffect(() => {
-    apiClient.get('/settings').then(res => {
-      if (res.data) setSettings(res.data);
-    }).catch(() => {});
-  }, []);
+    if (!propSettings && (!contextSettings || Object.keys(contextSettings).length === 0)) {
+      const req = apiClient.get('/settings');
+      if (req && typeof req.then === 'function') {
+        req.then(res => {
+          if (res?.data) setLocalSettings(res.data);
+        }).catch(() => {});
+      }
+    }
+  }, [propSettings, contextSettings]);
+
+  const settings = propSettings || (contextSettings && Object.keys(contextSettings).length > 0 ? contextSettings : localSettings);
 
   const isProductionEnabled = settings.enableProduction !== undefined ? Boolean(settings.enableProduction) : (settings.featureProduction !== false);
   const isRetailEnabled = settings.enableRetail !== undefined ? Boolean(settings.enableRetail) : (settings.featureBuySell !== false);
   const isReservationsEnabled = settings.enableReservations !== undefined ? Boolean(settings.enableReservations) : Boolean(settings.featureCustomerSchedules);
 
-  const availableTypes: ('REVENTA' | 'FORMULA' | 'SERVICIO')[] = [];
-  if (isRetailEnabled) availableTypes.push('REVENTA');
-  if (isProductionEnabled) availableTypes.push('FORMULA');
-  availableTypes.push('SERVICIO');
+  const availableTypes: ('REVENTA' | 'FORMULA' | 'SERVICIO')[] = React.useMemo(() => {
+    const types: ('REVENTA' | 'FORMULA' | 'SERVICIO')[] = [];
+    if (isRetailEnabled) types.push('REVENTA');
+    if (isProductionEnabled) types.push('FORMULA');
+    if (isReservationsEnabled) types.push('SERVICIO');
+    if (types.length === 0) types.push('REVENTA');
+    return types;
+  }, [isRetailEnabled, isProductionEnabled, isReservationsEnabled]);
 
   const isResale = selectedType === 'REVENTA';
   const isFormula = selectedType === 'FORMULA';
@@ -121,7 +139,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     } else {
       let defaultType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = archetype || (isResaleOnly ? 'REVENTA' : 'REVENTA');
       if (!availableTypes.includes(defaultType)) {
-        defaultType = availableTypes[0] || 'SERVICIO';
+        defaultType = availableTypes[0] || 'REVENTA';
       }
       setSelectedType(defaultType);
       setName('');
@@ -134,7 +152,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setIsSupplierPreorder(false);
       setSelectedStaffIds([]);
     }
-  }, [product, isCombo, archetype, isResaleOnly, isOpen, isProductionEnabled, isRetailEnabled]);
+  }, [product, isCombo, archetype, isResaleOnly, isOpen, isProductionEnabled, isRetailEnabled, isReservationsEnabled, availableTypes]);
 
   useEffect(() => {
     if (!product && !availableTypes.includes(selectedType) && availableTypes.length > 0) {
@@ -244,7 +262,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       <IonContent className="ion-padding" style={{ '--background': '#f8fafc' } as any}>
         <div style={{ maxWidth: '640px', margin: '0 auto' }}>
           {/* Selector de Arquetipo */}
-          {!isCombo && (
+          {!isCombo && availableTypes.length > 1 && (
             <div style={{
               display: 'flex',
               gap: '6px',
@@ -301,28 +319,30 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   🧪 Con Fórmula
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedType('SERVICIO');
-                  if (!category || category === 'General') setCategory('Servicios');
-                }}
-                style={{
-                  flex: 1,
-                  padding: '9px 6px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  fontWeight: selectedType === 'SERVICIO' ? '700' : '500',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  backgroundColor: selectedType === 'SERVICIO' ? '#ffffff' : 'transparent',
-                  color: selectedType === 'SERVICIO' ? '#1e40af' : '#475569',
-                  boxShadow: selectedType === 'SERVICIO' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {isReservationsEnabled ? '💆 Servicio / Cita' : '💆 Servicio'}
-              </button>
+              {isReservationsEnabled && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedType('SERVICIO');
+                    if (!category || category === 'General') setCategory('Servicios');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '9px 6px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: selectedType === 'SERVICIO' ? '700' : '500',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    backgroundColor: selectedType === 'SERVICIO' ? '#ffffff' : 'transparent',
+                    color: selectedType === 'SERVICIO' ? '#1e40af' : '#475569',
+                    boxShadow: selectedType === 'SERVICIO' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  💆 Servicio / Cita
+                </button>
+              )}
             </div>
           )}
 
