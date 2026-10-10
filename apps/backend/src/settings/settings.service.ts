@@ -281,13 +281,37 @@ export class SettingsService implements OnModuleInit {
       }
     }
     
-    if (payload.exchangeRateMode !== undefined) settings.exchangeRateMode = payload.exchangeRateMode;
+    const globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+    const globalCache = globalSettings?.ratesCache;
+
+    if (payload.exchangeRateMode !== undefined) {
+      settings.exchangeRateMode = payload.exchangeRateMode;
+      if (payload.exchangeRateMode === 'BCV') {
+        settings.exchangeRateBs = Number(globalCache?.bcv || payload.exchangeRateBs || settings.exchangeRateBs || 40.0);
+        if (!payload.currencySymbol) settings.currencySymbol = 'Bs.';
+      } else if (payload.exchangeRateMode === 'PARALELO') {
+        settings.exchangeRateBs = Number(globalCache?.parallel || globalCache?.bcv || payload.exchangeRateBs || 40.0);
+        if (!payload.currencySymbol) settings.currencySymbol = 'Bs.';
+      } else if (payload.exchangeRateMode === 'USDT') {
+        settings.exchangeRateBs = Number(globalCache?.usdt || globalCache?.parallel || payload.exchangeRateBs || 40.0);
+        if (!payload.currencySymbol) settings.currencySymbol = 'Bs.';
+      } else if (payload.exchangeRateMode === 'EUR') {
+        settings.exchangeRateBs = Number(globalCache?.eur || 40.0);
+        if (!payload.currencySymbol) settings.currencySymbol = '€';
+      } else if (payload.exchangeRateMode === 'MANUAL') {
+        if (payload.manualExchangeRate !== undefined && payload.manualExchangeRate !== null) {
+          settings.manualExchangeRate = Number(payload.manualExchangeRate);
+          settings.exchangeRateBs = Number(payload.manualExchangeRate);
+        } else if (payload.exchangeRateBs !== undefined) {
+          settings.exchangeRateBs = Number(payload.exchangeRateBs);
+        }
+      }
+    }
     if (payload.manualExchangeRate !== undefined) settings.manualExchangeRate = payload.manualExchangeRate;
     if (payload.currencySymbol !== undefined) settings.currencySymbol = payload.currencySymbol;
     if (payload.ratesCache !== undefined) settings.ratesCache = payload.ratesCache;
-    if (payload.exchangeRateBs !== undefined) settings.exchangeRateBs = payload.exchangeRateBs;
-    if (settings.exchangeRateMode === 'MANUAL' && payload.manualExchangeRate !== undefined && payload.manualExchangeRate !== null) {
-      settings.exchangeRateBs = payload.manualExchangeRate;
+    if (payload.exchangeRateBs !== undefined && (!payload.exchangeRateMode || payload.exchangeRateMode === 'MANUAL')) {
+      settings.exchangeRateBs = payload.exchangeRateBs;
     }
     if (payload.companyBank !== undefined) settings.companyBank = payload.companyBank;
     if (payload.companyCedula !== undefined) settings.companyCedula = payload.companyCedula;
@@ -456,14 +480,14 @@ export class SettingsService implements OnModuleInit {
             const rates = data.rates;
 
             const bcvItem = rates.find((item: any) =>
-              (item.market?.toLowerCase() === 'bcv' && (item.pair?.toUpperCase() === 'USD/VES' || !item.pair)) ||
-              item.market?.toLowerCase() === 'reference' ||
-              item.type?.toLowerCase() === 'reference'
+              (item.market?.toLowerCase() === 'reference' && (item.base?.toUpperCase() === 'USD' || !item.base)) ||
+              (item.market?.toLowerCase() === 'bcv' && (item.pair?.toUpperCase() === 'USD/VES' || !item.pair || item.base?.toUpperCase() === 'USD')) ||
+              (item.type?.toLowerCase() === 'reference' && (item.base?.toUpperCase() === 'USD' || !item.base))
             );
 
             const parallelItem = rates.find((item: any) =>
-              item.market?.toLowerCase() === 'enparalelovzla' ||
               item.market?.toLowerCase() === 'parallel' ||
+              item.market?.toLowerCase() === 'enparalelovzla' ||
               item.market?.toLowerCase() === 'paralelo' ||
               item.type?.toLowerCase() === 'parallel'
             );
@@ -471,10 +495,13 @@ export class SettingsService implements OnModuleInit {
             const usdtItem = rates.find((item: any) =>
               item.market?.toLowerCase() === 'binance' ||
               item.pair?.toUpperCase() === 'USDT/VES' ||
-              item.market?.toLowerCase() === 'usdt'
+              item.market?.toLowerCase() === 'usdt' ||
+              (item.type?.toLowerCase() === 'p2p' && item.market?.toLowerCase() === 'binance')
             );
 
             const eurItem = rates.find((item: any) =>
+              item.market?.toLowerCase() === 'eur_reference' ||
+              item.base?.toUpperCase() === 'EUR' ||
               item.pair?.toUpperCase() === 'EUR/VES' ||
               (item.market?.toLowerCase() === 'bcv' && item.pair?.toUpperCase()?.includes('EUR'))
             );
@@ -490,8 +517,8 @@ export class SettingsService implements OnModuleInit {
       }
     }
 
-    // 2. Fallback a DolarApi Venezuela (API pública, rápida y sin necesidad de token)
-    if (!bcvVal || !parallelVal) {
+    // 2. Fallback a DolarApi Venezuela si falta alguna tasa
+    if (!bcvVal || !parallelVal || !eurVal) {
       try {
         this.logger.log('Consultando API pública de respaldo DolarApi Venezuela...');
         const controller = new AbortController();
@@ -507,14 +534,14 @@ export class SettingsService implements OnModuleInit {
           const dolaresData: any[] = await dolaresRes.value.json();
           const oficial = dolaresData.find((d) => d.fuente === 'oficial');
           const paralelo = dolaresData.find((d) => d.fuente === 'paralelo');
-          if (oficial?.promedio && (!bcvVal || bcvVal <= 50)) bcvVal = parseFloat(oficial.promedio);
-          if (paralelo?.promedio && (!parallelVal || parallelVal <= 50)) parallelVal = parseFloat(paralelo.promedio);
+          if (oficial?.promedio && !bcvVal) bcvVal = parseFloat(oficial.promedio);
+          if (paralelo?.promedio && !parallelVal) parallelVal = parseFloat(paralelo.promedio);
         }
 
         if (eurosRes.status === 'fulfilled' && eurosRes.value.ok) {
           const eurosData: any[] = await eurosRes.value.json();
           const eurOficial = eurosData.find((d) => d.fuente === 'oficial');
-          if (eurOficial?.promedio && (!eurVal || eurVal <= 50)) eurVal = parseFloat(eurOficial.promedio);
+          if (eurOficial?.promedio && !eurVal) eurVal = parseFloat(eurOficial.promedio);
         }
       } catch (fbErr: any) {
         this.logger.error(`Error en respaldo DolarApi: ${fbErr.message}`);
@@ -532,10 +559,10 @@ export class SettingsService implements OnModuleInit {
     }
     const currentCache = globalSettings.ratesCache || {};
 
-    const finalBcv = bcvVal || (currentCache.bcv && currentCache.bcv > 50 ? Number(currentCache.bcv) : 40.0);
-    const finalParallel = parallelVal || (currentCache.parallel && currentCache.parallel > 50 ? Number(currentCache.parallel) : finalBcv);
-    const finalUsdt = usdtVal || (currentCache.usdt && currentCache.usdt > 50 ? Number(currentCache.usdt) : finalParallel);
-    const finalEur = eurVal || (currentCache.eur && currentCache.eur > 50 ? Number(currentCache.eur) : Number((finalBcv * 1.085).toFixed(2)));
+    const finalBcv = bcvVal || (currentCache.bcv ? Number(currentCache.bcv) : 40.0);
+    const finalParallel = parallelVal || (currentCache.parallel ? Number(currentCache.parallel) : finalBcv);
+    const finalUsdt = usdtVal || (currentCache.usdt ? Number(currentCache.usdt) : finalParallel);
+    const finalEur = eurVal || (currentCache.eur ? Number(currentCache.eur) : Number((finalBcv * 1.12).toFixed(2)));
 
     const newRatesCache = {
       bcv: finalBcv,
