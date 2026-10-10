@@ -218,6 +218,10 @@ export class CreateOrderDto {
   status?: OrderStatus;
 
   @IsOptional()
+  @IsBoolean()
+  isImmediateDelivery?: boolean;
+
+  @IsOptional()
   requestedDeliveryDate?: string | Date;
 }
 
@@ -876,6 +880,12 @@ export class OrdersService {
           } else if (roundedReceived > 0 && roundedReceived < roundedTotal) {
             savedOrder.paymentStatus = PaymentStatus.PARTIAL;
           }
+        }
+
+        // Si se marcó como Entrega Inmediata y la orden está totalmente pagada, pasa directo a ENTREGADO
+        const isImmediate = dto.isImmediateDelivery === true || (dto.status === OrderStatus.DELIVERED);
+        if (isImmediate && savedOrder.paymentStatus === PaymentStatus.PAID) {
+          savedOrder.status = OrderStatus.DELIVERED;
         }
 
         if (dto.linkedReservationId) {
@@ -1780,6 +1790,10 @@ export class OrdersService {
         } else if (roundedAbonos === 0 && order.paymentStatus !== PaymentStatus.PAID) {
           order.paymentStatus = PaymentStatus.PENDING;
         }
+      }
+
+      if ((dto.isImmediateDelivery === true || dto.status === OrderStatus.DELIVERED) && order.paymentStatus === PaymentStatus.PAID) {
+        order.status = OrderStatus.DELIVERED;
       }
       
       const currentItems = await manager.find(OrderItem, { where: { orderId: order.id } });

@@ -29,7 +29,8 @@ import {
   storefrontOutline,
   timeOutline,
   imageOutline,
-  arrowForwardOutline
+  arrowForwardOutline,
+  flashOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
@@ -129,8 +130,16 @@ const Pos: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerCedula, setCustomerCedula] = useState('');
   const [tableNumber, setTableNumber] = useState('');
+  const [isImmediateDelivery, setIsImmediateDelivery] = useState<boolean>(true);
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
+
+  // Customer search & suggestions
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
+  const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
 
   // Payment
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('PAGO_MOVIL');
@@ -285,6 +294,66 @@ const Pos: React.FC = () => {
     }
   };
 
+  const handleCustomerSearch = async (query: string) => {
+    setCustomerSearchQuery(query);
+    const cleanQ = query.trim();
+    if (!cleanQ || cleanQ.length < 2) {
+      setCustomerSuggestions([]);
+      setShowCustomerDropdown(false);
+      return;
+    }
+
+    setIsSearchingCustomer(true);
+    setShowCustomerDropdown(true);
+
+    // 1. Buscar primero en offlineDb si hay caché local
+    let localMatches: any[] = [];
+    try {
+      const cached = user?.tenantId ? await offlineDb.getCustomersByTenant(user.tenantId) : [];
+      if (cached && cached.length > 0) {
+        const qLower = cleanQ.toLowerCase();
+        localMatches = cached.filter(c =>
+          (c.name && c.name.toLowerCase().includes(qLower)) ||
+          (c.phone && c.phone.includes(cleanQ)) ||
+          (c.identification && c.identification.toLowerCase().includes(qLower))
+        );
+        setCustomerSuggestions(localMatches);
+      }
+    } catch (err) {}
+
+    // 2. Si hay conexión online, consultar el endpoint /customers?search=
+    if (navigator.onLine) {
+      try {
+        const res = await apiClient.get<any[]>(`/customers?search=${encodeURIComponent(cleanQ)}`);
+        if (Array.isArray(res.data)) {
+          setCustomerSuggestions(res.data);
+          if (user?.tenantId && res.data.length > 0) {
+            offlineDb.saveCustomersForTenant(user.tenantId, res.data).catch(() => {});
+          }
+        }
+      } catch (apiErr) {
+        // En caso de fallo de red, conservamos localMatches
+      }
+    }
+    setIsSearchingCustomer(false);
+  };
+
+  const selectCustomer = (cust: any) => {
+    if (!cust) return;
+    if (cust.name) setCustomerName(cust.name);
+    if (cust.phone) setCustomerPhone(cust.phone);
+    if (cust.identification) setCustomerCedula(cust.identification);
+    if (cust.address) setCustomerAddress(cust.address);
+    if (cust.phone && !changePhone) setChangePhone(cust.phone);
+    setShowCustomerDropdown(false);
+    setCustomerSearchQuery('');
+    presentToast({
+      message: `✓ Cliente autocompletado: ${cust.name}`,
+      duration: 2000,
+      color: 'success'
+    });
+  };
+
   const fetchEmployees = async () => {
     try {
       const res = await apiClient.get<any[]>('/users/employees');
@@ -404,6 +473,7 @@ const Pos: React.FC = () => {
       setEditingOrderId(order.id);
       setCustomerName(order.customerName || '');
       setCustomerPhone(order.customerPhone || '');
+      setCustomerCedula(order.identification || order.customerCedula || order.pagoMovilCedula || '');
       setCustomerAddress(order.customerAddress || '');
       setTableNumber(order.tableNumber || '');
       setDeliveryMethod(order.deliveryMethod || DeliveryMethod.IN_STORE);
@@ -504,6 +574,7 @@ const Pos: React.FC = () => {
             setEditingOrderId(order.id);
             setCustomerName(order.customerName || '');
             setCustomerPhone(order.customerPhone || '');
+            setCustomerCedula(order.identification || order.customerCedula || order.pagoMovilCedula || '');
             setCustomerAddress(order.customerAddress || '');
             setTableNumber(order.tableNumber || '');
             setDeliveryMethod(order.deliveryMethod || DeliveryMethod.IN_STORE);
@@ -886,12 +957,15 @@ const Pos: React.FC = () => {
       editingOrderId: editingOrderId || undefined,
       customerName: customerName.trim() || 'Cliente Mostrador',
       customerPhone: customerPhone.trim() || undefined,
+      customerCedula: customerCedula.trim() || undefined,
       customerAddress: customerAddress.trim() || undefined,
       tableNumber: tableNumber.trim() || undefined,
       deliveryMethod,
       deliveryZoneId: deliveryMethod === DeliveryMethod.DELIVERY ? deliveryZoneId || undefined : undefined,
       deliveryUserId: deliveryMethod === DeliveryMethod.DELIVERY && deliveryUserId ? deliveryUserId : undefined,
       employeeId: employeeId || undefined,
+      isImmediateDelivery: isImmediateDelivery,
+      status: (isImmediateDelivery && (paymentMethod !== 'PENDING' || abonoAmount >= totalCart)) ? ('DELIVERED' as any) : undefined,
       paymentMethod,
       paymentStatus: paymentMethod === 'PENDING'
         ? (abonoAmount >= totalCart ? PaymentStatus.PAID : (abonoAmount > 0 ? PaymentStatus.PARTIAL : PaymentStatus.PENDING))
@@ -909,8 +983,8 @@ const Pos: React.FC = () => {
       discountType: discountAmount > 0 ? discountType : undefined,
       discountValue: discountAmount > 0 ? parseFloat(discountValue) : undefined,
       pagoMovilRef: paymentMethod === 'PAGO_MOVIL' ? pagoMovilRef : undefined,
-      pagoMovilPhone: paymentMethod === 'PAGO_MOVIL' ? pagoMovilPhone : undefined,
-      pagoMovilCedula: paymentMethod === 'PAGO_MOVIL' ? pagoMovilCedula : undefined,
+      pagoMovilPhone: paymentMethod === 'PAGO_MOVIL' ? (pagoMovilPhone || customerPhone || undefined) : undefined,
+      pagoMovilCedula: paymentMethod === 'PAGO_MOVIL' ? (pagoMovilCedula || customerCedula || undefined) : undefined,
       pagoMovilBank: paymentMethod === 'PAGO_MOVIL' ? pagoMovilBank : undefined,
       puntoRef: paymentMethod === 'PUNTO' ? puntoRef : undefined,
       puntoBank: paymentMethod === 'PUNTO' ? puntoBank : undefined,
@@ -922,7 +996,7 @@ const Pos: React.FC = () => {
       changeAmountBs: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? vueltoBs : undefined,
       changeMethod: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? changeMethod : undefined,
       changeRef: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? (changeRef.trim() || undefined) : undefined,
-      changePhone: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart && changeMethod === 'PAGO_MOVIL') ? (changePhone.trim() || undefined) : undefined,
+      changePhone: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart && changeMethod === 'PAGO_MOVIL') ? (changePhone.trim() || customerPhone.trim() || customerCedula.trim() || undefined) : undefined,
       changeBank: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart && changeMethod === 'PAGO_MOVIL') ? (changeBank || undefined) : undefined,
       initialAbono: paymentMethod === 'PENDING' ? abonoAmount : undefined,
       bypassMinDeposit: paymentMethod === 'PENDING' ? bypassMinDeposit : undefined,
@@ -977,8 +1051,11 @@ const Pos: React.FC = () => {
             setCart([]);
             setCustomerName('');
             setCustomerPhone('');
+            setCustomerCedula('');
             setCustomerAddress('');
             setTableNumber('');
+            setIsImmediateDelivery(true);
+            setCustomerSearchQuery('');
             setPagoMovilRef('');
             setPuntoRef('');
             setBinanceRef('');
@@ -1016,8 +1093,11 @@ const Pos: React.FC = () => {
           setCart([]);
           setCustomerName('');
           setCustomerPhone('');
+          setCustomerCedula('');
           setCustomerAddress('');
           setTableNumber('');
+          setIsImmediateDelivery(true);
+          setCustomerSearchQuery('');
           setPagoMovilRef('');
           setPuntoRef('');
           setBinanceRef('');
@@ -1169,7 +1249,10 @@ const Pos: React.FC = () => {
                   setCart([]);
                   setCustomerName('');
                   setCustomerPhone('');
+                  setCustomerCedula('');
                   setTableNumber('');
+                  setIsImmediateDelivery(true);
+                  setCustomerSearchQuery('');
                   setDiscountValue('');
                   window.history.replaceState({}, '', '/pos');
                 }}
@@ -1616,7 +1699,10 @@ const Pos: React.FC = () => {
                     {settings?.featureDelivery !== false && (
                       <button
                         type="button"
-                        onClick={() => setDeliveryMethod(DeliveryMethod.DELIVERY)}
+                        onClick={() => {
+                          setDeliveryMethod(DeliveryMethod.DELIVERY);
+                          setIsImmediateDelivery(false);
+                        }}
                         style={{
                           flex: 1,
                           padding: '8px 12px',
@@ -1634,6 +1720,50 @@ const Pos: React.FC = () => {
                       </button>
                     )}
                   </div>
+                </div>
+
+                {/* Opción de Entrega Inmediata */}
+                <div style={{
+                  marginBottom: '14px',
+                  background: isImmediateDelivery ? '#F0FDF4' : '#F8FAFC',
+                  border: isImmediateDelivery ? '1.5px solid #86EFAC' : '1px solid #E2E8F0',
+                  borderRadius: '14px',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  transition: 'all 0.2s ease'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      background: isImmediateDelivery ? '#DCFCE7' : '#F1F5F9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: isImmediateDelivery ? '#16A34A' : '#64748B'
+                    }}>
+                      <IonIcon icon={flashOutline} style={{ fontSize: '20px' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: isImmediateDelivery ? '#15803D' : '#0F172A' }}>
+                        Entrega Inmediata
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748B', lineHeight: '1.3' }}>
+                        {isImmediateDelivery
+                          ? 'Al pagar pasa a entregado (no estorba en comanda activa)'
+                          : 'Pasa a pedidos activos (requiere despacho o preparación)'}
+                      </div>
+                    </div>
+                  </div>
+                  <IonToggle
+                    checked={isImmediateDelivery}
+                    onIonChange={e => setIsImmediateDelivery(e.detail.checked)}
+                    color="success"
+                  />
                 </div>
 
                 {/* Delivery Zone & Shipping Info */}
@@ -1735,6 +1865,111 @@ const Pos: React.FC = () => {
                   </div>
                 )}
 
+                {/* Buscador Rápido de Clientes por Cédula o Teléfono */}
+                <div style={{ marginBottom: '14px', position: 'relative' }}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                    <span>🔍 Buscar cliente (Cédula o Teléfono)</span>
+                    <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: '500' }}>Opcional</span>
+                  </label>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: '#ffffff',
+                    border: '1px solid #CBD5E1',
+                    borderRadius: '12px',
+                    padding: '2px 10px',
+                    gap: '8px'
+                  }}>
+                    <IonIcon icon={searchOutline} style={{ color: '#64748B', fontSize: '18px' }} />
+                    <input
+                      type="text"
+                      value={customerSearchQuery}
+                      onChange={e => handleCustomerSearch(e.target.value)}
+                      onFocus={() => { if (customerSuggestions.length > 0) setShowCustomerDropdown(true); }}
+                      placeholder="Escribe cédula (V-12345678) o teléfono (0414...)"
+                      style={{
+                        flex: 1,
+                        border: 'none',
+                        outline: 'none',
+                        padding: '9px 0',
+                        fontSize: '13px',
+                        color: '#0F172A',
+                        background: 'transparent'
+                      }}
+                    />
+                    {isSearchingCustomer && <IonSpinner name="dots" style={{ width: '18px', height: '18px', color: '#10B981' }} />}
+                    {customerSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => { setCustomerSearchQuery(''); setCustomerSuggestions([]); setShowCustomerDropdown(false); }}
+                        style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: '#94A3B8' }}
+                      >
+                        <IonIcon icon={closeOutline} style={{ fontSize: '18px' }} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dropdown de resultados predictivos */}
+                  {showCustomerDropdown && customerSuggestions.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      zIndex: 30,
+                      background: '#ffffff',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                      maxHeight: '220px',
+                      overflowY: 'auto',
+                      marginTop: '4px'
+                    }}>
+                      <div style={{ padding: '6px 12px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '11px', fontWeight: '700', color: '#64748B' }}>
+                        Clientes Encontrados ({customerSuggestions.length})
+                      </div>
+                      {customerSuggestions.map(cust => (
+                        <div
+                          key={cust.id}
+                          onClick={() => selectCustomer(cust)}
+                          style={{
+                            padding: '10px 14px',
+                            borderBottom: '1px solid #F1F5F9',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            transition: 'background 0.15s ease'
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#ECFDF5')}
+                          onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                        >
+                          <div>
+                            <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>
+                              {cust.name}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#64748B', display: 'flex', gap: '8px', marginTop: '2px' }}>
+                              {cust.identification && (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                  🪪 {cust.identification}
+                                </span>
+                              )}
+                              {cust.phone && (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                  📞 {cust.phone}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '11px', fontWeight: '700', color: '#10B981', background: '#ECFDF5', padding: '3px 8px', borderRadius: '6px' }}>
+                            Seleccionar
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Cliente / Mesa / Empleado */}
                 <div style={{ display: 'grid', gridTemplateColumns: employees.length > 0 ? '1fr 1fr' : '1fr', gap: '10px', marginBottom: '14px' }}>
                   <div>
@@ -1791,6 +2026,36 @@ const Pos: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Cédula y Teléfono en Tienda (para agilizar registro de clientes) */}
+                {deliveryMethod === DeliveryMethod.IN_STORE && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                        🪪 Cédula / RIF (Opcional)
+                      </label>
+                      <input
+                        type="text"
+                        value={customerCedula}
+                        onChange={e => setCustomerCedula(e.target.value)}
+                        placeholder="V-12345678"
+                        style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#ffffff', color: '#0F172A' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                        📞 Teléfono (Opcional)
+                      </label>
+                      <input
+                        type="tel"
+                        value={customerPhone}
+                        onChange={e => setCustomerPhone(e.target.value)}
+                        placeholder="0412..."
+                        style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#ffffff', color: '#0F172A' }}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Descuento (Opcional) */}
                 <div style={{ marginBottom: '16px', background: '#F8FAFC', borderRadius: '12px', padding: '10px 12px', border: '1px solid #E2E8F0' }}>
