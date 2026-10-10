@@ -207,6 +207,14 @@ export class CreateOrderDto {
   paymentRejectedReason?: string;
 
   @IsOptional()
+  @IsString()
+  customerCedula?: string;
+
+  @IsOptional()
+  @IsString()
+  editingOrderId?: string;
+
+  @IsOptional()
   status?: OrderStatus;
 
   @IsOptional()
@@ -524,13 +532,13 @@ export class OrdersService {
       const initialStatus = dto.status || (requiresPreparation ? OrderStatus.PREPARING : OrderStatus.PENDING);
 
       let customerId: string | undefined = undefined;
-      let identification: string | undefined = dto.pagoMovilCedula;
+      let identification: string | undefined = dto.customerCedula || dto.pagoMovilCedula;
       if (dto.customerName && dto.customerPhone) {
         try {
           const customer = await this.customersService.findOrCreateOrUpdate(tenantId, {
             name: dto.customerName,
             phone: dto.customerPhone,
-            identification: dto.pagoMovilCedula
+            identification: dto.customerCedula || dto.pagoMovilCedula
           });
           customerId = customer.id;
           if (!identification && customer.identification) {

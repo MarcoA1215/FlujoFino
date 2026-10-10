@@ -17,6 +17,10 @@ export class CreateProductDto {
   @IsOptional() @IsString() availabilityType?: 'INMEDIATO' | 'BAJO_ENCARGO';
   @IsOptional() @IsBoolean() isSupplierPreorder?: boolean;
   @IsOptional() @IsArray() images?: string[];
+  @IsOptional() @IsString() imageUrl?: string;
   @IsOptional() @IsBoolean() is_service?: boolean;
+  @IsOptional() @IsBoolean() isService?: boolean;
   @IsOptional() @IsString() product_type?: string;
+  @IsOptional() @IsString() productType?: string;
+  @IsOptional() @IsString() id?: string;
 }

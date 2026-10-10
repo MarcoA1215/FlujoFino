@@ -211,7 +211,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         stock: isResale ? stockNum : 0,
         stockQuantity: isResale ? stockNum : 0,
         physicalStock: isResale ? stockNum : 0,
-        durationMinutes: isService ? (durationMinutes ? parseInt(durationMinutes, 10) : 30) : null,
+        durationMinutes: isService ? (durationMinutes ? parseInt(durationMinutes, 10) : 30) : undefined,
         assignedStaffIds: isService ? selectedStaffIds : [],
         is_service: isService,
         product_type: selectedType,

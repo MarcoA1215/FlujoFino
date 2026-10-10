@@ -94,6 +94,14 @@ export class CreatePublicReservationDto {
   @IsOptional()
   @IsString()
   tableNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  employeeName?: string;
+
+  @IsOptional()
+  @IsString()
+  referralSource?: string;
 }
 
 @Public()
