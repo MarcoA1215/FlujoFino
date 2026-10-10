@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { Capacitor } from '@capacitor/core';
 import {
   IonPage,
   IonHeader,
@@ -701,32 +702,55 @@ const SettingsPage: React.FC = () => {
                     </div>
 
                     <div>
-                      {notificationStatus === 'granted' && (
+                      {Capacitor.isNativePlatform() ? (
                         <IonBadge style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, backgroundColor: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0' }}>
-                          ✓ Notificaciones Activas
+                          ✓ App Móvil: Alertas y Timbre Activos
                         </IonBadge>
-                      )}
-                      {notificationStatus === 'denied' && (
-                        <IonBadge style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, backgroundColor: '#FEF2F2', color: '#991B1B', border: '1px solid #FECACA' }}>
-                          ✕ Bloqueadas por el navegador
-                        </IonBadge>
-                      )}
-                      {notificationStatus === 'default' && (
-                        <IonBadge style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, backgroundColor: '#FFFBEB', color: '#92400E', border: '1px solid #FDE68A' }}>
-                          ⚠ Requiere Permiso
-                        </IonBadge>
-                      )}
-                      {notificationStatus === 'unsupported' && (
-                        <IonBadge style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, backgroundColor: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1' }}>
-                          No soportado en este entorno
-                        </IonBadge>
+                      ) : (
+                        <>
+                          {notificationStatus === 'granted' && (
+                            <IonBadge style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, backgroundColor: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0' }}>
+                              ✓ Notificaciones Activas
+                            </IonBadge>
+                          )}
+                          {notificationStatus === 'denied' && (
+                            <IonBadge style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, backgroundColor: '#FEF2F2', color: '#991B1B', border: '1px solid #FECACA' }}>
+                              ✕ Bloqueadas por el navegador
+                            </IonBadge>
+                          )}
+                          {notificationStatus === 'default' && (
+                            <IonBadge style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, backgroundColor: '#FFFBEB', color: '#92400E', border: '1px solid #FDE68A' }}>
+                              ⚠ Requiere Permiso
+                            </IonBadge>
+                          )}
+                          {notificationStatus === 'unsupported' && (
+                            <IonBadge style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, backgroundColor: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1' }}>
+                              No soportado en este navegador
+                            </IonBadge>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
                 </IonCardHeader>
 
                 <IonCardContent style={{ paddingTop: '12px' }}>
-                  {notificationStatus === 'denied' && (
+                  {Capacitor.isNativePlatform() && (
+                    <div style={{
+                      backgroundColor: '#F0FDF4',
+                      border: '1px solid #BBF7D0',
+                      borderRadius: '10px',
+                      padding: '12px 16px',
+                      marginBottom: '16px',
+                      fontSize: '13px',
+                      color: '#166534',
+                      lineHeight: '1.5'
+                    }}>
+                      <strong>💡 Alertas móviles activas:</strong> El timbre de caja y las alertas visuales se emiten en vivo mientras utilizas la aplicación cada vez que un cliente realiza un pedido o reserva una cita.
+                    </div>
+                  )}
+
+                  {notificationStatus === 'denied' && !Capacitor.isNativePlatform() && (
                     <div style={{
                       backgroundColor: '#FEF2F2',
                       border: '1px solid #F87171',
@@ -752,7 +776,7 @@ const SettingsPage: React.FC = () => {
                     gap: '12px',
                     marginTop: '8px'
                   }}>
-                    {notificationStatus !== 'granted' && (
+                    {!Capacitor.isNativePlatform() && notificationStatus !== 'granted' && (
                       <button
                         onClick={handleActivatePush}
                         disabled={isActivatingNotifications || notificationStatus === 'denied'}
