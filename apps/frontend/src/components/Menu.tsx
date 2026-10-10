@@ -41,7 +41,9 @@ import {
   personCircleOutline,
   shieldCheckmarkOutline,
   medalOutline,
+  cloudDownloadOutline,
 } from 'ionicons/icons';
+import { Capacitor } from '@capacitor/core';
 import { useSettings } from '../context/SettingsContext';
 import { apiClient } from '../api/client';
 
@@ -276,6 +278,8 @@ const Menu: React.FC = () => {
   const currentModeInfo = WORK_MODE_OPTIONS.find(m => m.role === user?.role);
   const currentBadgeLabel = currentModeInfo ? currentModeInfo.badgeLabel : `Modo ${user?.role || 'Personal'}`;
 
+  const isNativeApp = Capacitor.isNativePlatform() || (typeof window !== 'undefined' && window.location.protocol === 'capacitor:');
+
   return (
     <IonMenu
       contentId="main"
@@ -381,6 +385,33 @@ const Menu: React.FC = () => {
 
       <IonFooter className="ion-no-border" style={{ background: '#ffffff', borderTop: '1px solid #e2e8f0', paddingBottom: 'max(8px, env(safe-area-inset-bottom, 8px))' }}>
         <IonToolbar style={{ '--background': '#ffffff' } as any}>
+          {!isNativeApp && (
+            <IonMenuToggle autoHide={false}>
+              <a
+                href="/FinoWork.apk"
+                download="FinoWork.apk"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  margin: '8px 12px 6px 12px',
+                  padding: '10px 14px',
+                  background: '#ecfdf5',
+                  border: '1px solid #a7f3d0',
+                  borderRadius: '12px',
+                  color: '#065f46',
+                  textDecoration: 'none',
+                  fontSize: '13.5px',
+                  fontWeight: 700,
+                  boxShadow: '0 1px 2px rgba(16, 185, 129, 0.08)',
+                  cursor: 'pointer'
+                }}
+              >
+                <IonIcon icon={cloudDownloadOutline} style={{ fontSize: '20px', color: '#10b981' }} />
+                <span>Descargar APK Android</span>
+              </a>
+            </IonMenuToggle>
+          )}
           <IonItem button onClick={confirmLogout} lines="none" detail={false} style={{ '--background': 'transparent', cursor: 'pointer' } as any}>
             <IonIcon aria-hidden="true" slot="start" icon={logOutOutline} color="danger" style={{ fontSize: '22px' }} />
             <IonLabel color="danger" style={{ fontWeight: 700, fontSize: '15px' }}>Cerrar Sesión</IonLabel>

@@ -40,6 +40,7 @@ import {
   sparklesOutline,
   notificationsOutline,
   volumeHighOutline,
+  cloudDownloadOutline,
 } from 'ionicons/icons';
 import {
   getNotificationPermission,
@@ -848,6 +849,31 @@ const SettingsPage: React.FC = () => {
                       <IonIcon icon={volumeHighOutline} style={{ fontSize: '18px', color: '#059669' }} />
                       Probar Sonido de Timbre
                     </button>
+
+                    {!Capacitor.isNativePlatform() && (
+                      <a
+                        href="/FinoWork.apk"
+                        download="FinoWork.apk"
+                        style={{
+                          backgroundColor: '#ECFDF5',
+                          color: '#065F46',
+                          border: '1px solid #A7F3D0',
+                          borderRadius: '10px',
+                          padding: '12px 18px',
+                          fontSize: '14px',
+                          fontWeight: 700,
+                          textDecoration: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          boxShadow: '0 1px 2px rgba(16, 185, 129, 0.05)'
+                        }}
+                      >
+                        <IonIcon icon={cloudDownloadOutline} style={{ fontSize: '18px', color: '#10B981' }} />
+                        Descargar App Android (APK)
+                      </a>
+                    )}
                   </div>
                 </IonCardContent>
               </IonCard>
