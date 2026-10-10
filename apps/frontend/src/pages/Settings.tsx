@@ -125,40 +125,10 @@ const SettingsPage: React.FC = () => {
   // Subscription Payment Reporting Modal state
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [exchangeRate, setExchangeRate] = useState<number>(40.0);
-  const [isSyncingRates, setIsSyncingRates] = useState<boolean>(false);
 
   const [notificationStatus, setNotificationStatus] = useState<NotificationPermissionState>(() => getNotificationPermission());
   const [isActivatingNotifications, setIsActivatingNotifications] = useState<boolean>(false);
   const [isTestingNotifications, setIsTestingNotifications] = useState<boolean>(false);
-
-  const handleSyncRatesNow = async () => {
-    setIsSyncingRates(true);
-    try {
-      const res = await apiClient.post<Settings>('/settings/sync-rates');
-      if (res.data) {
-        setSettings(res.data);
-        if (res.data.exchangeRateBs) {
-          setExchangeRate(Number(res.data.exchangeRateBs));
-        }
-        const bcv = res.data.availableRates?.bcv ? Number(res.data.availableRates.bcv).toFixed(2) : '';
-        const par = res.data.availableRates?.parallel ? Number(res.data.availableRates.parallel).toFixed(2) : '';
-        presentToast({
-          message: `¡Tasas sincronizadas con éxito! BCV: Bs. ${bcv} | Paralelo: Bs. ${par}`,
-          duration: 3500,
-          color: 'success',
-          icon: checkmarkCircleOutline,
-        });
-      }
-    } catch (e: any) {
-      presentToast({
-        message: 'No se pudo sincronizar las tasas. Verifica la conexión con el servidor.',
-        duration: 4000,
-        color: 'danger',
-      });
-    } finally {
-      setIsSyncingRates(false);
-    }
-  };
 
   useEffect(() => {
     const updatePerm = () => setNotificationStatus(getNotificationPermission());
@@ -960,44 +930,19 @@ const SettingsPage: React.FC = () => {
                             padding: '14px 16px',
                             marginTop: '8px'
                           }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
-                              <div>
-                                <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span>🔄</span> Sincronización Automática de Tasas
-                                </div>
-                                {settings.availableRates?.updatedAt && (
-                                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                                    Última actualización: {new Date(settings.availableRates.updatedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} ({new Date(settings.availableRates.updatedAt).toLocaleDateString('es-VE')})
-                                  </div>
-                                )}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>🔄</span> Sincronización Automática de Tasas
                               </div>
-
-                              <button
-                                type="button"
-                                onClick={handleSyncRatesNow}
-                                disabled={isSyncingRates}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  padding: '8px 14px',
-                                  fontSize: '12px',
-                                  fontWeight: 700,
-                                  color: '#ffffff',
-                                  backgroundColor: isSyncingRates ? '#94a3b8' : '#0284c7',
-                                  border: 'none',
-                                  borderRadius: '8px',
-                                  cursor: isSyncingRates ? 'not-allowed' : 'pointer',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                }}
-                              >
-                                <IonIcon icon={refreshOutline} style={{ fontSize: '15px' }} />
-                                {isSyncingRates ? 'Sincronizando...' : 'Actualizar Tasas Ahora'}
-                              </button>
+                              {settings.availableRates?.updatedAt && (
+                                <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                  Última actualización: {new Date(settings.availableRates.updatedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} ({new Date(settings.availableRates.updatedAt).toLocaleDateString('es-VE')})
+                                </div>
+                              )}
                             </div>
 
                             <p style={{ margin: '0 0 12px 0', fontSize: '11.5px', color: '#475569', lineHeight: '1.4' }}>
-                              Las tasas se sincronizan automáticamente 2 veces al día (<strong>09:15 AM</strong> y <strong>05:45 PM</strong> tras el cierre del BCV). Presiona <strong>Actualizar Tasas Ahora</strong> para forzar la lectura del mercado venezolano en vivo.
+                              Las tasas del mercado se actualizan automáticamente 2 veces al día (<strong>09:15 AM</strong> y <strong>05:45 PM</strong> tras el cierre de mesas de cambio del BCV). Si necesitas una cotización distinta y fija para tu negocio, puedes seleccionar el modo <strong>Manual</strong>.
                             </p>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>

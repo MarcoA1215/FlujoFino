@@ -146,21 +146,29 @@ const SuperAdminDashboard: React.FC = () => {
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
+  // Platform Exchange Rates management
+  const [platformRates, setPlatformRates] = useState<any>(null);
+  const [isSyncingRates, setIsSyncingRates] = useState<boolean>(false);
+
   const loadData = async () => {
     try {
       setLoading(true);
-      const [tenantsRes, paymentsRes, supportRes, configRes, promotersRes, profileRes] = await Promise.all([
+      const [tenantsRes, paymentsRes, supportRes, configRes, promotersRes, profileRes, ratesRes] = await Promise.all([
         apiClient.get<SuperAdminTenantDTO[]>('/superadmin/tenants'),
         apiClient.get<SaaSPaymentReportDTO[]>('/superadmin/payments'),
         apiClient.get<any[]>('/feedback/platform'),
         apiClient.get<PlatformConfigDTO>('/superadmin/platform-config'),
         apiClient.get<SuperAdminPromoterDTO[]>('/superadmin/promoters').catch(() => ({ data: [] })),
         apiClient.get<any>('/superadmin/profile').catch(() => ({ data: null })),
+        apiClient.get<any>('/superadmin/rates').catch(() => ({ data: null })),
       ]);
       setTenants(tenantsRes.data || []);
       setPendingPayments(paymentsRes.data || []);
       setSupportMessages(supportRes.data || []);
       setPromoters(promotersRes.data || []);
+      if (ratesRes?.data) {
+        setPlatformRates(ratesRes.data);
+      }
       if (configRes.data) {
         setPlatformConfig(configRes.data);
       }
@@ -179,6 +187,35 @@ const SuperAdminDashboard: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncRates = async () => {
+    setIsSyncingRates(true);
+    try {
+      const res = await apiClient.post('/superadmin/sync-rates');
+      if (res.data) {
+        setPlatformRates((prev: any) => ({
+          ...prev,
+          availableRates: res.data,
+          ratesCache: res.data,
+          exchangeRateBs: res.data.bcv,
+        }));
+        presentToast({
+          message: `¡Tasas de mercado sincronizadas con éxito! BCV: Bs. ${Number(res.data.bcv).toFixed(2)} | Paralelo: Bs. ${Number(res.data.parallel).toFixed(2)}`,
+          duration: 4000,
+          color: 'success',
+          icon: checkmarkCircleOutline,
+        });
+      }
+    } catch (e: any) {
+      presentToast({
+        message: 'Error al sincronizar tasas: ' + (e.response?.data?.message || e.message),
+        duration: 4000,
+        color: 'danger',
+      });
+    } finally {
+      setIsSyncingRates(false);
     }
   };
 
@@ -527,6 +564,23 @@ const SuperAdminDashboard: React.FC = () => {
             </div>
           </IonTitle>
           <IonButtons slot="end">
+            <IonButton
+              fill="outline"
+              onClick={handleSyncRates}
+              disabled={isSyncingRates}
+              title="Sincronizar Tasas de Mercado en Vivo"
+              style={{
+                '--color': '#0284c7',
+                '--border-color': '#bae6fd',
+                fontWeight: 700,
+                fontSize: '12px',
+                marginRight: '8px',
+                height: '32px',
+              } as React.CSSProperties}
+            >
+              <IonIcon icon={refreshOutline} slot="start" />
+              {isSyncingRates ? 'Sincronizando Tasas...' : 'Sincronizar Tasas'}
+            </IonButton>
             <IonButton onClick={loadData} disabled={loading} title="Actualizar datos" style={{ color: '#64748b' }}>
               <IonIcon icon={refreshOutline} slot="icon-only" />
             </IonButton>
@@ -1209,9 +1263,91 @@ const SuperAdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 3: CUENTAS DE COBRO SAAS */}
+        {/* TAB 3: CUENTAS DE COBRO SAAS Y TASAS */}
         {activeTab === 'config' && (
           <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+            {/* CONTROL DE TASAS DE MERCADO DE LA PLATAFORMA */}
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '14px',
+              border: '1px solid #e2e8f0',
+              padding: '20px',
+              marginBottom: '20px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
+                <div>
+                  <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    🏛️ Control de Tasas de Mercado Oficiales
+                  </h3>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>
+                    {platformRates?.ratesCache?.updatedAt ? (
+                      <>Última sincronización: <strong>{new Date(platformRates.ratesCache.updatedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}</strong> ({new Date(platformRates.ratesCache.updatedAt).toLocaleDateString('es-VE')})</>
+                    ) : (
+                      'Sincronización automática activa (09:15 AM y 05:45 PM Caracas)'
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSyncRates}
+                  disabled={isSyncingRates}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '9px 16px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    color: '#ffffff',
+                    backgroundColor: isSyncingRates ? '#94a3b8' : '#0284c7',
+                    border: 'none',
+                    borderRadius: '10px',
+                    cursor: isSyncingRates ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
+                  }}
+                >
+                  <IonIcon icon={refreshOutline} style={{ fontSize: '16px' }} />
+                  {isSyncingRates ? 'Sincronizando Tasas...' : 'Forzar Sincronización Ahora'}
+                </button>
+              </div>
+
+              <p style={{ fontSize: '12px', color: '#475569', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+                Como <strong>SuperAdmin</strong>, puedes forzar la actualización de tasas en cualquier momento. Al presionar el botón, el sistema consulta Cotizave y el respaldo venezolano DolarApi, actualiza la cotización global y propaga el valor a todos los negocios que operan en modo automático.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#166534' }}>🏛️ Dólar BCV Oficial</div>
+                  <div style={{ fontSize: '18px', fontWeight: 900, color: '#14532d', marginTop: '4px' }}>
+                    Bs. {Number(platformRates?.ratesCache?.bcv || platformRates?.exchangeRateBs || 40).toFixed(2)}
+                  </div>
+                </div>
+
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#1e40af' }}>📈 Paralelo Promedio</div>
+                  <div style={{ fontSize: '18px', fontWeight: 900, color: '#1e3a8a', marginTop: '4px' }}>
+                    Bs. {Number(platformRates?.ratesCache?.parallel || platformRates?.ratesCache?.bcv || 40).toFixed(2)}
+                  </div>
+                </div>
+
+                <div style={{ background: '#fefce8', border: '1px solid #fef08a', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#854d0e' }}>🟡 Binance USDT</div>
+                  <div style={{ fontSize: '18px', fontWeight: 900, color: '#713f12', marginTop: '4px' }}>
+                    Bs. {Number(platformRates?.ratesCache?.usdt || platformRates?.ratesCache?.parallel || 40).toFixed(2)}
+                  </div>
+                </div>
+
+                <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#6b21a8' }}>💶 Euro BCV</div>
+                  <div style={{ fontSize: '18px', fontWeight: 900, color: '#581c87', marginTop: '4px' }}>
+                    Bs. {Number(platformRates?.ratesCache?.eur || 40).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div style={{ background: '#fff', borderRadius: '12px', padding: '16px 20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
               <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <IonIcon icon={walletOutline} color="primary" />

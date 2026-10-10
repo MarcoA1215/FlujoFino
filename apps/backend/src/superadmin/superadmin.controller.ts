@@ -16,10 +16,14 @@ import { ReportPaymentDto } from './dto/report-payment.dto';
 import { UpdatePlatformConfigDto } from './dto/update-platform-config.dto';
 import { CreatePromoterDto } from './dto/create-promoter.dto';
 import { UpdateSuperAdminProfileDto } from './dto/update-superadmin-profile.dto';
+import { SettingsService } from '../settings/settings.service';
 
 @Controller('superadmin')
 export class SuperAdminController {
-  constructor(private readonly superadminService: SuperAdminService) {}
+  constructor(
+    private readonly superadminService: SuperAdminService,
+    private readonly settingsService: SettingsService,
+  ) {}
 
   /**
    * Endpoint for tenants to view their own subscription & referral discount calculations
@@ -131,6 +135,18 @@ export class SuperAdminController {
     @Body() body: UpdateSuperAdminProfileDto,
   ) {
     return await this.superadminService.updateSuperAdminProfile(req.user.id, body);
+  }
+
+  @Get('rates')
+  @UseGuards(SuperAdminGuard)
+  async getRates() {
+    return await this.settingsService.getSettings();
+  }
+
+  @Post('sync-rates')
+  @UseGuards(SuperAdminGuard)
+  async syncRates() {
+    return await this.settingsService.syncRates();
   }
 }
 
