@@ -57,11 +57,29 @@ export class SettingsService implements OnModuleInit {
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "driverId" uuid;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "linkedReservationId" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "offlineId" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changePhone" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changeBank" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changeAmount" numeric(12,4);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changeAmountBs" numeric(12,4);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changeMethod" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changeRef" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "usdReceived" numeric(12,4);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "puntoRef" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "puntoBank" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "binanceRef" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferRef" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferBank" character varying;
         CREATE INDEX IF NOT EXISTS "IDX_8bde46c5c57a69f2cb02d02b17" ON "order" ("linkedReservationId");
         CREATE UNIQUE INDEX IF NOT EXISTS "idx_orders_tenant_offline_id" ON "order" ("tenantId", "offlineId") WHERE "offlineId" IS NOT NULL;
 
+        -- Columnas de productos y servicios
+        ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "durationMinutes" integer;
+
         -- Columnas de accesos y personal
         ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "roles" text DEFAULT '';
+        ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "job_title" character varying;
+        ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "entry_time" character varying;
+        ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "exit_time" character varying;
         ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "lunch_start" character varying;
         ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "lunch_end" character varying;
 

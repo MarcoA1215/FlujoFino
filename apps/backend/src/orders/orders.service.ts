@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataSource, Between, In, Not, MoreThanOrEqual, EntityManager } from 'typeorm';
 import { IsOptional, IsArray, IsString, IsNumber, IsBoolean } from 'class-validator';
@@ -255,12 +255,33 @@ import { CustomersService } from '../customers/customers.service';
 import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
-export class OrdersService {
+export class OrdersService implements OnModuleInit {
   constructor(
     private dataSource: DataSource,
     private readonly customersService: CustomersService,
     private readonly settingsService: SettingsService,
   ) {}
+
+  async onModuleInit() {
+    try {
+      await this.dataSource.query(`
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changePhone" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changeBank" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changeAmount" numeric(12,4);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changeAmountBs" numeric(12,4);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changeMethod" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changeRef" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "usdReceived" numeric(12,4);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "puntoRef" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "puntoBank" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "binanceRef" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferRef" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferBank" character varying;
+      `);
+    } catch (e: any) {
+      // Ignorar si las columnas ya existen o si no hay permisos DDL
+    }
+  }
 
   async addAbono(tenantId: string, orderId: string, amount: number, method?: string, ref?: string) {
     if (amount <= 0) throw new BadRequestException('El monto debe ser mayor a 0');
