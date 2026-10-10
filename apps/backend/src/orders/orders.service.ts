@@ -139,12 +139,24 @@ export class CreateOrderDto {
   changeRef?: string;
 
   @IsOptional()
+  @IsString()
+  changePhone?: string;
+
+  @IsOptional()
+  @IsString()
+  changeBank?: string;
+
+  @IsOptional()
   @IsNumber()
   amountBs?: number;
 
   @IsOptional()
   @IsNumber()
   exchangeRate?: number;
+
+  @IsOptional()
+  @IsNumber()
+  exchangeRateBs?: number;
 
   @IsOptional()
   @IsArray()
@@ -219,8 +231,11 @@ export class UpdatePaymentDto {
   changeAmountBs?: number;
   changeMethod?: string;
   changeRef?: string;
+  changePhone?: string;
+  changeBank?: string;
   amountBs?: number;
   exchangeRate?: number;
+  exchangeRateBs?: number;
   splitPayments?: SplitPaymentItem[];
 }
 
@@ -530,7 +545,9 @@ export class OrdersService {
       if (dto.changeAmount && Number(dto.changeAmount) > 0) {
         let vueltoNote = '';
         if (dto.changeMethod === 'PAGO_MOVIL') {
-          vueltoNote = `[Vuelto: $${Number(dto.changeAmount).toFixed(2)} (Bs. ${Number(dto.changeAmountBs || 0).toFixed(2)}) vía Pago Móvil Ref: ${dto.changeRef || 'S/R'}]`;
+          const bankStr = dto.changeBank ? ` Banco: ${dto.changeBank}` : '';
+          const phoneStr = dto.changePhone ? ` Tlf/CI: ${dto.changePhone}` : '';
+          vueltoNote = `[Vuelto: $${Number(dto.changeAmount).toFixed(2)} (Bs. ${Number(dto.changeAmountBs || 0).toFixed(2)}) vía Pago Móvil Ref: ${dto.changeRef || 'S/R'}${bankStr}${phoneStr}]`;
         } else if (dto.changeMethod === 'CASH_BS') {
           vueltoNote = `[Vuelto: $${Number(dto.changeAmount).toFixed(2)} en Efectivo Bs. ${Number(dto.changeAmountBs || 0).toFixed(2)}]`;
         } else {
@@ -610,6 +627,8 @@ export class OrdersService {
         changeAmountBs: dto.changeAmountBs,
         changeMethod: dto.changeMethod,
         changeRef: dto.changeRef,
+        changePhone: dto.changePhone,
+        changeBank: dto.changeBank,
         amountBs: dto.amountBs,
         exchangeRate: orderExchangeRate,
         offlineId: dto.offlineId || (dto as any)?.payload?.offlineId || undefined,
@@ -940,6 +959,8 @@ export class OrdersService {
     if (dto.changeAmountBs !== undefined) order.changeAmountBs = dto.changeAmountBs;
     if (dto.changeMethod !== undefined) order.changeMethod = dto.changeMethod;
     if (dto.changeRef !== undefined) order.changeRef = dto.changeRef;
+    if (dto.changePhone !== undefined) order.changePhone = dto.changePhone;
+    if (dto.changeBank !== undefined) order.changeBank = dto.changeBank;
     if (dto.amountBs !== undefined) order.amountBs = dto.amountBs;
     if (dto.exchangeRate !== undefined) order.exchangeRate = dto.exchangeRate;
     if (dto.splitPayments !== undefined) order.splitPayments = dto.splitPayments;

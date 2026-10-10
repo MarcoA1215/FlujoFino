@@ -149,6 +149,12 @@ export class Order {
   changeRef: string;
 
   @Column({ nullable: true })
+  changePhone: string;
+
+  @Column({ nullable: true })
+  changeBank: string;
+
+  @Column({ nullable: true })
   puntoRef: string;
 
   @Column({ nullable: true })

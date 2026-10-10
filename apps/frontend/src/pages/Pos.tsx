@@ -12,7 +12,8 @@ import {
   IonSelect,
   IonSelectOption,
   IonToggle,
-  useIonToast
+  useIonToast,
+  useIonAlert
 } from '@ionic/react';
 import {
   searchOutline,
@@ -94,7 +95,22 @@ const Pos: React.FC = () => {
   const { openImage } = useImageViewer();
   const { user } = useContext(AuthContext);
   const [presentToast] = useIonToast();
+  const [presentAlert] = useIonAlert();
   const location = useLocation();
+
+  // Treasury (Fondos reales para control de vueltos)
+  const [treasury, setTreasury] = useState<{ cashUSD?: number; bankBs?: number; digitalUSD?: number } | null>(null);
+
+  const fetchTreasury = async () => {
+    try {
+      const res = await apiClient.get<any>('/dashboard/treasury');
+      if (res.data) {
+        setTreasury(res.data);
+      }
+    } catch (e) {
+      // Ignorar si offline
+    }
+  };
 
   // Products & Categories
   const [products, setProducts] = useState<Product[]>([]);
@@ -293,6 +309,7 @@ const Pos: React.FC = () => {
     if (showCheckoutModal) {
       fetchEmployees();
       fetchDeliveryZones();
+      fetchTreasury();
     }
   }, [showCheckoutModal]);
 
@@ -324,6 +341,7 @@ const Pos: React.FC = () => {
     fetchRate();
     fetchDeliveryZones();
     fetchEmployees();
+    fetchTreasury();
 
     // Check for calculator quoted cart
     const calcCartRaw = localStorage.getItem('calculator_cart');
@@ -904,6 +922,8 @@ const Pos: React.FC = () => {
       changeAmountBs: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? vueltoBs : undefined,
       changeMethod: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? changeMethod : undefined,
       changeRef: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? (changeRef.trim() || undefined) : undefined,
+      changePhone: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart && changeMethod === 'PAGO_MOVIL') ? (changePhone.trim() || undefined) : undefined,
+      changeBank: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart && changeMethod === 'PAGO_MOVIL') ? (changeBank || undefined) : undefined,
       initialAbono: paymentMethod === 'PENDING' ? abonoAmount : undefined,
       bypassMinDeposit: paymentMethod === 'PENDING' ? bypassMinDeposit : undefined,
       amountBs: Number(totalCartBs.toFixed(2)),
@@ -912,47 +932,87 @@ const Pos: React.FC = () => {
       linkedReservationId: linkedReservationId || undefined
     };
 
-    setIsSubmitting(true);
-    try {
-      const isOffline = !navigator.onLine || localStorage.getItem('flujofino_simulating_offline') === 'true';
+    const executeOrderSubmit = async (orderPayload: any) => {
+      setIsSubmitting(true);
+      try {
+        const isOffline = !navigator.onLine || localStorage.getItem('flujofino_simulating_offline') === 'true';
 
-      // OFFLINE MODE: Save to Dexie
-      if (isOffline) {
-        try {
-          const offlineId = 'off_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
-          const offlineOrder: OfflineOrder = {
-            offlineId,
-            tenantId: user?.tenantId || '',
-            payload,
-            rateAtSale: exchangeRate,
-            createdAt: new Date().toISOString(),
-            synced: false
-          };
+        // OFFLINE MODE: Save to Dexie
+        if (isOffline) {
+          try {
+            const offlineId = 'off_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+            const offlineOrder: OfflineOrder = {
+              offlineId,
+              tenantId: user?.tenantId || '',
+              payload: orderPayload,
+              rateAtSale: exchangeRate,
+              createdAt: new Date().toISOString(),
+              synced: false
+            };
 
-          await offlineDb.offlineOrders.add(offlineOrder);
+            await offlineDb.offlineOrders.add(offlineOrder);
 
-          // Descontar inmediatamente el stock en memoria y en la base de datos local
-          setProducts(prevProducts => {
-            const updated = prevProducts.map(p => {
-              const itemInCart = cart.find(ci => (ci.product?.id || (ci as any).productId) === p.id);
-              if (!itemInCart) return p;
-              const qty = Number(itemInCart.quantity) || 1;
-              const allowNegative = Boolean(settings?.allowNegativeStock);
-              const newStock = allowNegative ? ((p.stockQuantity ?? 0) - qty) : Math.max(0, (p.stockQuantity ?? 0) - qty);
-              const newPhysical = allowNegative ? ((p.physicalStock ?? 0) - qty) : Math.max(0, (p.physicalStock ?? 0) - qty);
-              return { ...p, stockQuantity: newStock, physicalStock: newPhysical, tenantId: user?.tenantId || (p as any).tenantId };
+            // Descontar inmediatamente el stock en memoria y en la base de datos local
+            setProducts(prevProducts => {
+              const updated = prevProducts.map(p => {
+                const itemInCart = cart.find(ci => (ci.product?.id || (ci as any).productId) === p.id);
+                if (!itemInCart) return p;
+                const qty = Number(itemInCart.quantity) || 1;
+                const allowNegative = Boolean(settings?.allowNegativeStock);
+                const newStock = allowNegative ? ((p.stockQuantity ?? 0) - qty) : Math.max(0, (p.stockQuantity ?? 0) - qty);
+                const newPhysical = allowNegative ? ((p.physicalStock ?? 0) - qty) : Math.max(0, (p.physicalStock ?? 0) - qty);
+                return { ...p, stockQuantity: newStock, physicalStock: newPhysical, tenantId: user?.tenantId || (p as any).tenantId };
+              });
+              offlineDb.cachedProducts.bulkPut(updated).catch(() => {});
+              return updated;
             });
-            offlineDb.cachedProducts.bulkPut(updated).catch(() => {});
-            return updated;
-          });
 
-          presentToast({
-            message: '✓ Venta guardada localmente (Modo Offline)',
-            duration: 3000,
-            color: 'success'
-          });
+            presentToast({
+              message: '✓ Venta guardada localmente (Modo Offline)',
+              duration: 3000,
+              color: 'success'
+            });
 
-          // Reset cart and modal
+            // Reset cart and modal
+            setCart([]);
+            setCustomerName('');
+            setCustomerPhone('');
+            setCustomerAddress('');
+            setTableNumber('');
+            setPagoMovilRef('');
+            setPuntoRef('');
+            setBinanceRef('');
+            setTransferRef('');
+            setTransferBank('');
+            setUsdReceived('');
+            setChangeMethod('CASH_USD');
+            setChangeRef('');
+            setChangePhone('');
+            setChangeBank('');
+            setInitialAbono('');
+            setBypassMinDeposit(false);
+            setDiscountValue('');
+            setShowCheckoutModal(false);
+            setLinkedReservationId(null);
+            setEditingOrderId(null);
+            return;
+          } catch (dexieErr) {
+            console.error('Error guardando en Dexie:', dexieErr);
+            presentToast({ message: 'Error guardando orden local', duration: 3000, color: 'danger' });
+            return;
+          }
+        }
+
+        // ONLINE MODE: Send to server
+        try {
+          if (editingOrderId) {
+            await apiClient.put(`/orders/${editingOrderId}`, orderPayload);
+            presentToast({ message: 'Pedido actualizado con éxito', duration: 2500, color: 'success' });
+          } else {
+            await apiClient.post('/orders', orderPayload);
+            presentToast({ message: '✓ ¡Pedido registrado con éxito!', duration: 2500, color: 'success' });
+          }
+
           setCart([]);
           setCustomerName('');
           setCustomerPhone('');
@@ -972,99 +1032,107 @@ const Pos: React.FC = () => {
           setBypassMinDeposit(false);
           setDiscountValue('');
           setShowCheckoutModal(false);
-          setLinkedReservationId(null);
           setEditingOrderId(null);
-          return;
-        } catch (dexieErr) {
-          console.error('Error guardando en Dexie:', dexieErr);
-          presentToast({ message: 'Error guardando orden local', duration: 3000, color: 'danger' });
-          return;
-        }
-      }
-
-      // ONLINE MODE: Send to server
-      try {
-        if (editingOrderId) {
-          await apiClient.put(`/orders/${editingOrderId}`, payload);
-          presentToast({ message: 'Pedido actualizado con éxito', duration: 2500, color: 'success' });
-        } else {
-          await apiClient.post('/orders', payload);
-          presentToast({ message: '✓ ¡Pedido registrado con éxito!', duration: 2500, color: 'success' });
-        }
-
-        setCart([]);
-        setCustomerName('');
-        setCustomerPhone('');
-        setCustomerAddress('');
-        setTableNumber('');
-        setPagoMovilRef('');
-        setPuntoRef('');
-        setBinanceRef('');
-        setTransferRef('');
-        setTransferBank('');
-        setUsdReceived('');
-        setChangeMethod('CASH_USD');
-        setChangeRef('');
-        setChangePhone('');
-        setChangeBank('');
-        setInitialAbono('');
-        setBypassMinDeposit(false);
-        setDiscountValue('');
-        setShowCheckoutModal(false);
-        setEditingOrderId(null);
-        setLinkedReservationId(null);
-        fetchProducts();
-      } catch (e: any) {
-        console.error('Error procesando pedido:', e);
-        if (e.response) {
-          const errorMsg = e.response.data?.message || e.response.data?.error || 'Error al procesar el pedido';
-          presentToast({
-            message: `Error: ${Array.isArray(errorMsg) ? errorMsg.join(', ') : errorMsg}`,
-            duration: 4500,
-            color: 'danger'
-          });
-          return;
-        }
-
-        // Fallback: If network failed unexpectedly (no response), save offline
-        try {
-          const offlineId = 'off_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
-          const offlineOrder: OfflineOrder = {
-            offlineId,
-            tenantId: user?.tenantId || '',
-            payload,
-            rateAtSale: exchangeRate,
-            createdAt: new Date().toISOString(),
-            synced: false
-          };
-          await offlineDb.offlineOrders.add(offlineOrder);
-          setProducts(prevProducts => {
-            const updated = prevProducts.map(p => {
-              const itemInCart = cart.find(ci => (ci.product?.id || (ci as any).productId) === p.id);
-              if (!itemInCart) return p;
-              const qty = Number(itemInCart.quantity) || 1;
-              const allowNegative = Boolean(settings?.allowNegativeStock);
-              const newStock = allowNegative ? ((p.stockQuantity ?? 0) - qty) : Math.max(0, (p.stockQuantity ?? 0) - qty);
-              const newPhysical = allowNegative ? ((p.physicalStock ?? 0) - qty) : Math.max(0, (p.physicalStock ?? 0) - qty);
-              return { ...p, stockQuantity: newStock, physicalStock: newPhysical, tenantId: user?.tenantId || (p as any).tenantId };
+          setLinkedReservationId(null);
+          fetchProducts();
+        } catch (e: any) {
+          console.error('Error procesando pedido:', e);
+          if (e.response) {
+            const errorMsg = e.response.data?.message || e.response.data?.error || 'Error al procesar el pedido';
+            presentToast({
+              message: `Error: ${Array.isArray(errorMsg) ? errorMsg.join(', ') : errorMsg}`,
+              duration: 4500,
+              color: 'danger'
             });
-            offlineDb.cachedProducts.bulkPut(updated).catch(() => {});
-            return updated;
+            return;
+          }
+
+          // Fallback: If network failed unexpectedly (no response), save offline
+          try {
+            const offlineId = 'off_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+            const offlineOrder: OfflineOrder = {
+              offlineId,
+              tenantId: user?.tenantId || '',
+              payload: orderPayload,
+              rateAtSale: exchangeRate,
+              createdAt: new Date().toISOString(),
+              synced: false
+            };
+            await offlineDb.offlineOrders.add(offlineOrder);
+            setProducts(prevProducts => {
+              const updated = prevProducts.map(p => {
+                const itemInCart = cart.find(ci => (ci.product?.id || (ci as any).productId) === p.id);
+                if (!itemInCart) return p;
+                const qty = Number(itemInCart.quantity) || 1;
+                const allowNegative = Boolean(settings?.allowNegativeStock);
+                const newStock = allowNegative ? ((p.stockQuantity ?? 0) - qty) : Math.max(0, (p.stockQuantity ?? 0) - qty);
+                const newPhysical = allowNegative ? ((p.physicalStock ?? 0) - qty) : Math.max(0, (p.physicalStock ?? 0) - qty);
+                return { ...p, stockQuantity: newStock, physicalStock: newPhysical, tenantId: user?.tenantId || (p as any).tenantId };
+              });
+              offlineDb.cachedProducts.bulkPut(updated).catch(() => {});
+              return updated;
+            });
+            presentToast({
+              message: 'Fallo de conexión: Pedido guardado localmente en Modo Offline',
+              duration: 3500,
+              color: 'warning'
+            });
+            setCart([]);
+            setShowCheckoutModal(false);
+          } catch (err) {
+            presentToast({ message: 'Error al registrar pedido', duration: 3000, color: 'danger' });
+          }
+        }
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    // Validar si el vuelto supera el saldo de fondos en tesorería y advertir al cajero
+    if (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) {
+      if (changeMethod === 'PAGO_MOVIL') {
+        if (treasury && treasury.bankBs !== undefined && vueltoBs > (treasury.bankBs + 0.05)) {
+          presentAlert({
+            header: '⚠️ Saldo Insuficiente en Banco',
+            subHeader: `Saldo en banco: ${currencySymbol} ${formatLocalAmount(treasury.bankBs)} | Vuelto: ${currencySymbol} ${formatLocalAmount(vueltoBs)}`,
+            message: `El vuelto a transferir por Pago Móvil supera los fondos disponibles registrados en la cuenta bancaria del negocio.\n\n¿Estás seguro de que deseas confirmar esta transacción?`,
+            buttons: [
+              { text: 'Cancelar', role: 'cancel' },
+              { text: 'Confirmar de todos modos', handler: () => executeOrderSubmit(payload) }
+            ]
           });
-          presentToast({
-            message: 'Fallo de conexión: Pedido guardado localmente en Modo Offline',
-            duration: 3500,
-            color: 'warning'
+          return;
+        }
+      } else if (changeMethod === 'CASH_USD') {
+        if (treasury && treasury.cashUSD !== undefined && vueltoUsd > (treasury.cashUSD + 0.05)) {
+          presentAlert({
+            header: '⚠️ Efectivo Insuficiente en Gaveta',
+            subHeader: `Billetes en caja: $${treasury.cashUSD.toFixed(2)} USD | Vuelto: $${vueltoUsd.toFixed(2)} USD`,
+            message: `El vuelto en efectivo supera los dólares registrados en la gaveta física.\n\n¿Estás seguro de registrar la venta?`,
+            buttons: [
+              { text: 'Cancelar', role: 'cancel' },
+              { text: 'Confirmar de todos modos', handler: () => executeOrderSubmit(payload) }
+            ]
           });
-          setCart([]);
-          setShowCheckoutModal(false);
-        } catch (err) {
-          presentToast({ message: 'Error al registrar pedido', duration: 3000, color: 'danger' });
+          return;
+        }
+      } else if (changeMethod === 'CASH_BS') {
+        if (treasury && treasury.bankBs !== undefined && vueltoBs > (treasury.bankBs + 0.05)) {
+          presentAlert({
+            header: '⚠️ Efectivo Insuficiente en Bs',
+            subHeader: `Saldo en Bs: ${currencySymbol} ${formatLocalAmount(treasury.bankBs)} | Vuelto: ${currencySymbol} ${formatLocalAmount(vueltoBs)}`,
+            message: `El vuelto en bolívares en efectivo supera los fondos registrados.\n\n¿Estás seguro de continuar?`,
+            buttons: [
+              { text: 'Cancelar', role: 'cancel' },
+              { text: 'Confirmar de todos modos', handler: () => executeOrderSubmit(payload) }
+            ]
+          });
+          return;
         }
       }
-    } finally {
-      setIsSubmitting(false);
     }
+
+    executeOrderSubmit(payload);
   };
 
   return (
@@ -2084,18 +2152,72 @@ const Pos: React.FC = () => {
                                     />
                                   </div>
                                 </div>
+
+                                {/* Advertencia de saldo en banco */}
+                                {treasury && treasury.bankBs !== undefined && vueltoBs > (treasury.bankBs + 0.05) && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    background: '#FEF2F2',
+                                    border: '1px solid #FECACA',
+                                    borderRadius: '8px',
+                                    padding: '8px 10px',
+                                    fontSize: '11.5px',
+                                    color: '#991B1B',
+                                    lineHeight: '1.4'
+                                  }}>
+                                    ⚠️ <strong>Fondos insuficientes en Banco:</strong> Saldo registrado: {currencySymbol} {formatLocalAmount(treasury.bankBs)} (Faltan {currencySymbol} {formatLocalAmount(vueltoBs - treasury.bankBs)}). Asegúrate de tener saldo en la cuenta bancaria del negocio antes de transferir.
+                                  </div>
+                                )}
+                                {treasury && treasury.bankBs !== undefined && vueltoBs <= (treasury.bankBs + 0.05) && (
+                                  <div style={{ fontSize: '11px', color: '#047857', marginTop: '6px' }}>
+                                    ✓ Fondos suficientes en Banco (Saldo: {currencySymbol} {formatLocalAmount(treasury.bankBs)})
+                                  </div>
+                                )}
                               </div>
                             )}
 
                             {changeMethod === 'CASH_USD' && (
                               <div style={{ fontSize: '11px', color: '#065F46', background: '#ffffff', padding: '8px 10px', borderRadius: '8px', border: '1px solid #A7F3D0' }}>
                                 💡 Se entregarán <b>${vueltoUsd.toFixed(2)} USD</b> en billetes físicos desde la gaveta.
+                                {treasury && treasury.cashUSD !== undefined && vueltoUsd > (treasury.cashUSD + 0.05) && (
+                                  <div style={{
+                                    marginTop: '6px',
+                                    background: '#FEF2F2',
+                                    border: '1px solid #FECACA',
+                                    borderRadius: '8px',
+                                    padding: '8px 10px',
+                                    fontSize: '11.5px',
+                                    color: '#991B1B',
+                                    lineHeight: '1.4'
+                                  }}>
+                                    ⚠️ <strong>Efectivo insuficiente en Gaveta:</strong> Hay ${treasury.cashUSD.toFixed(2)} USD registrados (Faltan ${(vueltoUsd - treasury.cashUSD).toFixed(2)} USD en billetes).
+                                  </div>
+                                )}
+                                {treasury && treasury.cashUSD !== undefined && vueltoUsd <= (treasury.cashUSD + 0.05) && (
+                                  <div style={{ fontSize: '10.5px', color: '#047857', marginTop: '4px' }}>
+                                    ✓ Hay ${treasury.cashUSD.toFixed(2)} USD disponibles en gaveta física.
+                                  </div>
+                                )}
                               </div>
                             )}
 
                             {changeMethod === 'CASH_BS' && (
                               <div style={{ fontSize: '11px', color: '#065F46', background: '#ffffff', padding: '8px 10px', borderRadius: '8px', border: '1px solid #A7F3D0' }}>
                                 💡 Se entregarán <b>{currencySymbol} {formatLocalAmount(vueltoBs)}</b> en billetes físicos desde la gaveta.
+                                {treasury && treasury.bankBs !== undefined && vueltoBs > (treasury.bankBs + 0.05) && (
+                                  <div style={{
+                                    marginTop: '6px',
+                                    background: '#FEF2F2',
+                                    border: '1px solid #FECACA',
+                                    borderRadius: '8px',
+                                    padding: '8px 10px',
+                                    fontSize: '11.5px',
+                                    color: '#991B1B',
+                                    lineHeight: '1.4'
+                                  }}>
+                                    ⚠️ <strong>Efectivo insuficiente en Bs:</strong> Fondos registrados: {currencySymbol} {formatLocalAmount(treasury.bankBs)}.
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
