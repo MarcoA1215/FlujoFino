@@ -55,7 +55,9 @@ export class SettingsService implements OnModuleInit {
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "splitPayments" jsonb;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "driverId" uuid;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "linkedReservationId" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "offlineId" character varying;
         CREATE INDEX IF NOT EXISTS "IDX_8bde46c5c57a69f2cb02d02b17" ON "order" ("linkedReservationId");
+        CREATE UNIQUE INDEX IF NOT EXISTS "idx_orders_tenant_offline_id" ON "order" ("tenantId", "offlineId") WHERE "offlineId" IS NOT NULL;
 
         -- Columnas de accesos y personal
         ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "roles" text DEFAULT '';

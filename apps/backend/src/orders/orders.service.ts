@@ -612,7 +612,7 @@ export class OrdersService {
         changeRef: dto.changeRef,
         amountBs: dto.amountBs,
         exchangeRate: orderExchangeRate,
-        offlineId: dto.offlineId || undefined,
+        offlineId: dto.offlineId || (dto as any)?.payload?.offlineId || undefined,
         createdAt: orderCreatedAt,
         abonosTotal: dto.initialAbono || 0,
         abonosHistory: (dto.initialAbono && dto.initialAbono > 0) ? [{ id: Date.now().toString(), amount: dto.initialAbono, date: new Date().toISOString() }] : []
@@ -2288,13 +2288,26 @@ export class OrdersService {
     };
   }
 
+  private static syncingOfflineIds = new Set<string>();
+
   async syncOfflineOrders(tenantId: string, orders: any[], userId?: string, authUserRole?: UserRole | string) {
     const syncedOfflineIds: string[] = [];
     const failedOrders: Array<{ offlineId: string; error: string }> = [];
 
     for (const item of orders || []) {
       const offlineId = item.offlineId || item.id || 'desconocido';
+
+      // Evitar que dos hilos o llamadas procesen el mismo offlineId concurrentemente
+      if (offlineId !== 'desconocido' && OrdersService.syncingOfflineIds.has(`${tenantId}_${offlineId}`)) {
+        syncedOfflineIds.push(offlineId);
+        continue;
+      }
+
       try {
+        if (offlineId !== 'desconocido') {
+          OrdersService.syncingOfflineIds.add(`${tenantId}_${offlineId}`);
+        }
+
         const payload = item.payload || item;
         if (!payload.offlineCreatedAt && (item.createdAt || item.offlineCreatedAt)) {
           payload.offlineCreatedAt = item.offlineCreatedAt || item.createdAt;
@@ -2302,7 +2315,10 @@ export class OrdersService {
         if (item.offlineId) {
           payload.offlineId = item.offlineId;
           const existing = await this.dataSource.getRepository(Order).findOne({
-            where: { tenantId, offlineId: item.offlineId },
+            where: [
+              { tenantId, offlineId: item.offlineId },
+              { offlineId: item.offlineId },
+            ],
           });
           if (existing) {
             syncedOfflineIds.push(item.offlineId);
@@ -2312,7 +2328,17 @@ export class OrdersService {
         if (payload.editingOrderId) {
           await this.editOrder(tenantId, payload.editingOrderId, payload, userId, authUserRole);
         } else {
-          await this.createOrder(tenantId, payload, userId, authUserRole);
+          try {
+            await this.createOrder(tenantId, payload, userId, authUserRole);
+          } catch (createErr: any) {
+            const isDuplicate = createErr?.code === '23505' ||
+              (createErr?.message && createErr.message.includes('offline'));
+            if (isDuplicate && item.offlineId) {
+              syncedOfflineIds.push(item.offlineId);
+              continue;
+            }
+            throw createErr;
+          }
         }
         if (item.offlineId) {
           syncedOfflineIds.push(item.offlineId);
@@ -2324,6 +2350,10 @@ export class OrdersService {
           offlineId,
           error: errMsg,
         });
+      } finally {
+        if (offlineId !== 'desconocido') {
+          OrdersService.syncingOfflineIds.delete(`${tenantId}_${offlineId}`);
+        }
       }
     }
     return { success: true, syncedOfflineIds, failedOrders };

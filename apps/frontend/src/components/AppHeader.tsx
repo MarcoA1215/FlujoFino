@@ -37,6 +37,8 @@ interface AppHeaderProps {
   children?: React.ReactNode;
 }
 
+let isGlobalSyncInProgress = false;
+
 export const AppHeader: React.FC<AppHeaderProps> = ({
   title = APP_NAME,
   subtitle,
@@ -160,8 +162,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         if (navigator.onLine && localStorage.getItem('flujofino_simulating_offline') !== 'true') {
           try {
             const allOrders = await offlineDb.offlineOrders.toArray();
-            const pendingCount = allOrders.filter(o => o.status !== 'failed').length;
-            if (pendingCount > 0) {
+            const pendingCount = allOrders.filter(o => o.status !== 'failed' && o.status !== 'syncing').length;
+            if (pendingCount > 0 && !isGlobalSyncInProgress) {
               await syncPendingOrders(true);
             }
           } catch (e) {}
@@ -172,7 +174,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     safeRefresh();
     fetchRate();
 
-    const interval = setInterval(safeRefresh, 6000);
+    const interval = setInterval(safeRefresh, 15000);
     return () => {
       isMounted = false;
       window.removeEventListener('online', handleOnline);
@@ -237,28 +239,43 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       if (!silent) presentToast({ message: 'No hay conexión a internet activa', duration: 2500, color: 'warning' });
       return;
     }
-    if (isSyncing) return;
+    if (isGlobalSyncInProgress || isSyncing) return;
+
+    let ordersToProcess: any[] = [];
     try {
       const allOrders = await offlineDb.offlineOrders.toArray();
       const pending = retryFailed
-        ? allOrders
-        : allOrders.filter(o => o.status !== 'failed');
+        ? allOrders.filter(o => o.status !== 'syncing')
+        : allOrders.filter(o => o.status !== 'failed' && o.status !== 'syncing');
 
       if (!pending || pending.length === 0) {
         const failedCount = allOrders.filter(o => o.status === 'failed').length;
         setPendingOfflineCount(0);
         if (!silent) {
           if (failedCount > 0) {
-            presentToast({ message: `No hay órdenes pendientes normales. (${failedCount} venta(s) marcada(s) con error previo)`, duration: 3500, color: 'warning' });
+            presentToast({ message: `No hay órdenes pendientes normales. (${failedCount} venta(s) con error previo)`, duration: 3500, color: 'warning' });
           } else {
             presentToast({ message: 'No hay ventas pendientes por sincronizar', duration: 2000, color: 'light' });
           }
         }
         return;
       }
-      setIsSyncing(true);
 
-      const response = await apiClient.post('/orders/sync-offline', { orders: pending });
+      isGlobalSyncInProgress = true;
+      setIsSyncing(true);
+      ordersToProcess = pending;
+
+      // Marcar órdenes en estado 'syncing' en Dexie de inmediato para evitar envíos concurrentes
+      for (const order of pending) {
+        await offlineDb.offlineOrders.update(order.offlineId, { status: 'syncing' });
+      }
+
+      // skipGlobalLoading: true para no bloquear la aplicación con pantalla de carga mientras se sincroniza
+      const response = await apiClient.post(
+        '/orders/sync-offline',
+        { orders: pending },
+        { skipGlobalLoading: true } as any
+      );
       const syncedIds: string[] = response.data?.syncedOfflineIds || [];
       const failedOrders: Array<{ offlineId: string; error: string }> = response.data?.failedOrders || [];
 
@@ -266,7 +283,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         await offlineDb.offlineOrders.bulkDelete(syncedIds);
         await refreshPendingCount();
         presentToast({
-          message: `✓ ${syncedIds.length} venta(s) offline sincronizada(s) con éxito con el servidor`,
+          message: `✓ ${syncedIds.length} venta(s) offline sincronizada(s) con éxito`,
           duration: 3000,
           color: 'success'
         });
@@ -287,7 +304,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         await refreshPendingCount();
         const firstErr = failedOrders[0]?.error || 'Error desconocido';
         presentToast({
-          message: `⚠️ ${failedOrders.length} venta(s) no se pudieron sincronizar y fueron marcadas con error: ${firstErr}`,
+          message: `⚠️ ${failedOrders.length} venta(s) no se pudieron sincronizar: ${firstErr}`,
           duration: 5000,
           color: 'warning'
         });
@@ -296,6 +313,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       }
     } catch (err: any) {
       console.error('Error sincronizando órdenes offline:', err);
+      // Revertir estado 'syncing' a 'pending' en Dexie para reintento posterior
+      for (const order of ordersToProcess) {
+        try {
+          const current = await offlineDb.offlineOrders.get(order.offlineId);
+          if (current && current.status === 'syncing') {
+            await offlineDb.offlineOrders.update(order.offlineId, { status: 'pending' });
+          }
+        } catch (_) {}
+      }
       if (!silent) {
         presentToast({
           message: 'Error al sincronizar con el servidor: ' + (err.response?.data?.message || err.message),
@@ -304,7 +330,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         });
       }
     } finally {
+      isGlobalSyncInProgress = false;
       setIsSyncing(false);
+      await refreshPendingCount();
     }
   };
 
@@ -548,6 +576,29 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         </IonToolbar>
         
         <SubscriptionWarningBanner />
+
+        {isDisconnected && (
+          <div
+            style={{
+              background: '#FFFBEB',
+              borderBottom: '1px solid #FDE68A',
+              padding: '7px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              fontSize: '12px',
+              color: '#92400E',
+              fontWeight: 600,
+              textAlign: 'center',
+            }}
+          >
+            <span>⚡</span>
+            <span>
+              <strong>Modo Sin Conexión:</strong> Operando localmente. Las ventas se sincronizarán al reconectar.
+            </span>
+          </div>
+        )}
 
         {user && !user.isEmailVerified && (
           <div

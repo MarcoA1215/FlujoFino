@@ -1,7 +1,7 @@
 import { IonApp, IonRouterOutlet, IonSplitPane, IonSpinner, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import { Navigate, Route, useLocation } from 'react-router-dom';
-import { useContext, useEffect, useState, lazy, Suspense } from 'react';
+import { useContext, useEffect, lazy, Suspense } from 'react';
 import Menu from './components/Menu';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { SubscriptionProvider, SubscriptionContext } from './context/SubscriptionContext';
@@ -267,21 +267,6 @@ const MainLayout: React.FC = () => {
   usePushNotifications(user);
   const { isReportModalOpen, setIsReportModalOpen } = useContext(SubscriptionContext);
   const location = useLocation();
-  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
   const isPublicRoute = location.pathname.startsWith('/book') || 
                         location.pathname.startsWith('/store') || 
                         location.pathname.startsWith('/tienda') || 
@@ -298,24 +283,6 @@ const MainLayout: React.FC = () => {
 
   return (
     <>
-      {!isOnline && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          backgroundColor: '#d97706',
-          color: '#ffffff',
-          textAlign: 'center',
-          padding: '6px 12px',
-          fontSize: '0.85rem',
-          fontWeight: 'bold',
-          zIndex: 99999,
-          boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
-        }}>
-          ⚡ Modo Sin Conexión: Visualizando agenda, clientes y catálogo guardados localmente.
-        </div>
-      )}
       {!isPublicRoute && !isExpiredRoute && <NotificationPermissionBanner />}
       <IonSplitPane contentId="main" when={!isPublicRoute && !isExpiredRoute && (user?.tenantId || isSuperAdmin || isPromotor) ? 'md' : false}>
         {!isPublicRoute && !isExpiredRoute && <Menu />}

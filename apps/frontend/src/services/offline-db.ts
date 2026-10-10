@@ -7,7 +7,7 @@ export interface OfflineOrder {
   rateAtSale: number;
   createdAt: string; // Timestamp exacto de la venta local
   synced: boolean;
-  status?: 'pending' | 'failed' | 'synced';
+  status?: 'pending' | 'failed' | 'synced' | 'syncing';
   syncError?: string;
   retryCount?: number;
 }
