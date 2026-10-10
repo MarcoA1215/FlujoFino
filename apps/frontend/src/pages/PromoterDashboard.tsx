@@ -42,6 +42,7 @@ import {
   TenantStatus,
 } from '@finowork/shared-types';
 import { BankSelect } from '../components/BankSelect';
+import { getPublicBaseUrl } from '../utils/public-url';
 
 const PromoterDashboard: React.FC = () => {
   const { user } = useContext(AuthContext);
@@ -77,16 +78,6 @@ const PromoterDashboard: React.FC = () => {
   useEffect(() => {
     fetchStats();
   }, []);
-
-  const getPublicBaseUrl = () => {
-    if (
-      typeof window !== 'undefined' &&
-      (window.location.hostname === 'localhost' || window.location.protocol === 'capacitor:')
-    ) {
-      return 'https://flujo-fino-frontend.vercel.app'; // Dominio público de producción
-    }
-    return window.location.origin;
-  };
 
   const referralCode = stats?.code || 'PROM-';
   const affiliateLink = `${getPublicBaseUrl()}/register?ref=${referralCode}`;

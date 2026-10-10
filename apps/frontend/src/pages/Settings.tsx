@@ -50,6 +50,7 @@ import {
 } from '../services/push-notification.service';
 import { apiClient } from '../api/client';
 import { getContrastColor, isColorTooLight, ensureReadableColor, PRESET_THEME_COLORS } from '../utils/colors';
+import { getPublicBaseUrl } from '../utils/public-url';
 import { AuthContext } from '../context/AuthContext';
 import { ReportPaymentModal } from '../components/ReportPaymentModal';
 import {
@@ -108,14 +109,6 @@ interface Settings {
   themeHeaderColor?: string;
   allowNegativeStock?: boolean;
 }
-
-  const getPublicBaseUrl = () => {
-  // Si estamos dentro de la APK en Android (Capacitor) o en localhost
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.protocol === 'capacitor:')) {
-    return 'https://flujo-fino-frontend.vercel.app'; // 👈 Tu dominio público real de Vercel
-  }
-  return window.location.origin;
-};
 
 const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<Settings>({});
