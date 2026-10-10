@@ -229,7 +229,19 @@ export class SettingsService implements OnModuleInit {
   }
 
   async getSettings(tenantId?: string) {
-    const globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+    let globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+    
+    // Auto-recuperación si la caché no existe o tiene valor base (<= 40)
+    const cachedBcv = Number(globalSettings?.ratesCache?.bcv || 0);
+    if (!globalSettings?.ratesCache || cachedBcv <= 40) {
+      try {
+        await this.syncRates();
+        globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+      } catch (syncErr: any) {
+        this.logger.warn(`Auto-sincronización de tasas en getSettings: ${syncErr?.message || syncErr}`);
+      }
+    }
+
     const globalRate = globalSettings?.exchangeRateBs ? Number(globalSettings.exchangeRateBs) : 40.0;
     const availableRates = globalSettings?.ratesCache || null;
 
@@ -558,18 +570,20 @@ export class SettingsService implements OnModuleInit {
       globalSettings = this.settingsRepo.create({ id: 'GLOBAL' });
     }
     const currentCache = globalSettings.ratesCache || {};
+    const existingRate = Number(globalSettings.exchangeRateBs || 0);
 
-    const finalBcv = bcvVal || (currentCache.bcv ? Number(currentCache.bcv) : 40.0);
-    const finalParallel = parallelVal || (currentCache.parallel ? Number(currentCache.parallel) : finalBcv);
-    const finalUsdt = usdtVal || (currentCache.usdt ? Number(currentCache.usdt) : finalParallel);
-    const finalEur = eurVal || (currentCache.eur ? Number(currentCache.eur) : Number((finalBcv * 1.12).toFixed(2)));
+    const finalBcv = bcvVal || (currentCache.bcv && Number(currentCache.bcv) > 40 ? Number(currentCache.bcv) : (existingRate > 40 ? existingRate : 40.0));
+    const finalParallel = parallelVal || (currentCache.parallel && Number(currentCache.parallel) > 40 ? Number(currentCache.parallel) : finalBcv);
+    const finalUsdt = usdtVal || (currentCache.usdt && Number(currentCache.usdt) > 40 ? Number(currentCache.usdt) : finalParallel);
+    const finalEur = eurVal || (currentCache.eur && Number(currentCache.eur) > 40 ? Number(currentCache.eur) : Number((finalBcv * 1.12).toFixed(2)));
 
+    const hasRealRates = (bcvVal && bcvVal > 40) || finalBcv > 40;
     const newRatesCache = {
       bcv: finalBcv,
       parallel: finalParallel,
       usdt: finalUsdt,
       eur: finalEur,
-      updatedAt: new Date().toISOString(),
+      updatedAt: hasRealRates ? new Date().toISOString() : (currentCache.updatedAt || new Date().toISOString()),
     };
 
     globalSettings.ratesCache = newRatesCache;

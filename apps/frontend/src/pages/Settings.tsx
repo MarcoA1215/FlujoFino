@@ -130,6 +130,7 @@ const SettingsPage: React.FC = () => {
   const [notificationStatus, setNotificationStatus] = useState<NotificationPermissionState>(() => getNotificationPermission());
   const [isActivatingNotifications, setIsActivatingNotifications] = useState<boolean>(false);
   const [isTestingNotifications, setIsTestingNotifications] = useState<boolean>(false);
+  const [isSyncingRates, setIsSyncingRates] = useState<boolean>(false);
 
   useEffect(() => {
     const updatePerm = () => setNotificationStatus(getNotificationPermission());
@@ -230,6 +231,33 @@ const SettingsPage: React.FC = () => {
       console.log('Error cargando tasa cambiaria:', e);
     }
     return exchangeRate;
+  };
+
+  const handleSyncRates = async () => {
+    setIsSyncingRates(true);
+    try {
+      const res = await apiClient.post<Settings>('/settings/sync-rates');
+      if (res.data) {
+        setSettings(res.data);
+        if (res.data.exchangeRateBs) {
+          setExchangeRate(Number(res.data.exchangeRateBs));
+        }
+        const bcvRate = res.data.availableRates?.bcv || res.data.exchangeRateBs;
+        presentToast({
+          message: `¡Tasas de mercado sincronizadas con éxito! BCV: Bs. ${Number(bcvRate).toFixed(2)}`,
+          duration: 3500,
+          color: 'success',
+        });
+      }
+    } catch (e: any) {
+      presentToast({
+        message: 'No se pudieron sincronizar las tasas: ' + (e.response?.data?.message || e.message),
+        duration: 4000,
+        color: 'danger',
+      });
+    } finally {
+      setIsSyncingRates(false);
+    }
   };
 
   useEffect(() => {
@@ -983,114 +1011,154 @@ const SettingsPage: React.FC = () => {
                             padding: '14px 16px',
                             marginTop: '8px'
                           }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span>🔄</span> Sincronización Automática de Tasas
-                              </div>
-                              {settings.availableRates?.updatedAt && (
-                                <div style={{ fontSize: '11px', color: '#64748b' }}>
-                                  Última actualización: {new Date(settings.availableRates.updatedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} ({new Date(settings.availableRates.updatedAt).toLocaleDateString('es-VE')})
-                                </div>
-                              )}
-                            </div>
+                            {(() => {
+                              const rawBcv = Number(settings.availableRates?.bcv || 0);
+                              const tenantRate = Number(settings.exchangeRateBs || 0);
+                              const bcvDisplay = rawBcv > 40 ? rawBcv : (tenantRate > 40 ? tenantRate : 40);
+                              
+                              const rawParallel = Number(settings.availableRates?.parallel || 0);
+                              const parallelDisplay = rawParallel > 40 ? rawParallel : (bcvDisplay > 40 ? bcvDisplay : 40);
 
-                            <p style={{ margin: '0 0 12px 0', fontSize: '11.5px', color: '#475569', lineHeight: '1.4' }}>
-                              Las tasas del mercado se actualizan automáticamente 2 veces al día (<strong>09:15 AM</strong> y <strong>05:45 PM</strong> tras el cierre de mesas de cambio del BCV). Si necesitas una cotización distinta y fija para tu negocio, puedes seleccionar el modo <strong>Manual</strong>.
-                            </p>
+                              const rawUsdt = Number(settings.availableRates?.usdt || 0);
+                              const usdtDisplay = rawUsdt > 40 ? rawUsdt : parallelDisplay;
 
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
-                              <div
-                                onClick={() => {
-                                  const rate = Number(settings.availableRates?.bcv || settings.exchangeRateBs || 40);
-                                  setSettings({ ...settings, exchangeRateMode: 'BCV', currencySymbol: 'Bs.', exchangeRateBs: rate });
-                                }}
-                                style={{
-                                  background: settings.exchangeRateMode === 'BCV' || !settings.exchangeRateMode ? '#dbeafe' : '#ffffff',
-                                  border: settings.exchangeRateMode === 'BCV' || !settings.exchangeRateMode ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                                  padding: '10px 12px',
-                                  borderRadius: '8px',
-                                  textAlign: 'center',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s ease-in-out',
-                                  boxShadow: settings.exchangeRateMode === 'BCV' || !settings.exchangeRateMode ? '0 2px 4px rgba(59, 130, 246, 0.2)' : 'none'
-                                }}
-                                title="Seleccionar Dólar Oficial BCV"
-                              >
-                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>🏛️ BCV Oficial</div>
-                                <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
-                                  Bs. {Number(settings.availableRates?.bcv || settings.exchangeRateBs || 40).toFixed(2)}
-                                </div>
-                              </div>
+                              const rawEur = Number(settings.availableRates?.eur || 0);
+                              const eurDisplay = rawEur > 40 ? rawEur : Number((bcvDisplay * 1.12).toFixed(2));
 
-                              <div
-                                onClick={() => {
-                                  const rate = Number(settings.availableRates?.parallel || settings.availableRates?.bcv || settings.exchangeRateBs || 40);
-                                  setSettings({ ...settings, exchangeRateMode: 'PARALELO', currencySymbol: 'Bs.', exchangeRateBs: rate });
-                                }}
-                                style={{
-                                  background: settings.exchangeRateMode === 'PARALELO' ? '#dbeafe' : '#ffffff',
-                                  border: settings.exchangeRateMode === 'PARALELO' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                                  padding: '10px 12px',
-                                  borderRadius: '8px',
-                                  textAlign: 'center',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s ease-in-out',
-                                  boxShadow: settings.exchangeRateMode === 'PARALELO' ? '0 2px 4px rgba(59, 130, 246, 0.2)' : 'none'
-                                }}
-                                title="Seleccionar Dólar Paralelo"
-                              >
-                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>📈 Paralelo</div>
-                                <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
-                                  Bs. {Number(settings.availableRates?.parallel || settings.availableRates?.bcv || settings.exchangeRateBs || 40).toFixed(2)}
-                                </div>
-                              </div>
+                              return (
+                                <>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span>🔄</span> Sincronización Automática de Tasas
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                      {settings.availableRates?.updatedAt && (
+                                        <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                          Última actualización: {new Date(settings.availableRates.updatedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} ({new Date(settings.availableRates.updatedAt).toLocaleDateString('es-VE')})
+                                        </div>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={handleSyncRates}
+                                        disabled={isSyncingRates}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '6px',
+                                          background: isSyncingRates ? '#94a3b8' : '#2563eb',
+                                          color: '#ffffff',
+                                          border: 'none',
+                                          borderRadius: '8px',
+                                          padding: '5px 12px',
+                                          fontSize: '11.5px',
+                                          fontWeight: 600,
+                                          cursor: isSyncingRates ? 'not-allowed' : 'pointer',
+                                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                          transition: 'all 0.15s ease',
+                                        }}
+                                      >
+                                        <span>{isSyncingRates ? '⏳' : '🔄'}</span>
+                                        <span>{isSyncingRates ? 'Sincronizando...' : 'Actualizar ahora'}</span>
+                                      </button>
+                                    </div>
+                                  </div>
 
-                              <div
-                                onClick={() => {
-                                  const rate = Number(settings.availableRates?.usdt || settings.availableRates?.parallel || settings.exchangeRateBs || 40);
-                                  setSettings({ ...settings, exchangeRateMode: 'USDT', currencySymbol: 'Bs.', exchangeRateBs: rate });
-                                }}
-                                style={{
-                                  background: settings.exchangeRateMode === 'USDT' ? '#dbeafe' : '#ffffff',
-                                  border: settings.exchangeRateMode === 'USDT' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                                  padding: '10px 12px',
-                                  borderRadius: '8px',
-                                  textAlign: 'center',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s ease-in-out',
-                                  boxShadow: settings.exchangeRateMode === 'USDT' ? '0 2px 4px rgba(59, 130, 246, 0.2)' : 'none'
-                                }}
-                                title="Seleccionar Binance USDT"
-                              >
-                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>🟡 Binance USDT</div>
-                                <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
-                                  Bs. {Number(settings.availableRates?.usdt || settings.availableRates?.parallel || settings.exchangeRateBs || 40).toFixed(2)}
-                                </div>
-                              </div>
+                                  <p style={{ margin: '0 0 12px 0', fontSize: '11.5px', color: '#475569', lineHeight: '1.4' }}>
+                                    Las tasas del mercado se actualizan automáticamente 2 veces al día (<strong>09:15 AM</strong> y <strong>05:45 PM</strong> tras el cierre de mesas de cambio del BCV). Si necesitas una cotización distinta y fija para tu negocio, puedes seleccionar el modo <strong>Manual</strong>.
+                                  </p>
 
-                              <div
-                                onClick={() => {
-                                  const rate = Number(settings.availableRates?.eur || 40);
-                                  setSettings({ ...settings, exchangeRateMode: 'EUR', currencySymbol: '€', exchangeRateBs: rate });
-                                }}
-                                style={{
-                                  background: settings.exchangeRateMode === 'EUR' ? '#dbeafe' : '#ffffff',
-                                  border: settings.exchangeRateMode === 'EUR' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                                  padding: '10px 12px',
-                                  borderRadius: '8px',
-                                  textAlign: 'center',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s ease-in-out',
-                                  boxShadow: settings.exchangeRateMode === 'EUR' ? '0 2px 4px rgba(59, 130, 246, 0.2)' : 'none'
-                                }}
-                                title="Seleccionar Euro Oficial BCV"
-                              >
-                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>💶 Euro Oficial</div>
-                                <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
-                                  Bs. {Number(settings.availableRates?.eur || 40).toFixed(2)}
-                                </div>
-                              </div>
-                            </div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
+                                    <div
+                                      onClick={() => {
+                                        setSettings({ ...settings, exchangeRateMode: 'BCV', currencySymbol: 'Bs.', exchangeRateBs: bcvDisplay });
+                                      }}
+                                      style={{
+                                        background: settings.exchangeRateMode === 'BCV' || !settings.exchangeRateMode ? '#dbeafe' : '#ffffff',
+                                        border: settings.exchangeRateMode === 'BCV' || !settings.exchangeRateMode ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                                        padding: '10px 12px',
+                                        borderRadius: '8px',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease-in-out',
+                                        boxShadow: settings.exchangeRateMode === 'BCV' || !settings.exchangeRateMode ? '0 2px 4px rgba(59, 130, 246, 0.2)' : 'none'
+                                      }}
+                                      title="Seleccionar Dólar Oficial BCV"
+                                    >
+                                      <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>🏛️ BCV Oficial</div>
+                                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
+                                        Bs. {bcvDisplay.toFixed(2)}
+                                      </div>
+                                    </div>
+
+                                    <div
+                                      onClick={() => {
+                                        setSettings({ ...settings, exchangeRateMode: 'PARALELO', currencySymbol: 'Bs.', exchangeRateBs: parallelDisplay });
+                                      }}
+                                      style={{
+                                        background: settings.exchangeRateMode === 'PARALELO' ? '#dbeafe' : '#ffffff',
+                                        border: settings.exchangeRateMode === 'PARALELO' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                                        padding: '10px 12px',
+                                        borderRadius: '8px',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease-in-out',
+                                        boxShadow: settings.exchangeRateMode === 'PARALELO' ? '0 2px 4px rgba(59, 130, 246, 0.2)' : 'none'
+                                      }}
+                                      title="Seleccionar Dólar Paralelo"
+                                    >
+                                      <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>📈 Paralelo</div>
+                                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
+                                        Bs. {parallelDisplay.toFixed(2)}
+                                      </div>
+                                    </div>
+
+                                    <div
+                                      onClick={() => {
+                                        setSettings({ ...settings, exchangeRateMode: 'USDT', currencySymbol: 'Bs.', exchangeRateBs: usdtDisplay });
+                                      }}
+                                      style={{
+                                        background: settings.exchangeRateMode === 'USDT' ? '#dbeafe' : '#ffffff',
+                                        border: settings.exchangeRateMode === 'USDT' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                                        padding: '10px 12px',
+                                        borderRadius: '8px',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease-in-out',
+                                        boxShadow: settings.exchangeRateMode === 'USDT' ? '0 2px 4px rgba(59, 130, 246, 0.2)' : 'none'
+                                      }}
+                                      title="Seleccionar Binance USDT"
+                                    >
+                                      <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>🟡 Binance USDT</div>
+                                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
+                                        Bs. {usdtDisplay.toFixed(2)}
+                                      </div>
+                                    </div>
+
+                                    <div
+                                      onClick={() => {
+                                        setSettings({ ...settings, exchangeRateMode: 'EUR', currencySymbol: '€', exchangeRateBs: eurDisplay });
+                                      }}
+                                      style={{
+                                        background: settings.exchangeRateMode === 'EUR' ? '#dbeafe' : '#ffffff',
+                                        border: settings.exchangeRateMode === 'EUR' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                                        padding: '10px 12px',
+                                        borderRadius: '8px',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease-in-out',
+                                        boxShadow: settings.exchangeRateMode === 'EUR' ? '0 2px 4px rgba(59, 130, 246, 0.2)' : 'none'
+                                      }}
+                                      title="Seleccionar Euro Oficial BCV"
+                                    >
+                                      <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>💶 Euro Oficial</div>
+                                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
+                                        Bs. {eurDisplay.toFixed(2)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         </IonCol>
                       )}
