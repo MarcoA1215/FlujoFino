@@ -1,6 +1,6 @@
 import { pencilOutline, trashOutline, buildOutline, cubeOutline, swapHorizontalOutline, cutOutline, warningOutline, closeOutline } from 'ionicons/icons';
 import React from 'react';
-import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet } from '@ionic/react';
+import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet, useIonToast, useIonLoading } from '@ionic/react';
 import type { Product } from '../../types';
 import { useImageViewer } from '../../context/ImageViewerContext';
 
@@ -41,6 +41,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const { openImage } = useImageViewer();
   const [present] = useIonActionSheet();
+  const [presentToast] = useIonToast();
+  const [presentLoading, dismissLoading] = useIonLoading();
 
   const openOptions = () => {
     const currentType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = 
@@ -135,15 +137,36 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       const file = e.target.files[0];
       const formData = new FormData();
       formData.append('file', file);
+      
+      await presentLoading({
+        message: 'Optimizando y subiendo imagen...',
+        spinner: 'crescent',
+      });
+
       try {
         const { apiClient } = await import('../../api/client');
         await apiClient.post(`/products/${p.id}/image`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
-        alert('Imagen subida con éxito');
-        window.location.reload(); // Quick refresh to show it, or trigger a fetch
-      } catch (err) {
-        alert('Error al subir la imagen');
+        await dismissLoading();
+        presentToast({
+          message: '✨ Imagen subida y optimizada con éxito',
+          duration: 2000,
+          color: 'success',
+          position: 'top',
+        });
+        setTimeout(() => {
+          window.location.reload();
+        }, 700);
+      } catch (err: any) {
+        await dismissLoading();
+        const errorMsg = err.response?.data?.message || err.message || 'Error al subir la imagen';
+        presentToast({
+          message: `❌ ${errorMsg}`,
+          duration: 3500,
+          color: 'danger',
+          position: 'top',
+        });
       }
     }
   };

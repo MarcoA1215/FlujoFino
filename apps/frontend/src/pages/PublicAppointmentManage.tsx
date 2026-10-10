@@ -8,6 +8,7 @@ import {
   IonButton, 
   IonIcon, 
   useIonToast, 
+  useIonAlert,
   IonItem, 
   IonLabel, 
   IonSelect, 
@@ -77,6 +78,7 @@ const PublicAppointmentManage: React.FC = () => {
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   
   const [presentToast] = useIonToast();
+  const [presentAlert] = useIonAlert();
 
   const fetchAppointment = async () => {
     try {
@@ -201,15 +203,27 @@ const PublicAppointmentManage: React.FC = () => {
     }
   };
 
-  const handleCancel = async () => {
-    if (!window.confirm('¿Estás seguro de que deseas cancelar esta cita?')) return;
-    try {
-      await axios.put(`${apiBase}/public/reservations/appointment/${id}/cancel`);
-      presentToast({ message: 'Cita cancelada con éxito', duration: 3000, color: 'success' });
-      fetchAppointment();
-    } catch (e: any) {
-      presentToast({ message: e.response?.data?.message || 'Error al cancelar', duration: 3000, color: 'danger' });
-    }
+  const handleCancel = () => {
+    presentAlert({
+      header: 'Cancelar Cita',
+      message: '¿Estás seguro de que deseas cancelar esta cita?',
+      buttons: [
+        { text: 'No, mantener', role: 'cancel' },
+        {
+          text: 'Sí, cancelar',
+          role: 'destructive',
+          handler: async () => {
+            try {
+              await axios.put(`${apiBase}/public/reservations/appointment/${id}/cancel`);
+              presentToast({ message: 'Cita cancelada con éxito', duration: 3000, color: 'success' });
+              fetchAppointment();
+            } catch (e: any) {
+              presentToast({ message: e.response?.data?.message || 'Error al cancelar', duration: 3000, color: 'danger' });
+            }
+          }
+        }
+      ]
+    });
   };
 
   const handleReschedule = async () => {

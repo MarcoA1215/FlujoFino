@@ -314,22 +314,35 @@ const Products: React.FC = () => {
   };
 
   
-  const handleUnpackKit = async (p: Product) => {
-    if (!window.confirm(`¿Estás seguro de desarmar 1 ${p.name}? Los componentes regresarán al inventario.`)) return;
-    try {
-      await apiClient.post(`/products/${p.id}/unpack`);
-      fetchData();
-    } catch (e: any) {
-      alert(e.response?.data?.message || 'Error al desarmar el kit');
-    }
+  const handleUnpackKit = (p: Product) => {
+    presentAlert({
+      header: 'Desarmar Kit',
+      message: `¿Estás seguro de desarmar 1 ${p.name}? Los componentes regresarán al inventario.`,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Desarmar',
+          handler: async () => {
+            try {
+              await apiClient.post(`/products/${p.id}/unpack`);
+              presentToast({ message: 'Kit desarmado con éxito', duration: 2500, color: 'success', position: 'top' });
+              fetchData();
+            } catch (e: any) {
+              presentToast({ message: e.response?.data?.message || 'Error al desarmar el kit', duration: 3500, color: 'danger', position: 'top' });
+            }
+          }
+        }
+      ]
+    });
   };
   
   const handleToggleKitting = async (p: Product) => {
     try {
       await apiClient.put('/products/' + p.id, { isPreAssembled: !p.isPreAssembled });
+      presentToast({ message: 'Modo actualizado correctamente', duration: 2000, color: 'success', position: 'top' });
       fetchData();
     } catch (e: any) {
-      alert(e.response?.data?.message || 'Error al cambiar modo');
+      presentToast({ message: e.response?.data?.message || 'Error al cambiar modo', duration: 3500, color: 'danger', position: 'top' });
     }
   };
 
