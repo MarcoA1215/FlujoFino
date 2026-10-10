@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Put, Post, Body, UseGuards, Request } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -35,6 +35,11 @@ export class SettingsController {
     const mode = body?.mode;
     const manualRate = body?.manualRate;
     return this.settingsService.updateExchangeRate(rate, req.user?.tenantId, mode, manualRate);
+  }
+
+  @Post('sync-rates')
+  syncRates(@Request() req: any) {
+    return this.settingsService.forceSyncRates(req.user?.tenantId);
   }
 }
 

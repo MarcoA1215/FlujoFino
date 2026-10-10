@@ -125,10 +125,40 @@ const SettingsPage: React.FC = () => {
   // Subscription Payment Reporting Modal state
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [exchangeRate, setExchangeRate] = useState<number>(40.0);
+  const [isSyncingRates, setIsSyncingRates] = useState<boolean>(false);
 
   const [notificationStatus, setNotificationStatus] = useState<NotificationPermissionState>(() => getNotificationPermission());
   const [isActivatingNotifications, setIsActivatingNotifications] = useState<boolean>(false);
   const [isTestingNotifications, setIsTestingNotifications] = useState<boolean>(false);
+
+  const handleSyncRatesNow = async () => {
+    setIsSyncingRates(true);
+    try {
+      const res = await apiClient.post<Settings>('/settings/sync-rates');
+      if (res.data) {
+        setSettings(res.data);
+        if (res.data.exchangeRateBs) {
+          setExchangeRate(Number(res.data.exchangeRateBs));
+        }
+        const bcv = res.data.availableRates?.bcv ? Number(res.data.availableRates.bcv).toFixed(2) : '';
+        const par = res.data.availableRates?.parallel ? Number(res.data.availableRates.parallel).toFixed(2) : '';
+        presentToast({
+          message: `¡Tasas sincronizadas con éxito! BCV: Bs. ${bcv} | Paralelo: Bs. ${par}`,
+          duration: 3500,
+          color: 'success',
+          icon: checkmarkCircleOutline,
+        });
+      }
+    } catch (e: any) {
+      presentToast({
+        message: 'No se pudo sincronizar las tasas. Verifica la conexión con el servidor.',
+        duration: 4000,
+        color: 'danger',
+      });
+    } finally {
+      setIsSyncingRates(false);
+    }
+  };
 
   useEffect(() => {
     const updatePerm = () => setNotificationStatus(getNotificationPermission());
@@ -930,30 +960,56 @@ const SettingsPage: React.FC = () => {
                             padding: '14px 16px',
                             marginTop: '8px'
                           }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e40af' }}>
-                                🔄 Sincronización Automática (2 veces al día):
-                              </div>
-                              {settings.availableRates?.updatedAt && (
-                                <div style={{ fontSize: '11px', color: '#64748b' }}>
-                                  Última actualización: {new Date(settings.availableRates.updatedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
+                              <div>
+                                <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span>🔄</span> Sincronización Automática de Tasas
                                 </div>
-                              )}
+                                {settings.availableRates?.updatedAt && (
+                                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                                    Última actualización: {new Date(settings.availableRates.updatedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} ({new Date(settings.availableRates.updatedAt).toLocaleDateString('es-VE')})
+                                  </div>
+                                )}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={handleSyncRatesNow}
+                                disabled={isSyncingRates}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '8px 14px',
+                                  fontSize: '12px',
+                                  fontWeight: 700,
+                                  color: '#ffffff',
+                                  backgroundColor: isSyncingRates ? '#94a3b8' : '#0284c7',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  cursor: isSyncingRates ? 'not-allowed' : 'pointer',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                }}
+                              >
+                                <IonIcon icon={refreshOutline} style={{ fontSize: '15px' }} />
+                                {isSyncingRates ? 'Sincronizando...' : 'Actualizar Tasas Ahora'}
+                              </button>
                             </div>
-                            <p style={{ margin: '0 0 10px 0', fontSize: '11.5px', color: '#475569', lineHeight: '1.4' }}>
-                              Las tasas se actualizan automáticamente en la mañana (<strong>09:15 AM</strong>) y al final de la tarde (<strong>05:45 PM</strong> tras el reporte del BCV). Si necesitas una cotización distinta al instante, puedes seleccionar el modo <strong>Manual</strong>.
+
+                            <p style={{ margin: '0 0 12px 0', fontSize: '11.5px', color: '#475569', lineHeight: '1.4' }}>
+                              Las tasas se sincronizan automáticamente 2 veces al día (<strong>09:15 AM</strong> y <strong>05:45 PM</strong> tras el cierre del BCV). Presiona <strong>Actualizar Tasas Ahora</strong> para forzar la lectura del mercado venezolano en vivo.
                             </p>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
                               <div style={{
                                 background: settings.exchangeRateMode === 'BCV' || !settings.exchangeRateMode ? '#dbeafe' : '#ffffff',
                                 border: settings.exchangeRateMode === 'BCV' || !settings.exchangeRateMode ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                                padding: '8px 12px',
+                                padding: '10px 12px',
                                 borderRadius: '8px',
                                 textAlign: 'center'
                               }}>
-                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>🏛️ BCV</div>
-                                <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>🏛️ BCV Oficial</div>
+                                <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
                                   Bs. {Number(settings.availableRates?.bcv || settings.exchangeRateBs || 40).toFixed(2)}
                                 </div>
                               </div>
@@ -961,12 +1017,12 @@ const SettingsPage: React.FC = () => {
                               <div style={{
                                 background: settings.exchangeRateMode === 'PARALELO' ? '#dbeafe' : '#ffffff',
                                 border: settings.exchangeRateMode === 'PARALELO' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                                padding: '8px 12px',
+                                padding: '10px 12px',
                                 borderRadius: '8px',
                                 textAlign: 'center'
                               }}>
-                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>📈 Paralelo</div>
-                                <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>📈 Paralelo</div>
+                                <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
                                   Bs. {Number(settings.availableRates?.parallel || settings.availableRates?.bcv || settings.exchangeRateBs || 40).toFixed(2)}
                                 </div>
                               </div>
@@ -974,12 +1030,12 @@ const SettingsPage: React.FC = () => {
                               <div style={{
                                 background: settings.exchangeRateMode === 'USDT' ? '#dbeafe' : '#ffffff',
                                 border: settings.exchangeRateMode === 'USDT' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                                padding: '8px 12px',
+                                padding: '10px 12px',
                                 borderRadius: '8px',
                                 textAlign: 'center'
                               }}>
-                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>🟡 USDT</div>
-                                <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>🟡 Binance USDT</div>
+                                <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
                                   Bs. {Number(settings.availableRates?.usdt || settings.availableRates?.parallel || settings.exchangeRateBs || 40).toFixed(2)}
                                 </div>
                               </div>
@@ -987,12 +1043,12 @@ const SettingsPage: React.FC = () => {
                               <div style={{
                                 background: settings.exchangeRateMode === 'EUR' ? '#dbeafe' : '#ffffff',
                                 border: settings.exchangeRateMode === 'EUR' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                                padding: '8px 12px',
+                                padding: '10px 12px',
                                 borderRadius: '8px',
                                 textAlign: 'center'
                               }}>
-                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>💶 Euro BCV</div>
-                                <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>💶 Euro Oficial</div>
+                                <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
                                   Bs. {Number(settings.availableRates?.eur || 40).toFixed(2)}
                                 </div>
                               </div>

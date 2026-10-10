@@ -121,20 +121,22 @@ export class SettingsService implements OnModuleInit {
           parallel: 40.0,
           usdt: 40.0,
           eur: 43.0,
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(0).toISOString(),
         },
       });
     }
 
-    // Verificar si la caché existente está vacía o tiene más de 6 horas para hacer sync inicial sin quemar cuota en reinicios
+    // Verificar si la caché existente está vacía, tiene el valor por defecto (<= 50) o tiene más de 4 horas
     const globalRecord = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
     const lastUpdatedAt = globalRecord?.ratesCache?.updatedAt;
+    const currentBcv = Number(globalRecord?.ratesCache?.bcv || globalRecord?.exchangeRateBs || 0);
     const diffHours = lastUpdatedAt ? (Date.now() - new Date(lastUpdatedAt).getTime()) / (1000 * 60 * 60) : 999;
 
-    if (diffHours > 6) {
-      setTimeout(() => this.syncCotizave(), 5000);
+    if (currentBcv <= 50 || diffHours > 4 || !lastUpdatedAt) {
+      this.logger.log(`Tasas desactualizadas o en valor base (BCV actual: ${currentBcv}, antigüedad: ${diffHours.toFixed(1)}h). Iniciando sincronización de tasas inmediata...`);
+      setTimeout(() => this.syncRates(), 2000);
     } else {
-      this.logger.log(`Tasas en caché vigentes (hace ${diffHours.toFixed(1)}h). Próxima sincronización en el horario programado (09:15 AM / 05:45 PM Caracas).`);
+      this.logger.log(`Tasas en caché vigentes (BCV: ${currentBcv}, hace ${diffHours.toFixed(1)}h). Próxima sincronización en el horario programado (09:15 AM / 05:45 PM Caracas).`);
     }
 
     // Verificar cada minuto si corresponde ejecutar la sincronización fija
@@ -164,14 +166,14 @@ export class SettingsService implements OnModuleInit {
       if (hour === 9 && minute >= 15 && this.lastSyncSlot !== `${dateKey}-morning`) {
         this.lastSyncSlot = `${dateKey}-morning`;
         this.logger.log(`[Scheduled Sync] Ejecutando sincronización matutina de tasas (${dateKey} 09:15 Caracas)...`);
-        this.syncCotizave();
+        this.syncRates();
       }
 
       // Slot 2: Tarde a las 17:45 (5:45 PM tras cierre de mesas de cambio del BCV)
       if (hour === 17 && minute >= 45 && this.lastSyncSlot !== `${dateKey}-afternoon`) {
         this.lastSyncSlot = `${dateKey}-afternoon`;
         this.logger.log(`[Scheduled Sync] Ejecutando sincronización vespertina de tasas (${dateKey} 17:45 Caracas)...`);
-        this.syncCotizave();
+        this.syncRates();
       }
     } catch (e: any) {
       this.logger.error(`Error en checkAndTriggerSync: ${e.message}`);
@@ -414,94 +416,173 @@ export class SettingsService implements OnModuleInit {
   }
 
   async syncCotizave() {
+    return this.syncRates();
+  }
+
+  async syncRates(): Promise<{ bcv: number; parallel: number; usdt: number; eur: number; updatedAt: string }> {
+    let bcvVal: number | null = null;
+    let parallelVal: number | null = null;
+    let usdtVal: number | null = null;
+    let eurVal: number | null = null;
+
     const apiKey = this.configService.get<string>('COTIZAVE_API_KEY');
-    if (!apiKey || apiKey === 'tu_api_key_aqui') {
-      this.logger.warn('COTIZAVE_API_KEY no configurada. Saltando sincronización.');
-      return;
-    }
 
-    try {
-      this.logger.log('Sincronizando tasa de cambio desde Cotizave...');
-      const response = await fetch('https://api.cotizave.com/v1/fx/rates', {
-        headers: {
-          'X-API-Key': apiKey,
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      const getRateValue = (item: any): number | null => {
-        if (!item) return null;
-        const val = item.mid ?? item.price ?? item.value ?? item.rate;
-        const parsed = parseFloat(val);
-        return isNaN(parsed) ? null : parsed;
-      };
+    // 1. Intentar Cotizave si la API key existe y no es dummy
+    if (apiKey && apiKey !== 'tu_api_key_aqui') {
+      try {
+        this.logger.log('Sincronizando tasa de cambio desde Cotizave...');
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        const response = await fetch('https://api.cotizave.com/v1/fx/rates', {
+          headers: {
+            'X-API-Key': apiKey,
+          },
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
 
-      if (data.rates && Array.isArray(data.rates)) {
-        const rates = data.rates;
+        if (response.ok) {
+          const data = await response.json();
+          const getRateValue = (item: any): number | null => {
+            if (!item) return null;
+            const val = item.mid ?? item.price ?? item.value ?? item.rate;
+            const parsed = parseFloat(val);
+            return isNaN(parsed) ? null : parsed;
+          };
 
-        // bcv: market === 'bcv' y pair === 'USD/VES' (o reference)
-        const bcvItem = rates.find((item: any) => 
-          (item.market?.toLowerCase() === 'bcv' && (item.pair?.toUpperCase() === 'USD/VES' || !item.pair)) ||
-          item.market?.toLowerCase() === 'reference' ||
-          item.type?.toLowerCase() === 'reference'
-        );
+          if (data.rates && Array.isArray(data.rates)) {
+            const rates = data.rates;
 
-        // parallel: market === 'enparalelovzla' o parallel
-        const parallelItem = rates.find((item: any) => 
-          item.market?.toLowerCase() === 'enparalelovzla' || 
-          item.market?.toLowerCase() === 'parallel' ||
-          item.market?.toLowerCase() === 'paralelo' ||
-          item.type?.toLowerCase() === 'parallel'
-        );
+            const bcvItem = rates.find((item: any) =>
+              (item.market?.toLowerCase() === 'bcv' && (item.pair?.toUpperCase() === 'USD/VES' || !item.pair)) ||
+              item.market?.toLowerCase() === 'reference' ||
+              item.type?.toLowerCase() === 'reference'
+            );
 
-        // usdt: Binance P2P o USDT (market === 'binance' o pair === 'USDT/VES')
-        const usdtItem = rates.find((item: any) => 
-          item.market?.toLowerCase() === 'binance' || 
-          item.pair?.toUpperCase() === 'USDT/VES' ||
-          item.market?.toLowerCase() === 'usdt'
-        );
+            const parallelItem = rates.find((item: any) =>
+              item.market?.toLowerCase() === 'enparalelovzla' ||
+              item.market?.toLowerCase() === 'parallel' ||
+              item.market?.toLowerCase() === 'paralelo' ||
+              item.type?.toLowerCase() === 'parallel'
+            );
 
-        // eur: Euro BCV (pair === 'EUR/VES')
-        const eurItem = rates.find((item: any) => 
-          item.pair?.toUpperCase() === 'EUR/VES' ||
-          (item.market?.toLowerCase() === 'bcv' && item.pair?.toUpperCase()?.includes('EUR'))
-        );
+            const usdtItem = rates.find((item: any) =>
+              item.market?.toLowerCase() === 'binance' ||
+              item.pair?.toUpperCase() === 'USDT/VES' ||
+              item.market?.toLowerCase() === 'usdt'
+            );
 
-        let globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
-        if (!globalSettings) {
-          globalSettings = this.settingsRepo.create({ id: 'GLOBAL' });
+            const eurItem = rates.find((item: any) =>
+              item.pair?.toUpperCase() === 'EUR/VES' ||
+              (item.market?.toLowerCase() === 'bcv' && item.pair?.toUpperCase()?.includes('EUR'))
+            );
+
+            bcvVal = getRateValue(bcvItem);
+            parallelVal = getRateValue(parallelItem);
+            usdtVal = getRateValue(usdtItem);
+            eurVal = getRateValue(eurItem);
+          }
         }
-        const currentCache = globalSettings.ratesCache || {};
-
-        const bcvVal = getRateValue(bcvItem) ?? currentCache.bcv ?? (globalSettings.exchangeRateBs ? Number(globalSettings.exchangeRateBs) : 40.0);
-        const parallelVal = getRateValue(parallelItem) ?? currentCache.parallel ?? bcvVal;
-        const usdtVal = getRateValue(usdtItem) ?? currentCache.usdt ?? parallelVal;
-        const eurVal = getRateValue(eurItem) ?? currentCache.eur ?? Number((bcvVal * 1.08).toFixed(2));
-
-        const newRatesCache = {
-          bcv: bcvVal,
-          parallel: parallelVal,
-          usdt: usdtVal,
-          eur: eurVal,
-          updatedAt: new Date().toISOString(),
-        };
-
-        globalSettings.ratesCache = newRatesCache;
-        globalSettings.exchangeRateBs = bcvVal;
-        await this.settingsRepo.save(globalSettings);
-
-        this.logger.log(`Tasas Cotizave sincronizadas con éxito: BCV=${bcvVal}, Paralelo=${parallelVal}, USDT=${usdtVal}, EUR=${eurVal}`);
-      } else {
-        this.logger.error('No se pudo extraer la tasa de la estructura JSON: ' + JSON.stringify(data).substring(0, 300));
+      } catch (error: any) {
+        this.logger.warn(`Cotizave falló o excedió tiempo de espera (${error.message}). Recurriendo a respaldo de DolarApi...`);
       }
-    } catch (error: any) {
-      this.logger.error('Error sincronizando con Cotizave: ' + error.message);
     }
+
+    // 2. Fallback a DolarApi Venezuela (API pública, rápida y sin necesidad de token)
+    if (!bcvVal || !parallelVal) {
+      try {
+        this.logger.log('Consultando API pública de respaldo DolarApi Venezuela...');
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+
+        const [dolaresRes, eurosRes] = await Promise.allSettled([
+          fetch('https://ve.dolarapi.com/v1/dolares', { signal: controller.signal }),
+          fetch('https://ve.dolarapi.com/v1/euros', { signal: controller.signal }),
+        ]);
+        clearTimeout(timeout);
+
+        if (dolaresRes.status === 'fulfilled' && dolaresRes.value.ok) {
+          const dolaresData: any[] = await dolaresRes.value.json();
+          const oficial = dolaresData.find((d) => d.fuente === 'oficial');
+          const paralelo = dolaresData.find((d) => d.fuente === 'paralelo');
+          if (oficial?.promedio && (!bcvVal || bcvVal <= 50)) bcvVal = parseFloat(oficial.promedio);
+          if (paralelo?.promedio && (!parallelVal || parallelVal <= 50)) parallelVal = parseFloat(paralelo.promedio);
+        }
+
+        if (eurosRes.status === 'fulfilled' && eurosRes.value.ok) {
+          const eurosData: any[] = await eurosRes.value.json();
+          const eurOficial = eurosData.find((d) => d.fuente === 'oficial');
+          if (eurOficial?.promedio && (!eurVal || eurVal <= 50)) eurVal = parseFloat(eurOficial.promedio);
+        }
+      } catch (fbErr: any) {
+        this.logger.error(`Error en respaldo DolarApi: ${fbErr.message}`);
+      }
+    }
+
+    // Completar valores derivados si alguno faltó
+    if (!usdtVal && parallelVal) usdtVal = parallelVal;
+    if (!eurVal && bcvVal) eurVal = Number((bcvVal * 1.085).toFixed(2));
+    if (!parallelVal && bcvVal) parallelVal = bcvVal;
+
+    let globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+    if (!globalSettings) {
+      globalSettings = this.settingsRepo.create({ id: 'GLOBAL' });
+    }
+    const currentCache = globalSettings.ratesCache || {};
+
+    const finalBcv = bcvVal || (currentCache.bcv && currentCache.bcv > 50 ? Number(currentCache.bcv) : 40.0);
+    const finalParallel = parallelVal || (currentCache.parallel && currentCache.parallel > 50 ? Number(currentCache.parallel) : finalBcv);
+    const finalUsdt = usdtVal || (currentCache.usdt && currentCache.usdt > 50 ? Number(currentCache.usdt) : finalParallel);
+    const finalEur = eurVal || (currentCache.eur && currentCache.eur > 50 ? Number(currentCache.eur) : Number((finalBcv * 1.085).toFixed(2)));
+
+    const newRatesCache = {
+      bcv: finalBcv,
+      parallel: finalParallel,
+      usdt: finalUsdt,
+      eur: finalEur,
+      updatedAt: new Date().toISOString(),
+    };
+
+    globalSettings.ratesCache = newRatesCache;
+    globalSettings.exchangeRateBs = finalBcv;
+    await this.settingsRepo.save(globalSettings);
+
+    // Propagar automáticamente las nuevas tasas a todas las organizaciones en modo automático
+    try {
+      await this.settingsRepo.createQueryBuilder()
+        .update(Settings)
+        .set({ exchangeRateBs: finalBcv })
+        .where('(exchangeRateMode = :m OR exchangeRateMode IS NULL)', { m: 'BCV' })
+        .execute();
+
+      await this.settingsRepo.createQueryBuilder()
+        .update(Settings)
+        .set({ exchangeRateBs: finalParallel })
+        .where('exchangeRateMode = :m', { m: 'PARALELO' })
+        .execute();
+
+      await this.settingsRepo.createQueryBuilder()
+        .update(Settings)
+        .set({ exchangeRateBs: finalUsdt })
+        .where('exchangeRateMode = :m', { m: 'USDT' })
+        .execute();
+
+      await this.settingsRepo.createQueryBuilder()
+        .update(Settings)
+        .set({ exchangeRateBs: finalEur })
+        .where('exchangeRateMode = :m', { m: 'EUR' })
+        .execute();
+    } catch (errCascade: any) {
+      this.logger.warn(`No se propagaron tasas a los inquilinos: ${errCascade.message}`);
+    }
+
+    this.logger.log(`Tasas sincronizadas con éxito: BCV=${finalBcv}, Paralelo=${finalParallel}, USDT=${finalUsdt}, EUR=${finalEur}`);
+    return newRatesCache;
+  }
+
+  async forceSyncRates(tenantId?: string) {
+    await this.syncRates();
+    return this.getSettings(tenantId);
   }
 }
 
