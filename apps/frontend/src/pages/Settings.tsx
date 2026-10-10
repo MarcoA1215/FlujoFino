@@ -131,6 +131,15 @@ const SettingsPage: React.FC = () => {
   const [isActivatingNotifications, setIsActivatingNotifications] = useState<boolean>(false);
   const [isTestingNotifications, setIsTestingNotifications] = useState<boolean>(false);
   const [isSyncingRates, setIsSyncingRates] = useState<boolean>(false);
+  const [syncCooldown, setSyncCooldown] = useState<number>(0);
+
+  useEffect(() => {
+    if (syncCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setSyncCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [syncCooldown]);
 
   useEffect(() => {
     const updatePerm = () => setNotificationStatus(getNotificationPermission());
@@ -234,6 +243,7 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleSyncRates = async () => {
+    if (syncCooldown > 0) return;
     setIsSyncingRates(true);
     try {
       const res = await apiClient.post<Settings>('/settings/sync-rates');
@@ -242,6 +252,7 @@ const SettingsPage: React.FC = () => {
         if (res.data.exchangeRateBs) {
           setExchangeRate(Number(res.data.exchangeRateBs));
         }
+        setSyncCooldown(30);
         const bcvRate = res.data.availableRates?.bcv || res.data.exchangeRateBs;
         presentToast({
           message: `¡Tasas de mercado sincronizadas con éxito! BCV: Bs. ${Number(bcvRate).toFixed(2)}`,
@@ -1040,25 +1051,26 @@ const SettingsPage: React.FC = () => {
                                       <button
                                         type="button"
                                         onClick={handleSyncRates}
-                                        disabled={isSyncingRates}
+                                        disabled={isSyncingRates || syncCooldown > 0}
                                         style={{
                                           display: 'inline-flex',
                                           alignItems: 'center',
                                           gap: '6px',
-                                          background: isSyncingRates ? '#94a3b8' : '#2563eb',
+                                          background: isSyncingRates || syncCooldown > 0 ? '#94a3b8' : '#2563eb',
                                           color: '#ffffff',
                                           border: 'none',
                                           borderRadius: '8px',
                                           padding: '5px 12px',
                                           fontSize: '11.5px',
                                           fontWeight: 600,
-                                          cursor: isSyncingRates ? 'not-allowed' : 'pointer',
+                                          cursor: isSyncingRates || syncCooldown > 0 ? 'not-allowed' : 'pointer',
                                           boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                                           transition: 'all 0.15s ease',
                                         }}
+                                        title={syncCooldown > 0 ? `Tasas recién sincronizadas (espera ${syncCooldown}s)` : 'Sincronizar cotizaciones con el mercado'}
                                       >
-                                        <span>{isSyncingRates ? '⏳' : '🔄'}</span>
-                                        <span>{isSyncingRates ? 'Sincronizando...' : 'Actualizar ahora'}</span>
+                                        <span>{isSyncingRates ? '⏳' : syncCooldown > 0 ? '✓' : '🔄'}</span>
+                                        <span>{isSyncingRates ? 'Sincronizando...' : syncCooldown > 0 ? `Listo (${syncCooldown}s)` : 'Actualizar ahora'}</span>
                                       </button>
                                     </div>
                                   </div>

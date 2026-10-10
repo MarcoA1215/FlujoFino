@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class SettingsService implements OnModuleInit {
   private readonly logger = new Logger(SettingsService.name);
+  private static lastCotizaveFetchTime = 0;
 
   constructor(
     @InjectRepository(Settings)
@@ -464,11 +465,15 @@ export class SettingsService implements OnModuleInit {
     let eurVal: number | null = null;
 
     const apiKey = this.configService.get<string>('COTIZAVE_API_KEY');
+    const now = Date.now();
+    const COTIZAVE_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutos de protección para preservar cuota de Cotizave
+    const canCallCotizave = (now - SettingsService.lastCotizaveFetchTime) > COTIZAVE_COOLDOWN_MS;
 
-    // 1. Intentar Cotizave si la API key existe y no es dummy
-    if (apiKey && apiKey !== 'tu_api_key_aqui') {
+    // 1. Intentar Cotizave sólo si la API key existe, no es dummy y no está en cooldown
+    if (apiKey && apiKey !== 'tu_api_key_aqui' && canCallCotizave) {
       try {
-        this.logger.log('Sincronizando tasa de cambio desde Cotizave...');
+        this.logger.log('Sincronizando tasa de cambio desde Cotizave (consumo controlado de cuota)...');
+        SettingsService.lastCotizaveFetchTime = now;
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         const response = await fetch('https://api.cotizave.com/v1/fx/rates', {
@@ -624,6 +629,17 @@ export class SettingsService implements OnModuleInit {
   }
 
   async forceSyncRates(tenantId?: string) {
+    const globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+    const lastUpdate = globalSettings?.ratesCache?.updatedAt ? new Date(globalSettings.ratesCache.updatedAt).getTime() : 0;
+    const ageSeconds = (Date.now() - lastUpdate) / 1000;
+    const hasValidRates = Number(globalSettings?.ratesCache?.bcv || 0) > 40;
+
+    // Si las tasas se actualizaron hace menos de 60 segundos y son válidas, responder con la caché sin llamadas redundantes
+    if (hasValidRates && ageSeconds < 60) {
+      this.logger.log(`Sincronización manual solicitada hace solo ${Math.round(ageSeconds)}s. Retornando caché protegida.`);
+      return this.getSettings(tenantId);
+    }
+
     await this.syncRates();
     return this.getSettings(tenantId);
   }
