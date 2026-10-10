@@ -20,6 +20,7 @@ export class ProductsController {
   @Post(':id/image')
   @UseInterceptors(FileInterceptor('file', safeImageUploadOptions))
   async uploadImage(@Request() req: any, @Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+    console.log(`[ProductsController.uploadImage] 📥 Solicitud de carga de imagen para Producto ID="${id}", Tenant="${req.user?.tenantId}"`);
     if (!file) throw new BadRequestException('File is required');
     
     // Check if product exists first
@@ -32,6 +33,7 @@ export class ProductsController {
     const images = product.images || [];
     images.push(url);
     await this.productsService.update(req.user.tenantId, id, { images } as any);
+    console.log(`[ProductsController.uploadImage] ✅ Imagen asignada correctamente al producto "${product.name}" (${id}): ${url}`);
 
     return { url };
   }
