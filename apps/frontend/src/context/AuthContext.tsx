@@ -1,8 +1,9 @@
-﻿import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { apiClient } from '../api/client';
 import { UserRole } from '@finowork/shared-types';
 import { Preferences } from '@capacitor/preferences';
+import { offlineDb } from '../services/offline-db';
 
 interface User {
   id: string;
@@ -59,6 +60,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await Preferences.set({ key: 'token', value: token });
     await Preferences.set({ key: 'user', value: JSON.stringify(fullUserData) });
     apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+    // Aislamiento Multi-Tenant:
+    // Si el usuario que ingresa pertenece a un tenant diferente al último activo en este dispositivo,
+    // limpiamos la memoria local y caché offline del negocio previo para evitar contaminación de datos.
+    const prevTenant = localStorage.getItem('flujofino_active_tenant_id');
+    const newTenant = fullUserData.tenantId || '';
+    if (prevTenant && newTenant && prevTenant !== newTenant) {
+      await offlineDb.clearTenantCache(prevTenant);
+      localStorage.removeItem('flujofino_exchange_rate');
+      localStorage.removeItem('flujofino_rate_mode');
+      localStorage.removeItem('flujofino_currency_symbol');
+      localStorage.removeItem('flujofino_simulating_offline');
+    }
+    if (newTenant) {
+      localStorage.setItem('flujofino_active_tenant_id', newTenant);
+    }
   };
 
   const updateUser = async (updatedFields: Partial<User>) => {
@@ -69,6 +86,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const switchWorkspace = async (tenantId: string) => {
+    // Si cambia de workspace, limpiar la caché del workspace anterior
+    if (user?.tenantId && user.tenantId !== tenantId) {
+      await offlineDb.clearTenantCache(user.tenantId);
+      localStorage.removeItem('flujofino_exchange_rate');
+      localStorage.removeItem('flujofino_rate_mode');
+      localStorage.removeItem('flujofino_currency_symbol');
+    }
+
     const res = await apiClient.post('/auth/select-workspace', { tenantId });
     if (res.data.requiresApproval) {
       const info = {
@@ -128,6 +153,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
+    // Al cerrar sesión, limpiar caché de visualización del tenant para proteger su privacidad
+    const currentTenant = user?.tenantId || localStorage.getItem('flujofino_active_tenant_id');
+    if (currentTenant) {
+      await offlineDb.clearTenantCache(currentTenant);
+    }
+    localStorage.removeItem('flujofino_active_tenant_id');
+    localStorage.removeItem('flujofino_exchange_rate');
+    localStorage.removeItem('flujofino_rate_mode');
+    localStorage.removeItem('flujofino_currency_symbol');
+    localStorage.removeItem('flujofino_simulating_offline');
+
     setToken(null);
     setUser(null);
     await Preferences.remove({ key: 'token' });

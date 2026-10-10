@@ -202,22 +202,24 @@ const Pos: React.FC = () => {
     try {
       const res = await apiClient.get<Product[]>('/products');
       setProducts(res.data);
-      if (res.data && res.data.length > 0) {
+      if (res.data && res.data.length > 0 && user?.tenantId) {
         try {
-          await offlineDb.cachedProducts.clear();
-          await offlineDb.cachedProducts.bulkPut(res.data);
+          await offlineDb.saveProductsForTenant(user.tenantId, res.data);
         } catch (e) {}
       }
     } catch (e) {
       try {
-        const localProducts = await offlineDb.cachedProducts.toArray();
-        if (localProducts && localProducts.length > 0) {
-          setProducts(localProducts);
-          presentToast({ message: 'Sin conexión: Catálogo cargado desde la memoria local', duration: 2500, color: 'warning' });
-          return;
+        if (user?.tenantId) {
+          const localProducts = await offlineDb.getProductsByTenant(user.tenantId);
+          if (localProducts && localProducts.length > 0) {
+            setProducts(localProducts);
+            presentToast({ message: 'Sin conexión: Catálogo cargado desde la memoria local', duration: 2500, color: 'warning' });
+            return;
+          }
         }
+        setProducts([]);
       } catch (dbErr) {}
-      presentToast({ message: 'Error cargando productos', duration: 3000, color: 'danger' });
+      presentToast({ message: 'Error cargando productos o sin conexión', duration: 3000, color: 'danger' });
     }
   };
 
@@ -920,7 +922,7 @@ const Pos: React.FC = () => {
           const offlineId = 'off_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
           const offlineOrder: OfflineOrder = {
             offlineId,
-            tenantId: user?.tenantId || 'default',
+            tenantId: user?.tenantId || '',
             payload,
             rateAtSale: exchangeRate,
             createdAt: new Date().toISOString(),
@@ -938,7 +940,7 @@ const Pos: React.FC = () => {
               const allowNegative = Boolean(settings?.allowNegativeStock);
               const newStock = allowNegative ? ((p.stockQuantity ?? 0) - qty) : Math.max(0, (p.stockQuantity ?? 0) - qty);
               const newPhysical = allowNegative ? ((p.physicalStock ?? 0) - qty) : Math.max(0, (p.physicalStock ?? 0) - qty);
-              return { ...p, stockQuantity: newStock, physicalStock: newPhysical };
+              return { ...p, stockQuantity: newStock, physicalStock: newPhysical, tenantId: user?.tenantId || (p as any).tenantId };
             });
             offlineDb.cachedProducts.bulkPut(updated).catch(() => {});
             return updated;
@@ -1029,7 +1031,7 @@ const Pos: React.FC = () => {
           const offlineId = 'off_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
           const offlineOrder: OfflineOrder = {
             offlineId,
-            tenantId: user?.tenantId || 'default',
+            tenantId: user?.tenantId || '',
             payload,
             rateAtSale: exchangeRate,
             createdAt: new Date().toISOString(),
@@ -1044,7 +1046,7 @@ const Pos: React.FC = () => {
               const allowNegative = Boolean(settings?.allowNegativeStock);
               const newStock = allowNegative ? ((p.stockQuantity ?? 0) - qty) : Math.max(0, (p.stockQuantity ?? 0) - qty);
               const newPhysical = allowNegative ? ((p.physicalStock ?? 0) - qty) : Math.max(0, (p.physicalStock ?? 0) - qty);
-              return { ...p, stockQuantity: newStock, physicalStock: newPhysical };
+              return { ...p, stockQuantity: newStock, physicalStock: newPhysical, tenantId: user?.tenantId || (p as any).tenantId };
             });
             offlineDb.cachedProducts.bulkPut(updated).catch(() => {});
             return updated;

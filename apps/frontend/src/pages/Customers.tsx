@@ -80,27 +80,26 @@ const Customers: React.FC = () => {
       const res = await apiClient.get<CustomerDTO[]>(url);
       setCustomers(res.data);
 
-      if (!q && res.data && res.data.length > 0) {
+      if (user?.tenantId && res.data && res.data.length > 0) {
         try {
-          await offlineDb.cachedCustomers.clear();
-          await offlineDb.cachedCustomers.bulkPut(res.data);
-        } catch (dbErr) {}
-      } else if (res.data && res.data.length > 0) {
-        try {
-          await offlineDb.cachedCustomers.bulkPut(res.data);
+          await offlineDb.saveCustomersForTenant(user.tenantId, res.data);
         } catch (dbErr) {}
       }
     } catch (e: any) {
       try {
-        const cached = await offlineDb.cachedCustomers.toArray();
-        if (cached && cached.length > 0) {
-          setCustomers(filterLocalCustomers(cached, q));
-          presentToast({
-            message: '⚡ Modo Sin Conexión: Visualizando clientes guardados localmente.',
-            duration: 3000,
-            color: 'warning'
-          });
+        if (user?.tenantId) {
+          const cached = await offlineDb.getCustomersByTenant(user.tenantId);
+          if (cached && cached.length > 0) {
+            setCustomers(filterLocalCustomers(cached, q));
+            presentToast({
+              message: '⚡ Modo Sin Conexión: Visualizando clientes guardados localmente.',
+              duration: 3000,
+              color: 'warning'
+            });
+            return;
+          }
         }
+        setCustomers([]);
       } catch (err) {}
     } finally {
       setLoading(false);

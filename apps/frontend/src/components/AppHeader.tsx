@@ -97,7 +97,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const refreshPendingCount = async () => {
     try {
-      const allOrders = await offlineDb.offlineOrders.toArray();
+      const allOrders = user?.tenantId
+        ? await offlineDb.getOfflineOrdersByTenant(user.tenantId)
+        : [];
       const count = allOrders.filter(o => o.status !== 'failed').length;
       setPendingOfflineCount(count);
     } catch (err) {
@@ -159,9 +161,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     const safeRefresh = async () => {
       if (isMounted) {
         await refreshPendingCount();
-        if (navigator.onLine && localStorage.getItem('flujofino_simulating_offline') !== 'true') {
+        if (navigator.onLine && localStorage.getItem('flujofino_simulating_offline') !== 'true' && user?.tenantId) {
           try {
-            const allOrders = await offlineDb.offlineOrders.toArray();
+            const allOrders = await offlineDb.getOfflineOrdersByTenant(user.tenantId);
             const pendingCount = allOrders.filter(o => o.status !== 'failed' && o.status !== 'syncing').length;
             if (pendingCount > 0 && !isGlobalSyncInProgress) {
               await syncPendingOrders(true);
@@ -239,11 +241,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       if (!silent) presentToast({ message: 'No hay conexión a internet activa', duration: 2500, color: 'warning' });
       return;
     }
+    if (!user?.tenantId) return;
     if (isGlobalSyncInProgress || isSyncing) return;
 
     let ordersToProcess: any[] = [];
     try {
-      const allOrders = await offlineDb.offlineOrders.toArray();
+      const allOrders = await offlineDb.getOfflineOrdersByTenant(user.tenantId);
       const pending = retryFailed
         ? allOrders.filter(o => o.status !== 'syncing')
         : allOrders.filter(o => o.status !== 'failed' && o.status !== 'syncing');

@@ -162,24 +162,27 @@ const Reservations: React.FC = () => {
       setReservations(serverReservations);
       setIsOfflineMode(false);
 
-      try {
-        await offlineDb.cachedReservations.clear();
-        if (serverReservations.length > 0) {
-          await offlineDb.cachedReservations.bulkPut(serverReservations);
-        }
-      } catch (saveErr) {}
+      if (user?.tenantId && serverReservations.length > 0) {
+        try {
+          await offlineDb.saveReservationsForTenant(user.tenantId, serverReservations);
+        } catch (saveErr) {}
+      }
     } catch (e) {
       setIsOfflineMode(true);
       try {
-        const cached = await offlineDb.cachedReservations.toArray();
-        if (cached && cached.length > 0) {
-          setReservations(cached);
-          presentToast({
-            message: '⚡ Modo Sin Conexión: Visualizando agenda guardada localmente.',
-            duration: 3000,
-            color: 'warning'
-          });
+        if (user?.tenantId) {
+          const cached = await offlineDb.getReservationsByTenant(user.tenantId);
+          if (cached && cached.length > 0) {
+            setReservations(cached);
+            presentToast({
+              message: '⚡ Modo Sin Conexión: Visualizando agenda guardada localmente.',
+              duration: 3000,
+              color: 'warning'
+            });
+            return;
+          }
         }
+        setReservations([]);
       } catch (err) {}
     }
   };
@@ -188,10 +191,17 @@ const Reservations: React.FC = () => {
     try {
       const res = await apiClient.get('/products');
       setProducts(res.data);
+      if (user?.tenantId && res.data && res.data.length > 0) {
+        try {
+          await offlineDb.saveProductsForTenant(user.tenantId, res.data);
+        } catch (e) {}
+      }
     } catch (e) {
       try {
-        const cached = await offlineDb.cachedProducts.toArray();
-        if (cached && cached.length > 0) setProducts(cached);
+        if (user?.tenantId) {
+          const cached = await offlineDb.getProductsByTenant(user.tenantId);
+          if (cached && cached.length > 0) setProducts(cached);
+        }
       } catch (err) {}
     }
   };

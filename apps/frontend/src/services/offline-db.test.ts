@@ -152,4 +152,75 @@ describe('Offline Database Engine (Dexie with fake-indexeddb)', () => {
       expect(updated.physicalStock).toBe(8);
     });
   });
+
+  describe('Multi-Tenant Isolation in Offline Cache', () => {
+    it('debe aislar los productos por tenantId y no mezclar inventarios entre cuentas', async () => {
+      const productosNegocioA = [
+        { id: 'p-a-1', name: 'Pizza Familiar', salePrice: 12 },
+        { id: 'p-a-2', name: 'Refresco 2L', salePrice: 3 },
+      ];
+      const productosNegocioB = [
+        { id: 'p-b-1', name: 'Corte de Cabello', salePrice: 10 },
+      ];
+
+      await offlineDb.saveProductsForTenant('tenant-pizzeria', productosNegocioA);
+      await offlineDb.saveProductsForTenant('tenant-barberia', productosNegocioB);
+
+      const itemsPizzeria = await offlineDb.getProductsByTenant('tenant-pizzeria');
+      const itemsBarberia = await offlineDb.getProductsByTenant('tenant-barberia');
+      const itemsInexistente = await offlineDb.getProductsByTenant('tenant-otro');
+
+      expect(itemsPizzeria).toHaveLength(2);
+      expect(itemsPizzeria.map(p => p.name)).toEqual(['Pizza Familiar', 'Refresco 2L']);
+
+      expect(itemsBarberia).toHaveLength(1);
+      expect(itemsBarberia[0].name).toBe('Corte de Cabello');
+
+      expect(itemsInexistente).toHaveLength(0);
+    });
+
+    it('debe limpiar únicamente la caché del tenant que cierra sesión dejando intacto el otro', async () => {
+      await offlineDb.saveProductsForTenant('tenant-a', [{ id: 'pa1', name: 'Item A' }]);
+      await offlineDb.saveProductsForTenant('tenant-b', [{ id: 'pb1', name: 'Item B' }]);
+
+      await offlineDb.clearTenantCache('tenant-a');
+
+      const itemsA = await offlineDb.getProductsByTenant('tenant-a');
+      const itemsB = await offlineDb.getProductsByTenant('tenant-b');
+
+      expect(itemsA).toHaveLength(0);
+      expect(itemsB).toHaveLength(1);
+      expect(itemsB[0].name).toBe('Item B');
+    });
+
+    it('debe aislar órdenes offline y clientes entre tenants', async () => {
+      await offlineDb.offlineOrders.add({
+        offlineId: 'ord-negocio-a',
+        tenantId: 'tenant-a',
+        payload: {},
+        rateAtSale: 50,
+        createdAt: new Date().toISOString(),
+        synced: false,
+      });
+
+      await offlineDb.offlineOrders.add({
+        offlineId: 'ord-negocio-b',
+        tenantId: 'tenant-b',
+        payload: {},
+        rateAtSale: 50,
+        createdAt: new Date().toISOString(),
+        synced: false,
+      });
+
+      const ordenesA = await offlineDb.getOfflineOrdersByTenant('tenant-a');
+      const ordenesB = await offlineDb.getOfflineOrdersByTenant('tenant-b');
+
+      expect(ordenesA).toHaveLength(1);
+      expect(ordenesA[0].offlineId).toBe('ord-negocio-a');
+
+      expect(ordenesB).toHaveLength(1);
+      expect(ordenesB[0].offlineId).toBe('ord-negocio-b');
+    });
+  });
 });
+
