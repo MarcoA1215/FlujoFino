@@ -542,6 +542,14 @@ export class ReservationsService {
     const reservation = await this.repo.findOne({ where: { id, tenantId } });
     if (!reservation) throw new BadRequestException('Reservación no encontrada');
     await this.repo.remove(reservation);
+
+    try {
+      await this.notificationsService.notifyCustomerAppointment(reservation, {
+        title: '❌ Cita Cancelada',
+        body: `Tu cita para "${reservation.serviceName || 'Servicio'}" del ${reservation.date} a las ${reservation.time.substring(0, 5)} ha sido cancelada por el establecimiento.`
+      });
+    } catch (err) {}
+
     return { success: true };
   }
 
@@ -556,7 +564,17 @@ export class ReservationsService {
     res.abonosTotal = Math.round(((res.abonosTotal || 0) + Number(amount)) * 100) / 100;
     
     this.recalculatePaymentStatus(res);
-    return this.repo.save(res);
+    const saved = await this.repo.save(res);
+
+    try {
+      const remaining = Math.max(0, Number(saved.totalAmount || 0) - Number(saved.abonosTotal || 0));
+      await this.notificationsService.notifyCustomerAppointment(saved, {
+        title: '💵 Abono Registrado',
+        body: `Se ha registrado un abono de $${Number(amount).toFixed(2)} para tu cita. Saldo pendiente: $${remaining.toFixed(2)}.`
+      });
+    } catch (err) {}
+
+    return saved;
   }
 
   async revertAbono(tenantId: string, id: string, abonoIdentifier: string | number) {
@@ -607,7 +625,16 @@ export class ReservationsService {
     res.paymentStatus = PaymentStatus.PAID;
     res.paymentReported = false;
     res.paymentRejectedReason = null as any;
-    return this.repo.save(res);
+    const saved = await this.repo.save(res);
+
+    try {
+      await this.notificationsService.notifyCustomerAppointment(saved, {
+        title: '✅ Pago Completo Registrado',
+        body: `Tu cita para "${saved.serviceName || 'Servicio'}" está completamente saldada ($${total.toFixed(2)}).`
+      });
+    } catch (err) {}
+
+    return saved;
   }
 
   async approvePayment(tenantId: string, id: string) {

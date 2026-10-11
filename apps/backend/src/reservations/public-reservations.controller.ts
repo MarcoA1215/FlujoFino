@@ -655,7 +655,27 @@ export class PublicReservationsController {
     if (!reservation) throw new NotFoundException('Cita no encontrada');
     
     reservation.rescheduleStatus = 'ACCEPTED';
-    await reservationRepo.save(reservation);
+    const saved = await reservationRepo.save(reservation);
+
+    try {
+      await this.notificationsService.sendNotificationToNegocio(saved.tenantId, {
+        title: '✅ Reprogramación Aceptada',
+        body: `${saved.customerName} ha aceptado el nuevo horario para su cita del ${saved.date} a las ${saved.time.substring(0, 5)}.`,
+        data: {
+          url: '/reservations',
+          reservationId: saved.id,
+          type: 'APPOINTMENT_ACCEPTED'
+        }
+      }, ['ADMIN', 'CAJERO']);
+    } catch (err) {}
+
+    try {
+      await this.notificationsService.notifyCustomerAppointment(saved, {
+        title: '✅ Horario Confirmado',
+        body: `Tu cita ha quedado confirmada para el ${saved.date} a las ${saved.time.substring(0, 5)}.`
+      });
+    } catch (err) {}
+
     return { success: true, message: 'Reprogramación aceptada' };
   }
 
@@ -851,7 +871,27 @@ export class PublicReservationsController {
     }
     
     reservation.status = ReservationStatus.CANCELED;
-    await reservationRepo.save(reservation);
+    const saved = await reservationRepo.save(reservation);
+
+    try {
+      await this.notificationsService.sendNotificationToNegocio(saved.tenantId, {
+        title: '❌ Cita Cancelada por Cliente',
+        body: `${saved.customerName} canceló su cita del ${saved.date} a las ${saved.time.substring(0, 5)}.`,
+        data: {
+          url: '/reservations',
+          reservationId: saved.id,
+          type: 'APPOINTMENT_CANCELED'
+        }
+      }, ['ADMIN', 'CAJERO']);
+    } catch (err) {}
+
+    try {
+      await this.notificationsService.notifyCustomerAppointment(saved, {
+        title: '❌ Cita Cancelada',
+        body: `Tu cita para "${saved.serviceName || 'Servicio'}" del ${saved.date} ha sido cancelada exitosamente.`
+      });
+    } catch (err) {}
+
     return { success: true };
   }
 
@@ -872,6 +912,18 @@ export class PublicReservationsController {
       clientPhone: reservation.customerPhone
     });
     await feedbackRepo.save(feedback);
+
+    try {
+      await this.notificationsService.sendNotificationToNegocio(reservation.tenantId, {
+        title: '⭐ Nueva Opinión de Cita',
+        body: `${dto.clientName || reservation.customerName} dejó una opinión: "${dto.content.substring(0, 80)}${dto.content.length > 80 ? '...' : ''}"`,
+        data: {
+          url: '/feedback',
+          type: 'NEW_FEEDBACK'
+        }
+      }, ['ADMIN', 'CAJERO']);
+    } catch (err) {}
+
     return { success: true };
   }
 
