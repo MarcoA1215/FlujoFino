@@ -944,15 +944,7 @@ export class PublicReservationsController {
 
     // Determine candidate staff pool
     let candidateStaff = staffList;
-    if (employeeId) {
-      candidateStaff = staffList.filter(s => s.userId === employeeId);
-      if (candidateStaff.length === 0) {
-        const single = await accessRepo.findOne({
-          where: { userId: employeeId, tenantId, isActive: true, status: 'ACCEPTED' },
-        });
-        if (single) candidateStaff = [single];
-      }
-    } else if (serviceId) {
+    if (serviceId) {
       const requestedServices = serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean);
       const requiredStaffIdSets = requestedServices
         .map(s => (s as any)?.assignedStaffIds || [])
@@ -962,6 +954,28 @@ export class PublicReservationsController {
         candidateStaff = candidateStaff.filter(st =>
           requiredStaffIdSets.every(set => set.includes(st.userId))
         );
+      }
+    }
+
+    if (employeeId) {
+      candidateStaff = candidateStaff.filter(s => s.userId === employeeId);
+      if (candidateStaff.length === 0) {
+        const single = await accessRepo.findOne({
+          where: { userId: employeeId, tenantId, isActive: true, status: 'ACCEPTED' },
+        });
+        if (single) {
+          if (serviceId) {
+            const requestedServices = serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean);
+            const requiredStaffIdSets = requestedServices
+              .map(s => (s as any)?.assignedStaffIds || [])
+              .filter(arr => Array.isArray(arr) && arr.length > 0);
+            if (requiredStaffIdSets.length === 0 || requiredStaffIdSets.every(set => set.includes(employeeId))) {
+              candidateStaff = [single];
+            }
+          } else {
+            candidateStaff = [single];
+          }
+        }
       }
     }
 
@@ -984,8 +998,8 @@ export class PublicReservationsController {
     }
 
     const busyBookings: BusyBooking[] = existing.map(r => {
-      const [rh, rm] = r.time.split(':').map(Number);
-      const startMins = rh * 60 + rm;
+      const [rh, rm] = (r.time || '00:00').trim().split(':').map(Number);
+      const startMins = (rh || 0) * 60 + (rm || 0);
       let rDuration = Number(r.durationMinutes) || 0;
 
       if (rDuration === 0 && r.serviceId) {
@@ -1024,8 +1038,8 @@ export class PublicReservationsController {
     const slots: string[] = [];
     const timeZone = (settings as any)?.timezone || process.env.BUSINESS_TIMEZONE || 'America/Caracas';
     const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-    const [nowH, nowM] = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).split(':').map(Number);
-    const currentRealMins = nowH * 60 + nowM;
+    const [nowH, nowM] = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date()).split(':').map(Number);
+    const currentRealMins = (nowH || 0) * 60 + (nowM || 0);
 
     const isSoloBusiness = staffList.length === 0;
 

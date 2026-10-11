@@ -40,8 +40,8 @@ export class ReservationsService {
     }
 
     const toMins = (t: string) => {
-      const [h, m] = t.split(':').map(Number);
-      return h * 60 + m;
+      const [h, m] = (t || '00:00').trim().split(':').map(Number);
+      return (h || 0) * 60 + (m || 0);
     };
 
     const reqMins = toMins(time);
@@ -170,8 +170,8 @@ export class ReservationsService {
     }
 
     const busyBookings: BusyBooking[] = existing.map(res => {
-      const [rh, rm] = res.time.split(':').map(Number);
-      const exStart = rh * 60 + rm;
+      const [rh, rm] = (res.time || '00:00').trim().split(':').map(Number);
+      const exStart = (rh || 0) * 60 + (rm || 0);
       let exDuration = Number(res.durationMinutes) || 0;
       if (exDuration === 0 && res.serviceId) {
         const sIds = res.serviceId.split(',').map(s => s.trim()).filter(Boolean);
@@ -212,6 +212,17 @@ export class ReservationsService {
     }
 
     if (employeeId) {
+      if (serviceId) {
+        const requestedServices = serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean);
+        const requiredStaffIdSets = requestedServices
+          .map(s => (s as any)?.assignedStaffIds || [])
+          .filter(arr => Array.isArray(arr) && arr.length > 0);
+
+        if (requiredStaffIdSets.length > 0 && !requiredStaffIdSets.every(set => set.includes(employeeId))) {
+          throw new BadRequestException('El especialista seleccionado no está asignado al servicio solicitado.');
+        }
+      }
+
       let emp = staffList.find(s => s.userId === employeeId);
       if (!emp) {
         emp = await accessRepo.findOne({ where: { userId: employeeId, tenantId, isActive: true, status: 'ACCEPTED' } }) as any;
