@@ -857,6 +857,32 @@ export class PublicReservationsController {
         });
       } catch (err) {}
 
+      // Sincronizar orden vinculada (fecha/hora requerida y notas)
+      try {
+        const orderRepo = manager.getRepository(Order);
+        const linkedOrder = await orderRepo.findOne({
+          where: [
+            ...(saved.orderId ? [{ id: saved.orderId, tenantId: saved.tenantId }] : []),
+            { linkedReservationId: saved.id, tenantId: saved.tenantId }
+          ]
+        });
+        if (linkedOrder) {
+          const parsedD = new Date(`${saved.date}T${saved.time}`);
+          if (!isNaN(parsedD.getTime())) linkedOrder.requestedDeliveryDate = parsedD;
+          const prefix = `[Cita: ${saved.date} ${newTimeDisplay}]`;
+          if (linkedOrder.notes && linkedOrder.notes.includes('[Cita:')) {
+            linkedOrder.notes = linkedOrder.notes.replace(/\[Cita:[^\]]*\]/, prefix);
+          } else if (linkedOrder.notes) {
+            linkedOrder.notes = `${prefix} ${linkedOrder.notes}`;
+          } else {
+            linkedOrder.notes = prefix;
+          }
+          await orderRepo.save(linkedOrder);
+        }
+      } catch (orderErr) {
+        console.error('Error sincronizando Order en rescheduleAppointment:', orderErr);
+      }
+
       return { success: true };
     });
   }
@@ -873,6 +899,23 @@ export class PublicReservationsController {
     
     reservation.status = ReservationStatus.CANCELED;
     const saved = await reservationRepo.save(reservation);
+
+    // Sincronizar cancelación en orden vinculada
+    try {
+      const orderRepo = this.tenantRepo.manager.getRepository(Order);
+      const linkedOrder = await orderRepo.findOne({
+        where: [
+          ...(saved.orderId ? [{ id: saved.orderId, tenantId: saved.tenantId }] : []),
+          { linkedReservationId: saved.id, tenantId: saved.tenantId }
+        ]
+      });
+      if (linkedOrder && linkedOrder.status !== OrderStatus.CANCELED) {
+        linkedOrder.status = OrderStatus.CANCELED;
+        await orderRepo.save(linkedOrder);
+      }
+    } catch (orderErr) {
+      console.error('Error sincronizando Order en cancelAppointment:', orderErr);
+    }
 
     try {
       await this.notificationsService.sendNotificationToNegocio(saved.tenantId, {

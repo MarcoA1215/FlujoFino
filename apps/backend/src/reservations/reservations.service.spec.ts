@@ -6,18 +6,26 @@ import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import { Reservation } from '../entities/reservation.entity';
+import { Order } from '../entities/order.entity';
 import { ReservationStatus, PaymentStatus } from '@finowork/shared-types';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 
 describe('ReservationsService Suite', () => {
   let service: ReservationsService;
   let mockRepo: any;
+  let mockOrderRepo: any;
   let mockNotificationsService: any;
   let mockCustomersService: any;
   let mockStorageService: any;
   let mockManager: any;
 
   beforeEach(async () => {
+    mockOrderRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+      save: jest.fn((e) => Promise.resolve(e)),
+      create: jest.fn((dto) => dto),
+    };
+
     const mockQueryBuilder = {
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
@@ -54,6 +62,9 @@ describe('ReservationsService Suite', () => {
             }),
             find: jest.fn().mockResolvedValue([]),
           };
+        }
+        if (entity === Order || entity?.name === 'Order') {
+          return mockOrderRepo;
         }
         if (entity === Reservation || entity?.name === 'Reservation') {
           return mockRepo;
@@ -320,6 +331,156 @@ describe('ReservationsService Suite', () => {
           title: expect.stringContaining('Pago Completo Registrado'),
         }),
       );
+    });
+  });
+
+  describe('Sincronización Bidireccional con el Tablero de Pedidos (Orders)', () => {
+    it('al reprogramar una cita debe actualizar requestedDeliveryDate y las notas de la orden vinculada', async () => {
+      const tenantId = 'tenant-123';
+      const resId = 'res-sync-1';
+
+      const mockReservation = {
+        id: resId,
+        tenantId,
+        customerName: 'Cliente Sync',
+        date: '2026-10-15',
+        time: '10:00:00',
+        durationMinutes: 30,
+        status: ReservationStatus.CONFIRMED,
+      };
+
+      const mockLinkedOrder: any = {
+        id: 'ord-linked-1',
+        tenantId,
+        linkedReservationId: resId,
+        status: 'PENDING',
+        notes: '[Cita: 2026-10-15 10:00] Pedido inicial',
+        requestedDeliveryDate: new Date('2026-10-15T10:00:00Z'),
+      };
+
+      mockRepo.findOne.mockResolvedValue(mockReservation);
+      mockOrderRepo.findOne.mockResolvedValue(mockLinkedOrder);
+
+      await service.reschedule(tenantId, resId, {
+        date: '2026-10-15',
+        time: '14:30',
+        reason: 'Retraso de transporte',
+      });
+
+      expect(mockOrderRepo.save).toHaveBeenCalled();
+      expect(mockLinkedOrder.requestedDeliveryDate).toEqual(new Date('2026-10-15T14:30:00'));
+      expect(mockLinkedOrder.notes).toContain('[Cita: 2026-10-15 14:30]');
+    });
+
+    it('al cancelar una cita debe cancelar la orden vinculada en el tablero de pedidos', async () => {
+      const tenantId = 'tenant-123';
+      const resId = 'res-cancel-sync';
+
+      const mockReservation = {
+        id: resId,
+        tenantId,
+        status: ReservationStatus.CONFIRMED,
+      };
+
+      const mockLinkedOrder: any = {
+        id: 'ord-cancel-1',
+        tenantId,
+        linkedReservationId: resId,
+        status: 'PENDING',
+      };
+
+      mockRepo.findOne.mockResolvedValue(mockReservation);
+      mockOrderRepo.findOne.mockResolvedValue(mockLinkedOrder);
+
+      await service.updateStatus(tenantId, resId, ReservationStatus.CANCELED);
+
+      expect(mockOrderRepo.save).toHaveBeenCalled();
+      expect(mockLinkedOrder.status).toBe('CANCELED');
+    });
+
+    it('al completar una cita debe marcar la orden vinculada como DELIVERED (entregada)', async () => {
+      const tenantId = 'tenant-123';
+      const resId = 'res-comp-sync';
+
+      const mockReservation = {
+        id: resId,
+        tenantId,
+        status: ReservationStatus.CONFIRMED,
+      };
+
+      const mockLinkedOrder: any = {
+        id: 'ord-deliv-1',
+        tenantId,
+        linkedReservationId: resId,
+        status: 'PENDING',
+      };
+
+      mockRepo.findOne.mockResolvedValue(mockReservation);
+      mockOrderRepo.findOne.mockResolvedValue(mockLinkedOrder);
+
+      await service.updateStatus(tenantId, resId, ReservationStatus.COMPLETED);
+
+      expect(mockOrderRepo.save).toHaveBeenCalled();
+      expect(mockLinkedOrder.status).toBe('DELIVERED');
+    });
+
+    it('al registrar un abono en la cita debe actualizar el saldo y abonos de la orden vinculada', async () => {
+      const tenantId = 'tenant-123';
+      const resId = 'res-abono-sync';
+
+      const mockReservation = {
+        id: resId,
+        tenantId,
+        totalAmount: 50,
+        abonosTotal: 0,
+        abonosHistory: [],
+        paymentStatus: PaymentStatus.PENDING,
+      };
+
+      const mockLinkedOrder: any = {
+        id: 'ord-abono-1',
+        tenantId,
+        linkedReservationId: resId,
+        abonosTotal: 0,
+        abonosHistory: [],
+      };
+
+      mockRepo.findOne.mockResolvedValue(mockReservation);
+      mockOrderRepo.findOne.mockResolvedValue(mockLinkedOrder);
+
+      await service.addAbono(tenantId, resId, 20);
+
+      expect(mockOrderRepo.save).toHaveBeenCalled();
+      expect(mockLinkedOrder.abonosTotal).toBe(20);
+      expect(mockLinkedOrder.paymentStatus).toBe(PaymentStatus.PARTIAL);
+    });
+
+    it('al eliminar una cita debe cancelar la orden vinculada para no dejar tickets huérfanos', async () => {
+      const tenantId = 'tenant-123';
+      const resId = 'res-del-sync';
+
+      const mockReservation = {
+        id: resId,
+        tenantId,
+        serviceName: 'Masaje Relajante',
+      };
+
+      const mockLinkedOrder: any = {
+        id: 'ord-del-orphan',
+        tenantId,
+        linkedReservationId: resId,
+        status: 'PENDING',
+      };
+
+      mockRepo.findOne.mockResolvedValue(mockReservation);
+      mockRepo.remove = jest.fn().mockResolvedValue(true);
+      mockOrderRepo.findOne.mockResolvedValue(mockLinkedOrder);
+
+      await service.delete(tenantId, resId);
+
+      expect(mockOrderRepo.save).toHaveBeenCalled();
+      expect(mockLinkedOrder.status).toBe('CANCELED');
+      expect(mockRepo.remove).toHaveBeenCalledWith(mockReservation);
     });
   });
 });

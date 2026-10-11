@@ -319,6 +319,22 @@ export class OrdersService implements OnModuleInit {
     if (!wasPaid && saved.paymentStatus === PaymentStatus.PAID && saved.customerId) {
       await this.customersService.incrementVisits(tenantId, saved.customerId);
     }
+
+    if (order.linkedReservationId) {
+      try {
+        const resRepo = this.dataSource.getRepository(Reservation);
+        const res = await resRepo.findOne({ where: { id: order.linkedReservationId, tenantId } });
+        if (res) {
+          res.abonosTotal = saved.abonosTotal;
+          res.abonosHistory = saved.abonosHistory;
+          res.paymentStatus = saved.paymentStatus;
+          await resRepo.save(res);
+        }
+      } catch (err) {
+        console.error('Error sincronizando Reservation al registrar abono en orden:', err);
+      }
+    }
+
     return saved;
   }
 
@@ -389,7 +405,22 @@ export class OrdersService implements OnModuleInit {
       order.paymentStatus = PaymentStatus.PENDING;
     }
     
-    return this.dataSource.getRepository(Order).save(order);
+    const saved = await this.dataSource.getRepository(Order).save(order);
+    if (order.linkedReservationId) {
+      try {
+        const resRepo = this.dataSource.getRepository(Reservation);
+        const res = await resRepo.findOne({ where: { id: order.linkedReservationId, tenantId } });
+        if (res) {
+          res.abonosTotal = saved.abonosTotal;
+          res.abonosHistory = saved.abonosHistory;
+          res.paymentStatus = saved.paymentStatus;
+          await resRepo.save(res);
+        }
+      } catch (err) {
+        console.error('Error sincronizando Reservation al revertir abono en orden:', err);
+      }
+    }
+    return saved;
   }
 
   async createOrder(tenantId: string, dto: CreateOrderDto, authUserId?: string, authUserRole?: UserRole | string) {
@@ -917,8 +948,21 @@ export class OrdersService implements OnModuleInit {
               where: { id: dto.linkedReservationId, tenantId },
             });
             if (reservation) {
-              reservation.status = ReservationStatus.COMPLETED;
               reservation.orderId = savedOrder.id;
+              if (savedOrder.status === OrderStatus.DELIVERED) {
+                reservation.status = ReservationStatus.COMPLETED;
+              } else if (savedOrder.paymentStatus === PaymentStatus.PAID && reservation.status === ReservationStatus.PENDING) {
+                reservation.status = ReservationStatus.CONFIRMED;
+              }
+              if (savedOrder.paymentStatus) {
+                reservation.paymentStatus = savedOrder.paymentStatus;
+              }
+              if (savedOrder.abonosTotal !== undefined) {
+                reservation.abonosTotal = savedOrder.abonosTotal;
+              }
+              if (Array.isArray(savedOrder.abonosHistory)) {
+                reservation.abonosHistory = savedOrder.abonosHistory;
+              }
               await reservationRepo.save(reservation);
             }
           } catch (resErr) {
@@ -1025,6 +1069,22 @@ export class OrdersService implements OnModuleInit {
     const saved = await orderRepo.save(order);
     if (!wasPaid && saved.paymentStatus === PaymentStatus.PAID && saved.customerId) {
       await this.customersService.incrementVisits(tenantId, saved.customerId);
+    }
+    if (order.linkedReservationId) {
+      try {
+        const resRepo = this.dataSource.getRepository(Reservation);
+        const res = await resRepo.findOne({ where: { id: order.linkedReservationId, tenantId } });
+        if (res) {
+          res.paymentStatus = saved.paymentStatus;
+          if (saved.paymentStatus === PaymentStatus.PAID) {
+            res.paymentReported = false;
+            res.paymentRejectedReason = null as any;
+          }
+          await resRepo.save(res);
+        }
+      } catch (err) {
+        console.error('Error sincronizando Reservation al actualizar pago de orden:', err);
+      }
     }
     return saved;
   }
@@ -1310,6 +1370,26 @@ export class OrdersService implements OnModuleInit {
       if (!wasDelivered && status === OrderStatus.DELIVERED && savedResult.customerId && savedResult.paymentStatus !== PaymentStatus.PAID) {
         await this.customersService.incrementVisits(tenantId, savedResult.customerId);
       }
+
+      if (order.linkedReservationId) {
+        try {
+          const resRepo = manager.getRepository(Reservation);
+          const res = await resRepo.findOne({ where: { id: order.linkedReservationId, tenantId } });
+          if (res) {
+            if (status === OrderStatus.CANCELED) {
+              res.status = ReservationStatus.CANCELED;
+            } else if (status === OrderStatus.DELIVERED) {
+              res.status = ReservationStatus.COMPLETED;
+            } else if ((status === OrderStatus.PREPARING || status === OrderStatus.READY) && res.status === ReservationStatus.PENDING) {
+              res.status = ReservationStatus.CONFIRMED;
+            }
+            await resRepo.save(res);
+          }
+        } catch (syncErr) {
+          console.error('Error sincronizando Reservation desde updateOrderStatus:', syncErr);
+        }
+      }
+
       return savedResult;
     });
   }

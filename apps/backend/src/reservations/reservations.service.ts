@@ -3,7 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, EntityManager } from 'typeorm';
 import { Reservation } from '../entities/reservation.entity';
 import { Order } from '../entities/order.entity';
-import { ReservationStatus, PaymentStatus, UserRole } from '@finowork/shared-types';
+import { OrderItem } from '../entities/order-item.entity';
+import { Product } from '../entities/product.entity';
+import { ReservationStatus, PaymentStatus, UserRole, OrderStatus, DeliveryMethod } from '@finowork/shared-types';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -20,6 +22,155 @@ export class ReservationsService {
     private readonly notificationsService: NotificationsService,
     private readonly storageService: StorageService,
   ) {}
+
+  async syncLinkedOrder(tenantId: string, reservation: Reservation, em?: EntityManager) {
+    try {
+      const manager = em || this.repo.manager;
+      if (!manager?.getRepository) return;
+      const orderRepo = manager.getRepository(Order);
+      
+      const order = await orderRepo.findOne({
+        where: [
+          ...(reservation.orderId ? [{ id: reservation.orderId, tenantId }] : []),
+          { linkedReservationId: reservation.id, tenantId }
+        ]
+      });
+
+      if (!order) return;
+
+      // Sincronizar fecha/hora requerida y notas
+      if (reservation.date) {
+        const timePart = reservation.time ? (reservation.time.length <= 5 ? `${reservation.time}:00` : reservation.time) : '12:00:00';
+        const parsedD = new Date(`${reservation.date}T${timePart}`);
+        if (!isNaN(parsedD.getTime())) {
+          order.requestedDeliveryDate = parsedD;
+        }
+        const timeShort = reservation.time ? reservation.time.substring(0, 5) : '';
+        const prefix = `[Cita: ${reservation.date} ${timeShort}]`;
+        if (order.notes && order.notes.includes('[Cita:')) {
+          order.notes = order.notes.replace(/\[Cita:[^\]]*\]/, prefix);
+        } else if (order.notes) {
+          order.notes = `${prefix} ${order.notes}`;
+        } else {
+          order.notes = prefix;
+        }
+      }
+
+      // Sincronizar estados de cita hacia orden
+      if (reservation.status === ReservationStatus.CANCELED) {
+        order.status = OrderStatus.CANCELED;
+      } else if (reservation.status === ReservationStatus.COMPLETED) {
+        order.status = OrderStatus.DELIVERED;
+      }
+
+      // Sincronizar finanzas
+      if (reservation.paymentStatus) {
+        order.paymentStatus = reservation.paymentStatus;
+      }
+      order.paymentReported = Boolean(reservation.paymentReported);
+      order.paymentRejectedReason = reservation.paymentRejectedReason || null as any;
+      if (reservation.paymentProofUrl) {
+        order.paymentProofUrl = reservation.paymentProofUrl;
+      }
+      if (reservation.abonosTotal !== undefined && reservation.abonosTotal !== null) {
+        order.abonosTotal = Number(reservation.abonosTotal);
+      }
+      if (Array.isArray(reservation.abonosHistory)) {
+        order.abonosHistory = reservation.abonosHistory;
+      }
+
+      if (reservation.employeeId) {
+        order.employeeId = reservation.employeeId;
+      }
+      if (reservation.tableNumber) {
+        order.tableNumber = reservation.tableNumber;
+      }
+
+      await orderRepo.save(order);
+    } catch (err) {
+      console.error('Error sincronizando Order vinculada a Reservation:', err);
+    }
+  }
+
+  async createLinkedOrder(tenantId: string, reservation: Reservation, em?: EntityManager) {
+    try {
+      const manager = em || this.repo.manager;
+      if (!manager?.getRepository) return null;
+      const orderRepo = manager.getRepository(Order);
+      const productRepo = manager.getRepository(Product);
+      const orderItemRepo = manager.getRepository(OrderItem);
+      const settingsRepo = manager.getRepository('Settings');
+
+      const settings: any = await settingsRepo.findOne({ where: { tenantId } });
+      const rate = Number(settings?.exchangeRateBs || 40.0);
+
+      let reqDeliveryDate: Date | undefined;
+      if (reservation.date) {
+        const timePart = reservation.time ? (reservation.time.length <= 5 ? `${reservation.time}:00` : reservation.time) : '12:00:00';
+        const parsedD = new Date(`${reservation.date}T${timePart}`);
+        if (!isNaN(parsedD.getTime())) reqDeliveryDate = parsedD;
+      }
+
+      const timeShort = reservation.time ? reservation.time.substring(0, 5) : '';
+      const notes = reservation.notes 
+        ? `[Cita: ${reservation.date} ${timeShort}] ${reservation.notes}` 
+        : `[Cita: ${reservation.date} ${timeShort}]`;
+
+      const initialStatus = reservation.status === ReservationStatus.COMPLETED 
+        ? OrderStatus.DELIVERED 
+        : (reservation.status === ReservationStatus.CANCELED ? OrderStatus.CANCELED : OrderStatus.PENDING);
+
+      const linkedOrder = orderRepo.create({
+        tenantId,
+        customerId: reservation.customerId,
+        customerName: reservation.customerName,
+        customerPhone: reservation.customerPhone || '',
+        identification: reservation.identification || undefined,
+        notes,
+        tableNumber: reservation.tableNumber || '',
+        requestedDeliveryDate: reqDeliveryDate,
+        status: initialStatus,
+        paymentStatus: reservation.paymentStatus || PaymentStatus.PENDING,
+        paymentReported: Boolean(reservation.paymentReported),
+        paymentProofUrl: reservation.paymentProofUrl || undefined,
+        paymentRejectedReason: reservation.paymentRejectedReason || undefined,
+        deliveryMethod: DeliveryMethod.IN_STORE,
+        totalAmount: Number(reservation.totalAmount || 0),
+        abonosTotal: Number(reservation.abonosTotal || 0),
+        abonosHistory: reservation.abonosHistory || [],
+        employeeId: reservation.employeeId || undefined,
+        linkedReservationId: reservation.id,
+        exchangeRate: rate,
+      });
+
+      const savedOrder = await orderRepo.save(linkedOrder);
+      reservation.orderId = savedOrder.id;
+      await manager.save(Reservation, reservation);
+
+      if (reservation.serviceId) {
+        const sIds = reservation.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
+        for (const sId of sIds) {
+          const prod: any = await productRepo.findOne({ where: { id: sId } });
+          if (prod) {
+            const item = orderItemRepo.create({
+              orderId: savedOrder.id,
+              productId: prod.id,
+              productName: prod.name,
+              quantity: 1,
+              unitPrice: Number(prod.salePrice || 0),
+              subtotal: Number(prod.salePrice || 0),
+            });
+            await orderItemRepo.save(item);
+          }
+        }
+      }
+
+      return savedOrder;
+    } catch (err) {
+      console.error('Error auto-creando linked order en ReservationsService:', err);
+      return null;
+    }
+  }
 
   findAll(tenantId: string) {
     return this.repo.find({ where: { tenantId }, order: { date: 'ASC', time: 'ASC' } });
@@ -387,6 +538,7 @@ export class ReservationsService {
       delete (reservation as any).abonosHistory;
       this.recalculatePaymentStatus(reservation);
       const saved = await manager.save(Reservation, reservation);
+      await this.createLinkedOrder(tenantId, saved, manager);
 
       try {
         await this.notificationsService.notifyCustomerAppointment(saved, {
@@ -439,6 +591,7 @@ export class ReservationsService {
       reservation.durationMinutes = duration;
       this.recalculatePaymentStatus(reservation);
       const saved = await manager.save(Reservation, reservation);
+      await this.syncLinkedOrder(tenantId, saved, manager);
 
       if (dateChanged || timeChanged) {
         try {
@@ -483,6 +636,7 @@ export class ReservationsService {
       if (dto.reason) reservation.rescheduleReason = dto.reason.trim();
 
       const saved = await manager.save(Reservation, reservation);
+      await this.syncLinkedOrder(tenantId, saved, manager);
 
       const newTimeStr = saved.time.substring(0, 5);
       const reasonText = dto.reason ? ` Motivo: ${dto.reason.trim()}.` : '';
@@ -515,6 +669,7 @@ export class ReservationsService {
     if (!reservation) throw new BadRequestException('Reservación no encontrada');
     reservation.status = status;
     const saved = await this.repo.save(reservation);
+    await this.syncLinkedOrder(tenantId, saved);
 
     try {
       if (status === ReservationStatus.CONFIRMED) {
@@ -541,6 +696,24 @@ export class ReservationsService {
   async delete(tenantId: string, id: string) {
     const reservation = await this.repo.findOne({ where: { id, tenantId } });
     if (!reservation) throw new BadRequestException('Reservación no encontrada');
+
+    // Sincronizar cancelación en la orden vinculada para no dejar tickets huérfanos
+    try {
+      const orderRepo = this.repo.manager.getRepository(Order);
+      const linkedOrder = await orderRepo.findOne({
+        where: [
+          ...(reservation.orderId ? [{ id: reservation.orderId, tenantId }] : []),
+          { linkedReservationId: reservation.id, tenantId }
+        ]
+      });
+      if (linkedOrder && linkedOrder.status !== OrderStatus.CANCELED) {
+        linkedOrder.status = OrderStatus.CANCELED;
+        await orderRepo.save(linkedOrder);
+      }
+    } catch (err) {
+      console.error('Error sincronizando Order al eliminar Cita:', err);
+    }
+
     await this.repo.remove(reservation);
 
     try {
@@ -565,6 +738,7 @@ export class ReservationsService {
     
     this.recalculatePaymentStatus(res);
     const saved = await this.repo.save(res);
+    await this.syncLinkedOrder(tenantId, saved);
 
     try {
       const remaining = Math.max(0, Number(saved.totalAmount || 0) - Number(saved.abonosTotal || 0));
@@ -612,7 +786,9 @@ export class ReservationsService {
 
     res.abonosTotal = Math.round(Math.max(0, (res.abonosTotal || 0) - removedAmount) * 100) / 100;
     this.recalculatePaymentStatus(res);
-    return this.repo.save(res);
+    const saved = await this.repo.save(res);
+    await this.syncLinkedOrder(tenantId, saved);
+    return saved;
   }
 
   async payFull(tenantId: string, id: string) {
@@ -626,6 +802,7 @@ export class ReservationsService {
     res.paymentReported = false;
     res.paymentRejectedReason = null as any;
     const saved = await this.repo.save(res);
+    await this.syncLinkedOrder(tenantId, saved);
 
     try {
       await this.notificationsService.notifyCustomerAppointment(saved, {
@@ -660,6 +837,7 @@ export class ReservationsService {
     }
 
     const savedRes = await this.repo.save(res);
+    await this.syncLinkedOrder(tenantId, savedRes);
 
     // Notificación Push al cliente al aprobar pago
     try {
@@ -668,27 +846,6 @@ export class ReservationsService {
         body: `Tu pago para la cita de "${savedRes.serviceName || 'Servicio'}" fue verificado exitosamente.`
       });
     } catch (err) {}
-
-    // Sincronización bidireccional con Order
-    try {
-      const orderRepo = this.repo.manager.getRepository(Order);
-      const order = await orderRepo.findOne({
-        where: [
-          { id: res.orderId, tenantId },
-          { linkedReservationId: res.id, tenantId }
-        ]
-      });
-      if (order) {
-        order.paymentStatus = PaymentStatus.PAID;
-        order.paymentReported = false;
-        order.paymentRejectedReason = null as any;
-        order.abonosTotal = savedRes.abonosTotal;
-        order.abonosHistory = savedRes.abonosHistory;
-        await orderRepo.save(order);
-      }
-    } catch (err) {
-      console.error('Error sincronizando Order al aprobar pago de cita:', err);
-    }
 
     return savedRes;
   }
@@ -715,6 +872,7 @@ export class ReservationsService {
     res.notes = res.notes ? `${res.notes} | ${noteTag}` : noteTag;
 
     const savedRes = await this.repo.save(res);
+    await this.syncLinkedOrder(tenantId, savedRes);
 
     // Notificación Push al cliente al rechazar comprobante
     try {
@@ -723,26 +881,6 @@ export class ReservationsService {
         body: `Tu comprobante de pago fue rechazado (${cleanReason}). Por favor ingresa a tu cita y adjunta un comprobante válido.`
       });
     } catch (err) {}
-
-    // Sincronización bidireccional con Order
-    try {
-      const orderRepo = this.repo.manager.getRepository(Order);
-      const order = await orderRepo.findOne({
-        where: [
-          { id: res.orderId, tenantId },
-          { linkedReservationId: res.id, tenantId }
-        ]
-      });
-      if (order) {
-        order.paymentStatus = PaymentStatus.PENDING;
-        order.paymentReported = false;
-        order.paymentRejectedReason = cleanReason;
-        order.notes = order.notes ? `${order.notes} | ${noteTag}` : noteTag;
-        await orderRepo.save(order);
-      }
-    } catch (err) {
-      console.error('Error sincronizando Order al rechazar comprobante de cita:', err);
-    }
 
     return savedRes;
   }
@@ -847,6 +985,7 @@ export class ReservationsService {
         res.time = this.minutesToTime(newStartMins);
         res.rescheduleStatus = 'PENDING_ACCEPTANCE';
         await manager.save(res);
+        await this.syncLinkedOrder(tenantId, res, manager);
 
         try {
           await this.notificationsService.notifyCustomerAppointment(res, {
@@ -934,6 +1073,7 @@ export class ReservationsService {
     reservation.time = this.minutesToTime(newStartMins);
     reservation.rescheduleStatus = 'DELAYED';
     const saved = await this.repo.save(reservation);
+    await this.syncLinkedOrder(tenantId, saved);
     const newTimeStr = saved.time.substring(0, 5);
 
     const message = `Tu cita tiene un retraso de aprox. ${minutes} minutos. Nueva hora estimada: ${newTimeStr}.`;
