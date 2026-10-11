@@ -77,7 +77,17 @@ export class ReservationsService {
     }
   }
 
-  async validateSlotOverlap(tenantId: string, date: string, time: string, serviceId?: string, serviceName?: string, excludeId?: string, employeeId?: string, manager?: EntityManager) {
+  async validateSlotOverlap(
+    tenantId: string,
+    date: string,
+    time: string,
+    serviceId?: string,
+    serviceName?: string,
+    excludeId?: string,
+    employeeId?: string,
+    manager?: EntityManager,
+    explicitDuration?: number,
+  ) {
     const resRepo = manager ? manager.getRepository(Reservation) : this.repo;
     const qb = resRepo.createQueryBuilder('res')
       .where('res.tenantId = :tenantId', { tenantId })
@@ -103,8 +113,8 @@ export class ReservationsService {
     const productNameMap = new Map(products.map(p => [p.name.trim().toLowerCase(), p]));
 
     // Determine requested reservation duration
-    let reqDuration = 0;
-    if (serviceId) {
+    let reqDuration = explicitDuration && explicitDuration > 0 ? explicitDuration : 0;
+    if (reqDuration === 0 && serviceId) {
       const sIds = serviceId.split(',').map(s => s.trim()).filter(Boolean);
       for (const sId of sIds) {
         const sp = productMap.get(sId);
@@ -161,8 +171,8 @@ export class ReservationsService {
     for (const res of existing) {
       const [rh, rm] = res.time.split(':').map(Number);
       const exStart = rh * 60 + rm;
-      let exDuration = 0;
-      if (res.serviceId) {
+      let exDuration = Number(res.durationMinutes) || 0;
+      if (exDuration === 0 && res.serviceId) {
         const sIds = res.serviceId.split(',').map(s => s.trim()).filter(Boolean);
         for (const sId of sIds) {
           const sp = productMap.get(sId);
@@ -197,7 +207,9 @@ export class ReservationsService {
     }
   }
 
-  private async calculateServiceDuration(tenantId: string, serviceId?: string, serviceName?: string): Promise<number> {
+  private async calculateServiceDuration(tenantId: string, serviceId?: string, serviceName?: string, explicitMinutes?: number): Promise<number> {
+    if (explicitMinutes && explicitMinutes > 0) return explicitMinutes;
+
     const settingsRepo = this.repo.manager.getRepository('Settings');
     const settings: any = await settingsRepo.findOne({ where: { tenantId } });
     const interval = Number(settings?.slotInterval) || 30;
@@ -229,10 +241,11 @@ export class ReservationsService {
 
   async create(tenantId: string, dto: any) {
     return this.repo.manager.transaction(async (manager) => {
+      const duration = dto.durationMinutes || await this.calculateServiceDuration(tenantId, dto.serviceId, dto.serviceName);
+
       if (dto.date && dto.time && !dto.force) {
-        const duration = await this.calculateServiceDuration(tenantId, dto.serviceId, dto.serviceName);
         await this.validateBusinessHours(tenantId, dto.date, dto.time, duration);
-        await this.validateSlotOverlap(tenantId, dto.date, dto.time, dto.serviceId, dto.serviceName, undefined, dto.employeeId, manager);
+        await this.validateSlotOverlap(tenantId, dto.date, dto.time, dto.serviceId, dto.serviceName, undefined, dto.employeeId, manager, duration);
       }
       if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
       if (dto.totalAmount !== undefined && dto.totalAmount < 0) throw new BadRequestException('El monto total no puede ser negativo');
@@ -240,6 +253,7 @@ export class ReservationsService {
       const reservation = new Reservation();
       Object.assign(reservation, dto);
       reservation.tenantId = tenantId;
+      reservation.durationMinutes = duration;
 
       if (dto.customerName && dto.customerPhone && !dto.customerId) {
         try {
@@ -260,21 +274,42 @@ export class ReservationsService {
       delete (reservation as any).abonosTotal; // Security: do not allow setting abonos directly
       delete (reservation as any).abonosHistory;
       this.recalculatePaymentStatus(reservation);
-      return manager.save(Reservation, reservation);
+      const saved = await manager.save(Reservation, reservation);
+
+      try {
+        await this.notificationsService.notifyCustomerAppointment(saved, {
+          title: '📅 Cita Agendada con Éxito',
+          body: `Tu cita para "${saved.serviceName || 'Servicio'}" el ${saved.date} a las ${saved.time.substring(0, 5)} ha sido registrada exitosamente.`
+        });
+      } catch (err) {}
+
+      return saved;
     });
   }
 
   async update(tenantId: string, id: string, dto: any) {
-    if (dto.date && dto.time && !dto.force) {
-      const duration = await this.calculateServiceDuration(tenantId, dto.serviceId, dto.serviceName);
-      await this.validateBusinessHours(tenantId, dto.date, dto.time, duration);
-      await this.validateSlotOverlap(tenantId, dto.date, dto.time, dto.serviceId, dto.serviceName, id, dto.employeeId);
+    const reservation = await this.repo.findOne({ where: { id, tenantId } });
+    if (!reservation) throw new BadRequestException('Reservación no encontrada');
+
+    const duration = dto.durationMinutes || reservation.durationMinutes || await this.calculateServiceDuration(tenantId, dto.serviceId || reservation.serviceId, dto.serviceName || reservation.serviceName);
+    const targetDate = dto.date || reservation.date;
+    const targetTime = dto.time || reservation.time;
+
+    if ((dto.date || dto.time) && !dto.force) {
+      await this.validateBusinessHours(tenantId, targetDate, targetTime, duration);
+      await this.validateSlotOverlap(tenantId, targetDate, targetTime, dto.serviceId || reservation.serviceId, dto.serviceName || reservation.serviceName, id, dto.employeeId !== undefined ? dto.employeeId : reservation.employeeId, undefined, duration);
     }
     if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
     if (dto.totalAmount !== undefined && dto.totalAmount < 0) throw new BadRequestException('El monto total no puede ser negativo');
 
-    const reservation = await this.repo.findOne({ where: { id, tenantId } });
-    if (!reservation) throw new BadRequestException('Reservación no encontrada');
+    const dateChanged = dto.date && dto.date !== reservation.date;
+    const timeChanged = dto.time && dto.time.substring(0, 5) !== reservation.time.substring(0, 5);
+
+    if (dateChanged || timeChanged) {
+      if (!reservation.originalTime) reservation.originalTime = reservation.time.substring(0, 5);
+      if (!reservation.originalDate) reservation.originalDate = reservation.date;
+      reservation.rescheduleStatus = 'RESCHEDULED_BY_ADMIN';
+    }
 
     delete dto.id; // Security: cannot change ID
     delete dto.tenantId; // Security: cannot change tenant
@@ -282,15 +317,100 @@ export class ReservationsService {
     delete dto.abonosHistory;
     
     Object.assign(reservation, dto);
+    reservation.durationMinutes = duration;
     this.recalculatePaymentStatus(reservation);
-    return this.repo.save(reservation);
+    const saved = await this.repo.save(reservation);
+
+    if (dateChanged || timeChanged) {
+      try {
+        await this.notificationsService.notifyCustomerAppointment(saved, {
+          title: '🗓️ Tu Cita fue Actualizada',
+          body: `Tu cita para "${saved.serviceName || 'Servicio'}" ahora es el ${saved.date} a las ${saved.time.substring(0, 5)}.`
+        });
+      } catch (err) {}
+    }
+
+    return saved;
+  }
+
+  async reschedule(tenantId: string, id: string, dto: { date: string; time: string; reason?: string }) {
+    if (!dto.date || !dto.time) throw new BadRequestException('Fecha y hora requeridas para reprogramar');
+    const reservation = await this.repo.findOne({ where: { id, tenantId } });
+    if (!reservation) throw new NotFoundException('Cita no encontrada');
+    if (reservation.status === ReservationStatus.COMPLETED || reservation.status === ReservationStatus.CANCELED) {
+      throw new BadRequestException('No se puede reprogramar una cita completada o cancelada');
+    }
+
+    const duration = reservation.durationMinutes || await this.calculateServiceDuration(tenantId, reservation.serviceId, reservation.serviceName);
+    const tfFormatted = dto.time.length <= 5 ? dto.time + ':00' : dto.time;
+
+    await this.validateBusinessHours(tenantId, dto.date, tfFormatted, duration);
+    await this.validateSlotOverlap(tenantId, dto.date, tfFormatted, reservation.serviceId, reservation.serviceName, id, reservation.employeeId, undefined, duration);
+
+    const oldDate = reservation.date;
+    const oldTime = reservation.time.substring(0, 5);
+
+    if (!reservation.originalTime) reservation.originalTime = oldTime;
+    if (!reservation.originalDate) reservation.originalDate = oldDate;
+
+    reservation.date = dto.date;
+    reservation.time = tfFormatted;
+    reservation.rescheduleStatus = 'RESCHEDULED_BY_ADMIN';
+    if (dto.reason) reservation.rescheduleReason = dto.reason.trim();
+
+    const saved = await this.repo.save(reservation);
+
+    const newTimeStr = saved.time.substring(0, 5);
+    const reasonText = dto.reason ? ` Motivo: ${dto.reason.trim()}.` : '';
+
+    let sent = 0;
+    try {
+      sent = await this.notificationsService.notifyCustomerAppointment(saved, {
+        title: '🗓️ Tu Cita ha sido Reprogramada',
+        body: `Tu cita fue reprogramada para el ${saved.date} a las ${newTimeStr}.${reasonText}`
+      });
+    } catch (err) {}
+
+    const baseUrl = process.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+    const waText = `Hola ${saved.customerName}, tu cita ha sido reprogramada para el ${saved.date} a las ${newTimeStr}.${reasonText} Puedes verificar los detalles aquí: ${baseUrl}/appointment/${saved.id}`;
+    let phone = (saved.customerPhone || '').replace(/\D/g, '');
+    if (phone && !phone.startsWith('58') && phone.length === 10) phone = '58' + phone;
+
+    return {
+      success: true,
+      sent,
+      reservation: saved,
+      whatsappLink: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(waText)}` : null,
+      message: `Cita reprogramada con éxito para el ${saved.date} a las ${newTimeStr}.`
+    };
   }
 
   async updateStatus(tenantId: string, id: string, status: ReservationStatus) {
     const reservation = await this.repo.findOne({ where: { id, tenantId } });
     if (!reservation) throw new BadRequestException('Reservación no encontrada');
     reservation.status = status;
-    return this.repo.save(reservation);
+    const saved = await this.repo.save(reservation);
+
+    try {
+      if (status === ReservationStatus.CONFIRMED) {
+        await this.notificationsService.notifyCustomerAppointment(saved, {
+          title: '✅ Cita Confirmada',
+          body: `Tu cita para "${saved.serviceName || 'Servicio'}" el ${saved.date} a las ${saved.time.substring(0, 5)} está confirmada.`
+        });
+      } else if (status === ReservationStatus.CANCELED) {
+        await this.notificationsService.notifyCustomerAppointment(saved, {
+          title: '❌ Cita Cancelada',
+          body: `Tu cita para "${saved.serviceName || 'Servicio'}" del ${saved.date} ha sido cancelada.`
+        });
+      } else if (status === ReservationStatus.COMPLETED) {
+        await this.notificationsService.notifyCustomerAppointment(saved, {
+          title: '✨ ¡Gracias por tu Visita!',
+          body: `Esperamos que hayas disfrutado tu servicio. ¡Vuelve pronto!`
+        });
+      }
+    } catch (err) {}
+
+    return saved;
   }
 
   async delete(tenantId: string, id: string) {
@@ -389,6 +509,14 @@ export class ReservationsService {
 
     const savedRes = await this.repo.save(res);
 
+    // Notificación Push al cliente al aprobar pago
+    try {
+      await this.notificationsService.notifyCustomerAppointment(savedRes, {
+        title: '✅ ¡Pago Aprobado y Cita Confirmada!',
+        body: `Tu pago para la cita de "${savedRes.serviceName || 'Servicio'}" fue verificado exitosamente.`
+      });
+    } catch (err) {}
+
     // Sincronización bidireccional con Order
     try {
       const orderRepo = this.repo.manager.getRepository(Order);
@@ -435,6 +563,14 @@ export class ReservationsService {
     res.notes = res.notes ? `${res.notes} | ${noteTag}` : noteTag;
 
     const savedRes = await this.repo.save(res);
+
+    // Notificación Push al cliente al rechazar comprobante
+    try {
+      await this.notificationsService.notifyCustomerAppointment(savedRes, {
+        title: '❌ Comprobante de Pago Rechazado',
+        body: `Tu comprobante de pago fue rechazado (${cleanReason}). Por favor ingresa a tu cita y adjunta un comprobante válido.`
+      });
+    } catch (err) {}
 
     // Sincronización bidireccional con Order
     try {
@@ -513,8 +649,8 @@ export class ReservationsService {
         const startMins = this.timeToMinutes(res.time);
         const newStartMins = startMins + minutes;
         
-        let duration = 0;
-        if (res.serviceId) {
+        let duration = Number(res.durationMinutes) || 0;
+        if (duration === 0 && res.serviceId) {
           const sIds = res.serviceId.split(',').map(s => s.trim()).filter(Boolean);
           for (const sId of sIds) {
             const sp = productMap.get(sId);
@@ -544,6 +680,13 @@ export class ReservationsService {
         res.time = this.minutesToTime(newStartMins);
         res.rescheduleStatus = 'PENDING_ACCEPTANCE';
         await manager.save(res);
+
+        try {
+          await this.notificationsService.notifyCustomerAppointment(res, {
+            title: '⏱️ Desplazamiento de Cita',
+            body: `Tu cita de las ${oldTimeStr} fue reprogramada para las ${res.time.substring(0, 5)} por imprevisto en la jornada.`
+          });
+        } catch (notifyErr) {}
 
         const baseUrl = process.env.VITE_FRONTEND_URL || 'http://localhost:5173';
         const msg = `Hola ${res.customerName}, debido a un imprevisto en el servicio, tu cita de las ${oldTimeStr} ha sido reprogramada para las ${res.time.substring(0,5)}. Por favor confírmanos si estás de acuerdo en tu enlace: ${baseUrl}/appointment/${res.id}`;
@@ -582,9 +725,21 @@ export class ReservationsService {
       throw new NotFoundException('Reserva no encontrada');
     }
 
-    const message = `Tu reserva tiene un retraso aproximado de ${minutes} minutos.`;
+    const startMins = this.timeToMinutes(reservation.time);
+    const newStartMins = startMins + minutes;
+    const oldTimeStr = reservation.time.substring(0, 5);
+
+    if (!reservation.originalTime) reservation.originalTime = oldTimeStr;
+    if (!reservation.originalDate) reservation.originalDate = reservation.date;
+
+    reservation.time = this.minutesToTime(newStartMins);
+    reservation.rescheduleStatus = 'DELAYED';
+    const saved = await this.repo.save(reservation);
+    const newTimeStr = saved.time.substring(0, 5);
+
+    const message = `Tu cita tiene un retraso de aprox. ${minutes} minutos. Nueva hora estimada: ${newTimeStr}.`;
     const payload = {
-      title: 'Aviso de Retraso de Reserva',
+      title: '⏱️ Aviso de Retraso de Cita',
       body: message,
       data: {
         url: `/appointment/${id}`,
@@ -593,25 +748,22 @@ export class ReservationsService {
     };
 
     let sent = 0;
-    if (reservation.customerPhone) {
-      sent += await this.notificationsService.sendNotificationToIdentifier(
-        reservation.customerPhone,
-        payload,
-      );
-    }
-    if (reservation.identification && reservation.identification !== reservation.customerPhone) {
-      sent += await this.notificationsService.sendNotificationToIdentifier(
-        reservation.identification,
-        payload,
-      );
-    }
+    try {
+      sent = await this.notificationsService.notifyCustomerAppointment(saved, payload);
+    } catch (err) {}
+
+    const baseUrl = process.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+    const msg = `Hola ${saved.customerName}, debido a un retraso imprevisto de ${minutes} min, tu cita de las ${oldTimeStr} comenzará aprox. a las ${newTimeStr}. Gracias por tu comprensión. Puedes ver tu cita en: ${baseUrl}/appointment/${saved.id}`;
+    let phone = (saved.customerPhone || '').replace(/\D/g, '');
+    if (phone && !phone.startsWith('58') && phone.length === 10) phone = '58' + phone;
 
     return {
       success: true,
       sent,
-      message: sent > 0 
-        ? `Notificación enviada con éxito (${sent} dispositivo/s notificado/s).` 
-        : `No se encontraron suscripciones push activas para el cliente.`,
+      reservation: saved,
+      newTime: newTimeStr,
+      whatsappLink: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}` : null,
+      message: `Hora actualizada a las ${newTimeStr} (+${minutes}m). ${sent > 0 ? `Se envió notificación Push al cliente.` : `No se detectó Push activa (puedes avisar por WhatsApp).`}`,
     };
   }
 

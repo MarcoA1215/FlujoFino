@@ -85,19 +85,100 @@ const Reservations: React.FC = () => {
   const [, setIsOfflineMode] = useState<boolean>(!navigator.onLine);
   const [notifyingDelayId, setNotifyingDelayId] = useState<string | null>(null);
 
+  // States for Reschedule Modal
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [rescheduleReason, setRescheduleReason] = useState('');
+  const [isRescheduling, setIsRescheduling] = useState(false);
+
+  const openReschedule = (res: any) => {
+    setRescheduleDate(res.date || formatDateLocal(new Date()));
+    setRescheduleTime(res.time ? res.time.substring(0, 5) : '10:00');
+    setRescheduleReason('');
+    setShowRescheduleModal(true);
+  };
+
+  const handleConfirmReschedule = async () => {
+    if (!selectedEvent || !rescheduleDate || !rescheduleTime) {
+      presentToast({ message: 'Selecciona fecha y hora para reprogramar', duration: 2000, color: 'warning' });
+      return;
+    }
+    setIsRescheduling(true);
+    try {
+      const res = await apiClient.post(`/reservations/${selectedEvent.id}/reschedule`, {
+        date: rescheduleDate,
+        time: rescheduleTime,
+        reason: rescheduleReason
+      });
+      setShowRescheduleModal(false);
+      setShowDetails(false);
+      fetchReservations();
+
+      const whatsappLink = res.data?.whatsappLink;
+      if (whatsappLink) {
+        presentAlert({
+          header: '✅ Cita Reprogramada',
+          message: `${res.data?.message || 'Cita actualizada con éxito.'}\n\n¿Deseas enviar el aviso directo al cliente por WhatsApp?`,
+          buttons: [
+            { text: 'Listo', role: 'cancel' },
+            {
+              text: 'Enviar WhatsApp 💬',
+              handler: () => {
+                window.open(whatsappLink, '_blank');
+              }
+            }
+          ]
+        });
+      } else {
+        presentToast({
+          message: res.data?.message || 'Cita reprogramada con éxito.',
+          duration: 3500,
+          color: 'success'
+        });
+      }
+    } catch (e: any) {
+      const msg = e.response?.data?.message || e.message || 'Error al reprogramar la cita';
+      presentToast({ message: msg, duration: 4000, color: 'danger' });
+    } finally {
+      setIsRescheduling(false);
+    }
+  };
+
   const handleNotifyDelay = async (id: string, minutes: number = 15, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     try {
       setNotifyingDelayId(id);
       const res = await apiClient.post(`/reservations/${id}/notify-delay`, { minutes });
-      presentToast({
-        message: res.data?.message || `Notificación de retraso (+${minutes}m) enviada al cliente.`,
-        duration: 3500,
-        color: res.data?.sent > 0 ? 'success' : 'warning',
-      });
+      fetchReservations();
+      if (selectedEvent && selectedEvent.id === id && res.data?.reservation) {
+        setSelectedEvent(res.data.reservation);
+      }
+      const whatsappLink = res.data?.whatsappLink;
+      if (whatsappLink) {
+        presentAlert({
+          header: '⏱️ Horario de Cita Desplazado',
+          message: `${res.data?.message || `Cita desplazada (+${minutes}m).`}\n\n¿Deseas avisar al cliente por WhatsApp?`,
+          buttons: [
+            { text: 'Cerrar', role: 'cancel' },
+            {
+              text: 'Enviar WhatsApp 💬',
+              handler: () => {
+                window.open(whatsappLink, '_blank');
+              }
+            }
+          ]
+        });
+      } else {
+        presentToast({
+          message: res.data?.message || `Cita desplazada (+${minutes}m).`,
+          duration: 3500,
+          color: 'success',
+        });
+      }
     } catch (err: any) {
       console.error(err);
-      const msg = err.response?.data?.message || 'Error al enviar la notificación de retraso.';
+      const msg = err.response?.data?.message || 'Error al desplazar la cita.';
       presentToast({ message: msg, duration: 3500, color: 'danger' });
     } finally {
       setNotifyingDelayId(null);
@@ -306,6 +387,7 @@ const Reservations: React.FC = () => {
     }
 
     const selectedProd = products.find(p => p.id === serviceId);
+    const durationMinutes = Number(selectedProd?.durationMinutes) || 30;
     const payload = {
       customerName,
       customerPhone,
@@ -313,6 +395,7 @@ const Reservations: React.FC = () => {
       time,
       serviceId: serviceId || undefined,
       serviceName: selectedProd?.name || undefined,
+      durationMinutes,
       employeeId: employeeId || undefined,
       numberOfPeople,
       tableNumber,
@@ -470,10 +553,19 @@ const Reservations: React.FC = () => {
       if (r.status === ReservationStatus.CANCELED) color = '#EF4444';
       if (r.status === ReservationStatus.COMPLETED) color = '#64748B';
 
+      const [th, tm] = (r.time || '00:00').split(':').map(Number);
+      const startMins = (th || 0) * 60 + (tm || 0);
+      const dur = Number(r.durationMinutes) || 30;
+      const endMins = startMins + dur;
+      const eh = Math.floor(endMins / 60);
+      const em = endMins % 60;
+      const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}:00`;
+
       return {
         id: r.id,
         title: `${r.customerName} - ${r.serviceName || 'Cita'}`,
         start: `${r.date}T${r.time}`,
+        end: `${r.date}T${endTimeStr}`,
         color,
         extendedProps: { ...r }
       };
@@ -677,7 +769,7 @@ const Reservations: React.FC = () => {
               {/* Timeline Cards (Figma Modern Timeline) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '90px' }}>
                 {dayReservations.map(res => {
-                  const duration = res.serviceDuration || 45;
+                  const duration = Number(res.durationMinutes) || 30;
                   const isConfirmed = res.status === ReservationStatus.CONFIRMED;
                   const isPending = res.status === ReservationStatus.PENDING;
 
@@ -727,14 +819,26 @@ const Reservations: React.FC = () => {
                         {/* Top: Customer & Status Pill */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                           <div>
-                            <span style={{ fontSize: '15px', fontWeight: '800', color: '#0F172A' }}>
-                              {res.customerName}
-                            </span>
-                            {res.tableNumber && (
-                              <span style={{ fontSize: '12px', color: '#64748B', marginLeft: '6px' }}>
-                                &bull; Mesa {res.tableNumber}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '15px', fontWeight: '800', color: '#0F172A' }}>
+                                {res.customerName}
                               </span>
-                            )}
+                              {res.tableNumber && (
+                                <span style={{ fontSize: '12px', color: '#64748B' }}>
+                                  &bull; Mesa {res.tableNumber}
+                                </span>
+                              )}
+                              {res.rescheduleStatus === 'DELAYED' && (
+                                <span style={{ fontSize: '10px', background: '#FEF3C7', color: '#92400E', padding: '2px 6px', borderRadius: '6px', fontWeight: '800' }}>
+                                  ⏱️ Retrasada
+                                </span>
+                              )}
+                              {res.rescheduleStatus === 'RESCHEDULED_BY_ADMIN' && (
+                                <span style={{ fontSize: '10px', background: '#EFF6FF', color: '#1D4ED8', padding: '2px 6px', borderRadius: '6px', fontWeight: '800' }}>
+                                  🗓️ Reprogramada
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           {/* Status Pill */}
@@ -1217,8 +1321,18 @@ const Reservations: React.FC = () => {
                         📞 {selectedEvent.customerPhone}
                       </div>
                     )}
-                    <div style={{ fontSize: '13px', color: '#64748B' }}>
-                      📅 {selectedEvent.date} a las <b>{selectedEvent.time}</b>
+                    <div style={{ fontSize: '13px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span>📅 {selectedEvent.date} a las <b>{selectedEvent.time ? selectedEvent.time.substring(0, 5) : ''}</b> ({Number(selectedEvent.durationMinutes) || 30} min)</span>
+                      {selectedEvent.rescheduleStatus === 'DELAYED' && (
+                        <span style={{ fontSize: '11px', background: '#FEF3C7', color: '#92400E', padding: '2px 8px', borderRadius: '6px', fontWeight: '800' }}>
+                          ⏱️ Retrasada {selectedEvent.originalTime ? `(Original: ${selectedEvent.originalTime})` : ''}
+                        </span>
+                      )}
+                      {selectedEvent.rescheduleStatus === 'RESCHEDULED_BY_ADMIN' && (
+                        <span style={{ fontSize: '11px', background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: '6px', fontWeight: '800' }}>
+                          🗓️ Reprogramada {selectedEvent.originalDate ? `(Orig: ${selectedEvent.originalDate} ${selectedEvent.originalTime || ''})` : ''}
+                        </span>
+                      )}
                     </div>
                     {selectedEvent.serviceName && (
                       <div style={{ fontSize: '13px', fontWeight: '700', color: '#047857', marginTop: '6px' }}>
@@ -1467,7 +1581,7 @@ const Reservations: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Actions: Enviar a Caja, Avisar Retraso & Editar */}
+                  {/* Actions: Cobrar, Reprogramar, Avisar Retraso & Editar */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
                       <button
                         type="button"
@@ -1482,13 +1596,35 @@ const Reservations: React.FC = () => {
                         Enviar a Caja para Cobrar
                       </button>
 
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => openReschedule(selectedEvent)}
+                        style={{
+                          padding: '11px 8px',
+                          borderRadius: '10px',
+                          border: '1px solid #10B981',
+                          background: '#ECFDF5',
+                          color: '#065F46',
+                          fontSize: '13px',
+                          fontWeight: '800',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <IonIcon icon={calendarOutline} style={{ fontSize: '16px' }} />
+                        Reprogramar Cita
+                      </button>
+
                       <button
                         type="button"
                         disabled={notifyingDelayId === selectedEvent.id}
                         onClick={() => handleNotifyDelay(selectedEvent.id, 15)}
                         style={{
-                          width: '100%',
-                          padding: '11px',
+                          padding: '11px 8px',
                           borderRadius: '10px',
                           border: '1px solid #FCD34D',
                           background: '#FFFBEB',
@@ -1503,8 +1639,9 @@ const Reservations: React.FC = () => {
                         }}
                       >
                         <IonIcon icon={timeOutline} style={{ fontSize: '16px' }} />
-                        {notifyingDelayId === selectedEvent.id ? 'Avisando retraso...' : 'Avisar retraso (+15 min) al Cliente'}
+                        {notifyingDelayId === selectedEvent.id ? 'Avisando...' : 'Retraso (+15m)'}
                       </button>
+                    </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       <button
@@ -1576,6 +1713,90 @@ const Reservations: React.FC = () => {
             <button type="button" onClick={handleMassShift} className="ff-btn-primary" style={{ width: '100%', padding: '12px', background: '#F59E0B' }}>
               Aplicar Desplazamiento
             </button>
+          </div>
+        </IonModal>
+
+        {/* Modal de Reprogramación Directa para Administrador */}
+        <IonModal isOpen={showRescheduleModal} onDidDismiss={() => setShowRescheduleModal(false)} style={{ '--border-radius': '20px' } as any}>
+          <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
+                🗓️ Reprogramar Cita
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowRescheduleModal(false)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <IonIcon icon={closeOutline} style={{ color: '#64748B' }} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
+              {selectedEvent && (
+                <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '12px', border: '1px solid #E2E8F0', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#0F172A' }}>{selectedEvent.customerName}</div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                    Horario Actual: 📅 {selectedEvent.date} a las <b>{selectedEvent.time ? selectedEvent.time.substring(0, 5) : ''}</b> ({Number(selectedEvent.durationMinutes) || 30} min)
+                  </div>
+                  {selectedEvent.serviceName && (
+                    <div style={{ fontSize: '12px', color: '#059669', fontWeight: '700', marginTop: '2px' }}>
+                      ✂️ {selectedEvent.serviceName}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                  Nueva Fecha *
+                </label>
+                <input
+                  type="date"
+                  value={rescheduleDate}
+                  onChange={e => setRescheduleDate(e.target.value)}
+                  style={{ width: '100%', padding: '11px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                  Nueva Hora *
+                </label>
+                <input
+                  type="time"
+                  value={rescheduleTime}
+                  onChange={e => setRescheduleTime(e.target.value)}
+                  style={{ width: '100%', padding: '11px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '18px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                  Motivo de Reprogramación (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={rescheduleReason}
+                  onChange={e => setRescheduleReason(e.target.value)}
+                  placeholder="Ej. Solicitud del cliente / Imprevisto en salón"
+                  style={{ width: '100%', padding: '11px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                />
+                <span style={{ fontSize: '11px', color: '#64748B', display: 'block', marginTop: '4px' }}>
+                  Se notificará automáticamente al cliente vía Push y se generará enlace de WhatsApp.
+                </span>
+              </div>
+
+              <button
+                type="button"
+                disabled={isRescheduling}
+                onClick={handleConfirmReschedule}
+                className="ff-btn-primary"
+                style={{ width: '100%', padding: '13px', fontSize: '14px', borderRadius: '12px' }}
+              >
+                {isRescheduling ? 'Reprogramando...' : 'Confirmar Nueva Hora ✓'}
+              </button>
+            </div>
           </div>
         </IonModal>
 

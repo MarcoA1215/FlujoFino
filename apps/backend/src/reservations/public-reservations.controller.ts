@@ -555,7 +555,7 @@ export class PublicReservationsController {
       paymentReported: Boolean(reservation.paymentReported),
       paymentProofUrl: reservation.paymentProofUrl || null,
       paymentRejectedReason: reservation.paymentRejectedReason || null,
-      durationMinutes: serviceDetails?.durationMinutes || 30,
+      durationMinutes: reservation.durationMinutes || serviceDetails?.durationMinutes || 30,
       abonosHistory: reservation.abonosHistory || [],
       // Financial settings:
       exchangeRateBs: exchangeRate,
@@ -624,8 +624,19 @@ export class PublicReservationsController {
     const methodLabel = dto.method === 'PAGO_MOVIL' ? 'Pago Móvil' : dto.method === 'BINANCE' ? 'Binance' : dto.method === 'TRANSFER' ? 'Transferencia' : 'Pago';
     const noteTag = `[Pago Reportado: $${Number(dto.amount).toFixed(2)} vía ${methodLabel} Ref: ${dto.reference.trim()}]`;
     reservation.notes = reservation.notes ? `${reservation.notes} | ${noteTag}` : noteTag;
-
     await reservationRepo.save(reservation);
+
+    try {
+      await this.notificationsService.sendNotificationToNegocio(reservation.tenantId, {
+        title: '📱 Comprobante de Pago Recibido',
+        body: `${reservation.customerName} reportó un pago de $${Number(dto.amount).toFixed(2)} (${methodLabel}). Revisa y valida en Citas.`,
+        data: {
+          url: '/reservations',
+          reservationId: reservation.id,
+          type: 'PAYMENT_REPORTED'
+        }
+      }, ['ADMIN', 'CAJERO']);
+    } catch (err) {}
 
     return {
       success: true,
@@ -787,11 +798,39 @@ export class PublicReservationsController {
       throw new BadRequestException('El nuevo horario no está disponible o choca con otra cita.');
     }
 
+    const oldTimeStr = reservation.time.substring(0, 5);
+    const oldDateStr = reservation.date;
+    if (!reservation.originalTime) reservation.originalTime = oldTimeStr;
+    if (!reservation.originalDate) reservation.originalDate = oldDateStr;
+
     reservation.date = dto.date;
     reservation.time = dto.time.length <= 5 ? dto.time + ':00' : dto.time;
     reservation.status = ReservationStatus.PENDING; // Rescheduling resets to pending usually
     reservation.rescheduleStatus = 'ACCEPTED';
-    await reservationRepo.save(reservation);
+    const saved = await reservationRepo.save(reservation);
+
+    const newTimeDisplay = saved.time.substring(0, 5);
+
+    // Notificar al negocio
+    try {
+      await this.notificationsService.sendNotificationToNegocio(reservation.tenantId, {
+        title: '🗓️ Cita Reprogramada por Cliente',
+        body: `${reservation.customerName} reprogramó su cita del ${oldDateStr} (${oldTimeStr}) para el ${saved.date} a las ${newTimeDisplay}.`,
+        data: {
+          url: '/reservations',
+          reservationId: reservation.id,
+          type: 'APPOINTMENT_RESCHEDULED'
+        }
+      }, ['ADMIN', 'CAJERO']);
+    } catch (err) {}
+
+    // Notificar confirmación al cliente
+    try {
+      await this.notificationsService.notifyCustomerAppointment(saved, {
+        title: '🗓️ Cita Reprogramada Exitosamente',
+        body: `Tu cita fue actualizada para el ${saved.date} a las ${newTimeDisplay}.`
+      });
+    } catch (err) {}
 
     return { success: true };
   }
@@ -912,9 +951,9 @@ export class PublicReservationsController {
     const busyIntervals = existing.map(r => {
       const [rh, rm] = r.time.split(':').map(Number);
       const startMins = rh * 60 + rm;
-      let rDuration = 0;
+      let rDuration = Number(r.durationMinutes) || 0;
       
-      if (r.serviceId) {
+      if (rDuration === 0 && r.serviceId) {
         const ids = r.serviceId.split(',').map(s => s.trim()).filter(Boolean);
         for (const id of ids) {
           const sp = productMap.get(id);

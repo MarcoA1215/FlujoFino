@@ -147,6 +147,29 @@ export class NotificationsService {
     return this.sendNotificationToNegocio(negocioId, payload, ['ADMIN', 'CAJERO']);
   }
 
+  async notifyCustomerAppointment(
+    reservation: { id: string; customerPhone?: string; identification?: string; [key: string]: any },
+    payload: { title: string; body: string; data?: any }
+  ): Promise<number> {
+    if (!reservation) return 0;
+    let sent = 0;
+    const fullPayload = {
+      ...payload,
+      data: {
+        url: `/appointment/${reservation.id}`,
+        reservationId: reservation.id,
+        ...(payload.data || {})
+      }
+    };
+    if (reservation.customerPhone) {
+      sent += await this.sendNotificationToIdentifier(reservation.customerPhone, fullPayload);
+    }
+    if (reservation.identification && reservation.identification !== reservation.customerPhone) {
+      sent += await this.sendNotificationToIdentifier(reservation.identification, fullPayload);
+    }
+    return sent;
+  }
+
   async sendNotificationToIdentifier(
     identifier: string,
     payload: { title: string; body: string; data?: any },

@@ -360,8 +360,14 @@ const PublicAppointmentManage: React.FC = () => {
                     <strong style={{ color: '#0f172a' }}>Cliente:</strong> {appointment.customerName}
                   </p>
                   <p style={{ margin: '0 0 10px 0', color: '#334155' }}>
-                    <strong style={{ color: '#0f172a' }}>Servicio:</strong> {appointment.serviceName || 'Reserva Estándar'}
+                    <strong style={{ color: '#0f172a' }}>Servicio:</strong> {appointment.serviceName || 'Reserva Estándar'} ({Number(appointment.durationMinutes) || 30} min)
                   </p>
+                  {appointment.rescheduleStatus === 'DELAYED' && (
+                    <div style={{ backgroundColor: '#fffbe8', border: '1px solid #fde68a', borderRadius: '8px', padding: '8px 12px', marginBottom: '10px', fontSize: '12px', color: '#92400e', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <IonIcon icon={timeOutline} style={{ fontSize: '16px', color: '#d97706' }} />
+                      Horario ajustado por retraso en sala: {appointment.time} {appointment.originalTime ? `(Original: ${appointment.originalTime})` : ''}
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: '16px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #e2e8f0' }}>
                     <p style={{ margin: 0, display: 'flex', alignItems: 'center', fontSize: '14px', fontWeight: '500', color: '#475569' }}>
                       <IonIcon icon={calendarOutline} style={{ marginRight: '6px', color: 'var(--ion-color-primary)' }}/> {appointment.date}

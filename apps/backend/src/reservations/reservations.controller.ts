@@ -82,5 +82,14 @@ export class ReservationsController {
   ) {
     return this.service.notifyDelay(req.user.tenantId, id, Number(minutes) || 15);
   }
+
+  @Post(':id/reschedule')
+  reschedule(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: { date: string; time: string; reason?: string },
+  ) {
+    return this.service.reschedule(req.user.tenantId, id, dto);
+  }
 }
 

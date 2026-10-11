@@ -98,6 +98,12 @@ export class Reservation {
   @Column({ nullable: true })
   originalDate: string;
 
+  @Column({ type: 'int', default: 30 })
+  durationMinutes: number;
+
+  @Column({ nullable: true })
+  rescheduleReason: string;
+
   @Column({ type: 'text', nullable: true })
   imageUrl?: string | null;
 

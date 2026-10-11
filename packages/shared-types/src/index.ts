@@ -226,6 +226,13 @@ export interface ReservationDTO {
   abonosTotal?: number;
   notes?: string;
   imageUrl?: string;
+  durationMinutes?: number;
+  rescheduleReason?: string;
+  originalTime?: string;
+  originalDate?: string;
+  rescheduleStatus?: string;
+  employeeId?: string;
+  employeeName?: string;
 }
 
 export interface BusinessHourDay {
