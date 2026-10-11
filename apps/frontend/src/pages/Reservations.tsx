@@ -833,6 +833,16 @@ const Reservations: React.FC = () => {
                                   ⏱️ Retrasada
                                 </span>
                               )}
+                              {res.rescheduleStatus === 'PENDING_ACCEPTANCE' && (
+                                <span style={{ fontSize: '10px', background: '#FEF3C7', color: '#B45309', padding: '2px 6px', borderRadius: '6px', fontWeight: '800' }}>
+                                  ⏳ Reprogramada (Por Aceptar)
+                                </span>
+                              )}
+                              {res.rescheduleStatus === 'ACCEPTED' && (
+                                <span style={{ fontSize: '10px', background: '#ECFDF5', color: '#065F46', padding: '2px 6px', borderRadius: '6px', fontWeight: '800' }}>
+                                  ✓ Reprogramación Aceptada
+                                </span>
+                              )}
                               {res.rescheduleStatus === 'RESCHEDULED_BY_ADMIN' && (
                                 <span style={{ fontSize: '10px', background: '#EFF6FF', color: '#1D4ED8', padding: '2px 6px', borderRadius: '6px', fontWeight: '800' }}>
                                   🗓️ Reprogramada
@@ -1326,6 +1336,16 @@ const Reservations: React.FC = () => {
                       {selectedEvent.rescheduleStatus === 'DELAYED' && (
                         <span style={{ fontSize: '11px', background: '#FEF3C7', color: '#92400E', padding: '2px 8px', borderRadius: '6px', fontWeight: '800' }}>
                           ⏱️ Retrasada {selectedEvent.originalTime ? `(Original: ${selectedEvent.originalTime})` : ''}
+                        </span>
+                      )}
+                      {selectedEvent.rescheduleStatus === 'PENDING_ACCEPTANCE' && (
+                        <span style={{ fontSize: '11px', background: '#FEF3C7', color: '#B45309', padding: '2px 8px', borderRadius: '6px', fontWeight: '800' }}>
+                          ⏳ Reprogramada (Por Aceptar por Cliente) {selectedEvent.originalDate ? `(Orig: ${selectedEvent.originalDate} ${selectedEvent.originalTime || ''})` : ''}
+                        </span>
+                      )}
+                      {selectedEvent.rescheduleStatus === 'ACCEPTED' && (
+                        <span style={{ fontSize: '11px', background: '#ECFDF5', color: '#065F46', padding: '2px 8px', borderRadius: '6px', fontWeight: '800' }}>
+                          ✓ Aceptada por el Cliente {selectedEvent.originalDate ? `(Orig: ${selectedEvent.originalDate} ${selectedEvent.originalTime || ''})` : ''}
                         </span>
                       )}
                       {selectedEvent.rescheduleStatus === 'RESCHEDULED_BY_ADMIN' && (

@@ -327,30 +327,38 @@ const PublicAppointmentManage: React.FC = () => {
                   </span>
                 </div>
 
-                {appointment.rescheduleStatus === 'PENDING_ACCEPTANCE' && (
+                {(appointment.rescheduleStatus === 'PENDING_ACCEPTANCE' || appointment.rescheduleStatus === 'RESCHEDULED_BY_ADMIN') && (
                   <div style={{ backgroundColor: '#fff7ed', border: '1px solid #fdba74', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#c2410c', fontWeight: 'bold', fontSize: '15px' }}>
                       <IonIcon icon={timeOutline} style={{ fontSize: '20px' }} />
                       Tu cita ha sido reprogramada
                     </div>
-                    <p style={{ fontSize: '13px', color: '#7c2d12', margin: '8px 0 14px 0', lineHeight: '1.4' }}>
-                      Debido a un imprevisto en el servicio, tu cita que originalmente era a las <strong>{appointment.originalTime || 'hora anterior'}</strong> ha sido reprogramada para las <strong>{appointment.time}</strong>. ¿Estás de acuerdo con este nuevo horario?
+                    <p style={{ fontSize: '13px', color: '#7c2d12', margin: '8px 0 8px 0', lineHeight: '1.4' }}>
+                      Tu cita que originalmente era el <strong>{appointment.originalDate || appointment.date}</strong> a las <strong>{appointment.originalTime || 'hora anterior'}</strong> ha sido reprogramada para el <strong>{appointment.date}</strong> a las <strong>{appointment.time}</strong>.
+                    </p>
+                    {appointment.rescheduleReason && (
+                      <div style={{ fontSize: '12px', background: '#ffedd5', padding: '6px 10px', borderRadius: '8px', color: '#9a3412', marginBottom: '10px', fontWeight: '500' }}>
+                        💬 Motivo: {appointment.rescheduleReason}
+                      </div>
+                    )}
+                    <p style={{ fontSize: '13px', color: '#7c2d12', margin: '0 0 12px 0', fontWeight: '600' }}>
+                      ¿Estás de acuerdo con este nuevo horario?
                     </p>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       <IonButton expand="block" color="success" style={{ flex: 1, minWidth: '140px' }} onClick={handleAcceptReschedule}>
-                        Aceptar Nuevo Horario
+                        Aceptar Nuevo Horario ✓
                       </IonButton>
                       <IonButton expand="block" color="warning" fill="outline" style={{ flex: 1, minWidth: '140px' }} onClick={() => setShowReschedule(true)}>
-                        Elegir Otro Horario
+                        Elegir Otro Horario 🗓️
                       </IonButton>
                     </div>
                   </div>
                 )}
 
-                {appointment.rescheduleStatus === 'ACCEPTED' && appointment.originalTime && (
+                {appointment.rescheduleStatus === 'ACCEPTED' && (appointment.originalTime || appointment.originalDate) && (
                   <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <IonIcon icon={checkmarkCircleOutline} style={{ fontSize: '18px', color: '#16a34a' }} />
-                    Horario reprogramado ({appointment.time}) aceptado y confirmado.
+                    Horario reprogramado ({appointment.date} a las {appointment.time}) aceptado y confirmado.
                   </div>
                 )}
 

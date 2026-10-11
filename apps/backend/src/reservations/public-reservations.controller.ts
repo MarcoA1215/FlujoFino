@@ -512,13 +512,13 @@ export class PublicReservationsController {
     }
 
     // Auto-acceptance logic:
-    // Si llega la hora de su anterior cita antes de la reprogramación y no ha aceptado, se marca como aceptada automáticamente
-    if (reservation.rescheduleStatus === 'PENDING_ACCEPTANCE' && reservation.originalTime) {
-      const origDateStr = reservation.originalDate || reservation.date;
-      const [h, m] = reservation.originalTime.split(':').map(Number);
-      const originalDateTime = new Date(`${origDateStr}T${(h || 0).toString().padStart(2, '0')}:${(m || 0).toString().padStart(2, '0')}:00`);
-      
-      if (new Date() >= originalDateTime) {
+    // Solo si llega y pasa la hora de la NUEVA cita reprogramada se considera aceptada por transcurso del tiempo
+    if ((reservation.rescheduleStatus === 'PENDING_ACCEPTANCE' || reservation.rescheduleStatus === 'RESCHEDULED_BY_ADMIN') && reservation.time && reservation.date) {
+      const targetDateStr = reservation.date;
+      const [h, m] = (reservation.time || '00:00').trim().split(':').map(Number);
+      const targetDateTime = new Date(`${targetDateStr}T${(h || 0).toString().padStart(2, '0')}:${(m || 0).toString().padStart(2, '0')}:00`);
+
+      if (new Date() >= targetDateTime) {
         reservation.rescheduleStatus = 'ACCEPTED';
         await reservationRepo.save(reservation);
       }
@@ -542,6 +542,7 @@ export class PublicReservationsController {
       originalTime: reservation.originalTime ? reservation.originalTime.substring(0, 5) : null,
       originalDate: reservation.originalDate || reservation.date,
       rescheduleStatus: reservation.rescheduleStatus,
+      rescheduleReason: reservation.rescheduleReason || null,
       serviceId: reservation.serviceId,
       serviceName: reservation.serviceName,
       status: reservation.status,

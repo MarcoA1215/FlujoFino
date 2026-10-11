@@ -427,7 +427,7 @@ export class ReservationsService {
       if (dateChanged || timeChanged) {
         if (!reservation.originalTime) reservation.originalTime = reservation.time.substring(0, 5);
         if (!reservation.originalDate) reservation.originalDate = reservation.date;
-        reservation.rescheduleStatus = 'RESCHEDULED_BY_ADMIN';
+        reservation.rescheduleStatus = 'PENDING_ACCEPTANCE';
       }
 
       delete dto.id; // Security: cannot change ID
@@ -444,7 +444,7 @@ export class ReservationsService {
         try {
           await this.notificationsService.notifyCustomerAppointment(saved, {
             title: '🗓️ Tu Cita fue Actualizada',
-            body: `Tu cita para "${saved.serviceName || 'Servicio'}" ahora es el ${saved.date} a las ${saved.time.substring(0, 5)}.`
+            body: `Tu cita para "${saved.serviceName || 'Servicio'}" ahora es el ${saved.date} a las ${saved.time.substring(0, 5)}. Por favor verifica los detalles en tu enlace.`
           });
         } catch (err) {}
       }
@@ -479,7 +479,7 @@ export class ReservationsService {
 
       reservation.date = dto.date;
       reservation.time = tfFormatted;
-      reservation.rescheduleStatus = 'RESCHEDULED_BY_ADMIN';
+      reservation.rescheduleStatus = 'PENDING_ACCEPTANCE';
       if (dto.reason) reservation.rescheduleReason = dto.reason.trim();
 
       const saved = await manager.save(Reservation, reservation);
