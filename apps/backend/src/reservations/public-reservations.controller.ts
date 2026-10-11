@@ -779,60 +779,65 @@ export class PublicReservationsController {
 
   @Put('appointment/:id/reschedule')
   async rescheduleAppointment(@Param('id') id: string, @Body() dto: { date: string, time: string }) {
-    const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
-    const reservation = await reservationRepo.findOne({ where: { id } });
-    
-    if (!reservation) throw new NotFoundException('Cita no encontrada');
-    if (reservation.status === ReservationStatus.COMPLETED || reservation.status === ReservationStatus.CANCELED) {
-      throw new BadRequestException('No puedes reprogramar una cita pasada o cancelada.');
-    }
+    return await this.tenantRepo.manager.transaction(async (manager) => {
+      const reservationRepo = manager.getRepository(Reservation);
+      const reservation = await reservationRepo.findOne({ where: { id } });
 
-    const today = new Date().toISOString().split('T')[0];
-    if (dto.date < today) {
-      throw new BadRequestException('No puedes agendar en el pasado.');
-    }
+      if (!reservation) throw new NotFoundException('Cita no encontrada');
+      if (reservation.status === ReservationStatus.COMPLETED || reservation.status === ReservationStatus.CANCELED) {
+        throw new BadRequestException('No puedes reprogramar una cita pasada o cancelada.');
+      }
 
-    // validate availability
-    const isAvailable = await this.checkSlotAvailability(reservation.tenantId, dto.date, dto.time, reservation.serviceId, reservation.id, reservation.employeeId);
-    if (!isAvailable) {
-      throw new BadRequestException('El nuevo horario no está disponible o choca con otra cita.');
-    }
+      const today = new Date().toISOString().split('T')[0];
+      if (dto.date < today) {
+        throw new BadRequestException('No puedes agendar en el pasado.');
+      }
 
-    const oldTimeStr = reservation.time.substring(0, 5);
-    const oldDateStr = reservation.date;
-    if (!reservation.originalTime) reservation.originalTime = oldTimeStr;
-    if (!reservation.originalDate) reservation.originalDate = oldDateStr;
+      // Concurrency lock for date & tenant
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`${reservation.tenantId}_${dto.date}`]);
 
-    reservation.date = dto.date;
-    reservation.time = dto.time.length <= 5 ? dto.time + ':00' : dto.time;
-    reservation.status = ReservationStatus.PENDING; // Rescheduling resets to pending usually
-    reservation.rescheduleStatus = 'ACCEPTED';
-    const saved = await reservationRepo.save(reservation);
+      // validate availability
+      const isAvailable = await this.checkSlotAvailability(reservation.tenantId, dto.date, dto.time, reservation.serviceId, reservation.id, reservation.employeeId);
+      if (!isAvailable) {
+        throw new BadRequestException('El nuevo horario no está disponible o choca con otra cita.');
+      }
 
-    const newTimeDisplay = saved.time.substring(0, 5);
+      const oldTimeStr = reservation.time.substring(0, 5);
+      const oldDateStr = reservation.date;
+      if (!reservation.originalTime) reservation.originalTime = oldTimeStr;
+      if (!reservation.originalDate) reservation.originalDate = oldDateStr;
 
-    // Notificar al negocio
-    try {
-      await this.notificationsService.sendNotificationToNegocio(reservation.tenantId, {
-        title: '🗓️ Cita Reprogramada por Cliente',
-        body: `${reservation.customerName} reprogramó su cita del ${oldDateStr} (${oldTimeStr}) para el ${saved.date} a las ${newTimeDisplay}.`,
-        data: {
-          url: '/reservations',
-          reservationId: reservation.id,
-          type: 'APPOINTMENT_RESCHEDULED'
-        }
-      }, ['ADMIN', 'CAJERO']);
-    } catch (err) {}
+      reservation.date = dto.date;
+      reservation.time = dto.time.length <= 5 ? dto.time + ':00' : dto.time;
+      reservation.status = ReservationStatus.PENDING; // Rescheduling resets to pending usually
+      reservation.rescheduleStatus = 'ACCEPTED';
+      const saved = await reservationRepo.save(reservation);
 
-    // Notificar confirmación al cliente
-    try {
-      await this.notificationsService.notifyCustomerAppointment(saved, {
-        title: '🗓️ Cita Reprogramada Exitosamente',
-        body: `Tu cita fue actualizada para el ${saved.date} a las ${newTimeDisplay}.`
-      });
-    } catch (err) {}
+      const newTimeDisplay = saved.time.substring(0, 5);
 
-    return { success: true };
+      // Notificar al negocio
+      try {
+        await this.notificationsService.sendNotificationToNegocio(reservation.tenantId, {
+          title: '🗓️ Cita Reprogramada por Cliente',
+          body: `${reservation.customerName} reprogramó su cita del ${oldDateStr} (${oldTimeStr}) para el ${saved.date} a las ${newTimeDisplay}.`,
+          data: {
+            url: '/reservations',
+            reservationId: reservation.id,
+            type: 'APPOINTMENT_RESCHEDULED'
+          }
+        }, ['ADMIN', 'CAJERO']);
+      } catch (err) {}
+
+      // Notificar confirmación al cliente
+      try {
+        await this.notificationsService.notifyCustomerAppointment(saved, {
+          title: '🗓️ Cita Reprogramada Exitosamente',
+          body: `Tu cita fue actualizada para el ${saved.date} a las ${newTimeDisplay}.`
+        });
+      } catch (err) {}
+
+      return { success: true };
+    });
   }
 
   @Put('appointment/:id/cancel')
@@ -896,34 +901,24 @@ export class PublicReservationsController {
       shifts.push({ start: s2h * 60 + s2m, end: e2h * 60 + e2m });
     }
 
-    // Fetch employee individual settings if employeeId provided
-    let empAccess: UserTenantAccess | null = null;
-    if (employeeId) {
-      const accessRepo = this.tenantRepo.manager.getRepository(UserTenantAccess);
-      empAccess = await accessRepo.findOne({
-        where: { userId: employeeId, tenantId, isActive: true, status: 'ACCEPTED' },
-      });
-    }
-
     const toMins = (t: string) => {
       const [h, m] = t.split(':').map(Number);
       return h * 60 + m;
     };
 
-    // Fetch existing reservations
-    const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
-    const qb = reservationRepo.createQueryBuilder('res')
-      .where('res.tenantId = :tenantId', { tenantId })
-      .andWhere('res.date = :date', { date })
-      .andWhere('res.status IN (:...statuses)', { statuses: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] });
-      
-    if (excludeReservationId) {
-      qb.andWhere('res.id != :exclude', { exclude: excludeReservationId });
-    }
-    if (employeeId) {
-      qb.andWhere('(res.employeeId = :employeeId OR res.employeeId IS NULL)', { employeeId });
-    }
-    const existing = await qb.getMany();
+    // Query active staff in tenant
+    const accessRepo = this.tenantRepo.manager.getRepository(UserTenantAccess);
+    const allAccesses = await accessRepo.find({
+      where: { tenantId, isActive: true, status: 'ACCEPTED' },
+      relations: { user: true },
+    });
+    const staffList = allAccesses.filter(a => {
+      if (!a.user) return false;
+      const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
+        ? a.roles
+        : [a.role || a.user.role].filter(Boolean);
+      return !userRoles.every(r => r === UserRole.DELIVERY || r === UserRole.OPERATIVO);
+    });
 
     // Query products for service durations (match by ID and name)
     const productRepo = this.tenantRepo.manager.getRepository(Product);
@@ -947,12 +942,52 @@ export class PublicReservationsController {
       duration = interval;
     }
 
-    // Map existing into busy intervals [startMins, endMins]
-    const busyIntervals = existing.map(r => {
+    // Determine candidate staff pool
+    let candidateStaff = staffList;
+    if (employeeId) {
+      candidateStaff = staffList.filter(s => s.userId === employeeId);
+      if (candidateStaff.length === 0) {
+        const single = await accessRepo.findOne({
+          where: { userId: employeeId, tenantId, isActive: true, status: 'ACCEPTED' },
+        });
+        if (single) candidateStaff = [single];
+      }
+    } else if (serviceId) {
+      const requestedServices = serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean);
+      const requiredStaffIdSets = requestedServices
+        .map(s => (s as any)?.assignedStaffIds || [])
+        .filter(arr => Array.isArray(arr) && arr.length > 0);
+
+      if (requiredStaffIdSets.length > 0) {
+        candidateStaff = candidateStaff.filter(st =>
+          requiredStaffIdSets.every(set => set.includes(st.userId))
+        );
+      }
+    }
+
+    // Fetch existing reservations
+    const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
+    const qb = reservationRepo.createQueryBuilder('res')
+      .where('res.tenantId = :tenantId', { tenantId })
+      .andWhere('res.date = :date', { date })
+      .andWhere('res.status IN (:...statuses)', { statuses: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] });
+
+    if (excludeReservationId) {
+      qb.andWhere('res.id != :exclude', { exclude: excludeReservationId });
+    }
+    const existing = await qb.getMany();
+
+    interface BusyBooking {
+      employeeId: string | null;
+      start: number;
+      end: number;
+    }
+
+    const busyBookings: BusyBooking[] = existing.map(r => {
       const [rh, rm] = r.time.split(':').map(Number);
       const startMins = rh * 60 + rm;
       let rDuration = Number(r.durationMinutes) || 0;
-      
+
       if (rDuration === 0 && r.serviceId) {
         const ids = r.serviceId.split(',').map(s => s.trim()).filter(Boolean);
         for (const id of ids) {
@@ -979,13 +1014,20 @@ export class PublicReservationsController {
         rDuration = interval;
       }
 
-      return { start: startMins, end: startMins + rDuration };
+      return {
+        employeeId: r.employeeId || null,
+        start: startMins,
+        end: startMins + rDuration
+      };
     });
 
     const slots: string[] = [];
-    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Caracas', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-    const [vzH, vzM] = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Caracas', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).split(':').map(Number);
-    const currentRealMins = vzH * 60 + vzM;
+    const timeZone = (settings as any)?.timezone || process.env.BUSINESS_TIMEZONE || 'America/Caracas';
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const [nowH, nowM] = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).split(':').map(Number);
+    const currentRealMins = nowH * 60 + nowM;
+
+    const isSoloBusiness = staffList.length === 0;
 
     for (const shift of shifts) {
       let currentMins = shift.start;
@@ -998,38 +1040,86 @@ export class PublicReservationsController {
 
         const slotEnd = currentMins + duration;
 
-        // Check employee constraints if employeeId provided
-        if (empAccess) {
-          // Lunch break exclusion: slotStart < toMins(lunchEnd) && slotEnd > toMins(lunchStart)
-          if (empAccess.lunchStart && empAccess.lunchEnd) {
-            const lStart = toMins(empAccess.lunchStart);
-            const lEnd = toMins(empAccess.lunchEnd);
-            if (currentMins < lEnd && slotEnd > lStart) {
+        if (isSoloBusiness) {
+          // Solo business (single operator / no staff accounts configured)
+          const hasOverlap = busyBookings.some(b => currentMins < b.end && slotEnd > b.start);
+          if (!hasOverlap) {
+            const timeStr = this.minutesToTime(currentMins).substring(0, 5);
+            if (!slots.includes(timeStr)) {
+              slots.push(timeStr);
+            }
+          }
+        } else if (employeeId) {
+          // Specific employee requested
+          const emp = candidateStaff[0];
+          if (emp) {
+            // Check shift bounds
+            if (emp.entryTime && currentMins < toMins(emp.entryTime)) {
               currentMins += interval;
               continue;
             }
-          }
+            if (emp.exitTime && slotEnd > toMins(emp.exitTime)) {
+              currentMins += interval;
+              continue;
+            }
+            // Check lunch break
+            if (emp.lunchStart && emp.lunchEnd) {
+              const lStart = toMins(emp.lunchStart);
+              const lEnd = toMins(emp.lunchEnd);
+              if (currentMins < lEnd && slotEnd > lStart) {
+                currentMins += interval;
+                continue;
+              }
+            }
+            // Check direct overlapping reservations for this employee
+            const empDirectOverlap = busyBookings.some(
+              b => b.employeeId === emp.userId && currentMins < b.end && slotEnd > b.start
+            );
+            if (!empDirectOverlap) {
+              // Also ensure unassigned bookings haven't exhausted all working staff capacity
+              const unassignedCount = busyBookings.filter(
+                b => !b.employeeId && currentMins < b.end && slotEnd > b.start
+              ).length;
+              if (unassignedCount > 0) {
+                const totalFreeWorkingStaff = staffList.filter(s => {
+                  if (s.entryTime && currentMins < toMins(s.entryTime)) return false;
+                  if (s.exitTime && slotEnd > toMins(s.exitTime)) return false;
+                  if (s.lunchStart && s.lunchEnd && currentMins < toMins(s.lunchEnd) && slotEnd > toMins(s.lunchStart)) return false;
+                  return !busyBookings.some(b => b.employeeId === s.userId && currentMins < b.end && slotEnd > b.start);
+                }).length;
 
-          // Individual shift constraints:
-          if (empAccess.entryTime && currentMins < toMins(empAccess.entryTime)) {
-            currentMins += interval;
-            continue;
-          }
-          if (empAccess.exitTime && slotEnd > toMins(empAccess.exitTime)) {
-            currentMins += interval;
-            continue;
-          }
-        }
+                if (totalFreeWorkingStaff <= unassignedCount) {
+                  currentMins += interval;
+                  continue;
+                }
+              }
 
-        // Check overlap: new slot [currentMins, slotEnd) overlaps with [busy.start, busy.end)
-        const overlaps = busyIntervals.some(busy => {
-          return currentMins < busy.end && slotEnd > busy.start;
-        });
+              const timeStr = this.minutesToTime(currentMins).substring(0, 5);
+              if (!slots.includes(timeStr)) {
+                slots.push(timeStr);
+              }
+            }
+          }
+        } else {
+          // General / Multi-staff capacity calculation
+          const freeCandidateStaff = candidateStaff.filter(st => {
+            if (st.entryTime && currentMins < toMins(st.entryTime)) return false;
+            if (st.exitTime && slotEnd > toMins(st.exitTime)) return false;
+            if (st.lunchStart && st.lunchEnd && currentMins < toMins(st.lunchEnd) && slotEnd > toMins(st.lunchStart)) return false;
+            return !busyBookings.some(b => b.employeeId === st.userId && currentMins < b.end && slotEnd > b.start);
+          });
 
-        if (!overlaps) {
-          const timeStr = this.minutesToTime(currentMins).substring(0, 5);
-          if (!slots.includes(timeStr)) {
-            slots.push(timeStr);
+          const unassignedOverlapCount = busyBookings.filter(
+            b => !b.employeeId && currentMins < b.end && slotEnd > b.start
+          ).length;
+
+          const availableCapacity = freeCandidateStaff.length - unassignedOverlapCount;
+
+          if (availableCapacity > 0) {
+            const timeStr = this.minutesToTime(currentMins).substring(0, 5);
+            if (!slots.includes(timeStr)) {
+              slots.push(timeStr);
+            }
           }
         }
 

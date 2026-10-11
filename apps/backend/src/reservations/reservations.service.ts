@@ -3,7 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, EntityManager } from 'typeorm';
 import { Reservation } from '../entities/reservation.entity';
 import { Order } from '../entities/order.entity';
-import { ReservationStatus, PaymentStatus } from '@finowork/shared-types';
+import { ReservationStatus, PaymentStatus, UserRole } from '@finowork/shared-types';
+import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
@@ -88,20 +89,6 @@ export class ReservationsService {
     manager?: EntityManager,
     explicitDuration?: number,
   ) {
-    const resRepo = manager ? manager.getRepository(Reservation) : this.repo;
-    const qb = resRepo.createQueryBuilder('res')
-      .where('res.tenantId = :tenantId', { tenantId })
-      .andWhere('res.date = :date', { date })
-      .andWhere('res.status IN (:...statuses)', { statuses: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] });
-
-    if (excludeId) {
-      qb.andWhere('res.id != :exclude', { exclude: excludeId });
-    }
-    if (employeeId) {
-      qb.andWhere('(res.employeeId = :employeeId OR res.employeeId IS NULL)', { employeeId });
-    }
-    const existing = await qb.getMany();
-
     const em = manager || this.repo.manager;
     const settingsRepo = em.getRepository('Settings');
     const settings: any = await settingsRepo.findOne({ where: { tenantId } });
@@ -136,39 +123,53 @@ export class ReservationsService {
     const reqStart = th * 60 + tm;
     const reqEnd = reqStart + reqDuration;
 
-    if (employeeId) {
-      const accessRepo = this.repo.manager.getRepository('UserTenantAccess');
-      const access: any = await accessRepo.findOne({ where: { userId: employeeId, tenantId } });
-      if (access) {
-        const toMins = (t: string) => {
-          const [h, m] = t.split(':').map(Number);
-          return h * 60 + m;
-        };
-        if (access.lunchStart && access.lunchEnd) {
-          const lStart = toMins(access.lunchStart);
-          const lEnd = toMins(access.lunchEnd);
-          if (reqStart < lEnd && reqEnd > lStart) {
-            throw new BadRequestException(
-              `El especialista seleccionado se encuentra en su horario de almuerzo/receso (${access.lunchStart} a ${access.lunchEnd}).`
-            );
-          }
-        }
-        if (access.entryTime && reqStart < toMins(access.entryTime)) {
-          throw new BadRequestException(
-            `El especialista seleccionado ingresa a las ${access.entryTime}. La cita inicia antes de su jornada laboral.`
-          );
-        }
-        if (access.exitTime && reqEnd > toMins(access.exitTime)) {
-          throw new BadRequestException(
-            `El especialista seleccionado culmina a las ${access.exitTime}. La cita excede su jornada laboral.`
-          );
-        }
-      }
+    const toMins = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    const formatTime = (m: number) => {
+      const h = Math.floor(m / 60);
+      const min = m % 60;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${h12}:${min.toString().padStart(2, '0')} ${ampm}`;
+    };
+
+    // Query active staff in tenant
+    const accessRepo = em.getRepository(UserTenantAccess);
+    const allStaff = await accessRepo.find({
+      where: { tenantId, isActive: true, status: 'ACCEPTED' },
+      relations: { user: true },
+    });
+    const staffList = allStaff.filter(a => {
+      if (!a.user) return false;
+      const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
+        ? a.roles
+        : [a.role || a.user.role].filter(Boolean);
+      return !userRoles.every(r => r === UserRole.DELIVERY || r === UserRole.OPERATIVO);
+    });
+
+    // Query existing pending/confirmed reservations
+    const resRepo = em.getRepository(Reservation);
+    const qb = resRepo.createQueryBuilder('res')
+      .where('res.tenantId = :tenantId', { tenantId })
+      .andWhere('res.date = :date', { date })
+      .andWhere('res.status IN (:...statuses)', { statuses: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] });
+
+    if (excludeId) {
+      qb.andWhere('res.id != :exclude', { exclude: excludeId });
+    }
+    const existing = await qb.getMany();
+
+    interface BusyBooking {
+      employeeId: string | null;
+      customerName: string;
+      start: number;
+      end: number;
     }
 
-    if (existing.length === 0) return;
-
-    for (const res of existing) {
+    const busyBookings: BusyBooking[] = existing.map(res => {
       const [rh, rm] = res.time.split(':').map(Number);
       const exStart = rh * 60 + rm;
       let exDuration = Number(res.durationMinutes) || 0;
@@ -189,19 +190,115 @@ export class ReservationsService {
         }
       }
       if (exDuration <= 0) exDuration = interval;
-      const exEnd = exStart + exDuration;
+      return {
+        employeeId: res.employeeId || null,
+        customerName: res.customerName || 'Cliente',
+        start: exStart,
+        end: exStart + exDuration
+      };
+    });
 
-      // Overlap: reqStart < exEnd && reqEnd > exStart
-      if (reqStart < exEnd && reqEnd > exStart) {
-        const formatTime = (m: number) => {
-          const h = Math.floor(m / 60);
-          const min = m % 60;
-          const ampm = h >= 12 ? 'PM' : 'AM';
-          const h12 = h % 12 || 12;
-          return `${h12}:${min.toString().padStart(2, '0')} ${ampm}`;
-        };
+    const isSoloBusiness = staffList.length === 0;
+
+    if (isSoloBusiness) {
+      for (const b of busyBookings) {
+        if (reqStart < b.end && reqEnd > b.start) {
+          throw new BadRequestException(
+            `El horario choca con la cita de "${b.customerName}" (${formatTime(b.start)} a ${formatTime(b.end)}). Si deseas agendarla de todas formas, confirma para forzar.`
+          );
+        }
+      }
+      return;
+    }
+
+    if (employeeId) {
+      let emp = staffList.find(s => s.userId === employeeId);
+      if (!emp) {
+        emp = await accessRepo.findOne({ where: { userId: employeeId, tenantId, isActive: true, status: 'ACCEPTED' } }) as any;
+      }
+
+      if (emp) {
+        if (emp.entryTime && reqStart < toMins(emp.entryTime)) {
+          throw new BadRequestException(
+            `El especialista seleccionado ingresa a las ${emp.entryTime.substring(0, 5)}. La cita inicia antes de su jornada laboral.`
+          );
+        }
+        if (emp.exitTime && reqEnd > toMins(emp.exitTime)) {
+          throw new BadRequestException(
+            `El especialista seleccionado culmina a las ${emp.exitTime.substring(0, 5)}. La cita excede su jornada laboral.`
+          );
+        }
+        if (emp.lunchStart && emp.lunchEnd) {
+          const lStart = toMins(emp.lunchStart);
+          const lEnd = toMins(emp.lunchEnd);
+          if (reqStart < lEnd && reqEnd > lStart) {
+            throw new BadRequestException(
+              `El especialista seleccionado se encuentra en su horario de almuerzo/receso (${emp.lunchStart.substring(0, 5)} a ${emp.lunchEnd.substring(0, 5)}).`
+            );
+          }
+        }
+      }
+
+      // Check direct collision with this employee
+      const directCollision = busyBookings.find(
+        b => b.employeeId === employeeId && reqStart < b.end && reqEnd > b.start
+      );
+      if (directCollision) {
         throw new BadRequestException(
-          `El horario choca con la cita de "${res.customerName}" (${formatTime(exStart)} a ${formatTime(exEnd)}). Si deseas agendarla de todas formas, confirma para forzar.`
+          `El especialista ya tiene una cita asignada con "${directCollision.customerName}" (${formatTime(directCollision.start)} a ${formatTime(directCollision.end)}). Si deseas agendarla de todas formas, confirma para forzar.`
+        );
+      }
+
+      // Check unassigned bookings consuming total staff capacity
+      const unassignedCount = busyBookings.filter(
+        b => !b.employeeId && reqStart < b.end && reqEnd > b.start
+      ).length;
+      if (unassignedCount > 0) {
+        const totalFreeWorkingStaff = staffList.filter(s => {
+          if (s.entryTime && reqStart < toMins(s.entryTime)) return false;
+          if (s.exitTime && reqEnd > toMins(s.exitTime)) return false;
+          if (s.lunchStart && s.lunchEnd && reqStart < toMins(s.lunchEnd) && reqEnd > toMins(s.lunchStart)) return false;
+          return !busyBookings.some(b => b.employeeId === s.userId && reqStart < b.end && reqEnd > b.start);
+        }).length;
+
+        if (totalFreeWorkingStaff <= unassignedCount) {
+          throw new BadRequestException(
+            `No hay capacidad disponible a las ${formatTime(reqStart)}. Los cupos para esa hora se encuentran copados.`
+          );
+        }
+      }
+    } else {
+      // General capacity check (no specific employee selected)
+      let candidateStaff = staffList;
+      if (serviceId) {
+        const requestedServices = serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean);
+        const requiredStaffIdSets = requestedServices
+          .map(s => (s as any)?.assignedStaffIds || [])
+          .filter(arr => Array.isArray(arr) && arr.length > 0);
+
+        if (requiredStaffIdSets.length > 0) {
+          candidateStaff = candidateStaff.filter(st =>
+            requiredStaffIdSets.every(set => set.includes(st.userId))
+          );
+        }
+      }
+
+      const freeCandidateStaff = candidateStaff.filter(st => {
+        if (st.entryTime && reqStart < toMins(st.entryTime)) return false;
+        if (st.exitTime && reqEnd > toMins(st.exitTime)) return false;
+        if (st.lunchStart && st.lunchEnd && reqStart < toMins(st.lunchEnd) && reqEnd > toMins(st.lunchStart)) return false;
+        return !busyBookings.some(b => b.employeeId === st.userId && reqStart < b.end && reqEnd > b.start);
+      });
+
+      const unassignedOverlapCount = busyBookings.filter(
+        b => !b.employeeId && reqStart < b.end && reqEnd > b.start
+      ).length;
+
+      const availableCapacity = freeCandidateStaff.length - unassignedOverlapCount;
+
+      if (availableCapacity <= 0) {
+        throw new BadRequestException(
+          `No hay especialistas disponibles en este horario (${formatTime(reqStart)} a ${formatTime(reqEnd)}). Todos los especialistas se encuentran ocupados o en receso.`
         );
       }
     }
@@ -241,6 +338,10 @@ export class ReservationsService {
 
   async create(tenantId: string, dto: any) {
     return this.repo.manager.transaction(async (manager) => {
+      if (dto.date) {
+        await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`${tenantId}_${dto.date}`]);
+      }
+
       const duration = dto.durationMinutes || await this.calculateServiceDuration(tenantId, dto.serviceId, dto.serviceName);
 
       if (dto.date && dto.time && !dto.force) {
@@ -288,101 +389,114 @@ export class ReservationsService {
   }
 
   async update(tenantId: string, id: string, dto: any) {
-    const reservation = await this.repo.findOne({ where: { id, tenantId } });
-    if (!reservation) throw new BadRequestException('Reservación no encontrada');
+    return this.repo.manager.transaction(async (manager) => {
+      const reservationRepo = manager.getRepository(Reservation);
+      const reservation = await reservationRepo.findOne({ where: { id, tenantId } });
+      if (!reservation) throw new BadRequestException('Reservación no encontrada');
 
-    const duration = dto.durationMinutes || reservation.durationMinutes || await this.calculateServiceDuration(tenantId, dto.serviceId || reservation.serviceId, dto.serviceName || reservation.serviceName);
-    const targetDate = dto.date || reservation.date;
-    const targetTime = dto.time || reservation.time;
+      const targetDate = dto.date || reservation.date;
+      const targetTime = dto.time || reservation.time;
 
-    if ((dto.date || dto.time) && !dto.force) {
-      await this.validateBusinessHours(tenantId, targetDate, targetTime, duration);
-      await this.validateSlotOverlap(tenantId, targetDate, targetTime, dto.serviceId || reservation.serviceId, dto.serviceName || reservation.serviceName, id, dto.employeeId !== undefined ? dto.employeeId : reservation.employeeId, undefined, duration);
-    }
-    if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
-    if (dto.totalAmount !== undefined && dto.totalAmount < 0) throw new BadRequestException('El monto total no puede ser negativo');
+      if (targetDate) {
+        await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`${tenantId}_${targetDate}`]);
+      }
 
-    const dateChanged = dto.date && dto.date !== reservation.date;
-    const timeChanged = dto.time && dto.time.substring(0, 5) !== reservation.time.substring(0, 5);
+      const duration = dto.durationMinutes || reservation.durationMinutes || await this.calculateServiceDuration(tenantId, dto.serviceId || reservation.serviceId, dto.serviceName || reservation.serviceName);
 
-    if (dateChanged || timeChanged) {
-      if (!reservation.originalTime) reservation.originalTime = reservation.time.substring(0, 5);
-      if (!reservation.originalDate) reservation.originalDate = reservation.date;
-      reservation.rescheduleStatus = 'RESCHEDULED_BY_ADMIN';
-    }
+      if ((dto.date || dto.time) && !dto.force) {
+        await this.validateBusinessHours(tenantId, targetDate, targetTime, duration);
+        await this.validateSlotOverlap(tenantId, targetDate, targetTime, dto.serviceId || reservation.serviceId, dto.serviceName || reservation.serviceName, id, dto.employeeId !== undefined ? dto.employeeId : reservation.employeeId, manager, duration);
+      }
+      if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
+      if (dto.totalAmount !== undefined && dto.totalAmount < 0) throw new BadRequestException('El monto total no puede ser negativo');
 
-    delete dto.id; // Security: cannot change ID
-    delete dto.tenantId; // Security: cannot change tenant
-    delete dto.abonosTotal;
-    delete dto.abonosHistory;
-    
-    Object.assign(reservation, dto);
-    reservation.durationMinutes = duration;
-    this.recalculatePaymentStatus(reservation);
-    const saved = await this.repo.save(reservation);
+      const dateChanged = dto.date && dto.date !== reservation.date;
+      const timeChanged = dto.time && dto.time.substring(0, 5) !== reservation.time.substring(0, 5);
 
-    if (dateChanged || timeChanged) {
-      try {
-        await this.notificationsService.notifyCustomerAppointment(saved, {
-          title: '🗓️ Tu Cita fue Actualizada',
-          body: `Tu cita para "${saved.serviceName || 'Servicio'}" ahora es el ${saved.date} a las ${saved.time.substring(0, 5)}.`
-        });
-      } catch (err) {}
-    }
+      if (dateChanged || timeChanged) {
+        if (!reservation.originalTime) reservation.originalTime = reservation.time.substring(0, 5);
+        if (!reservation.originalDate) reservation.originalDate = reservation.date;
+        reservation.rescheduleStatus = 'RESCHEDULED_BY_ADMIN';
+      }
 
-    return saved;
+      delete dto.id; // Security: cannot change ID
+      delete dto.tenantId; // Security: cannot change tenant
+      delete dto.abonosTotal;
+      delete dto.abonosHistory;
+      
+      Object.assign(reservation, dto);
+      reservation.durationMinutes = duration;
+      this.recalculatePaymentStatus(reservation);
+      const saved = await manager.save(Reservation, reservation);
+
+      if (dateChanged || timeChanged) {
+        try {
+          await this.notificationsService.notifyCustomerAppointment(saved, {
+            title: '🗓️ Tu Cita fue Actualizada',
+            body: `Tu cita para "${saved.serviceName || 'Servicio'}" ahora es el ${saved.date} a las ${saved.time.substring(0, 5)}.`
+          });
+        } catch (err) {}
+      }
+
+      return saved;
+    });
   }
 
   async reschedule(tenantId: string, id: string, dto: { date: string; time: string; reason?: string }) {
     if (!dto.date || !dto.time) throw new BadRequestException('Fecha y hora requeridas para reprogramar');
-    const reservation = await this.repo.findOne({ where: { id, tenantId } });
-    if (!reservation) throw new NotFoundException('Cita no encontrada');
-    if (reservation.status === ReservationStatus.COMPLETED || reservation.status === ReservationStatus.CANCELED) {
-      throw new BadRequestException('No se puede reprogramar una cita completada o cancelada');
-    }
+    return this.repo.manager.transaction(async (manager) => {
+      const reservationRepo = manager.getRepository(Reservation);
+      const reservation = await reservationRepo.findOne({ where: { id, tenantId } });
+      if (!reservation) throw new NotFoundException('Cita no encontrada');
+      if (reservation.status === ReservationStatus.COMPLETED || reservation.status === ReservationStatus.CANCELED) {
+        throw new BadRequestException('No se puede reprogramar una cita completada o cancelada');
+      }
 
-    const duration = reservation.durationMinutes || await this.calculateServiceDuration(tenantId, reservation.serviceId, reservation.serviceName);
-    const tfFormatted = dto.time.length <= 5 ? dto.time + ':00' : dto.time;
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`${tenantId}_${dto.date}`]);
 
-    await this.validateBusinessHours(tenantId, dto.date, tfFormatted, duration);
-    await this.validateSlotOverlap(tenantId, dto.date, tfFormatted, reservation.serviceId, reservation.serviceName, id, reservation.employeeId, undefined, duration);
+      const duration = reservation.durationMinutes || await this.calculateServiceDuration(tenantId, reservation.serviceId, reservation.serviceName);
+      const tfFormatted = dto.time.length <= 5 ? dto.time + ':00' : dto.time;
 
-    const oldDate = reservation.date;
-    const oldTime = reservation.time.substring(0, 5);
+      await this.validateBusinessHours(tenantId, dto.date, tfFormatted, duration);
+      await this.validateSlotOverlap(tenantId, dto.date, tfFormatted, reservation.serviceId, reservation.serviceName, id, reservation.employeeId, manager, duration);
 
-    if (!reservation.originalTime) reservation.originalTime = oldTime;
-    if (!reservation.originalDate) reservation.originalDate = oldDate;
+      const oldDate = reservation.date;
+      const oldTime = reservation.time.substring(0, 5);
 
-    reservation.date = dto.date;
-    reservation.time = tfFormatted;
-    reservation.rescheduleStatus = 'RESCHEDULED_BY_ADMIN';
-    if (dto.reason) reservation.rescheduleReason = dto.reason.trim();
+      if (!reservation.originalTime) reservation.originalTime = oldTime;
+      if (!reservation.originalDate) reservation.originalDate = oldDate;
 
-    const saved = await this.repo.save(reservation);
+      reservation.date = dto.date;
+      reservation.time = tfFormatted;
+      reservation.rescheduleStatus = 'RESCHEDULED_BY_ADMIN';
+      if (dto.reason) reservation.rescheduleReason = dto.reason.trim();
 
-    const newTimeStr = saved.time.substring(0, 5);
-    const reasonText = dto.reason ? ` Motivo: ${dto.reason.trim()}.` : '';
+      const saved = await manager.save(Reservation, reservation);
 
-    let sent = 0;
-    try {
-      sent = await this.notificationsService.notifyCustomerAppointment(saved, {
-        title: '🗓️ Tu Cita ha sido Reprogramada',
-        body: `Tu cita fue reprogramada para el ${saved.date} a las ${newTimeStr}.${reasonText}`
-      });
-    } catch (err) {}
+      const newTimeStr = saved.time.substring(0, 5);
+      const reasonText = dto.reason ? ` Motivo: ${dto.reason.trim()}.` : '';
 
-    const baseUrl = process.env.VITE_FRONTEND_URL || 'http://localhost:5173';
-    const waText = `Hola ${saved.customerName}, tu cita ha sido reprogramada para el ${saved.date} a las ${newTimeStr}.${reasonText} Puedes verificar los detalles aquí: ${baseUrl}/appointment/${saved.id}`;
-    let phone = (saved.customerPhone || '').replace(/\D/g, '');
-    if (phone && !phone.startsWith('58') && phone.length === 10) phone = '58' + phone;
+      let sent = 0;
+      try {
+        sent = await this.notificationsService.notifyCustomerAppointment(saved, {
+          title: '🗓️ Tu Cita ha sido Reprogramada',
+          body: `Tu cita fue reprogramada para el ${saved.date} a las ${newTimeStr}.${reasonText}`
+        });
+      } catch (err) {}
 
-    return {
-      success: true,
-      sent,
-      reservation: saved,
-      whatsappLink: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(waText)}` : null,
-      message: `Cita reprogramada con éxito para el ${saved.date} a las ${newTimeStr}.`
-    };
+      const baseUrl = process.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+      const waText = `Hola ${saved.customerName}, tu cita ha sido reprogramada para el ${saved.date} a las ${newTimeStr}.${reasonText} Puedes verificar los detalles aquí: ${baseUrl}/appointment/${saved.id}`;
+      let phone = (saved.customerPhone || '').replace(/\D/g, '');
+      if (phone && !phone.startsWith('58') && phone.length === 10) phone = '58' + phone;
+
+      return {
+        success: true,
+        sent,
+        reservation: saved,
+        whatsappLink: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(waText)}` : null,
+        message: `Cita reprogramada con éxito para el ${saved.date} a las ${newTimeStr}.`
+      };
+    });
   }
 
   async updateStatus(tenantId: string, id: string, status: ReservationStatus) {
@@ -628,6 +742,12 @@ export class ReservationsService {
         closeMinutes = this.timeToMinutes(dayConfig.endTime);
       }
 
+      const accessRepo = manager.getRepository(UserTenantAccess);
+      const accesses = await accessRepo.find({
+        where: { tenantId, isActive: true, status: 'ACCEPTED' },
+      });
+      const staffMap = new Map(accesses.map(a => [a.userId, a]));
+
       const interval = settings?.slotInterval || 30;
 
       const reservations = await manager.createQueryBuilder(Reservation, 'res')
@@ -672,6 +792,15 @@ export class ReservationsService {
 
         if (newEndMins > closeMinutes) {
           throw new BadRequestException(`No se puede desplazar la cita de ${res.customerName} a las ${this.minutesToTime(newStartMins).substring(0,5)} porque sobrepasa la hora de cierre.`);
+        }
+
+        if (res.employeeId) {
+          const emp = staffMap.get(res.employeeId);
+          if (emp?.exitTime && newEndMins > this.timeToMinutes(emp.exitTime)) {
+            throw new BadRequestException(
+              `No se puede desplazar la cita de ${res.customerName} a las ${this.minutesToTime(newStartMins).substring(0,5)} porque el especialista finaliza su jornada laboral a las ${emp.exitTime.substring(0,5)}.`
+            );
+          }
         }
 
         const oldTimeStr = this.minutesToTime(startMins).substring(0, 5);
@@ -728,6 +857,38 @@ export class ReservationsService {
     const startMins = this.timeToMinutes(reservation.time);
     const newStartMins = startMins + minutes;
     const oldTimeStr = reservation.time.substring(0, 5);
+
+    const duration = Number(reservation.durationMinutes) || 30;
+    const newEndMins = newStartMins + duration;
+
+    // Check business close time
+    const settingsRepo = this.repo.manager.getRepository('Settings');
+    const settings: any = await settingsRepo.findOne({ where: { tenantId } });
+    const bHours = settings?.businessHours || {};
+    const d = new Date(reservation.date + 'T12:00:00Z');
+    const dayOfWeek = d.getUTCDay().toString();
+    const dayConfig = bHours[dayOfWeek];
+
+    if (dayConfig && dayConfig.isOpen && dayConfig.endTime) {
+      const closeMinutes = this.timeToMinutes(dayConfig.endTime);
+      if (newEndMins > closeMinutes) {
+        throw new BadRequestException(
+          `El retraso de ${minutes} min desplazaría la cita a las ${this.minutesToTime(newStartMins).substring(0,5)}, sobrepasando la hora de cierre (${dayConfig.endTime.substring(0,5)}).`
+        );
+      }
+    }
+
+    if (reservation.employeeId) {
+      const accessRepo = this.repo.manager.getRepository(UserTenantAccess);
+      const emp: any = await accessRepo.findOne({
+        where: { userId: reservation.employeeId, tenantId, isActive: true, status: 'ACCEPTED' },
+      });
+      if (emp?.exitTime && newEndMins > this.timeToMinutes(emp.exitTime)) {
+        throw new BadRequestException(
+          `El retraso de ${minutes} min desplazaría la cita a las ${this.minutesToTime(newStartMins).substring(0,5)}, sobrepasando el horario laboral del especialista (salida: ${emp.exitTime.substring(0,5)}).`
+        );
+      }
+    }
 
     if (!reservation.originalTime) reservation.originalTime = oldTimeStr;
     if (!reservation.originalDate) reservation.originalDate = reservation.date;
