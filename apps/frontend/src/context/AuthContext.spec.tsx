@@ -25,6 +25,12 @@ vi.mock('@capacitor/preferences', () => {
   };
 });
 
+vi.mock('../services/offline-db', () => ({
+  offlineDb: {
+    clearTenantCache: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 describe('AuthContext - Gestión de Sesión, Capacitor Preferences y Workspaces', () => {
   const originalLocation = window.location;
 

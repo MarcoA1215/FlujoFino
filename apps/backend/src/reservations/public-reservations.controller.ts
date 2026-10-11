@@ -546,7 +546,7 @@ export class PublicReservationsController {
       serviceId: reservation.serviceId,
       serviceName: reservation.serviceName,
       status: reservation.status,
-      tenantName: reservation.tenant.name,
+      tenantName: reservation.tenant?.name || '',
       tenantId: reservation.tenantId, // Real tenant UUID is OK to return here since they already have the appointment UUID
       servicePrice: totalAmount,
       totalAmount: totalAmount,

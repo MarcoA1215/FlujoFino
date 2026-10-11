@@ -8,43 +8,75 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { Tenant } from '../entities/tenant.entity';
 import { Settings } from '../entities/settings.entity';
 import { Product } from '../entities/product.entity';
+import { Reservation } from '../entities/reservation.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
-import { UserRole } from '@finowork/shared-types';
+import { UserRole, ReservationStatus } from '@finowork/shared-types';
 import * as tenantCrypto from '../utils/tenant-crypto';
 
-describe('PublicReservationsController Staff Filtering', () => {
+describe('PublicReservationsController Suite', () => {
   let controller: PublicReservationsController;
   let mockTenantRepo: any;
   let mockSettingsRepo: any;
   let mockProductRepo: any;
   let mockAccessRepo: any;
+  let mockReservationRepo: any;
+  let mockNotificationsService: any;
 
   beforeEach(async () => {
     mockSettingsRepo = {
       findOne: jest.fn().mockResolvedValue({
         bookingAllowStaffSelection: true,
         slotInterval: 30,
+        businessHours: {
+          '1': { isOpen: true, startTime: '09:00', endTime: '18:00' }, // Monday
+          '2': { isOpen: true, startTime: '09:00', endTime: '18:00' },
+          '3': { isOpen: true, startTime: '09:00', endTime: '18:00' },
+          '4': { isOpen: true, startTime: '09:00', endTime: '18:00' },
+          '5': { isOpen: true, startTime: '09:00', endTime: '18:00' },
+          '6': { isOpen: true, startTime: '09:00', endTime: '18:00' },
+          '0': { isOpen: false },
+        },
       }),
     };
 
     mockProductRepo = {
       find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
     };
 
     mockAccessRepo = {
-      find: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+    };
+
+    mockReservationRepo = {
+      findOne: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+      save: jest.fn((e) => Promise.resolve(e)),
+      createQueryBuilder: jest.fn(),
+    };
+
+    mockNotificationsService = {
+      sendNotificationToNegocio: jest.fn().mockResolvedValue(true),
+      notifyCustomerAppointment: jest.fn().mockResolvedValue(true),
+      sendNotificationToIdentifier: jest.fn().mockResolvedValue(true),
+    };
+
+    const manager = {
+      getRepository: jest.fn((target: any) => {
+        if (target === Settings || target?.name === 'Settings') return mockSettingsRepo;
+        if (target === Product || target?.name === 'Product') return mockProductRepo;
+        if (target === UserTenantAccess || target?.name === 'UserTenantAccess') return mockAccessRepo;
+        if (target === Reservation || target?.name === 'Reservation') return mockReservationRepo;
+        return { find: jest.fn(), findOne: jest.fn(), save: jest.fn() };
+      }),
+      transaction: jest.fn((cb) => cb(manager)),
+      query: jest.fn().mockResolvedValue([]),
     };
 
     mockTenantRepo = {
       findOne: jest.fn(),
-      manager: {
-        getRepository: jest.fn((target: any) => {
-          if (target === Settings) return mockSettingsRepo;
-          if (target === Product) return mockProductRepo;
-          if (target === UserTenantAccess) return mockAccessRepo;
-          return { find: jest.fn(), findOne: jest.fn() };
-        }),
-      },
+      manager,
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -53,7 +85,7 @@ describe('PublicReservationsController Staff Filtering', () => {
         { provide: ReservationsService, useValue: {} },
         { provide: CustomersService, useValue: {} },
         { provide: StorageService, useValue: {} },
-        { provide: NotificationsService, useValue: {} },
+        { provide: NotificationsService, useValue: mockNotificationsService },
         { provide: getRepositoryToken(Tenant), useValue: mockTenantRepo },
       ],
     }).compile();
@@ -61,46 +93,185 @@ describe('PublicReservationsController Staff Filtering', () => {
     controller = module.get<PublicReservationsController>(PublicReservationsController);
   });
 
-  it('debe excluir de la lista de personal a empleados con roles exclusivamente DELIVERY u OPERATIVO', async () => {
-    const tenantId = '00000000-0000-0000-0000-000000000002';
-    jest.spyOn(tenantCrypto, 'decodeTenantId').mockReturnValue(tenantId);
-    mockTenantRepo.findOne.mockResolvedValue({ id: tenantId, name: 'Salon Spa', isActive: true, status: 'ACTIVE' });
+  describe('Staff Filtering', () => {
+    it('debe excluir de la lista de personal a empleados con roles exclusivamente DELIVERY u OPERATIVO', async () => {
+      const tenantId = '00000000-0000-0000-0000-000000000002';
+      jest.spyOn(tenantCrypto, 'decodeTenantId').mockReturnValue(tenantId);
+      mockTenantRepo.findOne.mockResolvedValue({ id: tenantId, name: 'Salon Spa', isActive: true, status: 'ACTIVE' });
 
-    mockAccessRepo.find.mockResolvedValue([
-      {
-        id: 'acc-1',
-        roles: [UserRole.DELIVERY],
-        user: { id: 'u-delivery', username: 'repartidor_juan', name: 'Juan Repartidor' },
-      },
-      {
-        id: 'acc-2',
-        roles: [UserRole.OPERATIVO],
-        user: { id: 'u-operativo', username: 'limpieza_maria', name: 'Maria Limpieza' },
-      },
-      {
-        id: 'acc-3',
-        roles: [UserRole.POS],
-        user: { id: 'u-pos', username: 'estilista_pedro', name: 'Pedro Estilista' },
-      },
-      {
-        id: 'acc-4',
-        roles: [UserRole.ADMIN],
-        user: { id: 'u-admin', username: 'admin_ana', name: 'Ana Dueña' },
-      },
-    ]);
+      mockAccessRepo.find.mockResolvedValue([
+        {
+          id: 'acc-1',
+          roles: [UserRole.DELIVERY],
+          user: { id: 'u-delivery', username: 'repartidor_juan', name: 'Juan Repartidor' },
+        },
+        {
+          id: 'acc-2',
+          roles: [UserRole.OPERATIVO],
+          user: { id: 'u-operativo', username: 'limpieza_maria', name: 'Maria Limpieza' },
+        },
+        {
+          id: 'acc-3',
+          roles: [UserRole.POS],
+          user: { id: 'u-pos', username: 'estilista_pedro', name: 'Pedro Estilista' },
+        },
+        {
+          id: 'acc-4',
+          roles: [UserRole.ADMIN],
+          user: { id: 'u-admin', username: 'admin_ana', name: 'Ana Dueña' },
+        },
+      ]);
 
-    const result = await controller.getTenantInfo('token-valido');
+      const result = await controller.getTenantInfo('token-valido');
 
-    expect(result).toBeDefined();
-    expect(result.staff).toBeDefined();
-    const staffIds = result.staff.map((s: any) => s.id);
+      expect(result).toBeDefined();
+      expect(result.staff).toBeDefined();
+      const staffIds = result.staff.map((s: any) => s.id);
 
-    // Los roles exclusivos de DELIVERY u OPERATIVO quedan excluidos del selector público
-    expect(staffIds).not.toContain('u-delivery');
-    expect(staffIds).not.toContain('u-operativo');
+      expect(staffIds).not.toContain('u-delivery');
+      expect(staffIds).not.toContain('u-operativo');
+      expect(staffIds).toContain('u-pos');
+      expect(staffIds).toContain('u-admin');
+    });
+  });
 
-    // Los roles válidos permanecen
-    expect(staffIds).toContain('u-pos');
-    expect(staffIds).toContain('u-admin');
+  describe('Flujo de Aceptación de Reprogramación (Anti-regresión "A lo arrecho")', () => {
+    it('NO debe auto-aceptar prematuramente si la hora original ya pasó pero la nueva hora está en el futuro', async () => {
+      const futureDate = new Date(Date.now() + 86400000).toISOString().substring(0, 10);
+      const mockReservation: any = {
+        id: 'res-future',
+        tenantId: 'tenant-1',
+        customerName: 'Cliente Prueba',
+        date: futureDate,
+        time: '16:00:00',
+        originalDate: '2020-01-01',
+        originalTime: '09:00:00', // En el pasado
+        rescheduleStatus: 'PENDING_ACCEPTANCE',
+        totalAmount: 30,
+        abonosTotal: 0,
+        tenant: { name: 'Salon Spa' },
+      };
+
+      mockReservationRepo.findOne.mockResolvedValue(mockReservation);
+
+      const result = await controller.getAppointment('res-future');
+
+      // Debe permanecer estrictamente en PENDING_ACCEPTANCE para que el cliente decida
+      expect(result.rescheduleStatus).toBe('PENDING_ACCEPTANCE');
+      expect(mockReservation.rescheduleStatus).toBe('PENDING_ACCEPTANCE');
+      expect(mockReservationRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('debe marcar como ACCEPTED solo si la hora de la NUEVA cita ya transcurrió en el tiempo', async () => {
+      const pastDate = '2020-01-01';
+      const mockReservation: any = {
+        id: 'res-past',
+        tenantId: 'tenant-1',
+        customerName: 'Cliente Pasado',
+        date: pastDate,
+        time: '10:00:00', // Nueva hora ya pasó hace años
+        originalTime: '09:00:00',
+        rescheduleStatus: 'PENDING_ACCEPTANCE',
+        totalAmount: 30,
+        abonosTotal: 0,
+        tenant: { name: 'Salon Spa' },
+      };
+
+      mockReservationRepo.findOne.mockResolvedValue(mockReservation);
+
+      const result = await controller.getAppointment('res-past');
+
+      expect(result.rescheduleStatus).toBe('ACCEPTED');
+      expect(mockReservation.rescheduleStatus).toBe('ACCEPTED');
+      expect(mockReservationRepo.save).toHaveBeenCalled();
+    });
+
+    it('acceptReschedule debe actualizar rescheduleStatus a ACCEPTED y notificar al negocio y cliente', async () => {
+      const mockReservation: any = {
+        id: 'res-accept',
+        tenantId: 'tenant-1',
+        customerName: 'Manuel Gómez',
+        date: '2026-10-20',
+        time: '15:00:00',
+        rescheduleStatus: 'PENDING_ACCEPTANCE',
+      };
+
+      mockReservationRepo.findOne.mockResolvedValue(mockReservation);
+
+      const response = await controller.acceptReschedule('res-accept');
+
+      expect(response.success).toBe(true);
+      expect(mockReservation.rescheduleStatus).toBe('ACCEPTED');
+      expect(mockReservationRepo.save).toHaveBeenCalledWith(mockReservation);
+
+      // Notificación al negocio
+      expect(mockNotificationsService.sendNotificationToNegocio).toHaveBeenCalledWith(
+        'tenant-1',
+        expect.objectContaining({
+          title: expect.stringContaining('Reprogramación Aceptada'),
+          body: expect.stringContaining('Manuel Gómez'),
+        }),
+        expect.arrayContaining(['ADMIN', 'CAJERO']),
+      );
+
+      // Notificación al cliente
+      expect(mockNotificationsService.notifyCustomerAppointment).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'res-accept' }),
+        expect.objectContaining({
+          title: expect.stringContaining('Horario Confirmado'),
+        }),
+      );
+    });
+  });
+
+  describe('Cálculo de Disponibilidad de Bloques (Duraciones reales / 45 min)', () => {
+    it('un servicio de 45 minutos debe bloquear tanto su bloque inicial como el subsiguiente', async () => {
+      const tenantId = 'tenant-salon';
+      jest.spyOn(tenantCrypto, 'decodeTenantId').mockReturnValue(tenantId);
+      mockTenantRepo.findOne.mockResolvedValue({ id: tenantId, isActive: true });
+
+      // Configuración: lunes de 09:00 a 12:00 con intervalos de 30 min
+      mockSettingsRepo.findOne.mockResolvedValue({
+        slotInterval: 30,
+        businessHours: {
+          '1': { isOpen: true, startTime: '09:00', endTime: '12:00' },
+        },
+      });
+
+      // No hay staff adicional (negocio individual / solo business)
+      mockAccessRepo.find.mockResolvedValue([]);
+
+      // Cita existente a las 09:00 con duración explícita de 45 minutos (09:00 - 09:45)
+      const mockExistingRes: any = {
+        id: 'res-45min',
+        tenantId,
+        date: '2026-10-19', // Monday
+        time: '09:00:00',
+        durationMinutes: 45,
+        status: ReservationStatus.CONFIRMED,
+      };
+
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([mockExistingRes]),
+      };
+      mockReservationRepo.createQueryBuilder = jest.fn().mockReturnValue(mockQueryBuilder);
+
+      // Consulta de disponibilidad para fecha futura (Monday)
+      const slots = await controller.getAvailability('token-valido', '2026-10-19', undefined);
+
+      // Bloques posibles normalmente: 09:00, 09:30, 10:00, 10:30, 11:00, 11:30
+      // La cita dura de 09:00 a 09:45:
+      // - 09:00 debe estar BLOQUEADO (09:00 < 09:45 && 09:30 > 09:00)
+      // - 09:30 debe estar BLOQUEADO (09:30 < 09:45 && 10:00 > 09:00)
+      // - 10:00 debe estar DISPONIBLE (empieza después de las 09:45)
+      expect(slots).not.toContain('09:00');
+      expect(slots).not.toContain('09:30');
+      expect(slots).toContain('10:00');
+      expect(slots).toContain('10:30');
+      expect(slots).toContain('11:00');
+      expect(slots).toContain('11:30');
+    });
   });
 });

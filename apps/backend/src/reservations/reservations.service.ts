@@ -894,16 +894,16 @@ export class ReservationsService {
 
     const startMins = this.timeToMinutes(reservation.time);
     const newStartMins = startMins + minutes;
-    const oldTimeStr = reservation.time.substring(0, 5);
+    const oldTimeStr = (reservation.time || '00:00').substring(0, 5);
 
     const duration = Number(reservation.durationMinutes) || 30;
     const newEndMins = newStartMins + duration;
 
     // Check business close time
-    const settingsRepo = this.repo.manager.getRepository('Settings');
-    const settings: any = await settingsRepo.findOne({ where: { tenantId } });
+    const settingsRepo = this.repo.manager?.getRepository ? this.repo.manager.getRepository('Settings') : null;
+    const settings: any = settingsRepo ? await settingsRepo.findOne({ where: { tenantId } }) : null;
     const bHours = settings?.businessHours || {};
-    const d = new Date(reservation.date + 'T12:00:00Z');
+    const d = new Date((reservation.date || new Date().toISOString().substring(0, 10)) + 'T12:00:00Z');
     const dayOfWeek = d.getUTCDay().toString();
     const dayConfig = bHours[dayOfWeek];
 
@@ -916,11 +916,11 @@ export class ReservationsService {
       }
     }
 
-    if (reservation.employeeId) {
+    if (reservation.employeeId && this.repo.manager?.getRepository) {
       const accessRepo = this.repo.manager.getRepository(UserTenantAccess);
-      const emp: any = await accessRepo.findOne({
+      const emp: any = accessRepo ? await accessRepo.findOne({
         where: { userId: reservation.employeeId, tenantId, isActive: true, status: 'ACCEPTED' },
-      });
+      }) : null;
       if (emp?.exitTime && newEndMins > this.timeToMinutes(emp.exitTime)) {
         throw new BadRequestException(
           `El retraso de ${minutes} min desplazaría la cita a las ${this.minutesToTime(newStartMins).substring(0,5)}, sobrepasando el horario laboral del especialista (salida: ${emp.exitTime.substring(0,5)}).`
