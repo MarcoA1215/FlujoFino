@@ -23,6 +23,7 @@ import { useImageViewer } from '../context/ImageViewerContext';
 import { requestAndSubscribePush } from '../services/push-notification.service';
 import { CustomerNotificationPrompt } from '../components/CustomerNotificationPrompt';
 import { BankSelect } from '../components/BankSelect';
+import { getPublicBaseUrl } from '../utils/public-url';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -419,7 +420,7 @@ const PublicBooking: React.FC = () => {
       }
 
       const appointmentId = res.data.id;
-      setMagicLink(`${window.location.origin}/appointment/${appointmentId}`);
+      setMagicLink(`${getPublicBaseUrl()}/appointment/${appointmentId}`);
       setSuccess(true);
 
       // Web Push notification subscription

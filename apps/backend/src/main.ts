@@ -43,6 +43,10 @@ async function bootstrap() {
     'http://localhost:3001',
     'https://flujofino.onrender.com',
     'https://finowork.onrender.com',
+    'https://finowork.com',
+    'https://www.finowork.com',
+    'https://finowork.vercel.app',
+    'https://flujofino.vercel.app',
     'capacitor://localhost',
     'https://localhost',   
     'ionic://localhost',    
@@ -62,6 +66,8 @@ async function bootstrap() {
       if (
         !origin ||
         allowedOrigins.includes(origin) ||
+        origin.endsWith('.finowork.com') ||
+        origin === 'https://finowork.com' ||
         (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) ||
         (process.env.FRONTEND_URL_APK && origin === process.env.FRONTEND_URL_APK)
       ) {

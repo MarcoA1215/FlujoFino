@@ -10,13 +10,13 @@ export const getPublicBaseUrl = (): string => {
     if (isCapacitor || isLocalhost) {
       return (
         (import.meta.env.VITE_PUBLIC_URL as string) ||
-        'https://finowork.vercel.app'
+        'https://www.finowork.com'
       );
     }
     return window.location.origin;
   }
   return (
     (import.meta.env.VITE_PUBLIC_URL as string) ||
-    'https://finowork.vercel.app'
+    'https://www.finowork.com'
   );
 };

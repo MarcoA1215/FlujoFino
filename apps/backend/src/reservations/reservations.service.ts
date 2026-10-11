@@ -649,7 +649,7 @@ export class ReservationsService {
         });
       } catch (err) {}
 
-      const baseUrl = process.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+      const baseUrl = process.env.FRONTEND_URL || process.env.VITE_FRONTEND_URL || 'https://www.finowork.com';
       const waText = `Hola ${saved.customerName}, tu cita ha sido reprogramada para el ${saved.date} a las ${newTimeStr}.${reasonText} Puedes verificar los detalles aquí: ${baseUrl}/appointment/${saved.id}`;
       let phone = (saved.customerPhone || '').replace(/\D/g, '');
       if (phone && !phone.startsWith('58') && phone.length === 10) phone = '58' + phone;
@@ -994,7 +994,7 @@ export class ReservationsService {
           });
         } catch (notifyErr) {}
 
-        const baseUrl = process.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+        const baseUrl = process.env.FRONTEND_URL || process.env.VITE_FRONTEND_URL || 'https://www.finowork.com';
         const msg = `Hola ${res.customerName}, debido a un imprevisto en el servicio, tu cita de las ${oldTimeStr} ha sido reprogramada para las ${res.time.substring(0,5)}. Por favor confírmanos si estás de acuerdo en tu enlace: ${baseUrl}/appointment/${res.id}`;
         let phone = res.customerPhone || '';
         phone = phone.replace(/\D/g, '');
@@ -1091,7 +1091,7 @@ export class ReservationsService {
       sent = await this.notificationsService.notifyCustomerAppointment(saved, payload);
     } catch (err) {}
 
-    const baseUrl = process.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+    const baseUrl = process.env.FRONTEND_URL || process.env.VITE_FRONTEND_URL || 'https://www.finowork.com';
     const msg = `Hola ${saved.customerName}, debido a un retraso imprevisto de ${minutes} min, tu cita de las ${oldTimeStr} comenzará aprox. a las ${newTimeStr}. Gracias por tu comprensión. Puedes ver tu cita en: ${baseUrl}/appointment/${saved.id}`;
     let phone = (saved.customerPhone || '').replace(/\D/g, '');
     if (phone && !phone.startsWith('58') && phone.length === 10) phone = '58' + phone;
