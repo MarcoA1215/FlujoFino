@@ -19,7 +19,7 @@ describe('ProductsService & Accounting Immutability Suite', () => {
     mockProductRepo = {
       find: jest.fn(),
       findOne: jest.fn(),
-      save: jest.fn((entity) => Promise.resolve(entity)),
+      save: jest.fn((target: any, entity?: any) => Promise.resolve(entity || target)),
       create: jest.fn((dto) => dto),
       softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
     };
@@ -144,4 +144,58 @@ describe('ProductsService & Accounting Immutability Suite', () => {
       expect(orderItem.unitCost).not.toBe(product.estimatedCost);
     });
   });
+
+  describe('Servicios - Preservación de Costo de Producción / Atención', () => {
+    it('debe registrar y preservar cost y estimatedCost al crear un servicio', async () => {
+      const tenantId = 'tenant-test-1';
+      const dto = {
+        name: 'Balayage',
+        category: 'Servicios',
+        salePrice: 30.0,
+        cost: 8.5,
+        estimatedCost: 8.5,
+        durationMinutes: 45,
+        is_service: true,
+        product_type: 'SERVICIO',
+      };
+
+      const result = await productsService.create(tenantId, dto as any);
+      expect(result.is_service).toBe(true);
+      expect(result.stock).toBe(0);
+      expect(result.cost).toBe(8.5);
+      expect(result.estimatedCost).toBe(8.5);
+    });
+
+    it('no debe resetear el costo a 0 al actualizar un servicio', async () => {
+      const tenantId = 'tenant-test-1';
+      const existingService = {
+        id: 'serv-1',
+        name: 'Balayage',
+        category: 'Servicios',
+        salePrice: 30.0,
+        cost: 8.5,
+        estimatedCost: 8.5,
+        stock: 0,
+        stockQuantity: 0,
+        physicalStock: 0,
+        is_service: true,
+        product_type: 'SERVICIO',
+      };
+
+      mockProductRepo.findOne.mockResolvedValue(existingService);
+
+      const updateDto = {
+        salePrice: 35.0,
+        cost: 10.0,
+        is_service: true,
+        product_type: 'SERVICIO',
+      };
+
+      const updated = await productsService.update(tenantId, 'serv-1', updateDto);
+      expect(updated.cost).toBe(10.0);
+      expect(updated.estimatedCost).toBe(10.0);
+      expect(updated.stock).toBe(0);
+    });
+  });
 });
+

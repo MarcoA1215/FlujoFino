@@ -11,7 +11,7 @@ import {
   IonIcon,
   useIonToast
 } from '@ionic/react';
-import { closeOutline, checkmarkCircle, personOutline, timeOutline, pricetagOutline } from 'ionicons/icons';
+import { closeOutline, checkmarkCircle, personOutline, timeOutline, pricetagOutline, buildOutline } from 'ionicons/icons';
 import { apiClient } from '../../api/client';
 import { useSettings } from '../../context/SettingsContext';
 import type { Product } from '../../types';
@@ -26,6 +26,7 @@ interface ProductFormModalProps {
   isResaleOnly?: boolean;
   users: any[];
   settings?: any;
+  onConfigureRecipe?: (product: Product) => void;
 }
 
 export const ProductFormModal: React.FC<ProductFormModalProps> = ({
@@ -37,7 +38,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   archetype,
   isResaleOnly = false,
   users,
-  settings: propSettings
+  settings: propSettings,
+  onConfigureRecipe
 }) => {
   const [presentToast] = useIonToast();
   const [name, setName] = useState('');
@@ -206,7 +208,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         name: name.trim(),
         category: category.trim() || (isService ? 'Servicios' : 'General'),
         salePrice: priceNum,
-        cost: isService ? 0 : costNum,
+        cost: costNum,
         estimatedCost: costNum,
         stock: isResale ? stockNum : 0,
         stockQuantity: isResale ? stockNum : 0,
@@ -378,7 +380,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: isService ? '1fr' : '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '12px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
                   Precio Venta ($) *
@@ -393,22 +395,26 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 />
               </div>
 
-              {!isService && (
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                    {isResale ? 'Costo Unitario Compra ($)' : 'Costo Estimado Base ($)'}
-                  </label>
-                  <input 
-                    type="number" 
-                    value={estimatedCost} 
-                    onChange={e => setEstimatedCost(e.target.value)} 
-                    placeholder={isResale ? 'Ej. 10.00' : 'Opcional (Ej. 5.00)'} 
-                    step="0.01"
-                    style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
-                  />
-                </div>
-              )}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
+                  {isResale ? 'Costo Unitario Compra ($)' : isService ? 'Costo Promedio del Servicio ($)' : 'Costo Estimado Base ($)'}
+                </label>
+                <input 
+                  type="number" 
+                  value={estimatedCost} 
+                  onChange={e => setEstimatedCost(e.target.value)} 
+                  placeholder={isResale ? 'Ej. 10.00' : isService ? 'Ej. 5.00 (Mano de obra o insumos)' : 'Opcional (Ej. 5.00)'} 
+                  step="0.01"
+                  style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+                />
+              </div>
             </div>
+
+            {isService && (
+              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '-4px', marginBottom: '12px' }}>
+                💡 <b>Costo estimado del servicio:</b> Lo que te cuesta realizar la atención (mano de obra, insumos o gastos fijos). Se utiliza para calcular tu ganancia neta en Caja y Estadísticas.
+              </div>
+            )}
 
             {isResale && (
               <div style={{ marginBottom: '12px' }}>
@@ -450,11 +456,47 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     />
                   </div>
                 ) : null}
-                <div style={{ padding: '10px 12px', backgroundColor: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe', color: '#1e40af', fontSize: '13px', marginTop: '10px' }}>
-                  {isReservationsEnabled ? (
-                    <>💆 <b>Servicio / Cita:</b> No maneja stock físico. Si para realizar este servicio consumes insumos o materiales de trabajo (ej. tintes, desinfectante, etc.), podrás vincularlos en "Configurar Insumos del Servicio" desde la tarjeta.</>
+
+                {/* Sección Insumos y Materiales de Trabajo */}
+                <div style={{ padding: '14px', backgroundColor: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0', color: '#166534', marginTop: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🧪 <span>Insumos y Materiales de Trabajo</span>
+                    </div>
+                    {product && onConfigureRecipe && (
+                      <button
+                        type="button"
+                        onClick={() => onConfigureRecipe(product)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          backgroundColor: '#10b981',
+                          color: '#ffffff',
+                          border: 'none',
+                          fontWeight: 600,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <IonIcon icon={buildOutline} />
+                        Configurar Insumos
+                      </button>
+                    )}
+                  </div>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '12px', lineHeight: '1.4' }}>
+                    Si este servicio consume insumos específicos (ej. tintes, esmaltes, champú, aceites), puedes vincular la lista exacta de materiales para que se descuenten del inventario al atender.
+                  </p>
+                  {product && Array.isArray(product.recipe) && product.recipe.length > 0 ? (
+                    <div style={{ fontWeight: 600, fontSize: '12px', color: '#15803d' }}>
+                      ✓ {product.recipe.length} insumo(s) vinculados a este servicio.
+                    </div>
                   ) : (
-                    <>💆 <b>Servicio Directo:</b> No maneja stock físico. Diseñado para facturar mano de obra, trabajos o atenciones directamente en Caja (POS).</>
+                    <div style={{ fontSize: '12px', color: '#475569' }}>
+                      {product ? 'No tiene insumos vinculados actualmente (se usará el Costo Promedio directo).' : 'Al guardar el servicio podrás configurar los insumos consumidos desde "Configurar Insumos del Servicio".'}
+                    </div>
                   )}
                 </div>
               </>

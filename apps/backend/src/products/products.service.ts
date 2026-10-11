@@ -171,11 +171,19 @@ export class ProductsService {
 
       Object.assign(product, dto);
 
+      if (dto.cost !== undefined) {
+        product.cost = Number(dto.cost);
+        product.estimatedCost = Number(dto.cost);
+      } else if (dto.estimatedCost !== undefined) {
+        product.estimatedCost = Number(dto.estimatedCost);
+        product.cost = Number(dto.estimatedCost);
+      }
+
       if (product.product_type === 'SERVICIO' || product.is_service === true) {
         product.stock = 0;
         product.stockQuantity = 0;
         product.physicalStock = 0;
-        product.cost = 0;
+        // Preservar costo del servicio (mano de obra, insumos o costo estimado)
         product.is_service = true;
         product.product_type = 'SERVICIO';
       }

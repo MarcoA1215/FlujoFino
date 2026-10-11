@@ -81,14 +81,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         buttons.push({ text: 'Ajustar Stock Ensamblado', icon: cubeOutline, cssClass: 'action-sheet-editar', handler: () => onAdjustStock(p) });
       }
     } else if (isService) {
-      if (featureRecipes) {
-        buttons.push({ 
-          text: 'Configurar Insumos del Servicio', 
-          icon: buildOutline, 
-          cssClass: 'action-sheet-editar', 
-          handler: () => onConfigure(p) 
-        });
-      }
+      buttons.push({ 
+        text: 'Configurar Insumos del Servicio', 
+        icon: buildOutline, 
+        cssClass: 'action-sheet-editar', 
+        handler: () => onConfigure(p) 
+      });
     }
 
     if (onConvertType) {
@@ -279,7 +277,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                   </IonBadge>
                 )}
                 {isService && p.recipe && p.recipe.length > 0 && (
-                  <IonBadge color="tertiary" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
+                  <IonBadge 
+                    color="tertiary" 
+                    style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onConfigure(p);
+                    }}
+                    title="Toca para ver o modificar los insumos"
+                  >
                     🧪 {p.recipe.length} insumos
                   </IonBadge>
                 )}

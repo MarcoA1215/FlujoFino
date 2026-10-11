@@ -144,4 +144,20 @@ describe('ProductFormModal & Service Feature Flag Control Suite', () => {
     expect(screen.getByText(/Nombre del Producto \*/i)).toBeDefined();
     expect(screen.getByText(/Datos del Producto de Reventa/i)).toBeDefined();
   });
+
+  it('Debe mostrar el campo de Costo Promedio del Servicio y enviar costo real al guardar un servicio', async () => {
+    const serviceSettings = {
+      featureCustomerSchedules: true,
+      enableReservations: true,
+      featureBuySell: true,
+      featureProduction: false,
+    };
+
+    renderModalWithSettings(serviceSettings, { archetype: 'SERVICIO' });
+
+    // Debe mostrar la etiqueta del costo para servicios
+    expect(screen.getByText(/Costo Promedio del Servicio \(\$\)/i)).toBeDefined();
+    expect(screen.getByText(/Insumos y Materiales de Trabajo/i)).toBeDefined();
+  });
 });
+

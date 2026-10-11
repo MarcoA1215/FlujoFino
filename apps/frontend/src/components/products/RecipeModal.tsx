@@ -117,7 +117,8 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
         comboItems: comboItems.map(i => ({ componentId: i.componentId, quantity: i.quantity }))
       });
       await apiClient.put('/products/' + product.id, {
-        estimatedCost: Number(estimatedCost || 0)
+        estimatedCost: Number(estimatedCost || 0),
+        cost: effectiveCost
       });
       presentToast({ message: 'Composición guardada exitosamente', duration: 2000, color: 'success' });
       onSaved();
@@ -127,13 +128,16 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
     }
   };
 
-  const effectiveCost = totalRecipeCost > 0 ? totalRecipeCost : (estimatedCost || 0);
+  const isServiceProd = Boolean(product?.is_service || product?.product_type === 'SERVICIO' || product?.category === 'Servicios');
+  const effectiveCost = isServiceProd 
+    ? (totalRecipeCost + (estimatedCost || 0)) 
+    : (totalRecipeCost > 0 ? totalRecipeCost : (estimatedCost || 0));
 
   return (
     <IonModal isOpen={!!product} onDidDismiss={onClose}>
       <IonHeader>
         <IonToolbar color="light">
-          <IonTitle>{product?.isCombo ? 'Configurar Combo:' : 'Receta:'} {product?.name}</IonTitle>
+          <IonTitle>{isServiceProd ? 'Insumos del Servicio:' : product?.isCombo ? 'Configurar Combo:' : 'Receta:'} {product?.name}</IonTitle>
           <IonButtons slot="end"><IonButton onClick={onClose}>Cerrar</IonButton></IonButtons>
         </IonToolbar>
       </IonHeader>
@@ -143,7 +147,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
             <IonCol size="12" sizeLg="8">
               <IonCard style={{ margin: '0 0 20px 0' }}>
                 <IonCardHeader>
-                  <IonCardTitle style={{ fontSize: '1.1rem' }}>Insumos y Empaques</IonCardTitle>
+                  <IonCardTitle style={{ fontSize: '1.1rem' }}>{isServiceProd ? 'Materiales e Insumos Consumidos' : 'Insumos y Empaques'}</IonCardTitle>
                 </IonCardHeader>
                 <IonCardContent>
                   <IonList>
@@ -186,7 +190,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
                 </IonCardContent>
               </IonCard>
 
-              {product?.isCombo && (
+              {!isServiceProd && product?.isCombo && (
                 <IonCard style={{ margin: '0 0 20px 0' }}>
                   <IonCardHeader><IonCardTitle style={{ fontSize: '1.1rem' }}>Productos del Combo</IonCardTitle></IonCardHeader>
                   <IonCardContent>
@@ -227,10 +231,12 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
                 <IonCardContent>
                   <div style={{ marginBottom: '14px', background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                     <IonLabel style={{ fontWeight: 600, fontSize: '0.9rem', display: 'block', marginBottom: '4px' }}>
-                      Costo Estimado Directo ($)
+                      {isServiceProd ? 'Costo Adicional / Mano de Obra ($)' : 'Costo Estimado Directo ($)'}
                     </IonLabel>
                     <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 8px 0' }}>
-                      Costo aproximado en insumos por servicio o producto (si no usas lista de insumos).
+                      {isServiceProd 
+                        ? 'Costo directo o mano de obra adicional que cuesta realizar el servicio (sumado al consumo de insumos).'
+                        : 'Costo aproximado en insumos por servicio o producto (si no usas lista de insumos).'}
                     </p>
                     <IonInput 
                       type="number" 
@@ -244,9 +250,9 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({ product, onClose, onSa
                   </div>
 
                   {totalRecipeCost > 0 && (
-                    <p style={{ margin: '4px 0' }}><strong>Costo por Receta:</strong> ${totalRecipeCost.toFixed(2)}</p>
+                    <p style={{ margin: '4px 0' }}><strong>{isServiceProd ? 'Costo por Insumos:' : 'Costo por Receta:'}</strong> ${totalRecipeCost.toFixed(2)}</p>
                   )}
-                  <p style={{ margin: '4px 0' }}><strong>Costo Base Considerado:</strong> ${effectiveCost.toFixed(2)}</p>
+                  <p style={{ margin: '4px 0' }}><strong>Costo Total Considerado:</strong> ${effectiveCost.toFixed(2)}</p>
                   <p style={{ margin: '4px 0' }}><strong>Precio de Venta:</strong> ${(product?.salePrice || 0).toFixed(2)}</p>
                   <hr className="ion-margin-vertical" />
                   {product && (

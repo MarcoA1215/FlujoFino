@@ -683,6 +683,11 @@ const Products: React.FC = () => {
           isResaleOnly={selectedArchetype === 'REVENTA'}
           users={users}
           settings={settings}
+          onConfigureRecipe={(prod) => {
+            setShowProductModal(false);
+            setProductToEdit(null);
+            setSelectedProductForRecipe(prod);
+          }}
         />
         </div>
       </IonContent>
