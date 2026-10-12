@@ -142,7 +142,15 @@ export class PublicReservationsController {
         id: token,
         name: tenant.name,
         isSuspended: true,
-        settings: { companyPhone: settings?.companyPhone || '' },
+        themePrimaryColor: settings?.themePrimaryColor || '#10b981',
+        themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
+        companyLogoUrl: settings?.companyLogoUrl || null,
+        settings: {
+          companyPhone: settings?.companyPhone || '',
+          themePrimaryColor: settings?.themePrimaryColor || '#10b981',
+          themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
+          companyLogoUrl: settings?.companyLogoUrl || null,
+        },
         services: [],
         staff: []
       };
@@ -245,6 +253,15 @@ export class PublicReservationsController {
       acceptPagoMovil: settings?.acceptPagoMovil ?? true,
       acceptTransfer: settings?.acceptTransfer ?? false,
       acceptBinance: settings?.acceptBinance ?? false,
+      themePrimaryColor: settings?.themePrimaryColor || '#10b981',
+      themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
+      companyLogoUrl: settings?.companyLogoUrl || null,
+      settings: {
+        companyPhone: settings?.companyPhone || '',
+        themePrimaryColor: settings?.themePrimaryColor || '#10b981',
+        themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
+        companyLogoUrl: settings?.companyLogoUrl || null,
+      },
     };
   }
 
@@ -574,6 +591,15 @@ export class PublicReservationsController {
       acceptBinance: settings?.acceptBinance ?? false,
       acceptTransfer: settings?.acceptTransfer ?? false,
       minDepositPercentage: Number(settings?.minDepositPercentage || 0),
+      themePrimaryColor: settings?.themePrimaryColor || '#10b981',
+      themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
+      companyLogoUrl: settings?.companyLogoUrl || null,
+      settings: {
+        companyPhone: settings?.companyPhone || '',
+        themePrimaryColor: settings?.themePrimaryColor || '#10b981',
+        themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
+        companyLogoUrl: settings?.companyLogoUrl || null,
+      },
     };
   }
 

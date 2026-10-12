@@ -41,6 +41,10 @@ import {
   notificationsOutline,
   volumeHighOutline,
   cloudDownloadOutline,
+  shieldCheckmarkOutline,
+  documentTextOutline,
+  trashOutline,
+  cameraOutline,
 } from 'ionicons/icons';
 import {
   getNotificationPermission,
@@ -108,6 +112,7 @@ interface Settings {
   slotInterval?: number;
   themePrimaryColor?: string;
   themeHeaderColor?: string;
+  companyLogoUrl?: string;
   allowNegativeStock?: boolean;
 }
 
@@ -132,6 +137,10 @@ const SettingsPage: React.FC = () => {
   const [isTestingNotifications, setIsTestingNotifications] = useState<boolean>(false);
   const [isSyncingRates, setIsSyncingRates] = useState<boolean>(false);
   const [syncCooldown, setSyncCooldown] = useState<number>(0);
+
+  // Logo upload state
+  const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false);
+  const logoInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (syncCooldown <= 0) return;
@@ -330,7 +339,8 @@ const SettingsPage: React.FC = () => {
         services: settings.services,
         slotInterval: settings.slotInterval,
         themePrimaryColor: settings.themePrimaryColor,
-        themeHeaderColor: settings.themeHeaderColor
+        themeHeaderColor: settings.themeHeaderColor,
+        companyLogoUrl: settings.companyLogoUrl,
       };
 
       const res = await apiClient.put<Settings>('/settings', payload);
@@ -365,6 +375,67 @@ const SettingsPage: React.FC = () => {
     } catch(e: any) {
       const msg = e.response?.data?.message || 'Error guardando ajustes';
       presentToast({ message: msg, duration: 4000, color: 'danger' });
+    }
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      presentToast({ message: 'La imagen no debe superar los 5 MB', duration: 3000, color: 'warning' });
+      return;
+    }
+
+    try {
+      setIsUploadingLogo(true);
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await apiClient.post<{ logoUrl: string }>('/settings/logo', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      if (res.data?.logoUrl) {
+        const nextSettings = { ...settings, companyLogoUrl: res.data.logoUrl };
+        setSettings(nextSettings);
+        localStorage.setItem('tenant_settings', JSON.stringify(nextSettings));
+        window.dispatchEvent(new CustomEvent('settings_updated', { detail: nextSettings }));
+        presentToast({
+          message: '¡Logotipo cargado y sincronizado con éxito!',
+          duration: 3000,
+          color: 'success',
+        });
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Error al subir el logotipo';
+      presentToast({ message: msg, duration: 4000, color: 'danger' });
+    } finally {
+      setIsUploadingLogo(false);
+      if (logoInputRef.current) {
+        logoInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleDeleteLogo = async () => {
+    try {
+      setIsUploadingLogo(true);
+      await apiClient.delete('/settings/logo');
+      const nextSettings = { ...settings, companyLogoUrl: undefined };
+      setSettings(nextSettings);
+      localStorage.setItem('tenant_settings', JSON.stringify(nextSettings));
+      window.dispatchEvent(new CustomEvent('settings_updated', { detail: nextSettings }));
+      presentToast({
+        message: 'Logotipo eliminado correctamente',
+        duration: 2500,
+        color: 'success',
+      });
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Error al eliminar el logotipo';
+      presentToast({ message: msg, duration: 3000, color: 'danger' });
+    } finally {
+      setIsUploadingLogo(false);
     }
   };
 
@@ -1664,12 +1735,125 @@ const SettingsPage: React.FC = () => {
                     </div>
                   </div>
                   
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                    gap: '20px',
-                    paddingTop: '4px'
-                  }}>
+                    {/* Sección de Carga de Logotipo */}
+                    <div style={{
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '14px',
+                      padding: '16px',
+                      marginBottom: '20px',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '16px',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        {settings.companyLogoUrl ? (
+                          <div style={{ position: 'relative' }}>
+                            <img
+                              src={settings.companyLogoUrl}
+                              alt="Logo Negocio"
+                              style={{
+                                width: '72px',
+                                height: '72px',
+                                borderRadius: '14px',
+                                objectFit: 'contain',
+                                backgroundColor: '#ffffff',
+                                border: '1.5px solid #cbd5e1',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div style={{
+                            width: '72px',
+                            height: '72px',
+                            borderRadius: '14px',
+                            backgroundColor: '#ffffff',
+                            border: '1.5px dashed #94a3b8',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#64748b',
+                            fontSize: '26px',
+                          }}>
+                            🏢
+                          </div>
+                        )}
+                        <div>
+                          <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>
+                            Logotipo del Negocio
+                          </div>
+                          <p style={{ margin: 0, fontSize: '12px', color: '#64748b', maxWidth: '380px', lineHeight: 1.4 }}>
+                            Aparecerá en la barra superior y en el banner de tu <b>Tienda Virtual</b> y <b>Reserva de Citas Online</b>.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <input
+                          ref={logoInputRef}
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={handleLogoUpload}
+                        />
+                        <button
+                          type="button"
+                          disabled={isUploadingLogo}
+                          onClick={() => logoInputRef.current?.click()}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '8px 14px',
+                            borderRadius: '10px',
+                            border: '1px solid #cbd5e1',
+                            backgroundColor: '#ffffff',
+                            color: '#0f172a',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            cursor: isUploadingLogo ? 'not-allowed' : 'pointer',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                          }}
+                        >
+                          <IonIcon icon={cameraOutline} style={{ fontSize: '16px', color: '#10b981' }} />
+                          <span>{isUploadingLogo ? 'Subiendo...' : settings.companyLogoUrl ? 'Cambiar Logo' : 'Cargar Logo'}</span>
+                        </button>
+                        {settings.companyLogoUrl && (
+                          <button
+                            type="button"
+                            disabled={isUploadingLogo}
+                            onClick={handleDeleteLogo}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '8px 12px',
+                              borderRadius: '10px',
+                              border: '1px solid #fecaca',
+                              backgroundColor: '#fef2f2',
+                              color: '#dc2626',
+                              fontWeight: 700,
+                              fontSize: '13px',
+                              cursor: isUploadingLogo ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            <IonIcon icon={trashOutline} style={{ fontSize: '15px' }} />
+                            <span>Quitar</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                      gap: '20px',
+                      paddingTop: '4px'
+                    }}>
                     {/* Selectores de color */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       <div>
@@ -1863,16 +2047,24 @@ const SettingsPage: React.FC = () => {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            backgroundColor: settings.themeHeaderColor || '#ffffff',
-                            color: getContrastColor(settings.themeHeaderColor || '#ffffff'),
+                            backgroundColor: settings.themeHeaderColor || settings.themePrimaryColor || '#10b981',
+                            color: getContrastColor(settings.themeHeaderColor || settings.themePrimaryColor || '#10b981'),
                             transition: 'background-color 0.15s ease'
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 800 }}>☰</span>
-                            <span style={{ fontSize: '13px', fontWeight: 800 }}>FinoWork POS</span>
+                            {settings.companyLogoUrl ? (
+                              <img
+                                src={settings.companyLogoUrl}
+                                alt="Logo"
+                                style={{ width: '22px', height: '22px', borderRadius: '5px', objectFit: 'contain', backgroundColor: '#fff' }}
+                              />
+                            ) : (
+                              <span style={{ fontSize: '13px', fontWeight: 800 }}>🏪</span>
+                            )}
+                            <span style={{ fontSize: '13px', fontWeight: 800 }}>Mi Negocio Online</span>
                           </div>
-                          <span style={{ fontSize: '12px', opacity: 0.85, fontWeight: 600 }}>Negocio</span>
+                          <span style={{ fontSize: '11px', opacity: 0.9, fontWeight: 700, padding: '2px 8px', borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.08)' }}>Enlace Público</span>
                         </div>
 
                         {/* Superficie de Diálogo / Tarjeta Blanca */}
@@ -1955,8 +2147,8 @@ const SettingsPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <div style={{ marginTop: '12px', fontSize: '11px', color: '#64748b', textAlign: 'center' }}>
-                        Los cambios se aplicarán en todos tus dispositivos al guardar.
+                      <div style={{ marginTop: '12px', fontSize: '11px', color: '#047857', backgroundColor: '#ecfdf5', padding: '8px 12px', borderRadius: '8px', border: '1px solid #a7f3d0', textAlign: 'center', fontWeight: 600 }}>
+                        ✨ Tu logotipo y colores se sincronizan automáticamente con tu Tienda Virtual y Reserva de Citas Online.
                       </div>
                     </div>
                   </div>
@@ -1968,6 +2160,93 @@ const SettingsPage: React.FC = () => {
           {settings.featureCustomerSchedules && (
             <BookingSettings settings={settings} setSettings={setSettings} />
           )}
+
+          {/* Tarjeta de Privacidad y Eliminación de Cuenta (Google Play Compliance) */}
+          <IonRow>
+            <IonCol size="12">
+              <IonCard className="ff-card" style={{ border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                <IonCardHeader style={{ paddingBottom: '8px' }}>
+                  <IonCardTitle style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <IonIcon icon={shieldCheckmarkOutline} style={{ color: '#10b981' }} />
+                    Privacidad y Control de Cuenta
+                  </IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  <p style={{ color: '#64748b', fontSize: '13px', margin: '0 0 16px 0' }}>
+                    De acuerdo con las normativas de protección de datos y las directrices de Google Play Store, tienes el control sobre tus datos y privacidad.
+                  </p>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                    <a
+                      href="/privacy"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '12px',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1',
+                        color: '#0f172a',
+                        textDecoration: 'none',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        background: '#f8fafc',
+                      }}
+                    >
+                      <IonIcon icon={documentTextOutline} /> Ver Política de Privacidad
+                    </a>
+
+                    <a
+                      href="/terms"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '12px',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1',
+                        color: '#0f172a',
+                        textDecoration: 'none',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        background: '#f8fafc',
+                      }}
+                    >
+                      <IonIcon icon={documentTextOutline} /> Términos y Condiciones
+                    </a>
+                  </div>
+
+                  <div style={{ padding: '16px', borderRadius: '12px', background: '#fff1f2', border: '1px solid #fecdd3' }}>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#9f1239', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <IonIcon icon={trashOutline} /> Zona de Peligro: Eliminación de Cuenta
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#881337', margin: '0 0 12px 0' }}>
+                      Puedes solicitar la supresión definitiva de tu cuenta y datos personales asociados en cualquier momento.
+                    </p>
+                    <a
+                      href="/delete-account"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: '#e11d48',
+                        color: '#ffffff',
+                        padding: '8px 14px',
+                        borderRadius: '8px',
+                        textDecoration: 'none',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                      }}
+                    >
+                      <IonIcon icon={trashOutline} /> Gestionar o Eliminar Mi Cuenta
+                    </a>
+                  </div>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
+          </IonRow>
 
         </IonGrid>
         

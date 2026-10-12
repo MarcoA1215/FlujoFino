@@ -103,6 +103,27 @@ export class MailService {
     return this.sendMail(to, subject, html);
   }
 
+  async sendAccountDeletionNotification(to: string, username: string, reason?: string): Promise<boolean> {
+    const subject = `[Solicitud de Eliminación de Cuenta] - ${APP_NAME}`;
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0;">
+        <h2 style="color: #0f172a; margin: 0 0 16px; font-size: 20px;">Solicitud de Eliminación de Cuenta</h2>
+        <p style="color: #334155; font-size: 14px; line-height: 1.6;">
+          Hemos recibido una solicitud formal para eliminar la cuenta y los datos asociados al usuario: <strong>${username}</strong>.
+        </p>
+        <div style="background-color: #f8fafc; border-radius: 8px; padding: 16px; margin: 16px 0; border: 1px solid #e2e8f0; font-size: 13px; color: #475569;">
+          <strong>Motivo:</strong> ${reason || 'No especificado por el usuario'}<br/>
+          <strong>Fecha:</strong> ${new Date().toLocaleString('es-ES')}
+        </div>
+        <p style="color: #64748b; font-size: 13px;">
+          Esta solicitud será procesada conforme a las directrices de privacidad y la normativa de Google Play Store.
+        </p>
+      </div>
+    `;
+    return this.sendMail(to, subject, html);
+  }
+
+
   private async sendMail(to: string, subject: string, html: string): Promise<boolean> {
     const rawFrom = this.configService.get<string>('MAIL_FROM');
     const user = this.configService.get<string>('MAIL_USER') || DEFAULT_NOREPLY_EMAIL;

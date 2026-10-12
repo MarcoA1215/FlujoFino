@@ -50,3 +50,7 @@ repomix-frontend.xml
 
 # Root APK duplicate (served from apps/frontend/public/FinoWork.apk)
 /FinoWork.apk
+
+# Keystores y certificados Android
+*.keystore
+*.jks

@@ -42,6 +42,7 @@ import {
 import axios from 'axios';
 import { BankSelect } from '../components/BankSelect';
 import { CustomerNotificationPrompt } from '../components/CustomerNotificationPrompt';
+import { getContrastColor, ensureReadableColor } from '../utils/colors';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -79,6 +80,32 @@ const PublicAppointmentManage: React.FC = () => {
   
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
+
+  const primaryColor = appointment?.themePrimaryColor || '#10b981';
+  const headerColor = appointment?.themeHeaderColor || primaryColor;
+  const headerContrast = getContrastColor(headerColor);
+  const primaryContrast = getContrastColor(primaryColor);
+  const primaryReadable = ensureReadableColor(primaryColor);
+  const primarySoftBg = (primaryColor.startsWith('#') ? primaryColor : `#${primaryColor}`) + '18';
+  const companyLogoUrl = appointment?.companyLogoUrl || null;
+
+  useEffect(() => {
+    if (appointment) {
+      const pColor = appointment?.themePrimaryColor || '#10b981';
+      const hColor = appointment?.themeHeaderColor || pColor;
+      const pContrast = getContrastColor(pColor);
+      const hContrast = getContrastColor(hColor);
+      const pReadable = ensureReadableColor(pColor);
+
+      document.documentElement.style.setProperty('--theme-primary', pColor);
+      document.documentElement.style.setProperty('--theme-primary-contrast', pContrast);
+      document.documentElement.style.setProperty('--theme-primary-readable', pReadable);
+      document.documentElement.style.setProperty('--theme-header', hColor);
+      document.documentElement.style.setProperty('--theme-header-contrast', hContrast);
+      document.documentElement.style.setProperty('--ion-color-primary', pColor);
+      document.documentElement.style.setProperty('--ion-color-primary-contrast', pContrast);
+    }
+  }, [appointment]);
 
   const fetchAppointment = async () => {
     try {
@@ -293,12 +320,103 @@ const PublicAppointmentManage: React.FC = () => {
 
   return (
     <IonPage>
-      <IonContent className="ion-padding" style={{ 'backgroundColor': '#f4f5f8' }}>
-        <div style={{ maxWidth: '540px', margin: '20px auto' }}>
+      <IonHeader>
+        <IonToolbar style={{ ['--background' as any]: headerColor }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 12px' }}>
+            {companyLogoUrl ? (
+              <img
+                src={companyLogoUrl}
+                alt="Logo"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  objectFit: 'contain',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  flexShrink: 0,
+                }}
+              />
+            ) : null}
+            <IonTitle style={{ fontWeight: 'bold', padding: 0, color: headerContrast }}>
+              {appointment.tenantName || 'Gestión de Cita'}
+            </IonTitle>
+          </div>
+        </IonToolbar>
+      </IonHeader>
+
+      <IonContent fullscreen className="ion-padding" style={{ ['--background' as any]: '#F8FAFC' }}>
+        <div style={{ maxWidth: '560px', margin: '0 auto', paddingBottom: '40px' }}>
           
-          <h2 style={{ fontWeight: 'bold', color: '#1e293b', textAlign: 'center', marginBottom: '20px' }}>
-            {appointment.tenantName}
-          </h2>
+          {/* Card / Header Info matching PublicStore & PublicBooking */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '16px',
+              padding: '16px 20px',
+              marginBottom: '16px',
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {companyLogoUrl ? (
+                <img
+                  src={companyLogoUrl}
+                  alt={appointment.tenantName}
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    borderRadius: '12px',
+                    objectFit: 'contain',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                    flexShrink: 0,
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: '46px',
+                    height: '46px',
+                    borderRadius: '12px',
+                    backgroundColor: primarySoftBg,
+                    color: primaryReadable,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '22px',
+                    border: `1px solid ${primaryReadable}30`,
+                    flexShrink: 0,
+                  }}
+                >
+                  📅
+                </div>
+              )}
+              <div>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: '0 0 2px 0' }}>
+                  {appointment.tenantName}
+                </h2>
+                <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>
+                  Portal de Gestión de Cita
+                </span>
+              </div>
+            </div>
+
+            <IonButton
+              fill="clear"
+              size="small"
+              onClick={() => (window.location.href = `/book/${appointment.tenantId}`)}
+              style={{ fontWeight: 600, '--color': primaryReadable, fontSize: '13px' }}
+            >
+              Nueva Cita →
+            </IonButton>
+          </div>
 
           {!showReschedule ? (
             <IonCard style={{ margin: 0, borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
@@ -689,10 +807,9 @@ const PublicAppointmentManage: React.FC = () => {
 
                 <IonButton 
                   expand="block" 
-                  color="primary" 
                   disabled={!selectedDate || !selectedTime} 
                   onClick={handleReschedule}
-                  style={{ marginBottom: '10px' }}
+                  style={{ marginBottom: '10px', fontWeight: 'bold', '--background': primaryColor, '--color': primaryContrast }}
                 >
                   Confirmar Reprogramación
                 </IonButton>
@@ -706,10 +823,10 @@ const PublicAppointmentManage: React.FC = () => {
           {/* Modal for Reporting Payment / Deposit */}
           <IonModal isOpen={showPaymentModal} onDidDismiss={() => setShowPaymentModal(false)}>
             <IonHeader>
-              <IonToolbar color="primary">
-                <IonTitle>Registrar Pago / Abono</IonTitle>
+              <IonToolbar style={{ ['--background' as any]: headerColor }}>
+                <IonTitle style={{ color: headerContrast, fontWeight: 700 }}>Registrar Pago / Abono</IonTitle>
                 <IonButtons slot="end">
-                  <IonButton onClick={() => setShowPaymentModal(false)}>
+                  <IonButton onClick={() => setShowPaymentModal(false)} style={{ color: headerContrast }}>
                     <IonIcon icon={closeOutline} />
                   </IonButton>
                 </IonButtons>
@@ -916,10 +1033,9 @@ const PublicAppointmentManage: React.FC = () => {
                 {/* Action Buttons */}
                 <IonButton 
                   expand="block" 
-                  color="success" 
                   disabled={isSubmittingPayment || !paymentRef.trim() || inputAmt <= 0}
                   onClick={handlePaymentSubmit}
-                  style={{ fontWeight: 'bold', marginBottom: '10px' }}
+                  style={{ fontWeight: 'bold', marginBottom: '10px', '--background': primaryColor, '--color': primaryContrast }}
                 >
                   {isSubmittingPayment ? <IonSpinner name="crescent" /> : 'Confirmar y Enviar Comprobante'}
                 </IonButton>

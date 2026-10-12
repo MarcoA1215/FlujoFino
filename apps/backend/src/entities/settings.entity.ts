@@ -141,6 +141,9 @@ export class Settings {
   @Column({ nullable: true })
   themeHeaderColor: string;
 
+  @Column({ nullable: true })
+  companyLogoUrl: string;
+
   // --- Saldo Inicial de Tesorería al iniciar en FinoWork ---
   @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
   initialCashUSD: number;

@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Settings } from '../entities/settings.entity';
 import { Product } from '../entities/product.entity';
 import { ConfigService } from '@nestjs/config';
+import { StorageService } from '../storage/storage.service';
 
 @Injectable()
 export class SettingsService implements OnModuleInit {
@@ -16,6 +17,7 @@ export class SettingsService implements OnModuleInit {
     @InjectRepository(Product)
     private productRepo: Repository<Product>,
     private configService: ConfigService,
+    private storageService: StorageService,
   ) {}
 
   private lastSyncSlot = '';
@@ -28,6 +30,7 @@ export class SettingsService implements OnModuleInit {
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "endOfDayOffsetHours" integer DEFAULT 0;
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "themePrimaryColor" character varying;
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "themeHeaderColor" character varying;
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "companyLogoUrl" character varying;
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingMaxAdvanceDays" integer DEFAULT 365;
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingRequireDeposit" boolean DEFAULT false;
         ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingDepositPercentage" numeric(5,2) DEFAULT 0;
@@ -421,9 +424,40 @@ export class SettingsService implements OnModuleInit {
 
     if (payload.themePrimaryColor !== undefined) settings.themePrimaryColor = payload.themePrimaryColor;
     if (payload.themeHeaderColor !== undefined) settings.themeHeaderColor = payload.themeHeaderColor;
+    if (payload.companyLogoUrl !== undefined) settings.companyLogoUrl = payload.companyLogoUrl;
 
     await this.settingsRepo.save(settings);
     return this.getSettings(tenantId);
+  }
+
+  async uploadLogo(tenantId: string, file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('Archivo de imagen no proporcionado');
+    const { isValidUUID } = require('../utils/tenant-crypto');
+    if (!tenantId || !isValidUUID(tenantId)) {
+      throw new BadRequestException('Tenant inválido');
+    }
+    const url = await this.storageService.uploadFile(file, `tenant-${tenantId}/branding`);
+    let settings = await this.settingsRepo.findOne({ where: { tenantId } });
+    if (!settings) {
+      const { randomUUID } = require('crypto');
+      settings = this.settingsRepo.create({ id: randomUUID(), tenantId });
+    }
+    settings.companyLogoUrl = url;
+    await this.settingsRepo.save(settings);
+    return { logoUrl: url };
+  }
+
+  async deleteLogo(tenantId: string) {
+    const { isValidUUID } = require('../utils/tenant-crypto');
+    if (!tenantId || !isValidUUID(tenantId)) {
+      throw new BadRequestException('Tenant inválido');
+    }
+    const settings = await this.settingsRepo.findOne({ where: { tenantId } });
+    if (settings) {
+      settings.companyLogoUrl = null as any;
+      await this.settingsRepo.save(settings);
+    }
+    return { success: true };
   }
 
   async getExchangeRate(tenantId?: string) {

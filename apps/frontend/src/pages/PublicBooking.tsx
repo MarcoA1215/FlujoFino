@@ -24,6 +24,7 @@ import { requestAndSubscribePush } from '../services/push-notification.service';
 import { CustomerNotificationPrompt } from '../components/CustomerNotificationPrompt';
 import { BankSelect } from '../components/BankSelect';
 import { getPublicBaseUrl } from '../utils/public-url';
+import { getContrastColor, ensureReadableColor } from '../utils/colors';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -617,6 +618,32 @@ const PublicBooking: React.FC = () => {
     }
   }, [tenantInfo, isServiceRequired, step]);
 
+  const primaryColor = tenantInfo?.settings?.themePrimaryColor || tenantInfo?.themePrimaryColor || '#10b981';
+  const headerColor = tenantInfo?.settings?.themeHeaderColor || tenantInfo?.themeHeaderColor || primaryColor;
+  const headerContrast = getContrastColor(headerColor);
+  const primaryContrast = getContrastColor(primaryColor);
+  const primaryReadable = ensureReadableColor(primaryColor);
+  const primarySoftBg = (primaryColor.startsWith('#') ? primaryColor : `#${primaryColor}`) + '18';
+  const companyLogoUrl = tenantInfo?.settings?.companyLogoUrl || tenantInfo?.companyLogoUrl || null;
+
+  useEffect(() => {
+    if (tenantInfo) {
+      const pColor = tenantInfo?.settings?.themePrimaryColor || tenantInfo?.themePrimaryColor || '#10b981';
+      const hColor = tenantInfo?.settings?.themeHeaderColor || tenantInfo?.themeHeaderColor || pColor;
+      const pContrast = getContrastColor(pColor);
+      const hContrast = getContrastColor(hColor);
+      const pReadable = ensureReadableColor(pColor);
+
+      document.documentElement.style.setProperty('--theme-primary', pColor);
+      document.documentElement.style.setProperty('--theme-primary-contrast', pContrast);
+      document.documentElement.style.setProperty('--theme-primary-readable', pReadable);
+      document.documentElement.style.setProperty('--theme-header', hColor);
+      document.documentElement.style.setProperty('--theme-header-contrast', hContrast);
+      document.documentElement.style.setProperty('--ion-color-primary', pColor);
+      document.documentElement.style.setProperty('--ion-color-primary-contrast', pContrast);
+    }
+  }, [tenantInfo]);
+
   if (loading) return <IonPage><IonContent className="ion-padding ion-text-center"><IonSpinner /></IonContent></IonPage>;
 
   if (tenantInfo?.isSuspended) {
@@ -648,22 +675,40 @@ const PublicBooking: React.FC = () => {
               border: '1px solid #e2e8f0',
             }}
           >
-            <div
-              style={{
-                width: '72px',
-                height: '72px',
-                borderRadius: '50%',
-                backgroundColor: '#f1f5f9',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px auto',
-                fontSize: '32px',
-                color: '#64748b',
-              }}
-            >
-              🏪
-            </div>
+            {companyLogoUrl ? (
+              <img
+                src={companyLogoUrl}
+                alt={tenantInfo?.name || 'Logo'}
+                style={{
+                  width: '76px',
+                  height: '76px',
+                  borderRadius: '16px',
+                  objectFit: 'contain',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                  margin: '0 auto 16px auto',
+                  display: 'block'
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '72px',
+                  height: '72px',
+                  borderRadius: '50%',
+                  backgroundColor: '#f1f5f9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px auto',
+                  fontSize: '32px',
+                  color: '#64748b',
+                }}
+              >
+                🏪
+              </div>
+            )}
 
             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0' }}>
               {tenantInfo?.name || 'Negocio'}
@@ -711,28 +756,60 @@ const PublicBooking: React.FC = () => {
   if (success) {
     return (
       <IonPage>
-        <IonContent className="ion-padding" style={{ 'backgroundColor': '#f4f5f8' }}>
-          <div style={{ maxWidth: '500px', margin: '50px auto', textAlign: 'center' }}>
-            <IonCard>
-              <IonCardContent>
-                <IonIcon icon={checkmarkCircleOutline} style={{ fontSize: '80px', color: '#2dd36f' }} />
-                <h2 style={{ color: '#2dd36f', fontWeight: 'bold' }}>¡Cita Agendada!</h2>
-                <p style={{fontSize: '16px', marginTop: '10px'}}>Tu cita en <b>{tenantInfo?.name}</b> ha sido confirmada.</p>
+        <IonContent className="ion-padding" style={{ backgroundColor: '#F8FAFC' }}>
+          <div style={{ maxWidth: '520px', margin: '40px auto', textAlign: 'center' }}>
+            <IonCard style={{ borderRadius: '18px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', backgroundColor: '#ffffff' }}>
+              <IonCardContent style={{ padding: '28px 20px' }}>
+                {companyLogoUrl ? (
+                  <img
+                    src={companyLogoUrl}
+                    alt={tenantInfo?.name || 'Logo'}
+                    style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '14px',
+                      objectFit: 'contain',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                      margin: '0 auto 16px auto',
+                      display: 'block',
+                    }}
+                  />
+                ) : null}
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    backgroundColor: primarySoftBg,
+                    marginBottom: '14px',
+                  }}
+                >
+                  <IonIcon icon={checkmarkCircleOutline} style={{ fontSize: '42px', color: primaryReadable }} />
+                </div>
+                <h2 style={{ color: '#0F172A', fontWeight: 800, fontSize: '1.4rem', margin: '0 0 6px 0' }}>¡Cita Agendada!</h2>
+                <p style={{ fontSize: '15px', color: '#64748B', margin: '0 0 20px 0' }}>
+                  Tu cita en <b style={{ color: '#0F172A' }}>{tenantInfo?.name}</b> ha sido confirmada.
+                </p>
                 
-                <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px', textAlign: 'left' }}>
-                  <p><b>Fecha:</b> {selectedDate?.toLocaleDateString()}</p>
-                  <p><b>Hora:</b> {selectedTime}</p>
+                <div style={{ marginTop: '16px', padding: '16px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', textAlign: 'left', fontSize: '14px' }}>
+                  <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Fecha:</b> {selectedDate?.toLocaleDateString()}</p>
+                  <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Hora:</b> {selectedTime}</p>
                   {selectedServices.length > 0 && (
                     <>
-                      <p><b>Servicio(s):</b> {selectedServiceNames}</p>
-                      <p><b>Duración estimada:</b> {totalDurationMinutes} min</p>
-                      <p><b>Total:</b> ${totalServicePrice.toFixed(2)}</p>
+                      <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Servicio(s):</b> {selectedServiceNames}</p>
+                      <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Duración estimada:</b> {totalDurationMinutes} min</p>
+                      <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Total:</b> <span style={{ color: primaryReadable, fontWeight: 700 }}>${totalServicePrice.toFixed(2)}</span></p>
                     </>
                   )}
                   {selectedStaff ? (
-                    <p><b>Especialista:</b> {formatStaffName(selectedStaff.name)}</p>
+                    <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Especialista:</b> {formatStaffName(selectedStaff.name)}</p>
                   ) : selectedServices.length > 1 ? (
-                    <p><b>Atención:</b> Equipo del Local (Coordinación continua)</p>
+                    <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Atención:</b> Equipo del Local (Coordinación continua)</p>
                   ) : null}
                 </div>
 
@@ -742,20 +819,32 @@ const PublicBooking: React.FC = () => {
                   type="booking"
                 />
 
-                <div style={{ marginTop: '25px', padding: '15px', backgroundColor: '#eef8ff', borderRadius: '8px', border: '1px dashed var(--ion-color-primary)' }}>
-                  <h3 style={{ color: 'var(--ion-color-primary)', fontWeight: 'bold', fontSize: '16px', margin: '0 0 10px 0' }}>Enlace de Gestión</h3>
-                  <p style={{ fontSize: '14px', color: '#555', margin: '0 0 15px 0' }}>Guarda este enlace único. Desde aquí podrás ver los detalles bancarios, o cancelar y reprogramar tu cita sin necesidad de contactarnos:</p>
+                <div style={{ marginTop: '22px', padding: '16px', backgroundColor: primarySoftBg, borderRadius: '12px', border: `1px dashed ${primaryColor}`, textAlign: 'left' }}>
+                  <h3 style={{ color: primaryReadable, fontWeight: 700, fontSize: '15px', margin: '0 0 8px 0' }}>Enlace de Gestión</h3>
+                  <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 12px 0', lineHeight: 1.45 }}>
+                    Guarda este enlace único. Desde aquí podrás ver los detalles bancarios, o cancelar y reprogramar tu cita sin necesidad de contactarnos:
+                  </p>
                   
-                  <div style={{ wordBreak: 'break-all', backgroundColor: '#fff', padding: '10px', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', border: '1px solid #ddd', marginBottom: '10px' }}>
+                  <div style={{ wordBreak: 'break-all', backgroundColor: '#ffffff', padding: '10px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, border: '1px solid #CBD5E1', marginBottom: '14px', color: '#0F172A' }}>
                     {magicLink}
                   </div>
                   
-                  <IonButton fill="outline" color="primary" onClick={() => { navigator.clipboard.writeText(magicLink); presentToast({ message: '¡Enlace copiado!', duration: 2000, color: 'success' }); }}>
-                    Copiar Enlace
-                  </IonButton>
-                  <IonButton fill="solid" color="primary" onClick={() => window.open(magicLink, '_blank')}>
-                    Abrir Panel
-                  </IonButton>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <IonButton
+                      fill="outline"
+                      style={{ flex: 1, minWidth: '130px', '--border-color': primaryColor, '--color': primaryReadable, fontWeight: 600 }}
+                      onClick={() => { navigator.clipboard.writeText(magicLink); presentToast({ message: '¡Enlace copiado!', duration: 2000, color: 'success' }); }}
+                    >
+                      Copiar Enlace
+                    </IonButton>
+                    <IonButton
+                      fill="solid"
+                      style={{ flex: 1, minWidth: '130px', '--background': primaryColor, '--color': primaryContrast, fontWeight: 600 }}
+                      onClick={() => window.open(magicLink, '_blank')}
+                    >
+                      Abrir Panel
+                    </IonButton>
+                  </div>
                 </div>
               </IonCardContent>
             </IonCard>
@@ -773,7 +862,7 @@ const PublicBooking: React.FC = () => {
   const hasServices = availableServices.length > 0;
   const hasStore = Boolean(tenantInfo?.hasStore ?? ((tenantInfo?.featureBuySell || tenantInfo?.featureRecipes) && tenantInfo?.featureShowCatalog !== false));
   const companyPhone = tenantInfo?.companyPhone || tenantInfo?.settings?.companyPhone || '';
-  const headerColor = tenantInfo?.settings?.themeHeaderColor || '#0f172a';
+
 
   const goBack = () => {
     if (step === 2 && isServiceRequired) {
@@ -789,21 +878,40 @@ const PublicBooking: React.FC = () => {
     <IonPage>
       {/* Header matching PublicStore */}
       <IonHeader>
-        <IonToolbar style={{ ['--background' as any]: headerColor, color: '#fff' }}>
+        <IonToolbar style={{ ['--background' as any]: headerColor, color: headerContrast }}>
           {step > (isServiceRequired ? 1 : 2) ? (
             <IonButtons slot="start">
-              <IonButton fill="clear" onClick={goBack} style={{ color: '#fff' }} title="Regresar">
+              <IonButton fill="clear" onClick={goBack} style={{ color: headerContrast }} title="Regresar">
                 <IonIcon slot="icon-only" icon={chevronBackOutline} />
               </IonButton>
             </IonButtons>
           ) : hasStore ? (
             <IonButtons slot="start">
-              <IonButton fill="clear" onClick={() => (window.location.href = `/store/${tenantId}`)} style={{ color: '#fff' }} title="Volver a la Tienda">
+              <IonButton fill="clear" onClick={() => (window.location.href = `/store/${tenantId}`)} style={{ color: headerContrast }} title="Volver a la Tienda">
                 <IonIcon slot="icon-only" icon={chevronBackOutline} />
               </IonButton>
             </IonButtons>
           ) : null}
-          <IonTitle style={{ fontWeight: 'bold' }}>{tenantInfo?.name || 'Agendar Cita'}</IonTitle>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingLeft: '8px' }}>
+            {companyLogoUrl ? (
+              <img
+                src={companyLogoUrl}
+                alt="Logo"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  objectFit: 'contain',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  flexShrink: 0
+                }}
+              />
+            ) : null}
+            <IonTitle style={{ fontWeight: 'bold', padding: 0, color: headerContrast }}>
+              {tenantInfo?.name || 'Agendar Cita'}
+            </IonTitle>
+          </div>
           <IonButtons slot="end">
             {companyPhone && (
               <IonButton
@@ -822,8 +930,9 @@ const PublicBooking: React.FC = () => {
                 fill="clear"
                 onClick={() => (window.location.href = `/store/${tenantId}`)}
                 title="Ir al Catálogo / Tienda"
+                style={{ color: headerContrast }}
               >
-                <IonIcon slot="icon-only" icon={cartOutline} style={{ color: '#fff', fontSize: '1.5rem' }} />
+                <IonIcon slot="icon-only" icon={cartOutline} style={{ fontSize: '1.5rem' }} />
               </IonButton>
             )}
           </IonButtons>
@@ -849,13 +958,49 @@ const PublicBooking: React.FC = () => {
               boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
             }}
           >
-            <div>
-              <h2 style={{ margin: '0 0 4px 0', fontSize: '1.25rem', fontWeight: '800', color: '#0f172a' }}>
-                {tenantInfo?.name}
-              </h2>
-              <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b' }}>
-                Reserva de citas y atención personalizada
-              </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              {companyLogoUrl ? (
+                <img
+                  src={companyLogoUrl}
+                  alt={tenantInfo?.name}
+                  style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '14px',
+                    objectFit: 'contain',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                    flexShrink: 0
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: '54px',
+                    height: '54px',
+                    borderRadius: '12px',
+                    backgroundColor: primarySoftBg,
+                    color: primaryReadable,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '24px',
+                    border: `1px solid ${primaryReadable}30`,
+                    flexShrink: 0
+                  }}
+                >
+                  📅
+                </div>
+              )}
+              <div>
+                <h2 style={{ margin: '0 0 4px 0', fontSize: '1.25rem', fontWeight: '800', color: '#0f172a' }}>
+                  {tenantInfo?.name}
+                </h2>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b' }}>
+                  Reserva de citas y atención personalizada
+                </p>
+              </div>
             </div>
             <div style={{
               background: '#f8fafc',
@@ -977,8 +1122,8 @@ const PublicBooking: React.FC = () => {
                             onClick={() => toggleService(svc)}
                             style={{ 
                               padding: '14px 16px', 
-                              border: isSelected ? '2px solid #10B981' : '1px solid #E2E8F0', 
-                              backgroundColor: isSelected ? '#F0FDF4' : '#FFFFFF',
+                              border: isSelected ? `2px solid ${primaryColor}` : '1px solid #E2E8F0', 
+                              backgroundColor: isSelected ? primarySoftBg : '#FFFFFF',
                               borderRadius: '14px', 
                               marginBottom: '12px',
                               cursor: 'pointer',
@@ -986,7 +1131,7 @@ const PublicBooking: React.FC = () => {
                               justifyContent: 'space-between',
                               alignItems: 'center',
                               transition: 'all 0.2s ease',
-                              boxShadow: isSelected ? '0 2px 8px rgba(16,185,129,0.12)' : '0 1px 3px rgba(0,0,0,0.02)'
+                              boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.06)' : '0 1px 3px rgba(0,0,0,0.02)'
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -1013,15 +1158,15 @@ const PublicBooking: React.FC = () => {
                               </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
-                              <div style={{ fontWeight: '900', fontSize: '17px', color: '#10B981' }}>
+                              <div style={{ fontWeight: '900', fontSize: '17px', color: primaryReadable }}>
                                 ${Number(svc.price).toFixed(2)}
                               </div>
                               {isSelected ? (
-                                <div style={{ fontSize: '11px', color: '#059669', fontWeight: '800', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#ECFDF5', padding: '3px 8px', borderRadius: '6px' }}>
+                                <div style={{ fontSize: '11px', color: primaryReadable, fontWeight: '800', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px', background: primarySoftBg, padding: '3px 8px', borderRadius: '6px' }}>
                                   <IonIcon icon={checkmarkCircleOutline} /> Seleccionado
                                 </div>
                               ) : (
-                                <div style={{ fontSize: '12px', color: '#059669', fontWeight: '700', marginTop: '4px' }}>
+                                <div style={{ fontSize: '12px', color: primaryReadable, fontWeight: '700', marginTop: '4px' }}>
                                   + Agregar
                                 </div>
                               )}
@@ -1147,8 +1292,8 @@ const PublicBooking: React.FC = () => {
                           width: '100%',
                           marginTop: '20px',
                           padding: '14px 20px',
-                          backgroundColor: (isServiceRequired && selectedServices.length === 0) ? '#cbd5e1' : '#10B981',
-                          color: (isServiceRequired && selectedServices.length === 0) ? '#64748b' : '#ffffff',
+                          backgroundColor: (isServiceRequired && selectedServices.length === 0) ? '#cbd5e1' : primaryColor,
+                          color: (isServiceRequired && selectedServices.length === 0) ? '#64748b' : primaryContrast,
                           border: 'none',
                           borderRadius: '12px',
                           fontSize: '15px',
@@ -1158,7 +1303,7 @@ const PublicBooking: React.FC = () => {
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '8px',
-                          boxShadow: (isServiceRequired && selectedServices.length === 0) ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.25)',
+                          boxShadow: (isServiceRequired && selectedServices.length === 0) ? 'none' : '0 4px 12px rgba(0,0,0,0.15)',
                           transition: 'all 0.2s ease',
                         }}
                       >
@@ -1462,13 +1607,13 @@ const PublicBooking: React.FC = () => {
                                 height: '42px',
                                 borderRadius: '10px',
                                 border: isAvailable 
-                                  ? (cell.isSelected ? '2px solid #059669' : '1.5px solid #10B981')
+                                  ? (cell.isSelected ? `2px solid ${primaryReadable}` : `1.5px solid ${primaryColor}`)
                                   : '1px solid #f1f5f9',
                                 backgroundColor: isAvailable
-                                  ? (cell.isSelected ? '#10B981' : '#ecfdf5')
+                                  ? (cell.isSelected ? primaryColor : primarySoftBg)
                                   : '#f8fafc',
                                 color: isAvailable
-                                  ? (cell.isSelected ? '#ffffff' : '#065f46')
+                                  ? (cell.isSelected ? primaryContrast : primaryReadable)
                                   : '#cbd5e1',
                                 fontWeight: isAvailable ? 700 : 500,
                                 fontSize: '13px',
@@ -2144,8 +2289,8 @@ const PublicBooking: React.FC = () => {
                       width: '100%',
                       marginTop: '20px',
                       padding: '16px 20px',
-                      backgroundColor: '#10B981',
-                      color: '#ffffff',
+                      backgroundColor: primaryColor,
+                      color: primaryContrast,
                       border: 'none',
                       borderRadius: '12px',
                       fontSize: '16px',
@@ -2156,7 +2301,7 @@ const PublicBooking: React.FC = () => {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
                       transition: 'all 0.2s ease',
                     }}
                   >

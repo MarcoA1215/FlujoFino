@@ -48,6 +48,7 @@ import { CustomerNotificationPrompt } from '../components/CustomerNotificationPr
 import { formatWhatsAppUrl } from '../utils/whatsapp';
 import { playNotificationSound } from '../utils/audio';
 import { BankSelect } from '../components/BankSelect';
+import { getContrastColor, ensureReadableColor } from '../utils/colors';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -798,7 +799,31 @@ const PublicStore: React.FC = () => {
     copyToClipboard(lines, 'Datos de Pago Móvil');
   };
 
-  const headerColor = storeData?.settings?.themeHeaderColor || '#0f172a';
+  const primaryColor = storeData?.settings?.themePrimaryColor || '#10b981';
+  const headerColor = storeData?.settings?.themeHeaderColor || primaryColor;
+  const headerContrast = getContrastColor(headerColor);
+  const primaryContrast = getContrastColor(primaryColor);
+  const primaryReadable = ensureReadableColor(primaryColor);
+  const primarySoftBg = (primaryColor.startsWith('#') ? primaryColor : `#${primaryColor}`) + '18';
+  const companyLogoUrl = storeData?.settings?.companyLogoUrl || null;
+
+  useEffect(() => {
+    if (storeData?.settings) {
+      const pColor = storeData.settings.themePrimaryColor || '#10b981';
+      const hColor = storeData.settings.themeHeaderColor || pColor;
+      const pContrast = getContrastColor(pColor);
+      const hContrast = getContrastColor(hColor);
+      const pReadable = ensureReadableColor(pColor);
+
+      document.documentElement.style.setProperty('--theme-primary', pColor);
+      document.documentElement.style.setProperty('--theme-primary-contrast', pContrast);
+      document.documentElement.style.setProperty('--theme-primary-readable', pReadable);
+      document.documentElement.style.setProperty('--theme-header', hColor);
+      document.documentElement.style.setProperty('--theme-header-contrast', hContrast);
+      document.documentElement.style.setProperty('--ion-color-primary', pColor);
+      document.documentElement.style.setProperty('--ion-color-primary-contrast', pContrast);
+    }
+  }, [storeData]);
 
   if (loading) {
     return (
@@ -842,22 +867,40 @@ const PublicStore: React.FC = () => {
               border: '1px solid #e2e8f0',
             }}
           >
-            <div
-              style={{
-                width: '72px',
-                height: '72px',
-                borderRadius: '50%',
-                backgroundColor: '#f1f5f9',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px auto',
-                fontSize: '32px',
-                color: '#64748b',
-              }}
-            >
-              🏪
-            </div>
+            {companyLogoUrl ? (
+              <img
+                src={companyLogoUrl}
+                alt={storeData?.tenant?.name || 'Logo'}
+                style={{
+                  width: '76px',
+                  height: '76px',
+                  borderRadius: '16px',
+                  objectFit: 'contain',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                  margin: '0 auto 16px auto',
+                  display: 'block',
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '72px',
+                  height: '72px',
+                  borderRadius: '50%',
+                  backgroundColor: '#f1f5f9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px auto',
+                  fontSize: '32px',
+                  color: '#64748b',
+                }}
+              >
+                🏪
+              </div>
+            )}
 
             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0' }}>
               {storeData?.tenant?.name || 'Tienda'}
@@ -938,8 +981,27 @@ const PublicStore: React.FC = () => {
     return (
       <IonPage>
         <IonHeader>
-          <IonToolbar style={{ ['--background' as any]: headerColor, color: '#fff' }}>
-            <IonTitle>{storeData?.tenant?.name || 'Tienda Online'}</IonTitle>
+          <IonToolbar style={{ ['--background' as any]: headerColor, color: headerContrast }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingLeft: '8px' }}>
+              {companyLogoUrl ? (
+                <img
+                  src={companyLogoUrl}
+                  alt="Logo"
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    objectFit: 'contain',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid rgba(0,0,0,0.08)',
+                    flexShrink: 0,
+                  }}
+                />
+              ) : null}
+              <IonTitle style={{ fontWeight: 'bold', padding: 0, color: headerContrast }}>
+                {storeData?.tenant?.name || 'Tienda Online'}
+              </IonTitle>
+            </div>
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding" style={{ maxWidth: '600px', margin: '0 auto' }}>
@@ -1123,8 +1185,27 @@ const PublicStore: React.FC = () => {
     <IonPage>
       {/* Header */}
       <IonHeader>
-        <IonToolbar style={{ ['--background' as any]: headerColor, color: '#fff' }}>
-          <IonTitle style={{ fontWeight: 'bold' }}>{storeData?.tenant?.name || 'Tienda Online'}</IonTitle>
+        <IonToolbar style={{ ['--background' as any]: headerColor, color: headerContrast }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingLeft: '8px' }}>
+            {companyLogoUrl ? (
+              <img
+                src={companyLogoUrl}
+                alt="Logo"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  objectFit: 'contain',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  flexShrink: 0,
+                }}
+              />
+            ) : null}
+            <IonTitle style={{ fontWeight: 'bold', padding: 0, color: headerContrast }}>
+              {storeData?.tenant?.name || 'Tienda Online'}
+            </IonTitle>
+          </div>
           <IonButtons slot="end">
             <IonButton
               fill="clear"
@@ -1133,7 +1214,7 @@ const PublicStore: React.FC = () => {
                 setIsTrackModalOpen(true);
               }}
               title="Rastrear mi pedido"
-              style={{ color: '#fff' }}
+              style={{ color: headerContrast }}
             >
               <IonIcon slot="icon-only" icon={searchOutline} style={{ fontSize: '1.45rem' }} />
             </IonButton>
@@ -1147,11 +1228,10 @@ const PublicStore: React.FC = () => {
                 <IonIcon slot="icon-only" icon={logoWhatsapp} style={{ color: '#25D366', fontSize: '1.5rem' }} />
               </IonButton>
             )}
-            <IonButton onClick={() => setIsCartOpen(true)} style={{ position: 'relative' }}>
+            <IonButton onClick={() => setIsCartOpen(true)} style={{ position: 'relative', color: headerContrast }}>
               <IonIcon slot="icon-only" icon={cartOutline} style={{ fontSize: '1.6rem' }} />
               {cartTotalItems > 0 && (
                 <IonBadge
-                  color="danger"
                   style={{
                     position: 'absolute',
                     top: '2px',
@@ -1159,6 +1239,8 @@ const PublicStore: React.FC = () => {
                     fontSize: '11px',
                     padding: '2px 5px',
                     borderRadius: '10px',
+                    backgroundColor: primaryColor,
+                    color: primaryContrast,
                   }}
                 >
                   {cartTotalItems}
@@ -1174,8 +1256,8 @@ const PublicStore: React.FC = () => {
         {activeOrderMini && !orderResult && (
           <div
             style={{
-              backgroundColor: '#ecfdf5',
-              border: '1.5px solid #10b981',
+              backgroundColor: primarySoftBg,
+              border: `1.5px solid ${primaryReadable}40`,
               borderRadius: '12px',
               padding: '12px 16px',
               marginBottom: '16px',
@@ -1184,7 +1266,7 @@ const PublicStore: React.FC = () => {
               justifyContent: 'space-between',
               flexWrap: 'wrap',
               gap: '10px',
-              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.08)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1193,8 +1275,8 @@ const PublicStore: React.FC = () => {
                   width: '38px',
                   height: '38px',
                   borderRadius: '50%',
-                  backgroundColor: '#10b981',
-                  color: '#ffffff',
+                  backgroundColor: primaryColor,
+                  color: primaryContrast,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1205,10 +1287,10 @@ const PublicStore: React.FC = () => {
                 📡
               </div>
               <div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#065f46' }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
                   Pedido activo #{activeOrderMini.orderNumber || (activeOrderMini.orderId || activeOrderMini.id || '').slice(0, 8).toUpperCase()}
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#047857', fontWeight: 600 }}>
+                <div style={{ fontSize: '0.8rem', color: primaryReadable, fontWeight: 700 }}>
                   Estado: {getStatusLabel(activeOrderMini.status || 'PENDING')}
                 </div>
               </div>
@@ -1219,8 +1301,8 @@ const PublicStore: React.FC = () => {
                 type="button"
                 onClick={() => loadOrderDetails(activeOrderMini.orderId || activeOrderMini.id, true)}
                 style={{
-                  backgroundColor: '#10b981',
-                  color: '#ffffff',
+                  backgroundColor: primaryColor,
+                  color: primaryContrast,
                   border: 'none',
                   borderRadius: '8px',
                   padding: '8px 14px',
@@ -1230,7 +1312,7 @@ const PublicStore: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                 }}
               >
                 <span>Ver Seguimiento</span> ↗
@@ -1275,13 +1357,49 @@ const PublicStore: React.FC = () => {
             gap: '10px',
           }}
         >
-          <div>
-            <h2 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: 'bold', color: '#0f172a' }}>
-              {storeData?.tenant?.name}
-            </h2>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-              Catálogo de productos disponibles para retiro o delivery
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            {companyLogoUrl ? (
+              <img
+                src={companyLogoUrl}
+                alt={storeData?.tenant?.name}
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '14px',
+                  objectFit: 'contain',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                  flexShrink: 0,
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '54px',
+                  height: '54px',
+                  borderRadius: '12px',
+                  backgroundColor: primarySoftBg,
+                  color: primaryReadable,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '24px',
+                  border: `1px solid ${primaryReadable}30`,
+                  flexShrink: 0,
+                }}
+              >
+                🏪
+              </div>
+            )}
+            <div>
+              <h2 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: 'bold', color: '#0f172a' }}>
+                {storeData?.tenant?.name}
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+                Catálogo de productos disponibles para retiro o delivery
+              </p>
+            </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <IonBadge color="light" style={{ fontSize: '0.95rem', padding: '8px 12px', border: '1px solid #cbd5e1' }}>
@@ -1595,7 +1713,7 @@ const PublicStore: React.FC = () => {
                           }}
                         >
                           <div>
-                            <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#16a34a' }}>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: primaryReadable }}>
                               ${product.salePrice.toFixed(2)}
                             </div>
                             <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
@@ -1667,31 +1785,39 @@ const PublicStore: React.FC = () => {
               maxWidth: '450px',
             }}
           >
-            <IonButton
-              expand="block"
-              color="success"
+            <button
+              type="button"
               onClick={() => setIsCartOpen(true)}
               style={{
-                boxShadow: '0 8px 20px rgba(22, 163, 74, 0.35)',
-                borderRadius: '12px',
+                width: '100%',
+                backgroundColor: primaryColor,
+                color: primaryContrast,
+                border: 'none',
+                borderRadius: '14px',
                 height: '52px',
-                fontWeight: 'bold',
+                fontWeight: 800,
                 fontSize: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                cursor: 'pointer',
               }}
             >
-              <IonIcon slot="start" icon={cartOutline} style={{ fontSize: '1.3rem' }} />
-              Ver Carrito ({cartTotalItems}) • ${cartSubtotalUSD.toFixed(2)}
-            </IonButton>
+              <IonIcon icon={cartOutline} style={{ fontSize: '1.4rem' }} />
+              <span>Ver Carrito ({cartTotalItems}) • ${cartSubtotalUSD.toFixed(2)}</span>
+            </button>
           </div>
         )}
 
         {/* Cart and Checkout Modal */}
         <IonModal isOpen={isCartOpen} onDidDismiss={() => setIsCartOpen(false)}>
           <IonHeader>
-            <IonToolbar style={{ ['--background' as any]: headerColor, color: '#fff' }}>
-              <IonTitle>Mi Carrito ({cartTotalItems})</IonTitle>
+            <IonToolbar style={{ ['--background' as any]: headerColor, color: headerContrast }}>
+              <IonTitle style={{ color: headerContrast }}>Mi Carrito ({cartTotalItems})</IonTitle>
               <IonButtons slot="end">
-                <IonButton onClick={() => setIsCartOpen(false)}>
+                <IonButton onClick={() => setIsCartOpen(false)} style={{ color: headerContrast }}>
                   <IonIcon slot="icon-only" icon={closeOutline} />
                 </IonButton>
               </IonButtons>
@@ -2293,10 +2419,10 @@ const PublicStore: React.FC = () => {
           }}
         >
           <IonHeader>
-            <IonToolbar style={{ ['--background' as any]: headerColor, color: '#fff' }}>
-              <IonTitle style={{ fontWeight: 'bold' }}>🔍 Rastrear mi Pedido</IonTitle>
+            <IonToolbar style={{ ['--background' as any]: headerColor, color: headerContrast }}>
+              <IonTitle style={{ fontWeight: 'bold', color: headerContrast }}>🔍 Rastrear mi Pedido</IonTitle>
               <IonButtons slot="end">
-                <IonButton onClick={() => setIsTrackModalOpen(false)} style={{ color: '#fff' }}>
+                <IonButton onClick={() => setIsTrackModalOpen(false)} style={{ color: headerContrast }}>
                   <IonIcon icon={closeOutline} />
                 </IonButton>
               </IonButtons>
@@ -2445,8 +2571,8 @@ const PublicStore: React.FC = () => {
                       width: '100%',
                       height: '46px',
                       borderRadius: '10px',
-                      backgroundColor: '#10b981',
-                      color: '#ffffff',
+                      backgroundColor: primaryColor,
+                      color: primaryContrast,
                       border: 'none',
                       fontSize: '0.95rem',
                       fontWeight: 700,

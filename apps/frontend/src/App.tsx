@@ -43,6 +43,7 @@ const PromoterDashboard = lazy(() => import('./pages/PromoterDashboard'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const DeleteAccount = lazy(() => import('./pages/DeleteAccount'));
 
 const PageFallback: React.FC = () => (
   <div style={{
@@ -274,6 +275,8 @@ const MainLayout: React.FC = () => {
                         location.pathname === '/landing' ||
                         location.pathname === '/terms' ||
                         location.pathname === '/privacy' ||
+                        location.pathname === '/delete-account' ||
+                        location.pathname === '/solicitud-eliminacion' ||
                         location.pathname === '/login' ||
                         location.pathname === '/register' ||
                         (location.pathname === '/' && !user);
@@ -295,6 +298,8 @@ const MainLayout: React.FC = () => {
         <Route path="/landing" element={Capacitor.isNativePlatform() ? <Navigate to="/login" replace /> : <Suspense fallback={<PageFallback />}><LandingPage /></Suspense>} />
         <Route path="/terms" element={<Suspense fallback={<PageFallback />}><TermsAndConditions /></Suspense>} />
         <Route path="/privacy" element={<Suspense fallback={<PageFallback />}><PrivacyPolicy /></Suspense>} />
+        <Route path="/delete-account" element={<Suspense fallback={<PageFallback />}><DeleteAccount /></Suspense>} />
+        <Route path="/solicitud-eliminacion" element={<Suspense fallback={<PageFallback />}><DeleteAccount /></Suspense>} />
         <Route path="/" element={<HomeRedirector />} />
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/register" element={<RegisterRoute />} />
@@ -316,7 +321,6 @@ const MainLayout: React.FC = () => {
         <Route path="/feedback" element={<PrivateRoute><FeedbackPage /></PrivateRoute>} />
         <Route path="/promoter" element={<PromoterRoute><PromoterDashboard /></PromoterRoute>} />
         <Route path="/platform-admin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
-        <Route path="*" element={<HomeRedirector />} />
       </IonRouterOutlet>
       </IonSplitPane>
       <BottomNav />

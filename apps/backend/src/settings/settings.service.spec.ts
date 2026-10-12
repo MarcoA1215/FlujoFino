@@ -5,11 +5,14 @@ import { SettingsService } from './settings.service';
 import { Settings } from '../entities/settings.entity';
 import { Product } from '../entities/product.entity';
 
+import { StorageService } from '../storage/storage.service';
+
 describe('SettingsService (Unit Tests)', () => {
   let service: SettingsService;
   let mockSettingsRepo: any;
   let mockProductRepo: any;
   let mockConfigService: any;
+  let mockStorageService: any;
 
   const TENANT_123_ID = '55555555-5555-4555-8555-555555555555';
   const TENANT_PARALELO_ID = '11111111-1111-4111-8111-111111111111';
@@ -41,12 +44,18 @@ describe('SettingsService (Unit Tests)', () => {
       get: jest.fn((key) => (key === 'COTIZAVE_API_KEY' ? 'test-api-key' : null)),
     };
 
+    mockStorageService = {
+      uploadFile: jest.fn().mockResolvedValue('https://example.com/logo.png'),
+      deleteFile: jest.fn().mockResolvedValue(true),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SettingsService,
         { provide: getRepositoryToken(Settings), useValue: mockSettingsRepo },
         { provide: getRepositoryToken(Product), useValue: mockProductRepo },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: StorageService, useValue: mockStorageService },
       ],
     }).compile();
 
@@ -116,13 +125,31 @@ describe('SettingsService (Unit Tests)', () => {
 
   describe('updateExchangeRate', () => {
     it('debe actualizar la tasa y el modo correctamente para un tenant específico', async () => {
+      jest.spyOn(service, 'syncRates').mockResolvedValue({
+        bcv: 50.0,
+        parallel: 60.0,
+        usdt: 58.0,
+        eur: 52.0,
+        updatedAt: new Date().toISOString(),
+      });
+
       const existingSettings = {
         id: 'set-1',
         tenantId: TENANT_1_ID,
         exchangeRateMode: 'BCV',
         exchangeRateBs: 50.0,
+        ratesCache: { bcv: 50.0, parallel: 60.0, usdt: 58.0, eur: 52.0 },
       };
-      mockSettingsRepo.findOne.mockResolvedValue(existingSettings);
+      mockSettingsRepo.findOne.mockImplementation(({ where }: any) => {
+        if (where?.id === 'GLOBAL') {
+          return Promise.resolve({
+            id: 'GLOBAL',
+            exchangeRateBs: 50.0,
+            ratesCache: { bcv: 50.0, parallel: 60.0, usdt: 58.0, eur: 52.0 },
+          });
+        }
+        return Promise.resolve(existingSettings);
+      });
 
       await service.updateExchangeRate(undefined, TENANT_1_ID, 'PARALELO');
 

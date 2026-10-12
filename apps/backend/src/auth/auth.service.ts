@@ -715,4 +715,62 @@ export class AuthService {
       message: 'Tu contraseña ha sido restablecida exitosamente. Ya puedes iniciar sesión.',
     };
   }
+
+  async requestAccountDeletion(identifier: string, reason?: string): Promise<{ success: boolean; message: string }> {
+    const cleanId = (identifier || '').trim();
+    if (!cleanId) {
+      throw new BadRequestException('Debes proporcionar tu correo o nombre de usuario');
+    }
+
+    const user = await this.usersService.findByUsername(cleanId);
+    const targetEmail = process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN_EMAIL;
+
+    if (user) {
+      try {
+        await this.mailService.sendAccountDeletionNotification(
+          targetEmail,
+          user.username,
+          reason
+        );
+      } catch (err) {
+        console.warn('No se pudo enviar correo de solicitud de eliminación:', err);
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Tu solicitud de eliminación de cuenta ha sido recibida y registrada exitosamente. Tus datos serán procesados y eliminados conforme a nuestra política de privacidad.',
+    };
+  }
+
+  async deleteMyAccount(userId: string): Promise<{ success: boolean; message: string }> {
+    const userRepo = this.dataSource.getRepository(User);
+    const user = await userRepo.findOne({
+      where: { id: userId },
+      relations: { tenantAccess: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    const masterEmail = (process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN_EMAIL).toLowerCase();
+    if (user.email && user.email.toLowerCase() === masterEmail) {
+      throw new ForbiddenException('No se puede eliminar la cuenta de SuperAdministrador de la plataforma.');
+    }
+
+    // 1. Eliminar vínculos y accesos a empresas
+    await this.dataSource.query(`DELETE FROM "user_tenant_access" WHERE "userId" = $1`, [userId]);
+    
+    // 2. Eliminar solicitudes de acceso pendientes si existen
+    await this.dataSource.query(`DELETE FROM "access_requests" WHERE "userId" = $1`, [userId]).catch(() => null);
+
+    // 3. Eliminar el usuario
+    await userRepo.delete(userId);
+
+    return {
+      success: true,
+      message: 'Tu cuenta y todos tus datos personales han sido eliminados de la plataforma de manera permanente.',
+    };
+  }
 }

@@ -1,4 +1,4 @@
-﻿import { Public } from './public.decorator';
+import { Public } from './public.decorator';
 import { Controller, Post, Body, UnauthorizedException, Get, UseGuards, Request, Param, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -117,5 +117,20 @@ export class AuthController {
       throw new BadRequestException('targetRole es requerido');
     }
     return this.authService.switchMode(req.user.id, req.user.tenantId, body.targetRole, req.user);
+  }
+
+  @Public()
+  @Post('request-account-deletion')
+  async requestAccountDeletion(@Body() body: { identifier: string; reason?: string }) {
+    if (!body?.identifier) {
+      throw new BadRequestException('Debes ingresar tu correo electrónico o nombre de usuario');
+    }
+    return this.authService.requestAccountDeletion(body.identifier, body.reason);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('delete-my-account')
+  async deleteMyAccount(@Request() req: any) {
+    return this.authService.deleteMyAccount(req.user.id);
   }
 }
