@@ -28,6 +28,9 @@ jobs:
       - name: Install Dependencies
         run: yarn install
 
+      - name: Build Shared Types
+        run: yarn workspace @finowork/shared-types build
+
       - name: Run Backend Unit Tests
         run: yarn workspace finowork-backend test --runInBand
 

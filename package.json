@@ -5,5 +5,12 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "build:types": "yarn workspace @finowork/shared-types build",
+    "build:backend": "yarn workspace @finowork/shared-types build && yarn workspace finowork-backend build",
+    "build:frontend": "yarn workspace @finowork/shared-types build && yarn workspace frontend build",
+    "build": "yarn workspace @finowork/shared-types build && yarn workspace finowork-backend build",
+    "start": "yarn workspace finowork-backend start:prod"
+  }
 }
