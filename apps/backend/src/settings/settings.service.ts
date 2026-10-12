@@ -23,24 +23,34 @@ export class SettingsService implements OnModuleInit {
   private lastSyncSlot = '';
 
   async onModuleInit() {
-    // Migración defensiva autocurativa (idempotente) para evitar caídas si DB_SYNCHRONIZE está desactivado en producción
-    try {
-      await this.settingsRepo.query(`
-        -- Configuración y reservas previas
-        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "endOfDayOffsetHours" integer DEFAULT 0;
-        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "themePrimaryColor" character varying;
-        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "themeHeaderColor" character varying;
-        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "companyLogoUrl" character varying;
-        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingMaxAdvanceDays" integer DEFAULT 365;
-        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingRequireDeposit" boolean DEFAULT false;
-        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingDepositPercentage" numeric(5,2) DEFAULT 0;
-        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "exchangeRateMode" character varying DEFAULT 'BCV';
-        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "manualExchangeRate" numeric(12,4);
-        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "currencySymbol" character varying DEFAULT 'Bs.';
-        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "ratesCache" jsonb;
-        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "featureDelivery" boolean DEFAULT true;
-        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "allowNegativeStock" boolean DEFAULT false;
-        
+    // 1. Migración crítica inmediata para la tabla "settings" (statement por statement)
+    const settingsColumns = [
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "companyLogoUrl" character varying;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "themePrimaryColor" character varying;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "themeHeaderColor" character varying;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "endOfDayOffsetHours" integer DEFAULT 0;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingMaxAdvanceDays" integer DEFAULT 365;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingRequireDeposit" boolean DEFAULT false;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingDepositPercentage" numeric(5,2) DEFAULT 0;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "exchangeRateMode" character varying DEFAULT 'BCV';`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "manualExchangeRate" numeric(12,4);`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "currencySymbol" character varying DEFAULT 'Bs.';`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "ratesCache" jsonb;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "featureDelivery" boolean DEFAULT true;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "allowNegativeStock" boolean DEFAULT false;`,
+    ];
+
+    for (const sql of settingsColumns) {
+      try {
+        await this.settingsRepo.query(sql);
+      } catch (err: any) {
+        this.logger.warn(`Nota al autocurar columna de settings: ${err?.message || err}`);
+      }
+    }
+
+    // 2. Otras tablas (aisladas por entidad para que un fallo en índices no afecte las columnas)
+    const otherMigrations = [
+      `
         ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "abonosTotal" numeric(12,4) DEFAULT 0;
         ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "abonosHistory" jsonb;
         ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "rescheduleStatus" character varying;
@@ -51,8 +61,8 @@ export class SettingsService implements OnModuleInit {
         ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "paymentReported" boolean DEFAULT false;
         ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "paymentProofUrl" character varying;
         ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "paymentRejectedReason" character varying;
-
-        -- Columnas de Pedidos (Order)
+      `,
+      `
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "paymentReported" boolean NOT NULL DEFAULT false;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "paymentProofUrl" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "paymentRejectedReason" character varying;
@@ -73,22 +83,25 @@ export class SettingsService implements OnModuleInit {
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferRef" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferBank" character varying;
         CREATE INDEX IF NOT EXISTS "IDX_8bde46c5c57a69f2cb02d02b17" ON "order" ("linkedReservationId");
-        CREATE UNIQUE INDEX IF NOT EXISTS "idx_orders_tenant_offline_id" ON "order" ("tenantId", "offlineId") WHERE "offlineId" IS NOT NULL;
-
-        -- Columnas de productos y servicios
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS "idx_orders_tenant_offline_id" ON "order" ("tenantId", "offlineId") WHERE "offlineId" IS NOT NULL;
+      `,
+      `
         ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "durationMinutes" integer;
-
-        -- Columnas de accesos y personal
+      `,
+      `
         ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "roles" text DEFAULT '';
         ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "job_title" character varying;
         ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "entry_time" character varying;
         ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "exit_time" character varying;
         ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "lunch_start" character varying;
         ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "lunch_end" character varying;
-
-        -- Tenants y Promotores
+      `,
+      `
         ALTER TABLE "tenant" ADD COLUMN IF NOT EXISTS "promoterId" uuid;
-
+      `,
+      `
         CREATE TABLE IF NOT EXISTS "promoters" (
           "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
           "userId" uuid NOT NULL,
@@ -105,7 +118,8 @@ export class SettingsService implements OnModuleInit {
           CONSTRAINT "PK_7ab4bd7b1b1efeb3d2f8efc180f" PRIMARY KEY ("id")
         );
         CREATE UNIQUE INDEX IF NOT EXISTS "IDX_9c0a80fbc6cb93bfb63c899bad" ON "promoters" ("code");
-
+      `,
+      `
         CREATE TABLE IF NOT EXISTS "promoter_commissions" (
           "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
           "promoterId" uuid NOT NULL,
@@ -119,48 +133,58 @@ export class SettingsService implements OnModuleInit {
           "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
           CONSTRAINT "PK_5f1075c7d007c7917cb4ddafe66" PRIMARY KEY ("id")
         );
-
-        -- Usuarios
+      `,
+      `
         ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "name" character varying;
         ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_email_verified" boolean NOT NULL DEFAULT false;
         ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verification_code" character varying(6);
         ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verification_expires_at" TIMESTAMP;
-
-        -- Pagos SaaS
+      `,
+      `
         ALTER TABLE "saas_payment_reports" ADD COLUMN IF NOT EXISTS "months" integer DEFAULT 1;
-      `);
-    } catch (migrationErr: any) {
-      this.logger.warn(`Nota de autocuración de esquema al iniciar: ${migrationErr?.message || migrationErr}`);
+      `,
+    ];
+
+    for (const sql of otherMigrations) {
+      try {
+        await this.settingsRepo.query(sql);
+      } catch (migrationErr: any) {
+        this.logger.warn(`Nota de autocuración de esquema al iniciar: ${migrationErr?.message || migrationErr}`);
+      }
     }
 
-    const exists = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
-    if (!exists) {
-      await this.settingsRepo.save({
-        id: 'GLOBAL',
-        exchangeRateBs: 40.0,
-        exchangeRateMode: 'BCV',
-        currencySymbol: 'Bs.',
-        ratesCache: {
-          bcv: 40.0,
-          parallel: 40.0,
-          usdt: 40.0,
-          eur: 43.0,
-          updatedAt: new Date(0).toISOString(),
-        },
-      });
-    }
+    try {
+      const exists = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+      if (!exists) {
+        await this.settingsRepo.save({
+          id: 'GLOBAL',
+          exchangeRateBs: 40.0,
+          exchangeRateMode: 'BCV',
+          currencySymbol: 'Bs.',
+          ratesCache: {
+            bcv: 40.0,
+            parallel: 40.0,
+            usdt: 40.0,
+            eur: 43.0,
+            updatedAt: new Date(0).toISOString(),
+          },
+        });
+      }
 
-    // Verificar si la caché existente está vacía, tiene el valor por defecto (<= 50) o tiene más de 4 horas
-    const globalRecord = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
-    const lastUpdatedAt = globalRecord?.ratesCache?.updatedAt;
-    const currentBcv = Number(globalRecord?.ratesCache?.bcv || globalRecord?.exchangeRateBs || 0);
-    const diffHours = lastUpdatedAt ? (Date.now() - new Date(lastUpdatedAt).getTime()) / (1000 * 60 * 60) : 999;
+      // Verificar si la caché existente está vacía, tiene el valor por defecto (<= 50) o tiene más de 4 horas
+      const globalRecord = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+      const lastUpdatedAt = globalRecord?.ratesCache?.updatedAt;
+      const currentBcv = Number(globalRecord?.ratesCache?.bcv || globalRecord?.exchangeRateBs || 0);
+      const diffHours = lastUpdatedAt ? (Date.now() - new Date(lastUpdatedAt).getTime()) / (1000 * 60 * 60) : 999;
 
-    if (currentBcv <= 50 || diffHours > 4 || !lastUpdatedAt) {
-      this.logger.log(`Tasas desactualizadas o en valor base (BCV actual: ${currentBcv}, antigüedad: ${diffHours.toFixed(1)}h). Iniciando sincronización de tasas inmediata...`);
-      setTimeout(() => this.syncRates(), 2000);
-    } else {
-      this.logger.log(`Tasas en caché vigentes (BCV: ${currentBcv}, hace ${diffHours.toFixed(1)}h). Próxima sincronización en el horario programado (09:15 AM / 05:45 PM Caracas).`);
+      if (currentBcv <= 50 || diffHours > 4 || !lastUpdatedAt) {
+        this.logger.log(`Tasas desactualizadas o en valor base (BCV actual: ${currentBcv}, antigüedad: ${diffHours.toFixed(1)}h). Iniciando sincronización de tasas inmediata...`);
+        setTimeout(() => this.syncRates(), 2000);
+      } else {
+        this.logger.log(`Tasas en caché vigentes (BCV: ${currentBcv}, hace ${diffHours.toFixed(1)}h). Próxima sincronización en el horario programado (09:15 AM / 05:45 PM Caracas).`);
+      }
+    } catch (globalInitErr: any) {
+      this.logger.warn(`Nota al inicializar registro GLOBAL de settings: ${globalInitErr?.message || globalInitErr}`);
     }
 
     // Verificar cada minuto si corresponde ejecutar la sincronización fija
