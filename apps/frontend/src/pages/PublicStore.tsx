@@ -1179,7 +1179,7 @@ const PublicStore: React.FC = () => {
   return (
     <IonPage>
       {/* Header */}
-      <IonHeader>
+      <IonHeader className="ion-no-border" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <IonToolbar style={{ ['--background' as any]: headerColor, color: headerContrast }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingLeft: '8px' }}>
             {companyLogoUrl ? (
@@ -1187,21 +1187,45 @@ const PublicStore: React.FC = () => {
                 src={companyLogoUrl}
                 alt="Logo"
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '10px',
                   objectFit: 'contain',
                   backgroundColor: '#ffffff',
-                  border: '1px solid rgba(0,0,0,0.08)',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                   flexShrink: 0,
                 }}
               />
             ) : null}
-            <IonTitle style={{ fontWeight: 'bold', padding: 0, color: headerContrast }}>
+            <IonTitle style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.3px', padding: 0, color: headerContrast }}>
               {storeData?.tenant?.name || 'Tienda Online'}
             </IonTitle>
           </div>
-          <IonButtons slot="end">
+          <IonButtons slot="end" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {/* Tasa BCV compact pill in top navbar */}
+            <div
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.18)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '999px',
+                padding: '4px 10px',
+                fontSize: '0.78rem',
+                color: headerContrast,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                letterSpacing: '0.2px',
+                marginRight: '2px',
+              }}
+              title="Tasa oficial del día"
+            >
+              <span style={{ opacity: 0.85, fontSize: '0.72rem', textTransform: 'uppercase' }}>BCV</span>
+              <span>Bs. {exchangeRate.toFixed(2)}</span>
+            </div>
+
             <IonButton
               fill="clear"
               onClick={() => {
@@ -1211,7 +1235,7 @@ const PublicStore: React.FC = () => {
               title="Rastrear mi pedido"
               style={{ color: headerContrast }}
             >
-              <IonIcon slot="icon-only" icon={searchOutline} style={{ fontSize: '1.45rem' }} />
+              <IonIcon slot="icon-only" icon={searchOutline} style={{ fontSize: '1.35rem' }} />
             </IonButton>
             {storeData?.settings?.companyPhone && (
               <IonButton
@@ -1219,23 +1243,26 @@ const PublicStore: React.FC = () => {
                 onClick={() => {
                   window.open(formatWhatsAppUrl(storeData.settings.companyPhone), '_blank');
                 }}
+                title="Contactar por WhatsApp"
               >
-                <IonIcon slot="icon-only" icon={logoWhatsapp} style={{ color: '#25D366', fontSize: '1.5rem' }} />
+                <IonIcon slot="icon-only" icon={logoWhatsapp} style={{ color: '#25D366', fontSize: '1.45rem' }} />
               </IonButton>
             )}
-            <IonButton onClick={() => setIsCartOpen(true)} style={{ position: 'relative', color: headerContrast }}>
-              <IonIcon slot="icon-only" icon={cartOutline} style={{ fontSize: '1.6rem' }} />
+            <IonButton onClick={() => setIsCartOpen(true)} style={{ position: 'relative', color: headerContrast }} title="Ver Carrito">
+              <IonIcon slot="icon-only" icon={cartOutline} style={{ fontSize: '1.55rem' }} />
               {cartTotalItems > 0 && (
                 <IonBadge
                   style={{
                     position: 'absolute',
                     top: '2px',
                     right: '2px',
-                    fontSize: '11px',
+                    fontSize: '10px',
+                    fontWeight: 800,
                     padding: '2px 5px',
                     borderRadius: '10px',
                     backgroundColor: primaryColor,
                     color: primaryContrast,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
                   }}
                 >
                   {cartTotalItems}
@@ -1338,51 +1365,66 @@ const PublicStore: React.FC = () => {
           </div>
         )}
 
-        {/* Banner / Store Info */}
+        {/* Hero Card / Store Info */}
         <div
           style={{
             backgroundColor: '#ffffff',
-            borderRadius: '16px',
-            padding: '18px 22px',
-            marginBottom: '18px',
+            borderRadius: '18px',
+            padding: '20px 24px',
+            marginBottom: '20px',
             border: '1px solid #e2e8f0',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             flexWrap: 'wrap',
-            gap: '14px',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+            gap: '16px',
+            boxShadow: '0 4px 12px -2px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.03)',
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {/* Subtle accent highlight bar on top of the card */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '3px',
+              backgroundColor: primaryColor,
+            }}
+          />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {companyLogoUrl ? (
               <img
                 src={companyLogoUrl}
                 alt={storeData?.tenant?.name}
                 style={{
-                  width: '64px',
-                  height: '64px',
-                  borderRadius: '14px',
+                  width: '68px',
+                  height: '68px',
+                  borderRadius: '16px',
                   objectFit: 'contain',
                   backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                  border: '1.5px solid #e2e8f0',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
                   flexShrink: 0,
                 }}
               />
             ) : (
               <div
                 style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '14px',
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '16px',
                   backgroundColor: primarySoftBg,
                   color: primaryReadable,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '26px',
-                  border: `1px solid ${primaryReadable}30`,
+                  fontSize: '28px',
+                  border: `1.5px solid ${primaryReadable}30`,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                   flexShrink: 0,
                 }}
               >
@@ -1390,28 +1432,31 @@ const PublicStore: React.FC = () => {
               </div>
             )}
             <div>
-              <h2 style={{ margin: '0 0 4px 0', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
-                {storeData?.tenant?.name}
-              </h2>
-              <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.3px' }}>
+                  {storeData?.tenant?.name}
+                </h2>
+                <span
+                  style={{
+                    backgroundColor: '#ECFDF5',
+                    color: '#065F46',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRadius: '999px',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                  }}
+                >
+                  ● En línea
+                </span>
+              </div>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: '#64748b' }}>
                 Catálogo de productos disponibles para retiro o delivery
               </p>
             </div>
           </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <div
-              style={{
-                backgroundColor: '#f8fafc',
-                border: '1px solid #cbd5e1',
-                borderRadius: '10px',
-                padding: '8px 14px',
-                fontSize: '0.92rem',
-                color: '#0f172a',
-                fontWeight: 600,
-              }}
-            >
-              Tasa BCV: <b style={{ fontWeight: 800 }}>Bs. {exchangeRate.toFixed(2)}</b>
-            </div>
             <button
               type="button"
               onClick={() => {
@@ -1419,24 +1464,30 @@ const PublicStore: React.FC = () => {
                 setIsTrackModalOpen(true);
               }}
               style={{
-                backgroundColor: '#ffffff',
+                backgroundColor: '#f8fafc',
                 border: '1px solid #cbd5e1',
                 borderRadius: '10px',
-                padding: '8px 14px',
-                fontSize: '0.88rem',
+                padding: '9px 16px',
+                fontSize: '0.86rem',
                 fontWeight: 700,
                 color: '#1e293b',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.2s ease',
+                gap: '8px',
+                transition: 'all 0.15s ease',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#ffffff';
+                e.currentTarget.style.borderColor = '#94a3b8';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#f8fafc';
+                e.currentTarget.style.borderColor = '#cbd5e1';
+              }}
             >
-              <span>🔍</span> Rastrear Pedido
+              <span>🔍</span> Rastrear mi Pedido
             </button>
           </div>
         </div>

@@ -320,7 +320,8 @@ const PublicAppointmentManage: React.FC = () => {
 
   return (
     <IonPage>
-      <IonHeader>
+      {/* Header */}
+      <IonHeader className="ion-no-border" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <IonToolbar style={{ ['--background' as any]: headerColor }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 12px' }}>
             {companyLogoUrl ? (
@@ -328,53 +329,91 @@ const PublicAppointmentManage: React.FC = () => {
                 src={companyLogoUrl}
                 alt="Logo"
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '10px',
                   objectFit: 'contain',
                   backgroundColor: '#ffffff',
-                  border: '1px solid rgba(0,0,0,0.08)',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                   flexShrink: 0,
                 }}
               />
             ) : null}
-            <IonTitle style={{ fontWeight: 'bold', padding: 0, color: headerContrast }}>
+            <IonTitle style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.3px', padding: 0, color: headerContrast }}>
               {appointment.tenantName || 'Gestión de Cita'}
             </IonTitle>
           </div>
+          <IonButtons slot="end" style={{ display: 'flex', alignItems: 'center', gap: '4px', paddingRight: '8px' }}>
+            {/* Tasa BCV compact pill in top navbar */}
+            <div
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.18)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '999px',
+                padding: '4px 10px',
+                fontSize: '0.78rem',
+                color: headerContrast,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                letterSpacing: '0.2px',
+              }}
+              title="Tasa oficial del día"
+            >
+              <span style={{ opacity: 0.85, fontSize: '0.72rem', textTransform: 'uppercase' }}>BCV</span>
+              <span>Bs. {rateBs.toFixed(2)}</span>
+            </div>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
 
       <IonContent fullscreen className="ion-padding" style={{ ['--background' as any]: '#F8FAFC' }}>
-        <div style={{ maxWidth: '560px', margin: '0 auto', paddingBottom: '40px' }}>
+        <div style={{ maxWidth: '620px', margin: '0 auto', paddingBottom: '40px' }}>
           
-          {/* Card / Header Info matching PublicStore & PublicBooking */}
+          {/* Hero Card / Store Info matching PublicStore & PublicBooking */}
           <div
             style={{
               backgroundColor: '#ffffff',
-              borderRadius: '16px',
-              padding: '16px 20px',
-              marginBottom: '16px',
+              borderRadius: '18px',
+              padding: '18px 22px',
+              marginBottom: '18px',
               border: '1px solid #e2e8f0',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '12px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+              gap: '14px',
+              boxShadow: '0 4px 12px -2px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.03)',
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Subtle accent highlight bar on top of card */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '3px',
+                backgroundColor: primaryColor,
+              }}
+            />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               {companyLogoUrl ? (
                 <img
                   src={companyLogoUrl}
                   alt={appointment.tenantName}
                   style={{
-                    width: '52px',
-                    height: '52px',
-                    borderRadius: '12px',
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '14px',
                     objectFit: 'contain',
                     backgroundColor: '#ffffff',
-                    border: '1px solid #e2e8f0',
+                    border: '1.5px solid #e2e8f0',
                     boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
                     flexShrink: 0,
                   }}
@@ -382,16 +421,16 @@ const PublicAppointmentManage: React.FC = () => {
               ) : (
                 <div
                   style={{
-                    width: '46px',
-                    height: '46px',
-                    borderRadius: '12px',
+                    width: '52px',
+                    height: '52px',
+                    borderRadius: '14px',
                     backgroundColor: primarySoftBg,
                     color: primaryReadable,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '22px',
-                    border: `1px solid ${primaryReadable}30`,
+                    fontSize: '24px',
+                    border: `1.5px solid ${primaryReadable}30`,
                     flexShrink: 0,
                   }}
                 >
@@ -399,12 +438,27 @@ const PublicAppointmentManage: React.FC = () => {
                 </div>
               )}
               <div>
-                <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: '0 0 2px 0' }}>
-                  {appointment.tenantName}
-                </h2>
-                <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>
-                  Portal de Gestión de Cita
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0F172A', margin: 0, letterSpacing: '-0.2px' }}>
+                    {appointment.tenantName}
+                  </h2>
+                  <span
+                    style={{
+                      backgroundColor: '#ECFDF5',
+                      color: '#065F46',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      borderRadius: '999px',
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    ● Verificado
+                  </span>
+                </div>
+                <p style={{ fontSize: '12px', color: '#64748B', fontWeight: 500, margin: '3px 0 0 0' }}>
+                  Portal oficial de gestión de cita
+                </p>
               </div>
             </div>
 
@@ -412,7 +466,7 @@ const PublicAppointmentManage: React.FC = () => {
               fill="clear"
               size="small"
               onClick={() => (window.location.href = `/book/${appointment.tenantId}`)}
-              style={{ fontWeight: 600, '--color': primaryReadable, fontSize: '13px' }}
+              style={{ fontWeight: 700, '--color': primaryReadable, fontSize: '13px' }}
             >
               Nueva Cita →
             </IonButton>
