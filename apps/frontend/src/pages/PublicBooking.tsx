@@ -893,15 +893,15 @@ const PublicBooking: React.FC = () => {
               </IonButton>
             </IonButtons>
           ) : null}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingLeft: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '6px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
             {companyLogoUrl ? (
               <img
                 src={companyLogoUrl}
                 alt="Logo"
                 style={{
-                  width: '34px',
-                  height: '34px',
-                  borderRadius: '10px',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
                   objectFit: 'contain',
                   backgroundColor: '#ffffff',
                   border: '1px solid rgba(255,255,255,0.3)',
@@ -910,31 +910,42 @@ const PublicBooking: React.FC = () => {
                 }}
               />
             ) : null}
-            <IonTitle style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.3px', padding: 0, color: headerContrast }}>
+            <span
+              style={{
+                fontWeight: 800,
+                fontSize: '1.05rem',
+                letterSpacing: '-0.3px',
+                color: headerContrast,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
               {tenantInfo?.name || 'Agendar Cita'}
-            </IonTitle>
+            </span>
           </div>
-          <IonButtons slot="end" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {/* Tasa BCV compact pill in top navbar */}
+          <IonButtons slot="end" style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+            {/* Tasa BCV compact micro-pill in top navbar */}
             <div
               style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.18)',
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
                 backdropFilter: 'blur(8px)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                border: '1px solid rgba(255, 255, 255, 0.35)',
                 borderRadius: '999px',
-                padding: '4px 10px',
-                fontSize: '0.78rem',
+                padding: '3px 8px',
+                fontSize: '0.72rem',
                 color: headerContrast,
-                fontWeight: 700,
+                fontWeight: 800,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
-                letterSpacing: '0.2px',
-                marginRight: '2px',
+                gap: '4px',
+                letterSpacing: '0.1px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
               title="Tasa oficial del día"
             >
-              <span style={{ opacity: 0.85, fontSize: '0.72rem', textTransform: 'uppercase' }}>BCV</span>
+              <span style={{ opacity: 0.85, fontSize: '0.66rem', textTransform: 'uppercase' }}>BCV</span>
               <span>Bs. {rateBs.toFixed(2)}</span>
             </div>
 
@@ -947,6 +958,7 @@ const PublicBooking: React.FC = () => {
                   window.open(`https://wa.me/${clean}`, '_blank');
                 }}
                 title="Contactar por WhatsApp"
+                style={{ margin: 0, '--padding-start': '6px', '--padding-end': '6px' }}
               >
                 <IonIcon slot="icon-only" icon={logoWhatsapp} style={{ color: '#25D366', fontSize: '1.45rem' }} />
               </IonButton>
@@ -956,7 +968,7 @@ const PublicBooking: React.FC = () => {
                 fill="clear"
                 onClick={() => (window.location.href = `/store/${tenantId}`)}
                 title="Ir al Catálogo / Tienda"
-                style={{ color: headerContrast }}
+                style={{ color: headerContrast, margin: 0, '--padding-start': '6px', '--padding-end': '8px' }}
               >
                 <IonIcon slot="icon-only" icon={cartOutline} style={{ fontSize: '1.55rem' }} />
               </IonButton>
