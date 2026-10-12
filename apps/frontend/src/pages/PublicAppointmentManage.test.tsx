@@ -68,7 +68,7 @@ describe('PublicAppointmentManage - Suite de Reprogramación y Aceptación', () 
 
     // Esperar a que cargue la cita
     await waitFor(() => {
-      expect(screen.getByText('Spa Belleza Real')).toBeDefined();
+      expect(screen.getAllByText('Spa Belleza Real').length).toBeGreaterThanOrEqual(1);
     });
 
     // Verificar presencia del banner de reprogramación

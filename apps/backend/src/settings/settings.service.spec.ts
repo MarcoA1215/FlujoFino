@@ -162,4 +162,49 @@ describe('SettingsService (Unit Tests)', () => {
       );
     });
   });
+
+  describe('uploadLogo and deleteLogo', () => {
+    it('debe subir logotipo a storage y actualizar companyLogoUrl en settings', async () => {
+      const mockFile: any = {
+        buffer: Buffer.from('fake-image-data'),
+        originalname: 'logo.png',
+        mimetype: 'image/png',
+      };
+      const existing = { tenantId: TENANT_1_ID, companyLogoUrl: null };
+      mockSettingsRepo.findOne.mockResolvedValue(existing);
+
+      const res = await service.uploadLogo(TENANT_1_ID, mockFile);
+
+      expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
+        mockFile,
+        `tenant-${TENANT_1_ID}/branding`,
+      );
+      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: TENANT_1_ID,
+          companyLogoUrl: 'https://example.com/logo.png',
+        }),
+      );
+      expect(res).toEqual({ logoUrl: 'https://example.com/logo.png' });
+    });
+
+    it('debe poner companyLogoUrl en null al eliminar logotipo', async () => {
+      const existing = {
+        tenantId: TENANT_1_ID,
+        companyLogoUrl: 'https://example.com/old-logo.webp',
+      };
+      mockSettingsRepo.findOne.mockResolvedValue(existing);
+
+      const res = await service.deleteLogo(TENANT_1_ID);
+
+      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: TENANT_1_ID,
+          companyLogoUrl: null,
+        }),
+      );
+      expect(res).toEqual({ success: true });
+    });
+  });
 });
+
