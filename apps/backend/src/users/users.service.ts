@@ -9,6 +9,8 @@ import { OperatingExpense } from '../entities/operating-expense.entity';
 import { SalaryAdvance, SalaryAdvanceStatus } from '../entities/salary-advance.entity';
 import { Reservation } from '../entities/reservation.entity';
 import { Order } from '../entities/order.entity';
+import { Product } from '../entities/product.entity';
+import { OrderItem } from '../entities/order-item.entity';
 import { UserRole, ReservationStatus, OrderStatus, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
@@ -440,11 +442,14 @@ export class UsersService implements OnModuleInit {
       : 0;
     const salaryPeriod = access?.salaryPeriod || null;
 
-    // Reservas completadas atendidas por el empleado
+    // Reservas completadas atendidas por el empleado (o vinculadas a órdenes entregadas)
     const reservationQuery = this.usersRepo.manager.createQueryBuilder(Reservation, 'res')
       .where('res.tenantId = :tenantId', { tenantId })
       .andWhere('res.employeeId = :userId', { userId })
-      .andWhere('res.status = :resStatus', { resStatus: ReservationStatus.COMPLETED });
+      .andWhere('(res.status = :resStatus OR EXISTS (SELECT 1 FROM "order" ord_link WHERE (ord_link.id = res."orderId" OR ord_link."linkedReservationId" = res.id) AND ord_link.status = :ordDelivered))', {
+        resStatus: ReservationStatus.COMPLETED,
+        ordDelivered: OrderStatus.DELIVERED,
+      });
 
     if (startDate) {
       reservationQuery.andWhere('res.date >= :startDate', { startDate });
@@ -454,6 +459,78 @@ export class UsersService implements OnModuleInit {
     }
     reservationQuery.orderBy('res.date', 'DESC').addOrderBy('res.time', 'DESC');
     const reservations = await reservationQuery.getMany();
+
+    // Auto-curar y calcular montos de reservas que tengan totalAmount <= 0
+    for (const r of reservations) {
+      let rAmount = Number(r.totalAmount || 0);
+      if (rAmount <= 0) {
+        // 1. Buscar orden vinculada
+        let linkedOrder: Order | null = null;
+        if (r.orderId) {
+          linkedOrder = await this.usersRepo.manager.findOne(Order, {
+            where: { id: r.orderId, tenantId },
+          });
+        }
+        if (!linkedOrder) {
+          linkedOrder = await this.usersRepo.manager.findOne(Order, {
+            where: { linkedReservationId: r.id, tenantId },
+          });
+        }
+
+        if (linkedOrder) {
+          if (Number(linkedOrder.totalAmount || 0) > 0) {
+            rAmount = Number(linkedOrder.totalAmount);
+          } else {
+            const items = await this.usersRepo.manager.find(OrderItem, {
+              where: { orderId: linkedOrder.id },
+            });
+            const itemsSum = items.reduce((s, it) => s + (Number(it.subtotal || 0) || (Number(it.quantity || 1) * Number(it.unitPrice || 0))), 0);
+            if (itemsSum > 0) {
+              rAmount = itemsSum;
+              linkedOrder.totalAmount = itemsSum;
+              this.usersRepo.manager.update(Order, { id: linkedOrder.id }, { totalAmount: itemsSum }).catch(() => {});
+            }
+          }
+        }
+
+        // 2. Si sigue en 0, calcular desde catálogo de productos con serviceId
+        if (rAmount <= 0 && r.serviceId) {
+          const sIds = r.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
+          if (sIds.length > 0) {
+            const products = await this.usersRepo.manager.find(Product, {
+              where: sIds.map(id => ({ id, tenantId })),
+            });
+            const prodSum = products.reduce((s, p) => s + Number(p.salePrice || 0), 0);
+            if (prodSum > 0) {
+              rAmount = prodSum;
+            }
+          }
+        }
+
+        // 3. Si sigue en 0, calcular desde catálogo de productos con serviceName
+        if (rAmount <= 0 && r.serviceName) {
+          const names = r.serviceName.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+          if (names.length > 0) {
+            const allProducts = await this.usersRepo.manager.find(Product, {
+              where: { tenantId },
+            });
+            const matching = allProducts.filter(p => names.includes(p.name?.trim().toLowerCase()));
+            const nameSum = matching.reduce((s, p) => s + Number(p.salePrice || 0), 0);
+            if (nameSum > 0) {
+              rAmount = nameSum;
+            }
+          }
+        }
+
+        if (rAmount > 0) {
+          r.totalAmount = rAmount;
+          this.usersRepo.manager.update(Reservation, { id: r.id }, { totalAmount: rAmount }).catch(() => {});
+          if (linkedOrder && Number(linkedOrder.totalAmount || 0) <= 0) {
+            this.usersRepo.manager.update(Order, { id: linkedOrder.id }, { totalAmount: rAmount }).catch(() => {});
+          }
+        }
+      }
+    }
 
     // Pedidos entregados atendidos por el empleado (excluyendo órdenes vinculadas a reservas ya contadas)
     const orderQuery = this.usersRepo.manager.createQueryBuilder(Order, 'ord')
@@ -472,6 +549,21 @@ export class UsersService implements OnModuleInit {
 
     const reservationIds = new Set(reservations.map(r => r.id));
     const standaloneOrders = orders.filter(o => !o.linkedReservationId || !reservationIds.has(o.linkedReservationId));
+
+    // Auto-curar y calcular montos de órdenes independientes si totalAmount <= 0
+    for (const o of standaloneOrders) {
+      let oAmount = Number(o.totalAmount || 0);
+      if (oAmount <= 0) {
+        const items = await this.usersRepo.manager.find(OrderItem, {
+          where: { orderId: o.id },
+        });
+        const itemsSum = items.reduce((s, it) => s + (Number(it.subtotal || 0) || (Number(it.quantity || 1) * Number(it.unitPrice || 0))), 0);
+        if (itemsSum > 0) {
+          o.totalAmount = itemsSum;
+          this.usersRepo.manager.update(Order, { id: o.id }, { totalAmount: itemsSum }).catch(() => {});
+        }
+      }
+    }
 
     const servicesTotalBilled = reservations.reduce((sum, r) => sum + Number(r.totalAmount || 0), 0);
     const ordersTotalBilled = standaloneOrders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);

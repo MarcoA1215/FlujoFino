@@ -1558,9 +1558,16 @@ const Users: React.FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '12px' }}>
                   <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px' }}>
-                    <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Trabajos / Citas</div>
-                    <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>{payrollSummary.servicesCount}</div>
-                    <div style={{ fontSize: '10px', color: '#64748B' }}>${payrollSummary.servicesTotalBilled} facturados</div>
+                    <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Trabajos Realizados</div>
+                    <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>
+                      {payrollSummary.servicesCount + (payrollSummary.ordersCount || 0)}
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#64748B' }}>
+                      ${payrollSummary.totalBilled} facturados
+                      {(payrollSummary.servicesCount > 0 && (payrollSummary.ordersCount || 0) > 0) && (
+                        <span> ({payrollSummary.servicesCount} citas, {payrollSummary.ordersCount} ventas)</span>
+                      )}
+                    </div>
                   </div>
 
                   {(payrollSummary.compensationType === 'COMISION' || payrollSummary.compensationType === 'MIXTO') && (

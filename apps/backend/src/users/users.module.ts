@@ -7,6 +7,8 @@ import { Reservation } from '../entities/reservation.entity';
 import { Order } from '../entities/order.entity';
 import { SalaryAdvance } from '../entities/salary-advance.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
+import { Product } from '../entities/product.entity';
+import { OrderItem } from '../entities/order-item.entity';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { JwtModule } from '@nestjs/jwt';
@@ -20,6 +22,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       UserTenantAccess,
       Reservation,
       Order,
+      OrderItem,
+      Product,
       SalaryAdvance,
       OperatingExpense,
     ]),

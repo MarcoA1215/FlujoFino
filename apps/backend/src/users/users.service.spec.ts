@@ -2,6 +2,8 @@ import { UsersService } from './users.service';
 import { UserRole, ReservationStatus, OrderStatus } from '@finowork/shared-types';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Reservation } from '../entities/reservation.entity';
+import { Order } from '../entities/order.entity';
+import { Product } from '../entities/product.entity';
 import { SalaryAdvance, SalaryAdvanceStatus } from '../entities/salary-advance.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
 
@@ -242,6 +244,77 @@ describe('UsersService', () => {
       expect(summary.grossTotal).toBe(0);
       expect(summary.advancesDeduction).toBe(50);
       expect(summary.netPayableUSD).toBe(0);
+    });
+
+    it('debe auto-curar y calcular la nómina si la reserva tiene totalAmount en 0 recuperando el precio del servicio', async () => {
+      const mockAccess = {
+        userId: 'emp-4',
+        tenantId: 'tenant-1',
+        compensationType: 'COMISION',
+        commissionPercentage: 20, // 20%
+        user: { id: 'emp-4', username: 'employeC', name: 'Empleado C' },
+      };
+
+      const mockReservations = [
+        {
+          id: 'res-healed',
+          date: '2026-10-12',
+          time: '15:00',
+          customerName: 'Cliente Z',
+          serviceId: 'prod-serv-1',
+          serviceName: 'Corte y Lavado',
+          totalAmount: 0, // En 0 originalmente
+          status: ReservationStatus.COMPLETED,
+        },
+      ];
+
+      mockUsersRepo.manager.findOne.mockImplementation((entity: any, criteria: any) => {
+        if (entity === UserTenantAccess) return Promise.resolve(mockAccess);
+        if (entity === Order) return Promise.resolve(null);
+        return Promise.resolve(null);
+      });
+
+      const reservationQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockReservations),
+      };
+      const orderQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+
+      mockUsersRepo.manager.createQueryBuilder.mockImplementation((entity: any) => {
+        if (entity === Reservation) return reservationQb;
+        return orderQb;
+      });
+
+      mockUsersRepo.manager.find.mockImplementation((entity: any) => {
+        if (entity === Product) {
+          return Promise.resolve([{ id: 'prod-serv-1', salePrice: 30 }]);
+        }
+        return Promise.resolve([]); // Advances = []
+      });
+
+      mockUsersRepo.manager.update = jest.fn().mockResolvedValue({ affected: 1 });
+
+      const summary = await service.getPayrollSummary('tenant-1', 'emp-4');
+
+      expect(summary.servicesCount).toBe(1);
+      expect(summary.totalBilled).toBe(30);
+      expect(summary.servicesTotalBilled).toBe(30);
+      expect(summary.commissionEarned).toBe(6); // 20% de 30 = 6
+      expect(summary.grossTotal).toBe(6);
+      expect(summary.netPayableUSD).toBe(6);
+      expect(mockUsersRepo.manager.update).toHaveBeenCalledWith(
+        Reservation,
+        { id: 'res-healed' },
+        { totalAmount: 30 }
+      );
     });
   });
 

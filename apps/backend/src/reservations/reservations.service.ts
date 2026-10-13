@@ -87,7 +87,22 @@ export class ReservationsService {
         } else {
           const orderItemRepo = manager.getRepository(OrderItem);
           const items = await orderItemRepo.find({ where: { orderId: order.id } });
-          const itemsSum = items.reduce((sum, it) => sum + (Number(it.subtotal) || (Number(it.unitPrice || 0) * Number(it.quantity || 1))), 0);
+          let itemsSum = items.reduce((sum, it) => sum + (Number(it.subtotal) || (Number(it.unitPrice || 0) * Number(it.quantity || 1))), 0);
+          if (itemsSum <= 0 && (reservation.serviceId || reservation.serviceName)) {
+            const productRepo = manager.getRepository(Product);
+            if (reservation.serviceId) {
+              const sIds = reservation.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
+              for (const sId of sIds) {
+                const p = await productRepo.findOne({ where: { id: sId } });
+                if (p?.salePrice) itemsSum += Number(p.salePrice);
+              }
+            }
+            if (itemsSum <= 0 && reservation.serviceName) {
+              const names = reservation.serviceName.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+              const prods = await productRepo.find({ where: { tenantId } });
+              itemsSum = prods.filter(p => names.includes(p.name?.trim().toLowerCase())).reduce((sum, p) => sum + Number(p.salePrice || 0), 0);
+            }
+          }
           if (itemsSum > 0) {
             order.totalAmount = itemsSum;
             if (Number(reservation.totalAmount || 0) <= 0) {
@@ -101,8 +116,11 @@ export class ReservationsService {
         await manager.save(Reservation, reservation);
       }
 
-      if (reservation.employeeId) {
+      if (reservation.employeeId && !order.employeeId) {
         order.employeeId = reservation.employeeId;
+      } else if (!reservation.employeeId && order.employeeId) {
+        reservation.employeeId = order.employeeId;
+        await manager.save(Reservation, reservation);
       }
       if (reservation.tableNumber) {
         order.tableNumber = reservation.tableNumber;
@@ -570,15 +588,23 @@ export class ReservationsService {
       }
 
       // Auto-calcular totalAmount si no vino o es 0 y hay servicios seleccionados
-      if ((!reservation.totalAmount || Number(reservation.totalAmount) <= 0) && reservation.serviceId) {
+      if ((!reservation.totalAmount || Number(reservation.totalAmount) <= 0) && (reservation.serviceId || reservation.serviceName)) {
         const productRepo = manager.getRepository(Product);
-        const sIds = reservation.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
         let calculatedTotal = 0;
-        for (const sId of sIds) {
-          const p = await productRepo.findOne({ where: { id: sId } });
-          if (p && p.salePrice) {
-            calculatedTotal += Number(p.salePrice || 0);
+        if (reservation.serviceId) {
+          const sIds = reservation.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
+          for (const sId of sIds) {
+            const p = await productRepo.findOne({ where: { id: sId } });
+            if (p && p.salePrice) {
+              calculatedTotal += Number(p.salePrice || 0);
+            }
           }
+        }
+        if (calculatedTotal === 0 && reservation.serviceName) {
+          const names = reservation.serviceName.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+          const allProds = await productRepo.find({ where: { tenantId } });
+          const matching = allProds.filter(p => names.includes(p.name?.trim().toLowerCase()));
+          calculatedTotal = matching.reduce((sum, p) => sum + Number(p.salePrice || 0), 0);
         }
         if (calculatedTotal > 0) {
           reservation.totalAmount = calculatedTotal;
@@ -640,6 +666,31 @@ export class ReservationsService {
       
       Object.assign(reservation, dto);
       reservation.durationMinutes = duration;
+
+      // Auto-calcular totalAmount si quedó en 0 o no vino y hay servicios
+      if ((!reservation.totalAmount || Number(reservation.totalAmount) <= 0) && (reservation.serviceId || reservation.serviceName)) {
+        const productRepo = manager.getRepository(Product);
+        let calculatedTotal = 0;
+        if (reservation.serviceId) {
+          const sIds = reservation.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
+          for (const sId of sIds) {
+            const p = await productRepo.findOne({ where: { id: sId } });
+            if (p && p.salePrice) {
+              calculatedTotal += Number(p.salePrice || 0);
+            }
+          }
+        }
+        if (calculatedTotal === 0 && reservation.serviceName) {
+          const names = reservation.serviceName.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+          const allProds = await productRepo.find({ where: { tenantId } });
+          const matching = allProds.filter(p => names.includes(p.name?.trim().toLowerCase()));
+          calculatedTotal = matching.reduce((sum, p) => sum + Number(p.salePrice || 0), 0);
+        }
+        if (calculatedTotal > 0) {
+          reservation.totalAmount = calculatedTotal;
+        }
+      }
+
       this.recalculatePaymentStatus(reservation);
       const saved = await manager.save(Reservation, reservation);
       await this.syncLinkedOrder(tenantId, saved, manager);
