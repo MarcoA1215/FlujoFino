@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   IonPage,
   IonContent,
@@ -127,6 +127,7 @@ const PublicStore: React.FC = () => {
 
   // Submission & Tracking state
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [orderResult, setOrderResult] = useState<any | null>(null);
   const [activeOrderMini, setActiveOrderMini] = useState<any | null>(null);
   const [liveOrderStatus, setLiveOrderStatus] = useState<string | null>(null);
@@ -551,6 +552,8 @@ const PublicStore: React.FC = () => {
 
   // Submit Order
   const handleCheckout = async () => {
+    if (submittingRef.current || isSubmitting) return;
+
     if (!customerName.trim()) {
       presentToast({ message: 'Por favor ingresa tu nombre', duration: 2500, color: 'warning' });
       return;
@@ -596,8 +599,9 @@ const PublicStore: React.FC = () => {
       }
     }
 
+    submittingRef.current = true;
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
       let usdNote = 'MÉTODO: Divisas Efectivo (USD)';
       if (paymentOption === 'USD' && cashReceivedAmount) {
         const cashNum = parseFloat(cashReceivedAmount);
@@ -708,6 +712,7 @@ const PublicStore: React.FC = () => {
       const msg = err.response?.data?.message || 'Error al procesar el pedido. Intenta de nuevo.';
       presentToast({ message: msg, duration: 4000, color: 'danger' });
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };

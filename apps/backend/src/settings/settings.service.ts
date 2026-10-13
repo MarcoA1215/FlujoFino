@@ -410,6 +410,7 @@ export class SettingsService implements OnModuleInit {
     if (payload.featureRecipes !== undefined) settings.featureRecipes = payload.featureRecipes;
     if (payload.featureBuySell !== undefined) settings.featureBuySell = payload.featureBuySell;
     if (payload.featureProduction !== undefined) settings.featureProduction = payload.featureProduction;
+    if (payload.featureDelivery !== undefined) settings.featureDelivery = payload.featureDelivery;
     if (payload.featureShowCatalog !== undefined) settings.featureShowCatalog = payload.featureShowCatalog;
     if (payload.allowNegativeStock !== undefined) settings.allowNegativeStock = payload.allowNegativeStock;
     if (payload.bookingRequireService !== undefined) settings.bookingRequireService = payload.bookingRequireService;
@@ -436,10 +437,17 @@ export class SettingsService implements OnModuleInit {
       }
     }
     if (payload.slotInterval !== undefined) settings.slotInterval = payload.slotInterval;
+    if (payload.bookingMaxAdvanceDays !== undefined) {
+      settings.bookingMaxAdvanceDays = Number(payload.bookingMaxAdvanceDays) || 365;
+    }
     if (payload.endOfDayOffsetHours !== undefined) {
       const offset = Number(payload.endOfDayOffsetHours);
       settings.endOfDayOffsetHours = Math.max(0, Math.min(6, isNaN(offset) ? 0 : Math.floor(offset)));
     }
+
+    if (payload.initialCashUSD !== undefined) settings.initialCashUSD = Number(payload.initialCashUSD) || 0;
+    if (payload.initialBankBs !== undefined) settings.initialBankBs = Number(payload.initialBankBs) || 0;
+    if (payload.initialDigitalUSD !== undefined) settings.initialDigitalUSD = Number(payload.initialDigitalUSD) || 0;
 
     if (payload.bookingRequireDeposit !== undefined) settings.bookingRequireDeposit = payload.bookingRequireDeposit;
     if (payload.bookingDepositPercentage !== undefined) {

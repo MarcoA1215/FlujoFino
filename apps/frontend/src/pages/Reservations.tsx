@@ -8,7 +8,8 @@ import {
   IonModal,
   useIonRouter,
   IonSelect,
-  IonSelectOption
+  IonSelectOption,
+  IonSpinner
 } from '@ionic/react';
 import {
   addOutline,
@@ -70,7 +71,9 @@ const Reservations: React.FC = () => {
   const [tableNumber, setTableNumber] = useState('');
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [notes, setNotes] = useState('');
-  const [serviceId, setServiceId] = useState('');
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState<boolean>(false);
   const [employeeId, setEmployeeId] = useState('');
   const [products, setProducts] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -351,33 +354,42 @@ const Reservations: React.FC = () => {
     setCustomerPhone('');
     setDate(selectedDate);
     setTime('09:00');
-    setServiceId('');
+    setSelectedServiceIds([]);
     setEmployeeId('');
     setNumberOfPeople(1);
     setTableNumber('');
     setTotalAmount(0);
     setNotes('');
+    setAvailableSlots([]);
     setShowModal(true);
   };
 
-  const handleServiceChange = (sId: string) => {
-    setServiceId(sId);
-    const found = products.find(p => p.id === sId);
-    if (found && (!totalAmount || totalAmount === 0)) {
-      setTotalAmount(found.salePrice || 0);
-    }
+  const toggleService = (sId: string) => {
+    setSelectedServiceIds(prev => {
+      const isSelected = prev.includes(sId);
+      const next = isSelected ? prev.filter(id => id !== sId) : [...prev, sId];
 
-    if (sId && found && found.assignedStaffIds) {
-      const assignedIds = Array.isArray(found.assignedStaffIds)
-        ? found.assignedStaffIds
-        : (typeof found.assignedStaffIds === 'string'
-            ? found.assignedStaffIds.split(',').map((s: string) => s.trim())
-            : []);
+      const newSelected = products.filter(p => next.includes(p.id));
+      const newSum = newSelected.reduce((sum, p) => sum + (Number(p.salePrice) || 0), 0);
+      setTotalAmount(newSum);
 
-      if (assignedIds.length > 0 && employeeId && !assignedIds.includes(employeeId)) {
-        setEmployeeId('');
+      if (employeeId && next.length > 0) {
+        const requiredStaffIdSets = newSelected
+          .map(s => {
+            const raw = s.assignedStaffIds;
+            if (!raw) return [];
+            if (Array.isArray(raw)) return raw;
+            if (typeof raw === 'string') return raw.split(',').map((x: string) => x.trim()).filter(Boolean);
+            return [];
+          })
+          .filter(arr => arr.length > 0);
+        if (requiredStaffIdSets.length > 0 && !requiredStaffIdSets.every(arr => arr.includes(employeeId))) {
+          setEmployeeId('');
+        }
       }
-    }
+
+      return next;
+    });
   };
 
   const handleSave = async (force: boolean = false) => {
@@ -386,15 +398,19 @@ const Reservations: React.FC = () => {
       return;
     }
 
-    const selectedProd = products.find(p => p.id === serviceId);
-    const durationMinutes = Number(selectedProd?.durationMinutes) || 30;
+    const sIds = selectedServiceIds.join(',');
+    const sNames = selectedServices.length > 0
+      ? selectedServices.map(s => s.name).join(', ')
+      : undefined;
+    const durationMinutes = totalDurationMinutes;
+
     const payload = {
       customerName,
       customerPhone,
       date,
       time,
-      serviceId: serviceId || undefined,
-      serviceName: selectedProd?.name || undefined,
+      serviceId: sIds || undefined,
+      serviceName: sNames,
       durationMinutes,
       employeeId: employeeId || undefined,
       numberOfPeople,
@@ -502,10 +518,14 @@ const Reservations: React.FC = () => {
     setCustomerName(res.customerName);
     setCustomerPhone(res.customerPhone || '');
     setDate(res.date);
-    setTime(res.time);
-    setServiceId(res.serviceId || '');
+    setTime(res.time ? res.time.substring(0, 5) : '09:00');
+    const rawSId = res.serviceId || '';
+    const parsedIds = rawSId
+      ? rawSId.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [];
+    setSelectedServiceIds(parsedIds);
     setEmployeeId(res.employeeId || '');
-    setNumberOfPeople(res.numberOfPeople);
+    setNumberOfPeople(res.numberOfPeople || 1);
     setTableNumber(res.tableNumber || '');
     setTotalAmount(res.totalAmount || 0);
     setNotes(res.notes || '');
@@ -580,6 +600,19 @@ const Reservations: React.FC = () => {
     });
   }, [products]);
 
+  const selectedServices = useMemo(() => {
+    return products.filter(p => selectedServiceIds.includes(p.id));
+  }, [products, selectedServiceIds]);
+
+  const totalDurationMinutes = useMemo(() => {
+    if (selectedServices.length === 0) return 30;
+    return selectedServices.reduce((sum, s) => sum + (Number(s.durationMinutes) || 30), 0);
+  }, [selectedServices]);
+
+  const totalCalculatedPrice = useMemo(() => {
+    return selectedServices.reduce((sum, s) => sum + (Number(s.salePrice) || 0), 0);
+  }, [selectedServices]);
+
   const availableSpecialists = useMemo(() => {
     // 1. Descartar usuarios que solo sean DELIVERY u OPERATIVO
     const qualifiedStaff = employees.filter(emp => {
@@ -591,24 +624,62 @@ const Reservations: React.FC = () => {
       return true;
     });
 
-    // 2. Si hay un servicio seleccionado, filtrar por sus especialistas capacitadas si están definidas
-    if (serviceId) {
-      const selectedProd = products.find(p => p.id === serviceId);
-      if (selectedProd && selectedProd.assignedStaffIds) {
-        const assignedIds = Array.isArray(selectedProd.assignedStaffIds)
-          ? selectedProd.assignedStaffIds
-          : (typeof selectedProd.assignedStaffIds === 'string'
-              ? selectedProd.assignedStaffIds.split(',').map((s: string) => s.trim())
-              : []);
+    // 2. Si hay servicios seleccionados, filtrar por sus especialistas asignados
+    if (selectedServiceIds.length > 0) {
+      const selectedProds = products.filter(p => selectedServiceIds.includes(p.id));
+      const requiredStaffIdSets = selectedProds
+        .map(p => {
+          const raw = p.assignedStaffIds;
+          if (!raw) return [];
+          if (Array.isArray(raw)) return raw;
+          if (typeof raw === 'string') return raw.split(',').map((s: string) => s.trim()).filter(Boolean);
+          return [];
+        })
+        .filter(arr => arr.length > 0);
 
-        if (assignedIds.length > 0) {
-          return qualifiedStaff.filter(st => assignedIds.includes(st.id));
-        }
+      if (requiredStaffIdSets.length > 0) {
+        return qualifiedStaff.filter(st =>
+          requiredStaffIdSets.every(set => set.includes(st.id))
+        );
       }
     }
 
     return qualifiedStaff;
-  }, [employees, serviceId, products]);
+  }, [employees, selectedServiceIds, products]);
+
+  // Fetch availability slots whenever modal is open and date/services/employee/editingId change
+  useEffect(() => {
+    if (!showModal || !date) return;
+    let isCancelled = false;
+    const fetchSlots = async () => {
+      setLoadingSlots(true);
+      try {
+        const sIds = selectedServiceIds.join(',');
+        const queryParams = new URLSearchParams();
+        queryParams.append('date', date);
+        if (sIds) queryParams.append('serviceId', sIds);
+        if (employeeId) queryParams.append('employeeId', employeeId);
+        if (editingId) queryParams.append('exclude', editingId);
+
+        const res = await apiClient.get(`/reservations/availability?${queryParams.toString()}`);
+        if (!isCancelled) {
+          setAvailableSlots(Array.isArray(res.data) ? res.data : []);
+        }
+      } catch (err) {
+        console.error('Error fetching availability slots:', err);
+        if (!isCancelled) {
+          setAvailableSlots([]);
+        }
+      } finally {
+        if (!isCancelled) setLoadingSlots(false);
+      }
+    };
+
+    fetchSlots();
+    return () => {
+      isCancelled = true;
+    };
+  }, [showModal, date, selectedServiceIds, employeeId, editingId]);
 
   return (
     <IonPage>
@@ -1194,54 +1265,95 @@ const Reservations: React.FC = () => {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
-                      Fecha *
-                    </label>
-                    <input
-                      type="date"
-                      value={date}
-                      onChange={e => setDate(e.target.value)}
-                      style={{ width: '100%', padding: '11px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '13px' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
-                      Hora *
-                    </label>
-                    <input
-                      type="time"
-                      value={time}
-                      onChange={e => setTime(e.target.value)}
-                      style={{ width: '100%', padding: '11px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '13px' }}
-                    />
-                  </div>
-                </div>
-
+                {/* 1. Selección Múltiple de Servicios */}
                 <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
-                    Servicio
-                  </label>
-                  <select
-                    value={serviceId}
-                    onChange={e => handleServiceChange(e.target.value)}
-                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#ffffff', color: '#0F172A', outline: 'none' }}
-                  >
-                    <option value="">Sin servicio específico</option>
-                    {servicesList.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.durationMinutes || 30} min) - ${Number(p.salePrice || 0).toFixed(2)}
-                      </option>
-                    ))}
-                  </select>
-                  {servicesList.length === 0 && (
-                    <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#DC2626' }}>
-                      No hay servicios registrados. Ve a "Servicios / Productos" y crea uno de tipo Servicio.
-                    </p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>
+                      Servicios a Realizar
+                    </label>
+                    {selectedServiceIds.length > 0 && (
+                      <span style={{ background: '#ECFDF5', color: '#065F46', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '800' }}>
+                        {selectedServiceIds.length} selec. • {totalDurationMinutes} min
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '8px', background: '#F8FAFC' }}>
+                    {servicesList.length === 0 ? (
+                      <p style={{ margin: '8px', fontSize: '12px', color: '#DC2626' }}>
+                        No hay servicios registrados. Ve a "Servicios / Productos" y crea servicios para seleccionarlos aquí.
+                      </p>
+                    ) : (
+                      servicesList.map(p => {
+                        const isSelected = selectedServiceIds.includes(p.id);
+                        return (
+                          <div
+                            key={p.id}
+                            onClick={() => toggleService(p.id)}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '10px 12px',
+                              borderRadius: '10px',
+                              marginBottom: '6px',
+                              cursor: 'pointer',
+                              border: isSelected ? '2px solid #10B981' : '1px solid #CBD5E1',
+                              background: isSelected ? '#ECFDF5' : '#FFFFFF',
+                              color: isSelected ? '#065F46' : '#0F172A',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div
+                                style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '6px',
+                                  border: isSelected ? '2px solid #10B981' : '1px solid #94A3B8',
+                                  background: isSelected ? '#10B981' : 'transparent',
+                                  color: '#ffffff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '12px',
+                                  fontWeight: '900',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {isSelected ? '✓' : ''}
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '13px', fontWeight: isSelected ? '800' : '600' }}>
+                                  {p.name}
+                                </div>
+                                <div style={{ fontSize: '11px', color: isSelected ? '#047857' : '#64748B' }}>
+                                  ⏱️ {p.durationMinutes || 30} min
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ fontSize: '13px', fontWeight: '800', color: isSelected ? '#059669' : '#0F172A' }}>
+                              ${Number(p.salePrice || 0).toFixed(2)}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {selectedServiceIds.length > 0 && (
+                    <div style={{ marginTop: '8px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '10px', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '12px', color: '#166534', fontWeight: '600' }}>
+                        ⏱️ Duración total: <b>{totalDurationMinutes} min</b>
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#166534', fontWeight: '800' }}>
+                        Total servicios: <b>${totalCalculatedPrice.toFixed(2)}</b>
+                      </div>
+                    </div>
                   )}
                 </div>
 
+                {/* 2. Especialista Asignado */}
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
                     Especialista Asignado
@@ -1251,13 +1363,89 @@ const Reservations: React.FC = () => {
                     onChange={e => setEmployeeId(e.target.value)}
                     style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#ffffff', color: '#0F172A', outline: 'none' }}
                   >
-                    <option value="">Sin asignar / Cualquiera</option>
+                    <option value="">Sin asignar / Cualquiera disponible</option>
                     {availableSpecialists.map(emp => (
                       <option key={emp.id} value={emp.id}>
                         👤 {emp.username || emp.name} {emp.jobTitle ? `(${emp.jobTitle})` : ''}
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* 3. Fecha */}
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
+                    Fecha *
+                  </label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={e => setDate(e.target.value)}
+                    style={{ width: '100%', padding: '11px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                  />
+                </div>
+
+                {/* 4. Recuadro de Horarios Disponibles (Online) */}
+                <div style={{ marginBottom: '14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <IonIcon icon={timeOutline} style={{ color: '#10B981', fontSize: '16px' }} />
+                      Horarios Disponibles ({date || 'Elige fecha'})
+                    </label>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#047857', background: '#ECFDF5', padding: '2px 8px', borderRadius: '6px' }}>
+                      Bloques de {totalDurationMinutes} min
+                    </span>
+                  </div>
+
+                  {loadingSlots ? (
+                    <div style={{ textAlign: 'center', padding: '16px' }}>
+                      <IonSpinner name="crescent" color="primary" />
+                      <div style={{ fontSize: '12px', color: '#64748B', marginTop: '6px' }}>Calculando cupos libres...</div>
+                    </div>
+                  ) : availableSlots.length === 0 ? (
+                    <div style={{ padding: '10px', background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: '10px', fontSize: '12px', color: '#92400E', lineHeight: '1.4' }}>
+                      ⚠️ No hay cupos automáticos calculados para esta fecha o especialista. Si deseas autorizar una excepción, ajusta la hora manual a continuación.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(68px, 1fr))', gap: '8px', maxHeight: '160px', overflowY: 'auto', padding: '2px' }}>
+                      {availableSlots.map((slot, idx) => {
+                        const isChosen = time === slot || time.substring(0, 5) === slot;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setTime(slot)}
+                            style={{
+                              padding: '10px 4px',
+                              borderRadius: '8px',
+                              border: isChosen ? '2px solid #10B981' : '1px solid #A7F3D0',
+                              background: isChosen ? '#10B981' : '#F0FDF4',
+                              color: isChosen ? '#FFFFFF' : '#065F46',
+                              fontSize: '12px',
+                              fontWeight: isChosen ? '800' : '600',
+                              cursor: 'pointer',
+                              boxShadow: isChosen ? '0 2px 6px rgba(16,185,129,0.3)' : 'none',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            {slot}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed #CBD5E1' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#475569' }}>
+                      Hora Seleccionada:
+                    </span>
+                    <input
+                      type="time"
+                      value={time}
+                      onChange={e => setTime(e.target.value)}
+                      style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', fontWeight: '700', color: '#0F172A', background: '#FFFFFF' }}
+                    />
+                  </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>

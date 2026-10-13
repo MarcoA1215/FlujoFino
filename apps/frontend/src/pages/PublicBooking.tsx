@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { IonPage, IonContent, IonCard, IonCardContent, IonInput, IonLabel, IonItem, IonButton, useIonToast, IonSpinner, IonIcon, IonSelect, IonSelectOption, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
@@ -46,6 +46,8 @@ const PublicBooking: React.FC = () => {
   const [tenantInfo, setTenantInfo] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [presentToast] = useIonToast();
 
   const [step, setStep] = useState(1);
@@ -321,6 +323,8 @@ const PublicBooking: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (submittingRef.current || isSubmitting) return;
+
     if (!customerName) {
       presentToast({ message: 'Por favor, ingresa tu nombre', duration: 2000, color: 'warning' });
       return;
@@ -380,6 +384,9 @@ const PublicBooking: React.FC = () => {
       }
     }
 
+    submittingRef.current = true;
+    setIsSubmitting(true);
+
     try {
       const payAmtNum = parseFloat(bookingPaymentAmount) || totalServicePrice;
       const res = await axios.post(`${apiBase}/public/reservations/${tenantId}`, {
@@ -434,6 +441,9 @@ const PublicBooking: React.FC = () => {
     } catch (e: any) {
       const msg = e.response?.data?.message || 'Error procesando tu reservación. Intenta de nuevo.';
       presentToast({ message: msg, duration: 3000, color: 'danger' });
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -2343,6 +2353,7 @@ const PublicBooking: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleSubmit}
+                    disabled={isSubmitting}
                     style={{
                       width: '100%',
                       marginTop: '20px',
@@ -2354,16 +2365,25 @@ const PublicBooking: React.FC = () => {
                       fontSize: '16px',
                       fontWeight: '800',
                       letterSpacing: '0.5px',
-                      cursor: 'pointer',
+                      cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                      pointerEvents: isSubmitting ? 'none' : 'auto',
+                      opacity: isSubmitting ? 0.75 : 1,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '8px',
+                      gap: '10px',
                       boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
                       transition: 'all 0.2s ease',
                     }}
                   >
-                    <span>✓ CONFIRMAR CITA</span>
+                    {isSubmitting ? (
+                      <>
+                        <IonSpinner name="crescent" style={{ width: '22px', height: '22px', color: primaryContrast }} />
+                        <span>PROCESANDO RESERVA...</span>
+                      </>
+                    ) : (
+                      <span>✓ CONFIRMAR CITA</span>
+                    )}
                   </button>
                 </div>
               )}

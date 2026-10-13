@@ -106,6 +106,13 @@ interface Settings {
   featureShowCatalog?: boolean;
   bookingRequireService?: boolean;
   bookingAllowStaffSelection?: boolean;
+  bookingRequireDeposit?: boolean;
+  bookingDepositPercentage?: number;
+  bookingMaxAdvanceDays?: number;
+  endOfDayOffsetHours?: number;
+  initialCashUSD?: number;
+  initialBankBs?: number;
+  initialDigitalUSD?: number;
   publicToken?: string;
   businessHours?: any;
   services?: any[];
@@ -335,6 +342,10 @@ const SettingsPage: React.FC = () => {
         allowNegativeStock: settings.allowNegativeStock === true,
         bookingRequireService: settings.bookingRequireService,
         bookingAllowStaffSelection: settings.bookingAllowStaffSelection,
+        bookingRequireDeposit: settings.bookingRequireDeposit !== undefined ? settings.bookingRequireDeposit : false,
+        bookingDepositPercentage: settings.bookingDepositPercentage !== undefined ? Number(settings.bookingDepositPercentage) : 0,
+        bookingMaxAdvanceDays: settings.bookingMaxAdvanceDays !== undefined ? Number(settings.bookingMaxAdvanceDays) : 365,
+        endOfDayOffsetHours: settings.endOfDayOffsetHours !== undefined ? Number(settings.endOfDayOffsetHours) : 0,
         businessHours: settings.businessHours,
         services: settings.services,
         slotInterval: settings.slotInterval,

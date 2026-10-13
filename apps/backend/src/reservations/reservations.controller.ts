@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, Request, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, UseGuards, Request, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ReservationsService } from './reservations.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -7,6 +7,17 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 @Controller('reservations')
 export class ReservationsController {
   constructor(private readonly service: ReservationsService) {}
+
+  @Get('availability')
+  getAvailability(
+    @Request() req,
+    @Query('date') date: string,
+    @Query('serviceId') serviceId?: string,
+    @Query('exclude') exclude?: string,
+    @Query('employeeId') employeeId?: string,
+  ) {
+    return this.service.calculateAvailableSlots(req.user.tenantId, date, serviceId, exclude, employeeId);
+  }
 
   @Get()
   getAll(@Request() req) {

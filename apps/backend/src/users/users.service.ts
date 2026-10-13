@@ -5,7 +5,11 @@ import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Tenant } from '../entities/tenant.entity';
 import { AccessRequest, AccessRequestStatus } from '../entities/access-request.entity';
-import { UserRole, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
+import { OperatingExpense } from '../entities/operating-expense.entity';
+import { SalaryAdvance, SalaryAdvanceStatus } from '../entities/salary-advance.entity';
+import { Reservation } from '../entities/reservation.entity';
+import { Order } from '../entities/order.entity';
+import { UserRole, ReservationStatus, OrderStatus, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 
@@ -89,13 +93,30 @@ export class UsersService implements OnModuleInit {
         (user as any).lunchEnd = access.lunchEnd;
         (user as any).salaryAmount = access.salaryAmount;
         (user as any).salaryPeriod = access.salaryPeriod;
+        (user as any).compensationType = access.compensationType || 'FIJO';
+        (user as any).commissionPercentage = (access.commissionPercentage !== null && access.commissionPercentage !== undefined)
+          ? Number(access.commissionPercentage)
+          : null;
       }
       delete (user as any).passwordHash;
       return user;
     });
   }
 
-  async findActiveEmployees(tenantId?: string): Promise<{ id: string; username: string; name: string; role: UserRole; roles?: UserRole[]; jobTitle?: string; entryTime?: string; exitTime?: string; lunchStart?: string; lunchEnd?: string }[]> {
+  async findActiveEmployees(tenantId?: string): Promise<{
+    id: string;
+    username: string;
+    name: string;
+    role: UserRole;
+    roles?: UserRole[];
+    jobTitle?: string;
+    entryTime?: string;
+    exitTime?: string;
+    lunchStart?: string;
+    lunchEnd?: string;
+    compensationType?: string;
+    commissionPercentage?: number | null;
+  }[]> {
     if (!tenantId) return [];
     const users = await this.findAll(tenantId);
     return users.map(u => ({
@@ -109,6 +130,8 @@ export class UsersService implements OnModuleInit {
       exitTime: (u as any).exitTime || undefined,
       lunchStart: (u as any).lunchStart || undefined,
       lunchEnd: (u as any).lunchEnd || undefined,
+      compensationType: (u as any).compensationType || 'FIJO',
+      commissionPercentage: (u as any).commissionPercentage || null,
     }));
   }
 
@@ -146,6 +169,10 @@ export class UsersService implements OnModuleInit {
           status: 'ACCEPTED',
           salaryAmount: data.salaryAmount ? Number(data.salaryAmount) : null,
           salaryPeriod: data.salaryPeriod || 'SEMANAL',
+          compensationType: data.compensationType || 'FIJO',
+          commissionPercentage: (data.commissionPercentage !== undefined && data.commissionPercentage !== null && data.commissionPercentage !== '')
+            ? Number(data.commissionPercentage)
+            : null,
           jobTitle: data.jobTitle || 'Personal Operativo (Limpieza / Mantenimiento)',
           entryTime: data.entryTime || null,
           exitTime: data.exitTime || null,
@@ -217,6 +244,10 @@ export class UsersService implements OnModuleInit {
         status: status,
         salaryAmount: data.salaryAmount ? Number(data.salaryAmount) : null,
         salaryPeriod: data.salaryPeriod || null,
+        compensationType: data.compensationType || 'FIJO',
+        commissionPercentage: (data.commissionPercentage !== undefined && data.commissionPercentage !== null && data.commissionPercentage !== '')
+          ? Number(data.commissionPercentage)
+          : null,
         jobTitle: data.jobTitle || data.job_title || null,
         entryTime: data.entryTime || data.entry_time || null,
         exitTime: data.exitTime || data.exit_time || null,
@@ -294,6 +325,14 @@ export class UsersService implements OnModuleInit {
     if (data.salaryPeriod !== undefined) {
       access.salaryPeriod = data.salaryPeriod || null;
     }
+    if (data.compensationType !== undefined) {
+      access.compensationType = data.compensationType || 'FIJO';
+    }
+    if (data.commissionPercentage !== undefined) {
+      access.commissionPercentage = (data.commissionPercentage !== null && data.commissionPercentage !== '')
+        ? Number(data.commissionPercentage)
+        : null;
+    }
 
     if (data.identification !== undefined || data.phone !== undefined || data.name !== undefined) {
       await this.usersRepo.update(userId, {
@@ -320,8 +359,8 @@ export class UsersService implements OnModuleInit {
     if (!tenantId) throw new Error('Tenant ID required');
     
     await this.usersRepo.manager.transaction(async manager => {
-      // Create expense
-      const expense = manager.create('OperatingExpense', {
+      // 1. Create expense in box / operating expenses
+      const expense = manager.create(OperatingExpense, {
         tenantId,
         description: `Pago de Nómina - Empleado ${data.username || userId}`,
         amount: Number(data.amount),
@@ -330,7 +369,175 @@ export class UsersService implements OnModuleInit {
         createdAt: data.date ? new Date(data.date) : new Date()
       });
       await manager.save(expense);
+
+      // 2. Si se solicitó descontar vales / anticipos pendientes
+      if (data.deductAdvances) {
+        if (Array.isArray(data.advanceIds) && data.advanceIds.length > 0) {
+          await manager.createQueryBuilder()
+            .update(SalaryAdvance)
+            .set({ status: SalaryAdvanceStatus.DESCONTADO })
+            .where('id IN (:...advanceIds) AND negocioId = :tenantId AND userId = :userId', {
+              advanceIds: data.advanceIds,
+              tenantId,
+              userId,
+            })
+            .execute();
+        } else {
+          await manager.createQueryBuilder()
+            .update(SalaryAdvance)
+            .set({ status: SalaryAdvanceStatus.DESCONTADO })
+            .where('negocioId = :tenantId AND userId = :userId AND status = :status', {
+              tenantId,
+              userId,
+              status: SalaryAdvanceStatus.PENDIENTE,
+            })
+            .execute();
+        }
+      }
     });
+  }
+
+  async getPayrollSummary(
+    tenantId: string,
+    userId: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
+    if (!tenantId) throw new Error('Tenant ID required');
+
+    const access = await this.usersRepo.manager.findOne(UserTenantAccess, {
+      where: { userId, tenantId },
+      relations: { user: true },
+    });
+
+    let userObj = access?.user;
+    if (!userObj) {
+      userObj = await this.usersRepo.findOne({ where: { id: userId } });
+    }
+    if (!userObj) {
+      throw new NotFoundException('Empleado no encontrado');
+    }
+
+    const compensationType = access?.compensationType || 'FIJO';
+    const commissionPercentage = access?.commissionPercentage !== null && access?.commissionPercentage !== undefined
+      ? Number(access.commissionPercentage)
+      : 0;
+    const salaryAmount = access?.salaryAmount !== null && access?.salaryAmount !== undefined
+      ? Number(access.salaryAmount)
+      : 0;
+    const salaryPeriod = access?.salaryPeriod || null;
+
+    // Reservas completadas atendidas por el empleado
+    const reservationQuery = this.usersRepo.manager.createQueryBuilder(Reservation, 'res')
+      .where('res.tenantId = :tenantId', { tenantId })
+      .andWhere('res.employeeId = :userId', { userId })
+      .andWhere('res.status = :resStatus', { resStatus: ReservationStatus.COMPLETED });
+
+    if (startDate) {
+      reservationQuery.andWhere('res.date >= :startDate', { startDate });
+    }
+    if (endDate) {
+      reservationQuery.andWhere('res.date <= :endDate', { endDate });
+    }
+    reservationQuery.orderBy('res.date', 'DESC').addOrderBy('res.time', 'DESC');
+    const reservations = await reservationQuery.getMany();
+
+    // Pedidos entregados atendidos por el empleado (excluyendo órdenes vinculadas a reservas ya contadas)
+    const orderQuery = this.usersRepo.manager.createQueryBuilder(Order, 'ord')
+      .where('ord.tenantId = :tenantId', { tenantId })
+      .andWhere('ord.employeeId = :userId', { userId })
+      .andWhere('ord.status = :orderStatus', { orderStatus: OrderStatus.DELIVERED });
+
+    if (startDate) {
+      orderQuery.andWhere('ord.createdAt >= :startDateTime', { startDateTime: new Date(`${startDate}T00:00:00.000Z`) });
+    }
+    if (endDate) {
+      orderQuery.andWhere('ord.createdAt <= :endDateTime', { endDateTime: new Date(`${endDate}T23:59:59.999Z`) });
+    }
+    orderQuery.orderBy('ord.createdAt', 'DESC');
+    const orders = await orderQuery.getMany();
+
+    const reservationIds = new Set(reservations.map(r => r.id));
+    const standaloneOrders = orders.filter(o => !o.linkedReservationId || !reservationIds.has(o.linkedReservationId));
+
+    const servicesTotalBilled = reservations.reduce((sum, r) => sum + Number(r.totalAmount || 0), 0);
+    const ordersTotalBilled = standaloneOrders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+    const totalBilled = Number((servicesTotalBilled + ordersTotalBilled).toFixed(2));
+
+    let commissionEarned = 0;
+    if (compensationType === 'COMISION' || compensationType === 'MIXTO') {
+      commissionEarned = Number(((totalBilled * (commissionPercentage || 0)) / 100).toFixed(2));
+    }
+
+    let baseSalary = 0;
+    if (compensationType === 'FIJO' || compensationType === 'MIXTO') {
+      baseSalary = Number(salaryAmount.toFixed(2));
+    }
+
+    const grossTotal = Number((baseSalary + commissionEarned).toFixed(2));
+
+    // Vales / Anticipos pendientes
+    const pendingAdvances = await this.usersRepo.manager.find(SalaryAdvance, {
+      where: {
+        negocioId: tenantId,
+        userId,
+        status: SalaryAdvanceStatus.PENDIENTE,
+      },
+      order: { date: 'DESC', createdAt: 'DESC' },
+    });
+
+    const pendingAdvancesTotalUSD = Number(pendingAdvances.reduce((sum, a) => sum + Number(a.amountUSD || 0), 0).toFixed(2));
+    const pendingAdvancesTotalBS = Number(pendingAdvances.reduce((sum, a) => sum + Number(a.amountBS || 0), 0).toFixed(2));
+
+    const advancesDeduction = pendingAdvancesTotalUSD;
+    const netPayableUSD = Math.max(0, Number((grossTotal - advancesDeduction).toFixed(2)));
+
+    const workItems = [
+      ...reservations.map(r => ({
+        type: 'RESERVATION' as const,
+        id: r.id,
+        date: r.date,
+        time: r.time,
+        client: r.customerName || 'Cliente',
+        description: r.serviceName || 'Servicio realizado',
+        amount: Number(r.totalAmount || 0),
+      })),
+      ...standaloneOrders.map(o => ({
+        type: 'ORDER' as const,
+        id: o.id,
+        date: o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '',
+        time: o.createdAt ? new Date(o.createdAt).toISOString().split('T')[1]?.substring(0, 5) : '',
+        client: o.customerName || 'Cliente',
+        description: `Pedido #${o.id.substring(0, 6)}`,
+        amount: Number(o.totalAmount || 0),
+      })),
+    ].sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
+
+    return {
+      user: {
+        id: userObj.id,
+        username: userObj.username,
+        name: userObj.name || userObj.username,
+      },
+      compensationType,
+      salaryAmount,
+      salaryPeriod,
+      commissionPercentage,
+      servicesCount: reservations.length,
+      servicesTotalBilled: Number(servicesTotalBilled.toFixed(2)),
+      ordersCount: standaloneOrders.length,
+      ordersTotalBilled: Number(ordersTotalBilled.toFixed(2)),
+      totalBilled,
+      commissionEarned,
+      baseSalary,
+      grossTotal,
+      pendingAdvancesTotalUSD,
+      pendingAdvancesTotalBS,
+      advancesDeduction,
+      netPayableUSD,
+      pendingAdvances,
+      workItems,
+    };
   }
 
   async acceptInvite(userId: string, tenantId: string): Promise<void> {

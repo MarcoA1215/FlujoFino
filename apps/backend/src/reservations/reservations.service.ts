@@ -10,6 +10,7 @@ import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
+import { Settings } from '../entities/settings.entity';
 import { NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 
@@ -1123,6 +1124,277 @@ export class ReservationsService {
     reservation.imageUrl = null;
     await this.repo.save(reservation);
     return { success: true, reservation };
+  }
+
+  async calculateAvailableSlots(tenantId: string, date: string, serviceId?: string, excludeReservationId?: string, employeeId?: string): Promise<string[]> {
+    const settingsRepo = this.repo.manager.getRepository(Settings);
+    const settings = await settingsRepo.findOne({ where: { tenantId } });
+
+    const bHours = settings?.businessHours || {};
+    const d = new Date(date + 'T12:00:00Z');
+    const dayOfWeek = d.getUTCDay().toString();
+    const dayConfig = bHours[dayOfWeek];
+
+    if (!dayConfig || !dayConfig.isOpen) return [];
+
+    const interval = Number(settings?.slotInterval) || 30;
+
+    const shifts: { start: number; end: number }[] = [];
+    const [sh, sm] = (dayConfig.startTime || '08:00').split(':').map(Number);
+    const [eh, em] = (dayConfig.endTime || '18:00').split(':').map(Number);
+    shifts.push({ start: sh * 60 + sm, end: eh * 60 + em });
+
+    if (dayConfig.hasSecondShift && dayConfig.secondStartTime && dayConfig.secondEndTime) {
+      const [s2h, s2m] = dayConfig.secondStartTime.split(':').map(Number);
+      const [e2h, e2m] = dayConfig.secondEndTime.split(':').map(Number);
+      shifts.push({ start: s2h * 60 + s2m, end: e2h * 60 + e2m });
+    }
+
+    const toMins = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    // Query active staff in tenant
+    const accessRepo = this.repo.manager.getRepository(UserTenantAccess);
+    const allAccesses = await accessRepo.find({
+      where: { tenantId, isActive: true, status: 'ACCEPTED' },
+      relations: { user: true },
+    });
+    const staffList = allAccesses.filter(a => {
+      if (!a.user) return false;
+      const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
+        ? a.roles
+        : [a.role || a.user.role].filter(Boolean);
+      return !userRoles.every(r => r === UserRole.DELIVERY || r === UserRole.OPERATIVO);
+    });
+
+    // Query products for service durations (match by ID and name)
+    const productRepo = this.repo.manager.getRepository(Product);
+    const allProducts = await productRepo.find({ where: { tenantId } });
+    const productMap = new Map<string, Product>(allProducts.map(p => [p.id, p]));
+    const productNameMap = new Map<string, Product>(allProducts.map(p => [p.name.trim().toLowerCase(), p]));
+
+    let duration = 0;
+    if (serviceId) {
+      const sIds = serviceId.split(',').map(s => s.trim()).filter(Boolean);
+      for (const sId of sIds) {
+        const sp = productMap.get(sId);
+        if (sp && sp.durationMinutes) {
+          duration += Number(sp.durationMinutes);
+        } else {
+          duration += interval;
+        }
+      }
+    }
+    if (duration <= 0) {
+      duration = interval;
+    }
+
+    // Determine candidate staff pool
+    let candidateStaff = staffList;
+    if (serviceId) {
+      const requestedServices = serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean);
+      const requiredStaffIdSets = requestedServices
+        .map(s => (s as any)?.assignedStaffIds || [])
+        .filter(arr => Array.isArray(arr) && arr.length > 0);
+
+      if (requiredStaffIdSets.length > 0) {
+        candidateStaff = candidateStaff.filter(st =>
+          requiredStaffIdSets.every(set => set.includes(st.userId))
+        );
+      }
+    }
+
+    if (employeeId) {
+      candidateStaff = candidateStaff.filter(s => s.userId === employeeId);
+      if (candidateStaff.length === 0) {
+        const single = await accessRepo.findOne({
+          where: { userId: employeeId, tenantId, isActive: true, status: 'ACCEPTED' },
+        });
+        if (single) {
+          if (serviceId) {
+            const requestedServices = serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean);
+            const requiredStaffIdSets = requestedServices
+              .map(s => (s as any)?.assignedStaffIds || [])
+              .filter(arr => Array.isArray(arr) && arr.length > 0);
+            if (requiredStaffIdSets.length === 0 || requiredStaffIdSets.every(set => set.includes(employeeId))) {
+              candidateStaff = [single];
+            }
+          } else {
+            candidateStaff = [single];
+          }
+        }
+      }
+    }
+
+    // Fetch existing reservations
+    const reservationRepo = this.repo.manager.getRepository(Reservation);
+    const qb = reservationRepo.createQueryBuilder('res')
+      .where('res.tenantId = :tenantId', { tenantId })
+      .andWhere('res.date = :date', { date })
+      .andWhere('res.status IN (:...statuses)', { statuses: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] });
+
+    if (excludeReservationId) {
+      qb.andWhere('res.id != :exclude', { exclude: excludeReservationId });
+    }
+    const existing = await qb.getMany();
+
+    interface BusyBooking {
+      employeeId: string | null;
+      start: number;
+      end: number;
+    }
+
+    const busyBookings: BusyBooking[] = existing.map(r => {
+      const [rh, rm] = (r.time || '00:00').trim().split(':').map(Number);
+      const startMins = (rh || 0) * 60 + (rm || 0);
+      let rDuration = Number(r.durationMinutes) || 0;
+
+      if (rDuration === 0 && r.serviceId) {
+        const ids = r.serviceId.split(',').map(s => s.trim()).filter(Boolean);
+        for (const id of ids) {
+          const sp = productMap.get(id);
+          if (sp && sp.durationMinutes) {
+            rDuration += Number(sp.durationMinutes);
+          } else {
+            rDuration += interval;
+          }
+        }
+      }
+      if (rDuration === 0 && r.serviceName) {
+        const names = r.serviceName.split(',').map(s => s.trim().toLowerCase());
+        for (const nm of names) {
+          const sp = productNameMap.get(nm);
+          if (sp && sp.durationMinutes) {
+            rDuration += Number(sp.durationMinutes);
+          } else {
+            rDuration += interval;
+          }
+        }
+      }
+      if (rDuration === 0) {
+        rDuration = interval;
+      }
+
+      return {
+        employeeId: r.employeeId || null,
+        start: startMins,
+        end: startMins + rDuration
+      };
+    });
+
+    const slots: string[] = [];
+    const timeZone = (settings as any)?.timezone || process.env.BUSINESS_TIMEZONE || 'America/Caracas';
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const [nowH, nowM] = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date()).split(':').map(Number);
+    const currentRealMins = (nowH || 0) * 60 + (nowM || 0);
+
+    const isSoloBusiness = staffList.length === 0;
+
+    for (const shift of shifts) {
+      let currentMins = shift.start;
+      while (currentMins + duration <= shift.end) {
+        // If it's today, filter out past slots
+        if (date === todayStr && currentMins <= currentRealMins) {
+          currentMins += interval;
+          continue;
+        }
+
+        const slotEnd = currentMins + duration;
+
+        if (isSoloBusiness) {
+          const hasOverlap = busyBookings.some(b => currentMins < b.end && slotEnd > b.start);
+          if (!hasOverlap) {
+            const timeStr = this.minutesToTime(currentMins).substring(0, 5);
+            if (!slots.includes(timeStr)) {
+              slots.push(timeStr);
+            }
+          }
+        } else if (employeeId) {
+          const emp = candidateStaff[0];
+          if (emp) {
+            if (emp.entryTime && currentMins < toMins(emp.entryTime)) {
+              currentMins += interval;
+              continue;
+            }
+            if (emp.exitTime && slotEnd > toMins(emp.exitTime)) {
+              currentMins += interval;
+              continue;
+            }
+            if (emp.lunchStart && emp.lunchEnd) {
+              const lStart = toMins(emp.lunchStart);
+              const lEnd = toMins(emp.lunchEnd);
+              if (currentMins < lEnd && slotEnd > lStart) {
+                currentMins += interval;
+                continue;
+              }
+            }
+            const empDirectOverlap = busyBookings.some(
+              b => b.employeeId === emp.userId && currentMins < b.end && slotEnd > b.start
+            );
+            if (!empDirectOverlap) {
+              const unassignedCount = busyBookings.filter(
+                b => !b.employeeId && currentMins < b.end && slotEnd > b.start
+              ).length;
+              if (unassignedCount > 0) {
+                const totalFreeWorkingStaff = staffList.filter(s => {
+                  if (s.entryTime && currentMins < toMins(s.entryTime)) return false;
+                  if (s.exitTime && slotEnd > toMins(s.exitTime)) return false;
+                  if (s.lunchStart && s.lunchEnd && currentMins < toMins(s.lunchEnd) && slotEnd > toMins(s.lunchStart)) return false;
+                  return !busyBookings.some(b => b.employeeId === s.userId && currentMins < b.end && slotEnd > b.start);
+                }).length;
+
+                if (totalFreeWorkingStaff <= unassignedCount) {
+                  currentMins += interval;
+                  continue;
+                }
+              }
+
+              const timeStr = this.minutesToTime(currentMins).substring(0, 5);
+              if (!slots.includes(timeStr)) {
+                slots.push(timeStr);
+              }
+            }
+          }
+        } else {
+          const freeCandidateStaff = candidateStaff.filter(st => {
+            if (st.entryTime && currentMins < toMins(st.entryTime)) return false;
+            if (st.exitTime && slotEnd > toMins(st.exitTime)) return false;
+            if (st.lunchStart && st.lunchEnd && currentMins < toMins(st.lunchEnd) && slotEnd > toMins(st.lunchStart)) return false;
+            return !busyBookings.some(b => b.employeeId === st.userId && currentMins < b.end && slotEnd > b.start);
+          });
+
+          const unassignedOverlapCount = busyBookings.filter(
+            b => !b.employeeId && currentMins < b.end && slotEnd > b.start
+          ).length;
+
+          const availableCapacity = freeCandidateStaff.length - unassignedOverlapCount;
+
+          if (availableCapacity > 0) {
+            const timeStr = this.minutesToTime(currentMins).substring(0, 5);
+            if (!slots.includes(timeStr)) {
+              slots.push(timeStr);
+            }
+          }
+        }
+
+        currentMins += interval;
+      }
+    }
+
+    return slots;
+  }
+
+  async checkSlotAvailability(tenantId: string, date: string, time: string, serviceId?: string, excludeReservationId?: string, employeeId?: string): Promise<boolean> {
+    const slots = await this.calculateAvailableSlots(tenantId, date, serviceId, excludeReservationId, employeeId);
+    return slots.includes(time.substring(0, 5));
+  }
+
+  private minutesToTime(m: number): string {
+    const h = Math.floor(m / 60);
+    const min = m % 60;
+    return `${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00`;
   }
 }
 

@@ -43,6 +43,12 @@ export class UserTenantAccess {
   @Column({ type: 'varchar', nullable: true }) // 'SEMANAL', 'QUINCENAL', 'MENSUAL'
   salaryPeriod: string | null;
 
+  @Column({ name: 'compensation_type', type: 'varchar', default: 'FIJO' }) // 'FIJO', 'COMISION', 'MIXTO'
+  compensationType: string;
+
+  @Column({ name: 'commission_percentage', type: 'decimal', nullable: true, precision: 5, scale: 2, transformer: new ColumnNumericTransformer() })
+  commissionPercentage: number | null;
+
   @Column({ name: 'job_title', type: 'varchar', nullable: true })
   jobTitle: string | null;
 

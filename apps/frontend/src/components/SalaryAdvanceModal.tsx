@@ -8,8 +8,7 @@ import {
   IonButton,
   IonContent,
   IonIcon,
-  IonSelect,
-  IonSelectOption,
+  IonSpinner,
   useIonToast,
   useIonAlert,
 } from '@ionic/react';
@@ -32,6 +31,7 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
   defaultExchangeRate,
 }) => {
   const [employees, setEmployees] = useState<any[]>(propEmployees || []);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState<boolean>(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [amountUSD, setAmountUSD] = useState<string>('');
   const [amountBS, setAmountBS] = useState<string>('');
@@ -60,8 +60,20 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
     }
   }, [defaultExchangeRate]);
 
+  // Synchronize when propEmployees updates from parent
+  useEffect(() => {
+    if (propEmployees && propEmployees.length > 0) {
+      setEmployees(propEmployees);
+      setSelectedUserId((current) => {
+        if (current && propEmployees.some((e) => e.id === current)) return current;
+        return propEmployees[0].id;
+      });
+    }
+  }, [propEmployees]);
+
   useEffect(() => {
     if (isOpen) {
+      // Fetch exchange rate
       apiClient
         .get('/settings/exchange-rate')
         .then((res) => {
@@ -79,19 +91,51 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
         })
         .catch(() => {});
 
-      if (!propEmployees || propEmployees.length === 0) {
-        apiClient
-          .get('/users/employees')
-          .then((res) => {
-            setEmployees(res.data || []);
-            if (res.data?.length > 0 && !selectedUserId) {
-              setSelectedUserId(res.data[0].id);
-            }
-          })
-          .catch(() => {});
-      } else if (propEmployees.length > 0 && !selectedUserId) {
-        setSelectedUserId(propEmployees[0].id);
+      // If propEmployees is already provided with items, ensure it's loaded
+      if (propEmployees && propEmployees.length > 0) {
+        setEmployees(propEmployees);
+        setSelectedUserId((current) => {
+          if (current && propEmployees.some((e) => e.id === current)) return current;
+          return propEmployees[0].id;
+        });
+        return;
       }
+
+      // Otherwise fetch active employees with fallback
+      const fetchEmployees = async () => {
+        setIsLoadingEmployees(true);
+        let loaded: any[] = [];
+        try {
+          const res = await apiClient.get('/users/employees');
+          if (Array.isArray(res.data) && res.data.length > 0) {
+            loaded = res.data;
+          }
+        } catch (err) {
+          console.warn('Error cargando /users/employees en SalaryAdvanceModal:', err);
+        }
+
+        if (loaded.length === 0) {
+          try {
+            const fallbackRes = await apiClient.get('/users');
+            if (Array.isArray(fallbackRes.data) && fallbackRes.data.length > 0) {
+              loaded = fallbackRes.data;
+            }
+          } catch (fallbackErr) {
+            console.warn('Error cargando fallback /users en SalaryAdvanceModal:', fallbackErr);
+          }
+        }
+
+        setEmployees(loaded);
+        if (loaded.length > 0) {
+          setSelectedUserId((current) => {
+            if (current && loaded.some((e) => e.id === current)) return current;
+            return loaded[0].id;
+          });
+        }
+        setIsLoadingEmployees(false);
+      };
+
+      fetchEmployees();
     }
   }, [isOpen, propEmployees]);
 
@@ -199,14 +243,13 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
               Trabajador *
             </label>
-            <IonSelect
-              interface="popover"
+            <select
               value={selectedUserId}
-              placeholder="Selecciona trabajador..."
-              onIonChange={(e) => setSelectedUserId(e.detail.value)}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              disabled={isLoadingEmployees || employees.length === 0}
               style={{
                 width: '100%',
-                padding: '4px 12px',
+                padding: '12px',
                 borderRadius: '10px',
                 border: '1px solid #CBD5E1',
                 background: '#ffffff',
@@ -214,17 +257,35 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
                 fontWeight: 600,
                 color: '#0F172A',
                 minHeight: '44px',
-                '--padding-start': '0px',
-                '--padding-end': '0px',
-              } as any}
+                outline: 'none',
+              }}
             >
-              <IonSelectOption value="">Selecciona trabajador...</IonSelectOption>
+              <option value="">
+                {isLoadingEmployees
+                  ? 'Cargando trabajadores...'
+                  : employees.length === 0
+                  ? 'No hay trabajadores disponibles'
+                  : 'Selecciona trabajador...'}
+              </option>
               {employees.map((e) => (
-                <IonSelectOption key={e.id} value={e.id}>
-                  👤 {e.username || e.name} ({e.role || 'Empleado'})
-                </IonSelectOption>
+                <option key={e.id} value={e.id}>
+                  👤 {e.name ? `${e.name} (${e.username})` : e.username} {e.jobTitle ? `• ${e.jobTitle}` : e.role ? `• ${e.role}` : ''}
+                </option>
               ))}
-            </IonSelect>
+            </select>
+
+            {isLoadingEmployees && (
+              <div style={{ fontSize: '12px', color: '#64748B', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <IonSpinner name="dots" style={{ width: '16px', height: '16px' }} />
+                <span>Cargando lista de personal...</span>
+              </div>
+            )}
+
+            {!isLoadingEmployees && employees.length === 0 && (
+              <div style={{ fontSize: '12px', color: '#DC2626', marginTop: '6px', background: '#FEF2F2', padding: '8px 10px', borderRadius: '8px', border: '1px solid #FECACA' }}>
+                ⚠️ No se encontraron trabajadores registrados en este negocio. Ve a la sección de Personal para registrar empleados.
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>

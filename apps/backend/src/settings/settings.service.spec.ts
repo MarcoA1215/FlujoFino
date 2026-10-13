@@ -206,5 +206,39 @@ describe('SettingsService (Unit Tests)', () => {
       expect(res).toEqual({ success: true });
     });
   });
+
+  describe('updateSettings', () => {
+    it('debe persistir featureDelivery, bookingRequireDeposit, bookingDepositPercentage y bookingMaxAdvanceDays', async () => {
+      const existingSettings: any = {
+        id: 'settings-1',
+        tenantId: TENANT_1_ID,
+        featureDelivery: true,
+        bookingRequireDeposit: false,
+        bookingDepositPercentage: 0,
+        bookingMaxAdvanceDays: 365,
+      };
+      mockSettingsRepo.findOne.mockImplementation(({ where }: any) => {
+        if (where?.tenantId === TENANT_1_ID) return Promise.resolve(existingSettings);
+        if (where?.id === 'GLOBAL') return Promise.resolve({ id: 'GLOBAL', ratesCache: { bcv: 50.0 } });
+        return Promise.resolve(null);
+      });
+
+      await service.updateSettings(TENANT_1_ID, {
+        featureDelivery: false,
+        bookingRequireDeposit: true,
+        bookingDepositPercentage: 40,
+        bookingMaxAdvanceDays: 60,
+      });
+
+      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          featureDelivery: false,
+          bookingRequireDeposit: true,
+          bookingDepositPercentage: 40,
+          bookingMaxAdvanceDays: 60,
+        }),
+      );
+    });
+  });
 });
 

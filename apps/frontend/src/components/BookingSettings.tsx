@@ -165,20 +165,20 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                 </IonLabel>
                 <IonToggle 
                   slot="end" 
-                  checked={settings.bookingRequireDeposit ?? (Number(settings.bookingDepositPercentage ?? settings.minDepositPercentage) > 0)} 
+                  checked={settings.bookingRequireDeposit === true} 
                   onIonChange={e => {
                     const checked = e.detail.checked;
                     setSettings({ 
                       ...settings, 
                       bookingRequireDeposit: checked,
-                      bookingDepositPercentage: checked ? (settings.bookingDepositPercentage || settings.minDepositPercentage || 30) : 0
+                      bookingDepositPercentage: checked ? (Number(settings.bookingDepositPercentage) || 30) : 0
                     });
                   }} 
                   color="primary" 
                 />
               </IonItem>
 
-              {(settings.bookingRequireDeposit ?? (Number(settings.bookingDepositPercentage ?? settings.minDepositPercentage) > 0)) && (
+              {settings.bookingRequireDeposit === true && (
                 <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '8px' }}>
                   <IonLabel style={{ fontSize: '13px', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '6px' }}>
                     Porcentaje de Seña Requerido (%)
@@ -187,7 +187,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                     type="number"
                     min="1"
                     max="100"
-                    value={settings.bookingDepositPercentage ?? settings.minDepositPercentage ?? 30}
+                    value={settings.bookingDepositPercentage !== undefined && settings.bookingDepositPercentage !== null ? settings.bookingDepositPercentage : 30}
                     onChange={e => setSettings({ ...settings, bookingDepositPercentage: Math.max(1, Math.min(100, parseFloat(e.target.value) || 0)) })}
                     style={{
                       width: '100%',

@@ -274,4 +274,35 @@ describe('PublicReservationsController Suite', () => {
       expect(slots).toContain('11:30');
     });
   });
+
+  describe('Blindaje contra doble toque / duplicación de reservas y órdenes', () => {
+    it('debe detectar doble toque del cliente y retornar la reservación existente sin duplicar', async () => {
+      const tenantId = '00000000-0000-0000-0000-000000000001';
+      jest.spyOn(tenantCrypto, 'decodeTenantId').mockReturnValue(tenantId);
+      mockTenantRepo.findOne.mockResolvedValue({ id: tenantId, name: 'Salon Spa', isActive: true, status: 'ACTIVE' });
+
+      const existingRes = {
+        id: 'res-existente-1',
+        tenantId,
+        date: '2026-10-20',
+        time: '10:00',
+        customerName: 'Maria Perez',
+        customerPhone: '04141234567',
+        status: ReservationStatus.CONFIRMED,
+        createdAt: new Date(),
+      };
+
+      mockReservationRepo.findOne.mockResolvedValue(existingRes);
+
+      const result = await controller.createPublicReservation('token-valido', {
+        date: '2026-10-20',
+        time: '10:00',
+        customerName: 'Maria Perez',
+        customerPhone: '04141234567',
+      });
+
+      expect(result).toBe(existingRes);
+      expect(result.id).toBe('res-existente-1');
+    });
+  });
 });

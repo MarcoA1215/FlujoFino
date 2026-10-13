@@ -293,6 +293,44 @@ export class PublicReservationsController {
     if (isTenantSuspendedOrExpired(tenant)) {
       throw new BadRequestException('Este negocio se encuentra temporalmente en pausa y no está recibiendo citas.');
     }
+
+    // Detección y blindaje contra doble toque / envíos concurrentes duplicados
+    const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
+    const recentWindow = new Date(Date.now() - 120 * 1000); // 2 minutos
+    const cleanPhone = dto.customerPhone?.trim();
+    const cleanCedula = dto.identification?.trim();
+
+    const duplicateConditions: any[] = [];
+    if (cleanPhone) {
+      duplicateConditions.push({
+        tenantId: id,
+        date: dto.date,
+        time: dto.time,
+        customerPhone: cleanPhone,
+        status: In([ReservationStatus.PENDING, ReservationStatus.CONFIRMED]),
+        createdAt: MoreThanOrEqual(recentWindow),
+      });
+    }
+    if (cleanCedula) {
+      duplicateConditions.push({
+        tenantId: id,
+        date: dto.date,
+        time: dto.time,
+        identification: cleanCedula,
+        status: In([ReservationStatus.PENDING, ReservationStatus.CONFIRMED]),
+        createdAt: MoreThanOrEqual(recentWindow),
+      });
+    }
+
+    if (duplicateConditions.length > 0) {
+      const existingDuplicate = await reservationRepo.findOne({
+        where: duplicateConditions,
+      });
+      if (existingDuplicate) {
+        console.warn(`[Blindaje Doble Toque] Solicitud duplicada detectada para cliente "${dto.customerName}" (${dto.date} ${dto.time}). Retornando cita existente #${existingDuplicate.id}`);
+        return existingDuplicate;
+      }
+    }
     
     // Check overlap using new logic
     const isAvailable = await this.checkSlotAvailability(id, dto.date, dto.time, dto.serviceId, undefined, dto.employeeId);
@@ -414,7 +452,7 @@ export class PublicReservationsController {
 
     const finalReservation = resDb || res;
 
-    // Auto-crear y sincronizar orden vinculada para que aparezca en Pedidos/Tickets y Caja
+    // Sincronizar orden vinculada para que aparezca en Pedidos/Tickets y Caja con el pago reportado sin duplicar órdenes
     try {
       const orderRepo = this.tenantRepo.manager.getRepository(Order);
       const productRepo = this.tenantRepo.manager.getRepository(Product);
@@ -433,8 +471,18 @@ export class PublicReservationsController {
         if (!isNaN(parsedD.getTime())) reqDeliveryDate = parsedD;
       }
 
-      const linkedOrder = orderRepo.create({
-        tenantId: id,
+      // Buscar si ya existe la orden vinculada (creada por reservationsService.create)
+      let linkedOrder = finalReservation.orderId
+        ? await orderRepo.findOne({ where: { id: finalReservation.orderId, tenantId: id } })
+        : null;
+
+      if (!linkedOrder) {
+        linkedOrder = await orderRepo.findOne({
+          where: { linkedReservationId: finalReservation.id, tenantId: id },
+        });
+      }
+
+      const orderData: Partial<Order> = {
         customerId: finalReservation.customerId,
         customerName: finalReservation.customerName,
         customerPhone: finalReservation.customerPhone || '',
@@ -465,14 +513,29 @@ export class PublicReservationsController {
           amountBS: Number(finalReservation.abonosHistory[0]?.amountBs || 0),
           reference: dto.paymentReference || undefined,
         }] : undefined,
-      });
+      };
 
-      const savedOrder = await orderRepo.save(linkedOrder);
-      finalReservation.orderId = savedOrder.id;
-      const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
-      await reservationRepo.save(finalReservation);
+      let savedOrder: Order;
+      if (linkedOrder) {
+        Object.assign(linkedOrder, orderData);
+        savedOrder = await orderRepo.save(linkedOrder);
+      } else {
+        linkedOrder = orderRepo.create({
+          tenantId: id,
+          ...orderData,
+        });
+        savedOrder = await orderRepo.save(linkedOrder);
+      }
 
-      if (finalReservation.serviceId) {
+      if (finalReservation.orderId !== savedOrder.id) {
+        finalReservation.orderId = savedOrder.id;
+        const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
+        await reservationRepo.save(finalReservation);
+      }
+
+      // Asegurar OrderItems solo si la orden no tenía items
+      const existingItems = await orderItemRepo.count({ where: { orderId: savedOrder.id } });
+      if (existingItems === 0 && finalReservation.serviceId) {
         const sIds = finalReservation.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
         for (const sId of sIds) {
           const prod = await productRepo.findOne({ where: { id: sId } });
@@ -489,8 +552,21 @@ export class PublicReservationsController {
           }
         }
       }
+
+      // Limpieza de órdenes duplicadas huérfanas vinculadas a esta misma reservación
+      const allLinkedOrders = await orderRepo.find({
+        where: { linkedReservationId: finalReservation.id, tenantId: id },
+      });
+      if (allLinkedOrders.length > 1) {
+        for (const extraOrder of allLinkedOrders) {
+          if (extraOrder.id !== savedOrder.id) {
+            await orderItemRepo.delete({ orderId: extraOrder.id });
+            await orderRepo.delete({ id: extraOrder.id });
+          }
+        }
+      }
     } catch (orderErr) {
-      console.error('Error auto-creating linked order for reservation:', orderErr);
+      console.error('Error syncing or creating linked order for reservation:', orderErr);
     }
 
     // Notificar al negocio / administradores en tiempo real vía Push

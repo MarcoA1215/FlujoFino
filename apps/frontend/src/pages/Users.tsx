@@ -51,6 +51,8 @@ interface UserData {
   lunchEnd?: string;
   salaryAmount?: number;
   salaryPeriod?: string;
+  compensationType?: string; // 'FIJO' | 'COMISION' | 'MIXTO'
+  commissionPercentage?: number;
   status?: string;
   createdAt: string;
 }
@@ -132,6 +134,8 @@ const Users: React.FC = () => {
   const [settings, setSettings] = useState<any>({});
   const [salaryAmount, setSalaryAmount] = useState('');
   const [salaryPeriod, setSalaryPeriod] = useState('SEMANAL');
+  const [compensationType, setCompensationType] = useState('FIJO');
+  const [commissionPercentage, setCommissionPercentage] = useState('');
   
   // Vales / Anticipos
   const [showAdvanceModal, setShowAdvanceModal] = useState(false);
@@ -143,11 +147,17 @@ const Users: React.FC = () => {
   const [deliverySummary, setDeliverySummary] = useState<any>(null);
   const [selectedDriverDetails, setSelectedDriverDetails] = useState<any | null>(null);
 
+  // Liquidación de Nómina Dinámica & Pagos
   const [selectedUserForPay, setSelectedUserForPay] = useState<UserData | null>(null);
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('CASH_USD');
   const [payDate, setPayDate] = useState(formatDateLocal(new Date()));
   const [deductAdvances, setDeductAdvances] = useState(true);
+  const [payrollStartDate, setPayrollStartDate] = useState('');
+  const [payrollEndDate, setPayrollEndDate] = useState('');
+  const [payrollSummary, setPayrollSummary] = useState<any>(null);
+  const [loadingPayrollSummary, setLoadingPayrollSummary] = useState(false);
+  const [showWorkDetails, setShowWorkDetails] = useState(false);
 
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserData | null>(null);
   const [editName, setEditName] = useState('');
@@ -158,6 +168,8 @@ const Users: React.FC = () => {
   const [editLunchEnd, setEditLunchEnd] = useState('');
   const [editSalaryAmount, setEditSalaryAmount] = useState('');
   const [editSalaryPeriod, setEditSalaryPeriod] = useState('SEMANAL');
+  const [editCompensationType, setEditCompensationType] = useState('FIJO');
+  const [editCommissionPercentage, setEditCommissionPercentage] = useState('');
   
   const [isChecked, setIsChecked] = useState(false);
   const [isExisting, setIsExisting] = useState(false);
@@ -280,6 +292,24 @@ const Users: React.FC = () => {
     }
   };
 
+  const fetchPayrollSummary = async (userId: string, start?: string, end?: string) => {
+    setLoadingPayrollSummary(true);
+    try {
+      const params: any = {};
+      if (start) params.startDate = start;
+      if (end) params.endDate = end;
+      const res = await apiClient.get(`/users/${userId}/payroll-summary`, { params });
+      setPayrollSummary(res.data);
+      if (res.data?.netPayableUSD !== undefined) {
+        setPayAmount(String(res.data.netPayableUSD));
+      }
+    } catch (e) {
+      console.error('Error cargando liquidación de nómina', e);
+    } finally {
+      setLoadingPayrollSummary(false);
+    }
+  };
+
   const resetForm = () => {
     setEmail('');
     setUsername('');
@@ -294,6 +324,8 @@ const Users: React.FC = () => {
     setLunchEnd('');
     setSalaryAmount('');
     setSalaryPeriod('SEMANAL');
+    setCompensationType('FIJO');
+    setCommissionPercentage('');
     setRole(UserRole.POS);
     setSelectedRoles([UserRole.POS]);
     setIsChecked(false);
@@ -313,8 +345,10 @@ const Users: React.FC = () => {
           jobTitle: jobTitle.trim() || 'Personal Operativo (Limpieza / Mantenimiento)',
           identification: identification.trim() || undefined,
           phone: phone.trim() || undefined,
-          salaryAmount: salaryAmount ? Number(salaryAmount) : undefined,
-          salaryPeriod,
+          salaryAmount: compensationType !== 'COMISION' && salaryAmount ? Number(salaryAmount) : undefined,
+          salaryPeriod: compensationType !== 'COMISION' ? salaryPeriod : undefined,
+          compensationType,
+          commissionPercentage: compensationType !== 'FIJO' && commissionPercentage ? Number(commissionPercentage) : undefined,
           entryTime: entryTime || undefined,
           exitTime: exitTime || undefined,
           lunchStart: lunchStart || undefined,
@@ -345,8 +379,10 @@ const Users: React.FC = () => {
         exitTime: exitTime || undefined,
         lunchStart: lunchStart || undefined,
         lunchEnd: lunchEnd || undefined,
-        salaryAmount: salaryAmount ? Number(salaryAmount) : undefined, 
-        salaryPeriod 
+        salaryAmount: compensationType !== 'COMISION' && salaryAmount ? Number(salaryAmount) : undefined, 
+        salaryPeriod: compensationType !== 'COMISION' ? salaryPeriod : undefined,
+        compensationType,
+        commissionPercentage: compensationType !== 'FIJO' && commissionPercentage ? Number(commissionPercentage) : undefined,
       });
       presentToast({ message: isExisting ? 'Usuario invitado exitosamente' : 'Usuario creado exitosamente', duration: 2000, color: 'success' });
       resetForm();
@@ -359,39 +395,36 @@ const Users: React.FC = () => {
 
   const handleOpenPayModal = (u: UserData) => {
     setSelectedUserForPay(u);
-    const adv = advancesTotalsByUser[u.id];
-    const advTotal = Number(adv?.totalUSD || 0);
-    const base = Number(u.salaryAmount) || 0;
-    if (advTotal > 0) {
-      setDeductAdvances(true);
-      setPayAmount(base > 0 ? String(Math.max(0, Number((base - advTotal).toFixed(2)))) : '');
-    } else {
-      setDeductAdvances(false);
-      setPayAmount(base > 0 ? String(base) : '');
-    }
+    setShowWorkDetails(false);
+    const end = formatDateLocal(new Date());
+    const startObj = new Date();
+    startObj.setDate(startObj.getDate() - 7);
+    const start = formatDateLocal(startObj);
+    setPayrollStartDate(start);
+    setPayrollEndDate(end);
+    setDeductAdvances(true);
     setPayMethod('CASH_USD');
-    setPayDate(formatDateLocal(new Date()));
+    setPayDate(end);
+    fetchPayrollSummary(u.id, start, end);
   };
 
   const handleToggleDeductAdvances = (checked: boolean) => {
     setDeductAdvances(checked);
-    if (!selectedUserForPay) return;
-    const adv = advancesTotalsByUser[selectedUserForPay.id];
-    const advTotal = Number(adv?.totalUSD || 0);
-    const base = Number(selectedUserForPay.salaryAmount) || 0;
-    if (base > 0) {
+    if (!payrollSummary) {
+      const adv = advancesTotalsByUser[selectedUserForPay?.id || ''];
+      const advTotal = Number(adv?.totalUSD || 0);
+      const base = Number(selectedUserForPay?.salaryAmount) || 0;
       if (checked) {
         setPayAmount(String(Math.max(0, Number((base - advTotal).toFixed(2)))));
       } else {
         setPayAmount(String(base));
       }
+      return;
+    }
+    if (checked) {
+      setPayAmount(String(payrollSummary.netPayableUSD ?? 0));
     } else {
-      const current = Number(payAmount) || 0;
-      if (checked) {
-        setPayAmount(String(Math.max(0, Number((current - advTotal).toFixed(2)))));
-      } else {
-        setPayAmount(String(Number((current + advTotal).toFixed(2))));
-      }
+      setPayAmount(String(payrollSummary.grossTotal ?? 0));
     }
   };
 
@@ -402,22 +435,15 @@ const Users: React.FC = () => {
         username: selectedUserForPay.username,
         amount: Number(payAmount),
         method: payMethod,
-        date: payDate
+        date: payDate,
+        deductAdvances: deductAdvances,
       });
 
-      if (deductAdvances) {
-        const userAdvances = pendingAdvances.filter(a => a.userId === selectedUserForPay.id);
-        if (userAdvances.length > 0) {
-          await Promise.allSettled(
-            userAdvances.map(a => apiClient.patch(`/salary-advances/${a.id}/deduct`))
-          );
-          await fetchPendingAdvances();
-        }
-      }
-
-      presentToast({ message: 'Pago registrado como gasto de nómina', duration: 3000, color: 'success' });
+      presentToast({ message: 'Pago registrado exitosamente en gastos de nómina', duration: 3000, color: 'success' });
       setSelectedUserForPay(null);
+      setPayrollSummary(null);
       setPayAmount('');
+      fetchPendingAdvances();
     } catch (e: any) {
       presentToast({ message: 'Error registrando pago: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
     }
@@ -437,6 +463,8 @@ const Users: React.FC = () => {
     setEditLunchEnd(u.lunchEnd || '');
     setEditSalaryAmount(u.salaryAmount !== undefined && u.salaryAmount !== null ? String(u.salaryAmount) : '');
     setEditSalaryPeriod(u.salaryPeriod || 'SEMANAL');
+    setEditCompensationType(u.compensationType || 'FIJO');
+    setEditCommissionPercentage(u.commissionPercentage !== undefined && u.commissionPercentage !== null ? String(u.commissionPercentage) : '');
   };
 
   const handleSaveEdit = async () => {
@@ -451,8 +479,10 @@ const Users: React.FC = () => {
         exitTime: editExitTime || null,
         lunchStart: editLunchStart || null,
         lunchEnd: editLunchEnd || null,
-        salaryAmount: editSalaryAmount ? Number(editSalaryAmount) : null,
-        salaryPeriod: editSalaryPeriod || 'SEMANAL',
+        salaryAmount: editCompensationType !== 'COMISION' && editSalaryAmount ? Number(editSalaryAmount) : null,
+        salaryPeriod: editCompensationType !== 'COMISION' ? (editSalaryPeriod || 'SEMANAL') : null,
+        compensationType: editCompensationType,
+        commissionPercentage: editCompensationType !== 'FIJO' && editCommissionPercentage ? Number(editCommissionPercentage) : null,
       });
       presentToast({ message: 'Usuario actualizado exitosamente', duration: 2000, color: 'success' });
       setSelectedUserForEdit(null);
@@ -683,17 +713,49 @@ const Users: React.FC = () => {
                             </IonCol>
                           </IonRow>
                           <IonItem>
-                            <IonLabel position="stacked">Sueldo Acordado (USD)</IonLabel>
-                            <IonInput type="number" min="0" placeholder="Ej: 50" value={salaryAmount} onIonInput={e => setSalaryAmount(e.detail.value!)} />
-                          </IonItem>
-                          <IonItem>
-                            <IonLabel position="stacked">Frecuencia de Pago</IonLabel>
-                            <IonSelect value={salaryPeriod} onIonChange={e => setSalaryPeriod(e.detail.value)}>
-                              <IonSelectOption value="SEMANAL">Semanal</IonSelectOption>
-                              <IonSelectOption value="QUINCENAL">Quincenal</IonSelectOption>
-                              <IonSelectOption value="MENSUAL">Mensual</IonSelectOption>
+                            <IonLabel position="stacked">Esquema de Remuneración</IonLabel>
+                            <IonSelect
+                              interface="popover"
+                              value={compensationType}
+                              onIonChange={e => setCompensationType(e.detail.value)}
+                            >
+                              <IonSelectOption value="FIJO">💵 Sueldo Fijo</IonSelectOption>
+                              <IonSelectOption value="COMISION">💼 100% Por Comisión</IonSelectOption>
+                              <IonSelectOption value="MIXTO">⚖️ Mixto (Base + Comisión)</IonSelectOption>
                             </IonSelect>
                           </IonItem>
+                          {(compensationType === 'COMISION' || compensationType === 'MIXTO') && (
+                            <IonItem>
+                              <IonLabel position="stacked">Porcentaje de Comisión (%)</IonLabel>
+                              <IonInput
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.5"
+                                placeholder="Ej: 40 para 40%"
+                                value={commissionPercentage}
+                                onIonInput={e => setCommissionPercentage(e.detail.value!)}
+                              />
+                            </IonItem>
+                          )}
+                          {(compensationType === 'FIJO' || compensationType === 'MIXTO') && (
+                            <>
+                              <IonItem>
+                                <IonLabel position="stacked">
+                                  {compensationType === 'MIXTO' ? 'Sueldo Base Acordado (USD)' : 'Sueldo Acordado (USD)'}
+                                </IonLabel>
+                                <IonInput type="number" min="0" placeholder="Ej: 50" value={salaryAmount} onIonInput={e => setSalaryAmount(e.detail.value!)} />
+                              </IonItem>
+                              <IonItem>
+                                <IonLabel position="stacked">Frecuencia de Pago</IonLabel>
+                                <IonSelect value={salaryPeriod} onIonChange={e => setSalaryPeriod(e.detail.value)}>
+                                  <IonSelectOption value="SEMANAL">Semanal</IonSelectOption>
+                                  <IonSelectOption value="QUINCENAL">Quincenal</IonSelectOption>
+                                  <IonSelectOption value="MENSUAL">Mensual</IonSelectOption>
+                                </IonSelect>
+                              </IonItem>
+                            </>
+                          )}
                           <IonButton expand="block" color="primary" className="ion-margin-top" onClick={handleCreate}>
                             Registrar Personal Operativo
                           </IonButton>
@@ -819,17 +881,49 @@ const Users: React.FC = () => {
                             </IonCol>
                           </IonRow>
                           <IonItem>
-                            <IonLabel position="stacked">Sueldo Acordado (USD)</IonLabel>
-                            <IonInput type="number" min="0" placeholder="Ej: 50" value={salaryAmount} onIonInput={e => setSalaryAmount(e.detail.value!)} />
-                          </IonItem>
-                          <IonItem>
-                            <IonLabel position="stacked">Frecuencia de Pago</IonLabel>
-                            <IonSelect value={salaryPeriod} onIonChange={e => setSalaryPeriod(e.detail.value)}>
-                              <IonSelectOption value="SEMANAL">Semanal</IonSelectOption>
-                              <IonSelectOption value="QUINCENAL">Quincenal</IonSelectOption>
-                              <IonSelectOption value="MENSUAL">Mensual</IonSelectOption>
+                            <IonLabel position="stacked">Esquema de Remuneración</IonLabel>
+                            <IonSelect
+                              interface="popover"
+                              value={compensationType}
+                              onIonChange={e => setCompensationType(e.detail.value)}
+                            >
+                              <IonSelectOption value="FIJO">💵 Sueldo Fijo</IonSelectOption>
+                              <IonSelectOption value="COMISION">💼 100% Por Comisión</IonSelectOption>
+                              <IonSelectOption value="MIXTO">⚖️ Mixto (Base + Comisión)</IonSelectOption>
                             </IonSelect>
                           </IonItem>
+                          {(compensationType === 'COMISION' || compensationType === 'MIXTO') && (
+                            <IonItem>
+                              <IonLabel position="stacked">Porcentaje de Comisión (%)</IonLabel>
+                              <IonInput
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.5"
+                                placeholder="Ej: 40 para 40%"
+                                value={commissionPercentage}
+                                onIonInput={e => setCommissionPercentage(e.detail.value!)}
+                              />
+                            </IonItem>
+                          )}
+                          {(compensationType === 'FIJO' || compensationType === 'MIXTO') && (
+                            <>
+                              <IonItem>
+                                <IonLabel position="stacked">
+                                  {compensationType === 'MIXTO' ? 'Sueldo Base Acordado (USD)' : 'Sueldo Acordado (USD)'}
+                                </IonLabel>
+                                <IonInput type="number" min="0" placeholder="Ej: 50" value={salaryAmount} onIonInput={e => setSalaryAmount(e.detail.value!)} />
+                              </IonItem>
+                              <IonItem>
+                                <IonLabel position="stacked">Frecuencia de Pago</IonLabel>
+                                <IonSelect value={salaryPeriod} onIonChange={e => setSalaryPeriod(e.detail.value)}>
+                                  <IonSelectOption value="SEMANAL">Semanal</IonSelectOption>
+                                  <IonSelectOption value="QUINCENAL">Quincenal</IonSelectOption>
+                                  <IonSelectOption value="MENSUAL">Mensual</IonSelectOption>
+                                </IonSelect>
+                              </IonItem>
+                            </>
+                          )}
                           <IonButton expand="block" color="primary" className="ion-margin-top" onClick={handleCreate}>
                             {isExisting ? 'Invitar Usuario' : 'Crear Usuario'}
                           </IonButton>
@@ -883,6 +977,25 @@ const Users: React.FC = () => {
                                       {u.jobTitle}
                                     </div>
                                   )}
+                                  {u.compensationType === 'COMISION' ? (
+                                    <div style={{ marginTop: '3px' }}>
+                                      <span style={{ fontSize: '11px', background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0', padding: '2px 6px', borderRadius: '6px', fontWeight: 700 }}>
+                                        💼 {u.commissionPercentage || 0}% Comisión
+                                      </span>
+                                    </div>
+                                  ) : u.compensationType === 'MIXTO' ? (
+                                    <div style={{ marginTop: '3px' }}>
+                                      <span style={{ fontSize: '11px', background: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', padding: '2px 6px', borderRadius: '6px', fontWeight: 700 }}>
+                                        ⚖️ Mixto: ${u.salaryAmount || 0} + {u.commissionPercentage || 0}%
+                                      </span>
+                                    </div>
+                                  ) : u.salaryAmount ? (
+                                    <div style={{ marginTop: '3px' }}>
+                                      <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>
+                                        💵 ${u.salaryAmount} / {u.salaryPeriod || 'Sem'}
+                                      </span>
+                                    </div>
+                                  ) : null}
                                 </td>
                                 <td>{u.email}</td>
                                 <td>
@@ -1303,24 +1416,58 @@ const Users: React.FC = () => {
             </IonRow>
 
             <IonItem>
-              <IonLabel position="stacked">Sueldo Acordado (USD)</IonLabel>
-              <IonInput 
-                type="number" 
-                min="0" 
-                placeholder="Ej: 50" 
-                value={editSalaryAmount} 
-                onIonInput={e => setEditSalaryAmount(e.detail.value!)} 
-              />
-            </IonItem>
-
-            <IonItem>
-              <IonLabel position="stacked">Frecuencia de Pago</IonLabel>
-              <IonSelect value={editSalaryPeriod} onIonChange={e => setEditSalaryPeriod(e.detail.value)}>
-                <IonSelectOption value="SEMANAL">Semanal</IonSelectOption>
-                <IonSelectOption value="QUINCENAL">Quincenal</IonSelectOption>
-                <IonSelectOption value="MENSUAL">Mensual</IonSelectOption>
+              <IonLabel position="stacked">Esquema de Remuneración</IonLabel>
+              <IonSelect
+                interface="popover"
+                value={editCompensationType}
+                onIonChange={e => setEditCompensationType(e.detail.value)}
+              >
+                <IonSelectOption value="FIJO">💵 Sueldo Fijo</IonSelectOption>
+                <IonSelectOption value="COMISION">💼 100% Por Comisión</IonSelectOption>
+                <IonSelectOption value="MIXTO">⚖️ Mixto (Base + Comisión)</IonSelectOption>
               </IonSelect>
             </IonItem>
+
+            {(editCompensationType === 'COMISION' || editCompensationType === 'MIXTO') && (
+              <IonItem>
+                <IonLabel position="stacked">Porcentaje de Comisión (%)</IonLabel>
+                <IonInput 
+                  type="number" 
+                  min="0" 
+                  max="100" 
+                  step="0.5" 
+                  placeholder="Ej: 40 para 40%" 
+                  value={editCommissionPercentage} 
+                  onIonInput={e => setEditCommissionPercentage(e.detail.value!)} 
+                />
+              </IonItem>
+            )}
+
+            {(editCompensationType === 'FIJO' || editCompensationType === 'MIXTO') && (
+              <>
+                <IonItem>
+                  <IonLabel position="stacked">
+                    {editCompensationType === 'MIXTO' ? 'Sueldo Base Acordado (USD)' : 'Sueldo Acordado (USD)'}
+                  </IonLabel>
+                  <IonInput 
+                    type="number" 
+                    min="0" 
+                    placeholder="Ej: 50" 
+                    value={editSalaryAmount} 
+                    onIonInput={e => setEditSalaryAmount(e.detail.value!)} 
+                  />
+                </IonItem>
+
+                <IonItem>
+                  <IonLabel position="stacked">Frecuencia de Pago</IonLabel>
+                  <IonSelect value={editSalaryPeriod} onIonChange={e => setEditSalaryPeriod(e.detail.value)}>
+                    <IonSelectOption value="SEMANAL">Semanal</IonSelectOption>
+                    <IonSelectOption value="QUINCENAL">Quincenal</IonSelectOption>
+                    <IonSelectOption value="MENSUAL">Mensual</IonSelectOption>
+                  </IonSelect>
+                </IonItem>
+              </>
+            )}
 
             <div className="ion-margin-top">
               <IonButton expand="block" color="primary" onClick={handleSaveEdit}>
@@ -1334,18 +1481,166 @@ const Users: React.FC = () => {
         </IonModal>
       )}
 
-      {/* Modal Pago de Nómina */}
+      {/* Modal Pago de Nómina y Liquidación de Comisiones */}
       {selectedUserForPay && (
-        <IonModal isOpen={!!selectedUserForPay} onDidDismiss={() => setSelectedUserForPay(null)}>
+        <IonModal isOpen={!!selectedUserForPay} onDidDismiss={() => { setSelectedUserForPay(null); setPayrollSummary(null); }}>
           <IonHeader>
             <IonToolbar style={{ ['--background' as any]: '#ffffff', borderBottom: '1px solid #E2E8F0', padding: '4px 8px' }}>
-              <IonTitle style={{ color: '#0F172A', fontWeight: 700 }}>Registrar Pago a {selectedUserForPay.username}</IonTitle>
+              <IonTitle style={{ color: '#0F172A', fontWeight: 700, fontSize: '17px' }}>
+                Liquidar Nómina: {selectedUserForPay.name || selectedUserForPay.username}
+              </IonTitle>
               <IonButtons slot="end">
-                <IonButton color="medium" onClick={() => setSelectedUserForPay(null)}>Cerrar</IonButton>
+                <IonButton color="medium" onClick={() => { setSelectedUserForPay(null); setPayrollSummary(null); }}>Cerrar</IonButton>
               </IonButtons>
             </IonToolbar>
           </IonHeader>
-          <IonContent className="ion-padding">
+          <IonContent className="ion-padding" style={{ ['--background' as any]: '#F8FAFC' }}>
+            {/* Selector de Período */}
+            <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '14px', marginBottom: '14px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>
+                📅 Período de Liquidación de Trabajos
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', alignItems: 'center' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, display: 'block', marginBottom: '2px' }}>Desde</label>
+                  <input
+                    type="date"
+                    value={payrollStartDate}
+                    onChange={e => setPayrollStartDate(e.target.value)}
+                    style={{ width: '100%', padding: '6px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#FFFFFF' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, display: 'block', marginBottom: '2px' }}>Hasta</label>
+                  <input
+                    type="date"
+                    value={payrollEndDate}
+                    onChange={e => setPayrollEndDate(e.target.value)}
+                    style={{ width: '100%', padding: '6px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#FFFFFF' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%' }}>
+                  <IonButton
+                    expand="block"
+                    size="small"
+                    color="primary"
+                    disabled={loadingPayrollSummary}
+                    onClick={() => fetchPayrollSummary(selectedUserForPay.id, payrollStartDate, payrollEndDate)}
+                    style={{ width: '100%', height: '36px', margin: 0, fontWeight: 700 }}
+                  >
+                    {loadingPayrollSummary ? 'Calculando...' : '🔄 Recalcular'}
+                  </IonButton>
+                </div>
+              </div>
+            </div>
+
+            {/* Tarjeta de Resumen y Desglose Automático */}
+            {payrollSummary && (
+              <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '16px', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+                    Resumen de Compensación
+                  </span>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    padding: '3px 8px',
+                    borderRadius: '8px',
+                    background: payrollSummary.compensationType === 'COMISION' ? '#ECFDF5' : payrollSummary.compensationType === 'MIXTO' ? '#F0FDF4' : '#F1F5F9',
+                    color: payrollSummary.compensationType === 'COMISION' ? '#065F46' : payrollSummary.compensationType === 'MIXTO' ? '#166534' : '#334155',
+                    border: '1px solid #CBD5E1'
+                  }}>
+                    {payrollSummary.compensationType === 'COMISION' ? `💼 COMISIÓN ${payrollSummary.commissionPercentage}%` :
+                     payrollSummary.compensationType === 'MIXTO' ? `⚖️ MIXTO (${payrollSummary.commissionPercentage}% + $${payrollSummary.baseSalary})` :
+                     `💵 FIJO ($${payrollSummary.baseSalary})`}
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+                  <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px' }}>
+                    <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Trabajos / Citas</div>
+                    <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>{payrollSummary.servicesCount}</div>
+                    <div style={{ fontSize: '10px', color: '#64748B' }}>${payrollSummary.servicesTotalBilled} facturados</div>
+                  </div>
+
+                  {(payrollSummary.compensationType === 'COMISION' || payrollSummary.compensationType === 'MIXTO') && (
+                    <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '10px', padding: '10px' }}>
+                      <div style={{ fontSize: '11px', color: '#065F46', fontWeight: 600 }}>Comisión ({payrollSummary.commissionPercentage}%)</div>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#059669' }}>+${payrollSummary.commissionEarned} USD</div>
+                    </div>
+                  )}
+
+                  {(payrollSummary.compensationType === 'FIJO' || payrollSummary.compensationType === 'MIXTO') && (
+                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px' }}>
+                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Sueldo Base</div>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>+${payrollSummary.baseSalary} USD</div>
+                    </div>
+                  )}
+
+                  <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px' }}>
+                    <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Total Bruto Ganado</div>
+                    <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>${payrollSummary.grossTotal} USD</div>
+                  </div>
+
+                  {payrollSummary.advancesDeduction > 0 && (
+                    <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', padding: '10px' }}>
+                      <div style={{ fontSize: '11px', color: '#DC2626', fontWeight: 600 }}>Vales Pendientes</div>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#DC2626' }}>-${payrollSummary.advancesDeduction} USD</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Resultado Neto Sugerido */}
+                <div style={{ background: '#ECFDF5', border: '1px solid #10B981', borderRadius: '12px', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#065F46' }}>Neto a Pagar Calculado</div>
+                    <div style={{ fontSize: '10px', color: '#047857' }}>
+                      {deductAdvances ? 'Incluye deducción automática de vales' : 'Sin descontar vales'}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '20px', fontWeight: 900, color: '#065F46' }}>
+                    ${deductAdvances ? payrollSummary.netPayableUSD : payrollSummary.grossTotal} USD
+                  </div>
+                </div>
+
+                {/* Botón para ver desglose de trabajos */}
+                {payrollSummary.workItems && payrollSummary.workItems.length > 0 && (
+                  <div style={{ marginTop: '10px' }}>
+                    <IonButton
+                      fill="clear"
+                      size="small"
+                      onClick={() => setShowWorkDetails(!showWorkDetails)}
+                      style={{ fontSize: '12px', textTransform: 'none', margin: 0, padding: 0 }}
+                    >
+                      {showWorkDetails ? '🔼 Ocultar lista de trabajos' : `🔽 Ver lista detallada de trabajos (${payrollSummary.workItems.length})`}
+                    </IonButton>
+
+                    {showWorkDetails && (
+                      <div style={{ marginTop: '8px', maxHeight: '180px', overflowY: 'auto', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '6px' }}>
+                        {payrollSummary.workItems.map((item: any) => (
+                          <div
+                            key={item.id}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '11px',
+                              padding: '5px 8px',
+                              borderBottom: '1px solid #F1F5F9',
+                              color: '#334155',
+                            }}
+                          >
+                            <span><strong>{item.date}</strong> - {item.client} ({item.description})</span>
+                            <span style={{ fontWeight: 700, color: '#0F172A' }}>${Number(item.amount).toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Toggle de Descuento de Vales */}
             {advancesTotalsByUser[selectedUserForPay.id]?.totalUSD > 0 && (
               <IonItem lines="none" style={{ marginTop: '4px', marginBottom: '12px', background: '#FEF2F2', borderRadius: '12px', border: '1px solid #FECACA' }}>
                 <IonLabel color="danger" style={{ fontSize: '13px', fontWeight: 700 }}>
@@ -1359,33 +1654,71 @@ const Users: React.FC = () => {
                 />
               </IonItem>
             )}
-            <IonItem>
-              <IonLabel position="stacked">Monto a Pagar (USD)</IonLabel>
-              <IonInput type="number" min="0" placeholder="Ej. 20" value={payAmount} onIonInput={e => setPayAmount(e.detail.value!)} />
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Método de Pago</IonLabel>
-              <IonSelect value={payMethod} onIonChange={e => setPayMethod(e.detail.value)}>
-                <IonSelectOption value="CASH_USD">Efectivo USD</IonSelectOption>
-                <IonSelectOption value="PAGO_MOVIL">Pago Móvil</IonSelectOption>
-              </IonSelect>
-            </IonItem>
-            {payMethod === 'PAGO_MOVIL' && (
-              <div style={{ marginTop: '10px', padding: '10px 14px', background: '#EFF6FF', borderRadius: '8px', border: '1px solid #BFDBFE', color: '#1E40AF', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Transferir en Bolívares:</span>
-                <IonBadge color="primary" style={{ fontSize: '13px', padding: '6px 10px' }}>
-                  Bs. {(Number(payAmount || 0) * (Number(settings?.exchangeRateBs) || 1)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                </IonBadge>
-              </div>
-            )}
-            <IonItem>
-              <IonLabel position="stacked">Fecha</IonLabel>
-              <IonInput type="date" value={payDate} onIonInput={e => setPayDate(e.detail.value!)} />
-            </IonItem>
-            
-            <IonButton expand="block" color="success" className="ion-margin-top" onClick={handlePaySalary}>
-              💵 Registrar Pago
-            </IonButton>
+
+            {/* Campos de Pago */}
+            <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '14px' }}>
+              <IonItem lines="none" style={{ marginBottom: '8px' }}>
+                <IonLabel position="stacked" style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                  Monto a Transferir / Pagar (USD)
+                </IonLabel>
+                <IonInput
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={payAmount}
+                  onIonInput={e => setPayAmount(e.detail.value!)}
+                  style={{ border: '1px solid #CBD5E1', borderRadius: '8px', padding: '6px 10px', marginTop: '4px' }}
+                />
+              </IonItem>
+
+              <IonItem lines="none" style={{ marginBottom: '8px' }}>
+                <IonLabel position="stacked" style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                  Método de Pago
+                </IonLabel>
+                <IonSelect
+                  interface="popover"
+                  value={payMethod}
+                  onIonChange={e => setPayMethod(e.detail.value)}
+                  style={{ width: '100%', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '6px 10px', marginTop: '4px' }}
+                >
+                  <IonSelectOption value="CASH_USD">Efectivo USD</IonSelectOption>
+                  <IonSelectOption value="PAGO_MOVIL">Pago Móvil</IonSelectOption>
+                  <IonSelectOption value="TRANSFER_BS">Transferencia Bancaria Bs</IonSelectOption>
+                </IonSelect>
+              </IonItem>
+
+              {(payMethod === 'PAGO_MOVIL' || payMethod === 'TRANSFER_BS') && (
+                <div style={{ marginBottom: '10px', padding: '10px 14px', background: '#EFF6FF', borderRadius: '8px', border: '1px solid #BFDBFE', color: '#1E40AF', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Transferir en Bolívares:</span>
+                  <IonBadge color="primary" style={{ fontSize: '13px', padding: '6px 10px' }}>
+                    Bs. {(Number(payAmount || 0) * (Number(settings?.exchangeRateBs) || 1)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                  </IonBadge>
+                </div>
+              )}
+
+              <IonItem lines="none">
+                <IonLabel position="stacked" style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                  Fecha del Registro de Pago
+                </IonLabel>
+                <IonInput
+                  type="date"
+                  value={payDate}
+                  onIonInput={e => setPayDate(e.detail.value!)}
+                  style={{ border: '1px solid #CBD5E1', borderRadius: '8px', padding: '6px 10px', marginTop: '4px' }}
+                />
+              </IonItem>
+
+              <IonButton
+                expand="block"
+                color="success"
+                className="ion-margin-top"
+                onClick={handlePaySalary}
+                style={{ '--border-radius': '10px', fontWeight: 800, height: '44px' }}
+              >
+                💵 Confirmar Pago y Liquidar Nómina
+              </IonButton>
+            </div>
           </IonContent>
         </IonModal>
       )}
@@ -1395,6 +1728,7 @@ const Users: React.FC = () => {
         isOpen={showAdvanceModal}
         onClose={() => setShowAdvanceModal(false)}
         onSuccess={() => fetchPendingAdvances()}
+        employees={users}
         defaultExchangeRate={Number(settings?.exchangeRateBs) || undefined}
       />
 

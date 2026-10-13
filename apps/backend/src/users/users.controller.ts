@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Post, Put, Patch, Body, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Body, Param, Query, Delete, UseGuards, Request } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -49,6 +49,17 @@ export class UsersController {
   async checkEmail(@Param('email') email: string) {
     const user = await this.usersService.findByUsername(email);
     return { exists: !!user, username: user?.username };
+  }
+
+  @Get(':id/payroll-summary')
+  @Roles(UserRole.ADMIN)
+  getPayrollSummary(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.usersService.getPayrollSummary(req.user.tenantId, id, startDate, endDate);
   }
 
   @Post()
