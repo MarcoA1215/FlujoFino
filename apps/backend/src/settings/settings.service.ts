@@ -97,6 +97,10 @@ export class SettingsService implements OnModuleInit {
         ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "exit_time" character varying;
         ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "lunch_start" character varying;
         ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "lunch_end" character varying;
+        ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "salaryAmount" numeric(12,2);
+        ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "salaryPeriod" character varying;
+        ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "compensation_type" character varying DEFAULT 'FIJO';
+        ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "commission_percentage" numeric(5,2);
       `,
       `
         ALTER TABLE "tenant" ADD COLUMN IF NOT EXISTS "promoterId" uuid;

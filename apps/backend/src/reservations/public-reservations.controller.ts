@@ -184,34 +184,39 @@ export class PublicReservationsController {
     // Fetch active staff if staff selection is allowed
     let staff: any[] = [];
     if (settings?.bookingAllowStaffSelection) {
-      const accessRepo = this.tenantRepo.manager.getRepository(UserTenantAccess);
-      const accesses = await accessRepo.find({
-        where: { tenantId: id, isActive: true, status: 'ACCEPTED' },
-        relations: { user: true },
-        order: { user: { username: 'ASC' } }
-      });
-      staff = accesses
-        .filter(a => {
-          if (!a.user) return false;
-          const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
-            ? a.roles
-            : [a.role || a.user.role].filter(Boolean);
-          const isExclusivelyNonStaff = userRoles.length > 0 && userRoles.every(r => r === UserRole.DELIVERY || r === UserRole.OPERATIVO);
-          return !isExclusivelyNonStaff;
-        })
-        .map(a => {
-          const rawName = (a.user.name && a.user.name.trim()) ? a.user.name.trim() : '';
-          const cleanUsername = (a.user.username || '')
-            .replace(/[-_]?(admin|operativo|pos|delivery)$/i, '')
-            .replace(/[._]/g, ' ')
-            .trim();
-          const displayName = rawName || cleanUsername || a.user.username;
-          return {
-            id: a.user.id,
-            name: displayName,
-            jobTitle: a.jobTitle || undefined
-          };
+      try {
+        const accessRepo = this.tenantRepo.manager.getRepository(UserTenantAccess);
+        const accesses = await accessRepo.find({
+          where: { tenantId: id, isActive: true, status: 'ACCEPTED' },
+          relations: { user: true },
+          order: { user: { username: 'ASC' } }
         });
+        staff = accesses
+          .filter(a => {
+            if (!a.user) return false;
+            const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
+              ? a.roles
+              : [a.role || a.user.role].filter(Boolean);
+            const isExclusivelyNonStaff = userRoles.length > 0 && userRoles.every(r => r === UserRole.DELIVERY || r === UserRole.OPERATIVO);
+            return !isExclusivelyNonStaff;
+          })
+          .map(a => {
+            const rawName = (a.user.name && a.user.name.trim()) ? a.user.name.trim() : '';
+            const cleanUsername = (a.user.username || '')
+              .replace(/[-_]?(admin|operativo|pos|delivery)$/i, '')
+              .replace(/[._]/g, ' ')
+              .trim();
+            const displayName = rawName || cleanUsername || a.user.username;
+            return {
+              id: a.user.id,
+              name: displayName,
+              jobTitle: a.jobTitle || undefined
+            };
+          });
+      } catch (staffErr) {
+        console.warn('[PublicReservations] Error cargando staff del negocio:', staffErr);
+        staff = [];
+      }
     }
 
     const hasStore = ((settings?.featureBuySell || settings?.featureRecipes) && settings?.featureShowCatalog !== false) ?? false;
@@ -1106,17 +1111,23 @@ export class PublicReservationsController {
 
     // Query active staff in tenant
     const accessRepo = this.tenantRepo.manager.getRepository(UserTenantAccess);
-    const allAccesses = await accessRepo.find({
-      where: { tenantId, isActive: true, status: 'ACCEPTED' },
-      relations: { user: true },
-    });
-    const staffList = allAccesses.filter(a => {
-      if (!a.user) return false;
-      const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
-        ? a.roles
-        : [a.role || a.user.role].filter(Boolean);
-      return !userRoles.every(r => r === UserRole.DELIVERY || r === UserRole.OPERATIVO);
-    });
+    let staffList: any[] = [];
+    try {
+      const allAccesses = await accessRepo.find({
+        where: { tenantId, isActive: true, status: 'ACCEPTED' },
+        relations: { user: true },
+      });
+      staffList = allAccesses.filter(a => {
+        if (!a.user) return false;
+        const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
+          ? a.roles
+          : [a.role || a.user.role].filter(Boolean);
+        return !userRoles.every(r => r === UserRole.DELIVERY || r === UserRole.OPERATIVO);
+      });
+    } catch (staffErr) {
+      console.warn('[PublicReservations] Error consultando staff en slots:', staffErr);
+      staffList = [];
+    }
 
     // Query products for service durations (match by ID and name)
     const productRepo = this.tenantRepo.manager.getRepository(Product);

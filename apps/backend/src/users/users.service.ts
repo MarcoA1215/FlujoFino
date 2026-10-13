@@ -22,6 +22,19 @@ export class UsersService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    try {
+      if (this.usersRepo.manager?.query) {
+        await this.usersRepo.manager.query(`
+          ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "salaryAmount" numeric(12,2);
+          ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "salaryPeriod" character varying;
+          ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "compensation_type" character varying DEFAULT 'FIJO';
+          ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "commission_percentage" numeric(5,2);
+        `);
+      }
+    } catch (err) {
+      console.warn('[UsersService] Auto-migration columns check:', err);
+    }
+
     // Create default accounts if no users exist
     const count = await this.usersRepo.count();
     if (count === 0) {
