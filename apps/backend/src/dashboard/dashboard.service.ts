@@ -171,7 +171,56 @@ export class DashboardService {
 
     const historicalRevenue = orderRevenue + reservationRevenue;
     
-    // Gastos de nómina
+    // Costo acumulado a nivel de items vendidos en órdenes activas
+    const orderItemCostRes = await this.orderItemRepo.createQueryBuilder('item')
+      .innerJoin('item.order', 'o')
+      .leftJoin('item.product', 'prod')
+      .select('COALESCE(SUM(item.quantity * CASE WHEN item.unitCost > 0 THEN item.unitCost WHEN prod.estimatedCost > 0 THEN prod.estimatedCost WHEN prod.cost > 0 THEN prod.cost ELSE 0 END), 0)', 'total')
+      .where('o.tenantId = :tenantId', { tenantId })
+      .andWhere('o.status IN (:...statuses)', { statuses: [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.DELIVERED] })
+      .getRawOne();
+    const orderItemCost = Number(orderItemCostRes?.total || 0);
+
+    const ordersCostRes = await this.orderRepo.createQueryBuilder('o')
+      .select('COALESCE(SUM(o.totalCost), 0)', 'total')
+      .where('o.tenantId = :tenantId', { tenantId })
+      .andWhere('o.status IN (:...statuses)', { statuses: [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.DELIVERED] })
+      .getRawOne();
+    const ordersCost = Number(ordersCostRes?.total || 0);
+
+    const finalOrderCost = Math.max(ordersCost, orderItemCost);
+
+    // Costo de citas completadas y pagadas sin orden POS
+    const standaloneReservations = await this.reservationRepo.createQueryBuilder('r')
+      .where('r.tenantId = :tenantId', { tenantId })
+      .andWhere('r.status = :status', { status: ReservationStatus.COMPLETED })
+      .andWhere('r.paymentStatus = :paymentStatus', { paymentStatus: PaymentStatus.PAID })
+      .andWhere('(r.orderId IS NULL OR r.orderId = :empty)', { empty: '' })
+      .select(['r.id', 'r.serviceId'])
+      .getMany();
+
+    let standaloneReservationCost = 0;
+    if (standaloneReservations.length > 0 && products.length > 0) {
+      const prodCostMap = new Map(products.map(p => [p.id, Number(p.estimatedCost || p.cost || 0)]));
+      for (const r of standaloneReservations) {
+        if (r.serviceId) {
+          const ids = r.serviceId.split(',').map(s => s.trim());
+          for (const id of ids) {
+            standaloneReservationCost += prodCostMap.get(id) || 0;
+          }
+        }
+      }
+    }
+
+    const totalCostOfSales = finalOrderCost + standaloneReservationCost;
+
+    // Gastos operativos generales y de nómina
+    const expRes = await this.expenseRepo.createQueryBuilder('e')
+      .select('COALESCE(SUM(e.amount), 0)', 'total')
+      .where('e.tenantId = :tenantId', { tenantId })
+      .getRawOne();
+    const totalOperatingExpenses = Number(expRes?.total || 0);
+
     const payRes = await this.expenseRepo.createQueryBuilder('e')
       .select('COALESCE(SUM(e.amount), 0)', 'total')
       .where('e.tenantId = :tenantId', { tenantId })
@@ -179,7 +228,7 @@ export class DashboardService {
       .getRawOne();
     const payrollExpenses = Number(payRes?.total || 0);
     
-    const reinvestmentExpense = historicalInvestment - totalInventoryCapital;
+    const reinvestmentExpense = Math.max(0, historicalInvestment - totalInventoryCapital);
 
     // Inversión y Reinversión manual consolidada
     const investments = await this.investmentRepo.find({ where: { negocioId: tenantId } });
@@ -197,7 +246,10 @@ export class DashboardService {
 
     const totalConsolidatedReinvestment = reinvestmentExpense + totalRegisteredReinvestment;
     const totalConsolidatedInvestment = totalExternalInvestment + totalConsolidatedReinvestment;
-    const historicalProfit = historicalRevenue - totalConsolidatedReinvestment - payrollExpenses;
+
+    // Descontar costo efectivo de ventas/servicios para calcular margen neto real
+    const effectiveProductionCost = Math.max(totalCostOfSales, reinvestmentExpense);
+    const historicalProfit = Number((historicalRevenue - effectiveProductionCost - totalRegisteredReinvestment - totalOperatingExpenses).toFixed(2));
 
     // Calcular ventas de los últimos 7 días únicamente
     const sevenDaysAgo = new Date();
