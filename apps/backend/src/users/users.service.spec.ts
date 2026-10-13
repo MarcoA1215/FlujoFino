@@ -295,7 +295,7 @@ describe('UsersService', () => {
 
       mockUsersRepo.manager.find.mockImplementation((entity: any) => {
         if (entity === Product) {
-          return Promise.resolve([{ id: 'prod-serv-1', salePrice: 30 }]);
+          return Promise.resolve([{ id: 'prod-serv-1', name: 'Corte y Lavado', salePrice: 30 }]);
         }
         return Promise.resolve([]); // Advances = []
       });

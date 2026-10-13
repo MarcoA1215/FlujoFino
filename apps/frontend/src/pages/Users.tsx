@@ -29,6 +29,7 @@ import {
   IonSegmentButton,
   IonToggle,
   IonCheckbox,
+  IonSpinner,
 } from '@ionic/react';
 import { refreshOutline, walletOutline, carOutline, peopleOutline, timeOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
@@ -303,8 +304,14 @@ const Users: React.FC = () => {
       if (res.data?.netPayableUSD !== undefined) {
         setPayAmount(String(res.data.netPayableUSD));
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error cargando liquidación de nómina', e);
+      const errMsg = e.response?.data?.message || 'Error al calcular la nómina';
+      presentToast({
+        message: Array.isArray(errMsg) ? errMsg.join(', ') : String(errMsg),
+        duration: 3500,
+        color: 'danger',
+      });
     } finally {
       setLoadingPayrollSummary(false);
     }
@@ -1534,8 +1541,25 @@ const Users: React.FC = () => {
               </div>
             </div>
 
+            {/* Loading Indicator */}
+            {loadingPayrollSummary && (
+              <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '20px', textAlign: 'center', marginBottom: '14px' }}>
+                <IonSpinner name="crescent" color="primary" />
+                <div style={{ marginTop: '8px', fontSize: '12px', color: '#64748B', fontWeight: 600 }}>
+                  Calculando liquidación y comisiones...
+                </div>
+              </div>
+            )}
+
+            {/* Error or Empty Fallback */}
+            {!loadingPayrollSummary && !payrollSummary && (
+              <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '14px', padding: '14px', textAlign: 'center', marginBottom: '14px', color: '#92400E', fontSize: '12px' }}>
+                ⚠️ No se pudo cargar el cálculo automático. Pulsa <strong>🔄 Recalcular</strong> para intentar de nuevo.
+              </div>
+            )}
+
             {/* Tarjeta de Resumen y Desglose Automático */}
-            {payrollSummary && (
+            {!loadingPayrollSummary && payrollSummary && (
               <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '16px', marginBottom: '14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
