@@ -808,7 +808,7 @@ const Orders: React.FC = () => {
                                   )}
                                 </div>
                                 <div style={{ fontSize: '13px', color: '#78350F', marginTop: '2px' }}>
-                                  Ref: <b>{order.pagoMovilRef || order.transferRef || order.binanceRef}</b> | Banco: {order.pagoMovilBank || order.transferBank || (order.binanceRef ? 'Binance' : 'Pago Móvil')} | Monto: {order.amountBs ? `Bs. ${Number(order.amountBs).toFixed(2)}` : `$${totalUsd.toFixed(2)}`}
+                                  Ref: <b>{order.pagoMovilRef || order.transferRef || order.binanceRef}</b> | Banco: {order.pagoMovilBank || order.transferBank || (order.binanceRef ? 'Binance' : 'Pago Móvil')} | Monto: {order.amountBs ? `Bs. ${Number(order.amountBs).toFixed(2)}${order.abonosTotal && Number(order.abonosTotal) > 0 && Number(order.abonosTotal) < totalUsd ? ` ($${Number(order.abonosTotal).toFixed(2)} abono)` : ''}` : `$${Number(order.abonosTotal || totalUsd).toFixed(2)}`}
                                 </div>
                                 <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                                   <button

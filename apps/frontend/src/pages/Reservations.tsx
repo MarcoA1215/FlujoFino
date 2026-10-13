@@ -996,7 +996,7 @@ const Reservations: React.FC = () => {
                               )}
                             </div>
                             <div style={{ fontSize: '12px', color: '#78350F', marginTop: '2px' }}>
-                              Total Cita: <b>${Number(res.totalAmount || 0).toFixed(2)}</b>
+                              Abono reportado: <b style={{ color: '#047857' }}>${Number(res.abonosTotal || res.totalAmount || 0).toFixed(2)}</b> (Total: ${Number(res.totalAmount || 0).toFixed(2)})
                               {res.paymentRejectedReason && (
                                 <div style={{ color: '#DC2626', fontWeight: '700', marginTop: '2px' }}>
                                   Motivo rechazo: {res.paymentRejectedReason}
@@ -1572,7 +1572,7 @@ const Reservations: React.FC = () => {
                         )}
                       </div>
                       <div style={{ fontSize: '12px', color: '#78350F', marginTop: '4px' }}>
-                        El cliente reportó un pago electrónico para esta cita. Confirma que los fondos hayan ingresado en tu cuenta bancaria.
+                        El cliente reportó un pago electrónico para esta cita: <b style={{ color: '#047857' }}>${Number(selectedEvent.abonosTotal || selectedEvent.totalAmount || 0).toFixed(2)}</b> (Total Cita: ${Number(selectedEvent.totalAmount || 0).toFixed(2)}). Confirma que los fondos hayan ingresado en tu cuenta bancaria.
                       </div>
                       {selectedEvent.paymentProofUrl && (
                         <div style={{ marginTop: '8px' }}>

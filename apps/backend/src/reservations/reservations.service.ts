@@ -869,7 +869,6 @@ export class ReservationsService {
     const res = await this.repo.findOne({ where: { id, tenantId } });
     if (!res) throw new NotFoundException('Cita no encontrada');
 
-    res.paymentStatus = PaymentStatus.PAID;
     res.paymentReported = false;
     res.paymentRejectedReason = null as any;
 
@@ -882,19 +881,32 @@ export class ReservationsService {
       });
     }
 
-    const total = Number(res.totalAmount || 0);
-    if (Number(res.abonosTotal || 0) < total) {
-      res.abonosTotal = total;
+    // Calcular abonos reales aprobados
+    const historySum = Array.isArray(res.abonosHistory)
+      ? res.abonosHistory.filter((e: any) => e.status === 'APPROVED').reduce((acc: number, e: any) => acc + (Number(e.amount) || 0), 0)
+      : 0;
+
+    if (historySum > 0) {
+      res.abonosTotal = historySum;
+    } else if (!res.abonosTotal || Number(res.abonosTotal) <= 0) {
+      res.abonosTotal = Number(res.totalAmount || 0);
     }
+
+    this.recalculatePaymentStatus(res);
 
     const savedRes = await this.repo.save(res);
     await this.syncLinkedOrder(tenantId, savedRes);
 
     // Notificación Push al cliente al aprobar pago
     try {
+      const isFull = savedRes.paymentStatus === PaymentStatus.PAID;
+      const abonosAmt = Number(savedRes.abonosTotal || 0);
+      const remainingAmt = Math.max(0, Number(savedRes.totalAmount || 0) - abonosAmt);
       await this.notificationsService.notifyCustomerAppointment(savedRes, {
-        title: '✅ ¡Pago Aprobado y Cita Confirmada!',
-        body: `Tu pago para la cita de "${savedRes.serviceName || 'Servicio'}" fue verificado exitosamente.`
+        title: isFull ? '✅ ¡Pago Aprobado y Cita Confirmada!' : '💵 ¡Abono Confirmado en Cuenta!',
+        body: isFull 
+          ? `Tu pago para la cita de "${savedRes.serviceName || 'Servicio'}" fue verificado exitosamente.`
+          : `Tu abono de $${abonosAmt.toFixed(2)} fue confirmado en cuenta. Saldo restante: $${remainingAmt.toFixed(2)}.`
       });
     } catch (err) {}
 
@@ -906,7 +918,6 @@ export class ReservationsService {
     if (!res) throw new NotFoundException('Cita no encontrada');
 
     const cleanReason = (reason || 'No cayó / Comprobante inválido').trim();
-    res.paymentStatus = PaymentStatus.PENDING;
     res.paymentReported = false;
     res.paymentRejectedReason = cleanReason;
 
@@ -917,7 +928,15 @@ export class ReservationsService {
         }
         return entry;
       });
+      const remainingApproved = res.abonosHistory
+        .filter((e: any) => e.status === 'APPROVED')
+        .reduce((sum: number, e: any) => sum + (Number(e.amount) || 0), 0);
+      res.abonosTotal = remainingApproved;
+    } else {
+      res.abonosTotal = 0;
     }
+
+    this.recalculatePaymentStatus(res);
 
     const noteTag = `[Comprobante rechazado: ${cleanReason}]`;
     res.notes = res.notes ? `${res.notes} | ${noteTag}` : noteTag;

@@ -1001,6 +1001,25 @@ export class OrdersService implements OnModuleInit {
       }
     }
 
+    // Auto-curación: Si una orden vinculada a cita quedó marcada erróneamente como PAID pero el abono confirmado es menor al total
+    if (
+      order.linkedReservationId &&
+      order.paymentStatus === PaymentStatus.PAID &&
+      Array.isArray(order.abonosHistory) &&
+      order.abonosHistory.length > 0
+    ) {
+      const historySum = order.abonosHistory
+        .filter((e: any) => e.status !== 'REJECTED')
+        .reduce((sum: number, e: any) => sum + (Number(e.amount) || 0), 0);
+      const total = Number(order.totalAmount || 0);
+      if (historySum > 0 && historySum < total && (!order.notes || !order.notes.includes('Pago USD:'))) {
+        order.abonosTotal = historySum;
+        order.paymentStatus = PaymentStatus.PARTIAL;
+        this.dataSource.getRepository(Order).update({ id: order.id }, { abonosTotal: historySum, paymentStatus: PaymentStatus.PARTIAL }).catch(() => {});
+        this.dataSource.getRepository(Reservation).update({ id: order.linkedReservationId }, { abonosTotal: historySum, paymentStatus: PaymentStatus.PARTIAL }).catch(() => {});
+      }
+    }
+
     if (order && order.employee) {
       const access = order.employee.tenantAccess?.find(a => a.tenantId === tenantId);
       if (access) {
@@ -1114,12 +1133,50 @@ export class OrdersService implements OnModuleInit {
     if (order.status === OrderStatus.CANCELED) throw new BadRequestException('El pedido está cancelado');
     const wasPaid = order.paymentStatus === PaymentStatus.PAID;
 
-    order.paymentStatus = PaymentStatus.PAID;
     order.paymentReported = false;
     order.paymentRejectedReason = null as any;
 
+    if (Array.isArray(order.abonosHistory)) {
+      order.abonosHistory = order.abonosHistory.map((e: any) => {
+        if (e.status === 'REPORTED' || e.status === 'REPORTED_PENDING_APPROVAL') {
+          return { ...e, status: 'APPROVED' };
+        }
+        return e;
+      });
+    }
+
+    // Calcular abonos aprobados reales
+    const historySum = Array.isArray(order.abonosHistory)
+      ? order.abonosHistory.filter((e: any) => e.status === 'APPROVED').reduce((acc: number, e: any) => acc + (Number(e.amount) || 0), 0)
+      : 0;
+
+    if (historySum > 0) {
+      order.abonosTotal = historySum;
+    } else if (order.splitPayments && order.splitPayments.length > 0) {
+      const splitSum = order.splitPayments.reduce((acc: number, sp: any) => acc + (Number(sp.amountUSD) || 0), 0);
+      if (splitSum > 0) order.abonosTotal = splitSum;
+    } else if (!order.abonosTotal || Number(order.abonosTotal) <= 0) {
+      order.abonosTotal = Number(order.totalAmount || 0);
+    }
+
+    const total = Math.round(Number(order.totalAmount || 0) * 100) / 100;
+    const abonos = Math.round(Number(order.abonosTotal || 0) * 100) / 100;
+    const remaining = Math.round((total - abonos) * 100) / 100;
+
+    if (total > 0) {
+      if (abonos <= 0) {
+        order.paymentStatus = PaymentStatus.PENDING;
+      } else if (remaining <= 0) {
+        order.paymentStatus = PaymentStatus.PAID;
+      } else {
+        order.paymentStatus = PaymentStatus.PARTIAL;
+      }
+    } else {
+      order.paymentStatus = PaymentStatus.PAID;
+    }
+
     const savedOrder = await orderRepo.save(order);
-    if (!wasPaid && savedOrder.customerId) {
+    if (!wasPaid && savedOrder.paymentStatus === PaymentStatus.PAID && savedOrder.customerId) {
       await this.customersService.incrementVisits(tenantId, savedOrder.customerId);
     }
 
@@ -1128,12 +1185,17 @@ export class OrdersService implements OnModuleInit {
         const resRepo = this.dataSource.getRepository(Reservation);
         const res = await resRepo.findOne({ where: { id: order.linkedReservationId, tenantId } });
         if (res) {
-          res.paymentStatus = PaymentStatus.PAID;
           res.paymentReported = false;
           res.paymentRejectedReason = null as any;
-          res.abonosTotal = order.totalAmount;
+          res.abonosTotal = savedOrder.abonosTotal;
+          res.paymentStatus = savedOrder.paymentStatus;
           if (Array.isArray(res.abonosHistory)) {
-            res.abonosHistory = res.abonosHistory.map(e => ({ ...e, status: 'APPROVED' }));
+            res.abonosHistory = res.abonosHistory.map(e => {
+              if (e.status === 'REPORTED' || e.status === 'REPORTED_PENDING_APPROVAL') {
+                return { ...e, status: 'APPROVED' };
+              }
+              return e;
+            });
           }
           await resRepo.save(res);
         }
@@ -1151,11 +1213,33 @@ export class OrdersService implements OnModuleInit {
     if (!order) throw new BadRequestException('Pedido no encontrado');
 
     const cleanReason = (reason || 'No cayó / Comprobante inválido').trim();
-    order.paymentStatus = PaymentStatus.PENDING;
     order.paymentReported = false;
     order.paymentRejectedReason = cleanReason;
     const noteTag = `[Comprobante rechazado: ${cleanReason}]`;
     order.notes = order.notes ? `${order.notes} | ${noteTag}` : noteTag;
+
+    if (Array.isArray(order.abonosHistory)) {
+      order.abonosHistory = order.abonosHistory.map((e: any) => {
+        if (e.status === 'REPORTED' || e.status === 'REPORTED_PENDING_APPROVAL') {
+          return { ...e, status: 'REJECTED', rejectReason: cleanReason };
+        }
+        return e;
+      });
+      const remainingApproved = order.abonosHistory
+        .filter((e: any) => e.status === 'APPROVED')
+        .reduce((sum: number, e: any) => sum + (Number(e.amount) || 0), 0);
+      order.abonosTotal = remainingApproved;
+      const total = Number(order.totalAmount || 0);
+      if (remainingApproved <= 0) {
+        order.paymentStatus = PaymentStatus.PENDING;
+      } else if (remainingApproved >= total) {
+        order.paymentStatus = PaymentStatus.PAID;
+      } else {
+        order.paymentStatus = PaymentStatus.PARTIAL;
+      }
+    } else {
+      order.paymentStatus = PaymentStatus.PENDING;
+    }
 
     const savedOrder = await orderRepo.save(order);
 
@@ -1164,13 +1248,19 @@ export class OrdersService implements OnModuleInit {
         const resRepo = this.dataSource.getRepository(Reservation);
         const res = await resRepo.findOne({ where: { id: order.linkedReservationId, tenantId } });
         if (res) {
-          res.paymentStatus = PaymentStatus.PENDING;
           res.paymentReported = false;
           res.paymentRejectedReason = cleanReason;
+          res.paymentStatus = savedOrder.paymentStatus;
+          res.abonosTotal = savedOrder.abonosTotal;
           const resTag = `[Comprobante rechazado: ${cleanReason}]`;
           res.notes = res.notes ? `${res.notes} | ${resTag}` : resTag;
           if (Array.isArray(res.abonosHistory)) {
-            res.abonosHistory = res.abonosHistory.map(e => ({ ...e, status: 'REJECTED', rejectReason: cleanReason }));
+            res.abonosHistory = res.abonosHistory.map(e => {
+              if (e.status === 'REPORTED' || e.status === 'REPORTED_PENDING_APPROVAL') {
+                return { ...e, status: 'REJECTED', rejectReason: cleanReason };
+              }
+              return e;
+            });
           }
           await resRepo.save(res);
         }
