@@ -977,7 +977,7 @@ const Reservations: React.FC = () => {
                         </div>
 
                         {/* TAREA 1: Pago Reportado Por Verificar en Cita */}
-                        {!isConfirmed && res.paymentStatus !== 'PAID' && (res.paymentReported || res.paymentProofUrl || (Array.isArray(res.abonosHistory) && res.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) && (
+                        {!isConfirmed && res.paymentStatus !== 'PAID' && (Boolean(res.paymentReported) || (Array.isArray(res.abonosHistory) && res.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) && (
                           <div
                             onClick={(e) => e.stopPropagation()}
                             style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', padding: '10px', marginBottom: '10px' }}
@@ -1556,7 +1556,7 @@ const Reservations: React.FC = () => {
                   </div>
 
                   {/* TAREA 1: Pago Reportado Por Verificar en Modal */}
-                  {selectedEvent.paymentStatus !== 'PAID' && (selectedEvent.paymentReported || selectedEvent.paymentProofUrl || (Array.isArray(selectedEvent.abonosHistory) && selectedEvent.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) && (
+                  {selectedEvent.paymentStatus !== 'PAID' && (Boolean(selectedEvent.paymentReported) || (Array.isArray(selectedEvent.abonosHistory) && selectedEvent.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) && (
                     <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '14px', padding: '14px', marginBottom: '16px' }}>
                       <div style={{ fontSize: '13px', fontWeight: '800', color: '#92400E', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>📱 PAGO REPORTADO POR VERIFICAR</span>

@@ -782,6 +782,11 @@ const Orders: React.FC = () => {
                                     <div style={{ width: `${Math.min(100, (abonosTotal / (totalUsd || 1)) * 100)}%`, height: '100%', background: '#10B981' }} />
                                   </div>
                                 )}
+                                {!order.paymentReported && (order.pagoMovilRef || order.transferRef || order.binanceRef) && (
+                                  <div style={{ marginTop: '4px', fontSize: '10px', color: '#64748B' }}>
+                                    Ref confirmada: <b>{order.pagoMovilRef || order.transferRef || order.binanceRef}</b> ({order.pagoMovilBank || order.transferBank || 'Pago Móvil'})
+                                  </div>
+                                )}
                               </div>
                             )}
                             {abonosTotal > totalUsd && (
@@ -792,7 +797,7 @@ const Orders: React.FC = () => {
                             )}
 
                             {/* TAREA 1: Pago Móvil / Electrónico Por Verificar */}
-                            {!isPaid && (order.paymentReported || order.pagoMovilRef || order.transferRef || order.binanceRef) && (
+                            {!isPaid && (Boolean(order.paymentReported) || (Array.isArray(order.abonosHistory) && order.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) && (
                               <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', padding: '10px', marginTop: '8px' }}>
                                 <div style={{ fontSize: '12px', fontWeight: '800', color: '#92400E', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <span>📱 PAGO REPORTADO POR VERIFICAR</span>
