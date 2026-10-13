@@ -1390,11 +1390,5 @@ export class ReservationsService {
     const slots = await this.calculateAvailableSlots(tenantId, date, serviceId, excludeReservationId, employeeId);
     return slots.includes(time.substring(0, 5));
   }
-
-  private minutesToTime(m: number): string {
-    const h = Math.floor(m / 60);
-    const min = m % 60;
-    return `${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00`;
-  }
 }
 

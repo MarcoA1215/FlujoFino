@@ -410,7 +410,7 @@ export class UsersService implements OnModuleInit {
       relations: { user: true },
     });
 
-    let userObj = access?.user;
+    let userObj: User | null | undefined = access?.user;
     if (!userObj) {
       userObj = await this.usersRepo.findOne({ where: { id: userId } });
     }
