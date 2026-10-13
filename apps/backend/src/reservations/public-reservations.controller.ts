@@ -541,19 +541,31 @@ export class PublicReservationsController {
       // Asegurar OrderItems solo si la orden no tenía items
       const existingItems = await orderItemRepo.count({ where: { orderId: savedOrder.id } });
       if (existingItems === 0 && finalReservation.serviceId) {
+        let itemsSum = 0;
         const sIds = finalReservation.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
         for (const sId of sIds) {
           const prod = await productRepo.findOne({ where: { id: sId } });
           if (prod) {
+            const price = Number(prod.salePrice || 0);
+            itemsSum += price;
             const item = orderItemRepo.create({
               orderId: savedOrder.id,
               productId: prod.id,
               productName: prod.name,
               quantity: 1,
-              unitPrice: Number(prod.salePrice || 0),
-              subtotal: Number(prod.salePrice || 0),
+              unitPrice: price,
+              subtotal: price,
             });
             await orderItemRepo.save(item);
+          }
+        }
+        if (Number(savedOrder.totalAmount || 0) <= 0 && itemsSum > 0) {
+          savedOrder.totalAmount = itemsSum;
+          await orderRepo.save(savedOrder);
+          if (Number(finalReservation.totalAmount || 0) <= 0) {
+            finalReservation.totalAmount = itemsSum;
+            const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
+            await reservationRepo.save(finalReservation);
           }
         }
       }

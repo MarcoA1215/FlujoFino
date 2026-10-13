@@ -80,6 +80,27 @@ export class ReservationsService {
         order.abonosHistory = reservation.abonosHistory;
       }
 
+      // Sincronizar y auto-curar totalAmount si es 0
+      if (Number(order.totalAmount || 0) <= 0) {
+        if (Number(reservation.totalAmount || 0) > 0) {
+          order.totalAmount = Number(reservation.totalAmount);
+        } else {
+          const orderItemRepo = manager.getRepository(OrderItem);
+          const items = await orderItemRepo.find({ where: { orderId: order.id } });
+          const itemsSum = items.reduce((sum, it) => sum + (Number(it.subtotal) || (Number(it.unitPrice || 0) * Number(it.quantity || 1))), 0);
+          if (itemsSum > 0) {
+            order.totalAmount = itemsSum;
+            if (Number(reservation.totalAmount || 0) <= 0) {
+              reservation.totalAmount = itemsSum;
+              await manager.save(Reservation, reservation);
+            }
+          }
+        }
+      } else if (Number(reservation.totalAmount || 0) <= 0 && Number(order.totalAmount || 0) > 0) {
+        reservation.totalAmount = Number(order.totalAmount);
+        await manager.save(Reservation, reservation);
+      }
+
       if (reservation.employeeId) {
         order.employeeId = reservation.employeeId;
       }
@@ -148,21 +169,34 @@ export class ReservationsService {
       reservation.orderId = savedOrder.id;
       await manager.save(Reservation, reservation);
 
+      let itemsTotal = 0;
       if (reservation.serviceId) {
         const sIds = reservation.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
         for (const sId of sIds) {
           const prod: any = await productRepo.findOne({ where: { id: sId } });
           if (prod) {
+            const price = Number(prod.salePrice || 0);
+            itemsTotal += price;
             const item = orderItemRepo.create({
               orderId: savedOrder.id,
               productId: prod.id,
               productName: prod.name,
               quantity: 1,
-              unitPrice: Number(prod.salePrice || 0),
-              subtotal: Number(prod.salePrice || 0),
+              unitPrice: price,
+              subtotal: price,
             });
             await orderItemRepo.save(item);
           }
+        }
+      }
+
+      // Si el totalAmount de la orden o reserva quedó en 0 y los items tienen precio, auto-corregir
+      if (Number(savedOrder.totalAmount || 0) <= 0 && itemsTotal > 0) {
+        savedOrder.totalAmount = itemsTotal;
+        await orderRepo.save(savedOrder);
+        if (Number(reservation.totalAmount || 0) <= 0) {
+          reservation.totalAmount = itemsTotal;
+          await manager.save(Reservation, reservation);
         }
       }
 
@@ -532,6 +566,22 @@ export class ReservationsService {
           }
         } catch (err) {
           console.error('Customer sync error in ReservationsService.create:', err);
+        }
+      }
+
+      // Auto-calcular totalAmount si no vino o es 0 y hay servicios seleccionados
+      if ((!reservation.totalAmount || Number(reservation.totalAmount) <= 0) && reservation.serviceId) {
+        const productRepo = manager.getRepository(Product);
+        const sIds = reservation.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
+        let calculatedTotal = 0;
+        for (const sId of sIds) {
+          const p = await productRepo.findOne({ where: { id: sId } });
+          if (p && p.salePrice) {
+            calculatedTotal += Number(p.salePrice || 0);
+          }
+        }
+        if (calculatedTotal > 0) {
+          reservation.totalAmount = calculatedTotal;
         }
       }
 

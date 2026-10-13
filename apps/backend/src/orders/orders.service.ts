@@ -983,6 +983,24 @@ export class OrdersService implements OnModuleInit {
   }
 
   private mapOrderEmployee(order: Order, tenantId: string): Order {
+    if (!order) return order;
+
+    // Auto-curación: Si la orden tiene totalAmount en 0 pero sus items tienen importe > 0, corregir totalAmount
+    if (Number(order.totalAmount || 0) <= 0 && Array.isArray(order.items) && order.items.length > 0) {
+      const itemsSum = order.items.reduce(
+        (sum, it) => sum + (Number(it.subtotal) || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
+        0
+      );
+      if (itemsSum > 0) {
+        order.totalAmount = itemsSum;
+        // Persistir en base de datos en segundo plano
+        this.dataSource.getRepository(Order).update({ id: order.id }, { totalAmount: itemsSum }).catch(() => {});
+        if (order.linkedReservationId) {
+          this.dataSource.getRepository(Reservation).update({ id: order.linkedReservationId }, { totalAmount: itemsSum }).catch(() => {});
+        }
+      }
+    }
+
     if (order && order.employee) {
       const access = order.employee.tenantAccess?.find(a => a.tenantId === tenantId);
       if (access) {

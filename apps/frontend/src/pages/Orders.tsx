@@ -488,8 +488,9 @@ const Orders: React.FC = () => {
               })();
 
               const orderItems = Array.isArray(order.items) ? order.items : [];
+              const itemsSum = orderItems.reduce((acc: number, it: any) => acc + (Number(it.subtotal) || (Number(it.unitPrice || 0) * Number(it.quantity || 1))), 0);
               const orderRate = Number(order.exchangeRate) > 0 ? Number(order.exchangeRate) : (Number(exchangeRate) || 40);
-              const totalUsd = Number(order.totalAmount || 0);
+              const totalUsd = Number(order.totalAmount || 0) > 0 ? Number(order.totalAmount) : itemsSum;
               const orderAmountLocal = (order.amountBs !== undefined && order.amountBs !== null && Number(order.amountBs) > 0)
                 ? Number(order.amountBs)
                 : Number((totalUsd * orderRate).toFixed(2));
@@ -574,11 +575,25 @@ const Orders: React.FC = () => {
                           🗓️ Cita Agendada
                         </span>
                       )}
-                      {order.requestedDeliveryDate && (
-                        <span style={{ fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: '#FEF3C7', color: '#92400E', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          📅 Requerido: {new Date(order.requestedDeliveryDate).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
-                        </span>
-                      )}
+                      {order.requestedDeliveryDate && (() => {
+                        const isPast = new Date(order.requestedDeliveryDate).getTime() < Date.now();
+                        return (
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            background: isPast && !isPaid ? '#FEE2E2' : '#FEF3C7',
+                            color: isPast && !isPaid ? '#991B1B' : '#92400E',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            border: isPast && !isPaid ? '1px solid #FECACA' : 'none'
+                          }}>
+                            {isPast && !isPaid ? '⏰ Cita Cumplida:' : '📅 Requerido:'} {new Date(order.requestedDeliveryDate).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
+                          </span>
+                        );
+                      })()}
                       {order.tableNumber && (
                         <span style={{ fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: '#F1F5F9', color: '#0F172A' }}>
                           Mesa {order.tableNumber}
@@ -1022,7 +1037,12 @@ const Orders: React.FC = () => {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
-              {selectedOrderForDetails && (
+              {selectedOrderForDetails && (() => {
+                const detailsItems = Array.isArray(selectedOrderForDetails.items) ? selectedOrderForDetails.items : [];
+                const detailsItemsSum = detailsItems.reduce((acc: number, it: any) => acc + (Number(it.subtotal) || (Number(it.unitPrice || 0) * Number(it.quantity || 1))), 0);
+                const detailsTotal = Number(selectedOrderForDetails.totalAmount || 0) > 0 ? Number(selectedOrderForDetails.totalAmount) : detailsItemsSum;
+
+                return (
                 <div style={{ padding: '20px' }}>
                   <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
                     <div style={{ fontSize: '16px', fontWeight: '800', color: '#0F172A', marginBottom: '4px' }}>
@@ -1150,7 +1170,7 @@ const Orders: React.FC = () => {
                     {!isKitchen && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', paddingTop: '8px', borderTop: '2px dashed #E2E8F0', fontWeight: '800', fontSize: '16px', color: '#10B981' }}>
                         <span>Total Final:</span>
-                        <span>${Number(selectedOrderForDetails.totalAmount || 0).toFixed(2)}</span>
+                        <span>${detailsTotal.toFixed(2)}</span>
                       </div>
                     )}
                   </div>
@@ -1202,7 +1222,7 @@ const Orders: React.FC = () => {
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <span style={{ fontSize: '13px', color: '#166534', fontWeight: '700' }}>💵 Efectivo Recibido:</span>
                             <span style={{ fontSize: '16px', fontWeight: '900', color: '#15803D' }}>
-                              ${Number(selectedOrderForDetails.usdReceived || selectedOrderForDetails.totalAmount).toFixed(2)} USD
+                              ${Number(selectedOrderForDetails.usdReceived || detailsTotal).toFixed(2)} USD
                             </span>
                           </div>
 
@@ -1256,7 +1276,7 @@ const Orders: React.FC = () => {
                             <div style={{ gridColumn: 'span 2' }}>
                               <span style={{ color: '#6D28D9', display: 'block', fontSize: '11px', fontWeight: '600' }}>Monto Cobrado</span>
                               <span style={{ fontWeight: '900', color: '#4C1D95', fontSize: '14px' }}>
-                                {formatLocalAmount(Number(selectedOrderForDetails.amountBs || (selectedOrderForDetails.totalAmount * (selectedOrderForDetails.exchangeRate || exchangeRate))))}
+                                {formatLocalAmount(Number(selectedOrderForDetails.amountBs || (detailsTotal * (selectedOrderForDetails.exchangeRate || exchangeRate))))}
                               </span>
                             </div>
                             {selectedOrderForDetails.pagoMovilPhone && (
@@ -1284,7 +1304,7 @@ const Orders: React.FC = () => {
                             <div style={{ gridColumn: 'span 2' }}>
                               <span style={{ color: '#1D4ED8', display: 'block', fontSize: '11px', fontWeight: '600' }}>Monto Cobrado</span>
                               <span style={{ fontWeight: '900', color: '#1E3A8A', fontSize: '14px' }}>
-                                {formatLocalAmount(Number(selectedOrderForDetails.amountBs || (selectedOrderForDetails.totalAmount * (selectedOrderForDetails.exchangeRate || exchangeRate))))}
+                                {formatLocalAmount(Number(selectedOrderForDetails.amountBs || (detailsTotal * (selectedOrderForDetails.exchangeRate || exchangeRate))))}
                               </span>
                             </div>
                           </div>
@@ -1316,12 +1336,12 @@ const Orders: React.FC = () => {
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingTop: '4px', borderTop: '1px dashed #FCD34D' }}>
                             <span style={{ color: '#92400E', fontWeight: '700' }}>
-                              {Number(selectedOrderForDetails.abonosTotal || 0) > Number(selectedOrderForDetails.totalAmount) ? 'Saldo a Favor del Cliente:' : 'Saldo Pendiente:'}
+                              {Number(selectedOrderForDetails.abonosTotal || 0) > detailsTotal ? 'Saldo a Favor del Cliente:' : 'Saldo Pendiente:'}
                             </span>
-                            <span style={{ fontWeight: '900', color: Number(selectedOrderForDetails.abonosTotal || 0) > Number(selectedOrderForDetails.totalAmount) ? '#059669' : '#D97706' }}>
-                              {Number(selectedOrderForDetails.abonosTotal || 0) > Number(selectedOrderForDetails.totalAmount)
-                                ? `+$${(Number(selectedOrderForDetails.abonosTotal) - Number(selectedOrderForDetails.totalAmount)).toFixed(2)} USD`
-                                : `$${Math.max(0, Number(selectedOrderForDetails.totalAmount) - Number(selectedOrderForDetails.abonosTotal || 0)).toFixed(2)} USD`
+                            <span style={{ fontWeight: '900', color: Number(selectedOrderForDetails.abonosTotal || 0) > detailsTotal ? '#059669' : '#D97706' }}>
+                              {Number(selectedOrderForDetails.abonosTotal || 0) > detailsTotal
+                                ? `+$${(Number(selectedOrderForDetails.abonosTotal) - detailsTotal).toFixed(2)} USD`
+                                : `$${Math.max(0, detailsTotal - Number(selectedOrderForDetails.abonosTotal || 0)).toFixed(2)} USD`
                               }
                             </span>
                           </div>
@@ -1537,7 +1557,8 @@ const Orders: React.FC = () => {
                     )}
                   </div>
                 </div>
-              )}
+              );
+            })()}
             </div>
           </div>
         </IonModal>
@@ -1545,7 +1566,9 @@ const Orders: React.FC = () => {
         {/* Abono Modal */}
         <IonModal isOpen={!!selectedOrderForAbono} onDidDismiss={() => setSelectedOrderForAbono(null)} style={{ '--border-radius': '20px' } as any}>
           {selectedOrderForAbono && (() => {
-            const total = Number(selectedOrderForAbono.totalAmount || 0);
+            const abonoItems = Array.isArray(selectedOrderForAbono.items) ? selectedOrderForAbono.items : [];
+            const abonoItemsSum = abonoItems.reduce((acc: number, it: any) => acc + (Number(it.subtotal) || (Number(it.unitPrice || 0) * Number(it.quantity || 1))), 0);
+            const total = Number(selectedOrderForAbono.totalAmount || 0) > 0 ? Number(selectedOrderForAbono.totalAmount) : abonoItemsSum;
             const yaAbonado = Number(selectedOrderForAbono.abonosTotal || 0);
             const restante = Math.max(0, total - yaAbonado);
             const effectiveOrderRate = Number(selectedOrderForAbono.exchangeRate) > 0 ? Number(selectedOrderForAbono.exchangeRate) : (Number(exchangeRate) || 40);
@@ -1796,7 +1819,9 @@ const Orders: React.FC = () => {
         {/* TAREA 3: Modal Limpio de Cobro Directo (Reemplaza alertas anidadas de Ionic) */}
         <IonModal isOpen={!!selectedOrderForCobro} onDidDismiss={() => setSelectedOrderForCobro(null)} style={{ '--border-radius': '20px' } as any}>
           {selectedOrderForCobro && (() => {
-            const total = Number(selectedOrderForCobro.totalAmount || 0);
+            const cobroItems = Array.isArray(selectedOrderForCobro.items) ? selectedOrderForCobro.items : [];
+            const cobroItemsSum = cobroItems.reduce((acc: number, it: any) => acc + (Number(it.subtotal) || (Number(it.unitPrice || 0) * Number(it.quantity || 1))), 0);
+            const total = Number(selectedOrderForCobro.totalAmount || 0) > 0 ? Number(selectedOrderForCobro.totalAmount) : cobroItemsSum;
             const yaAbonado = Number(selectedOrderForCobro.abonosTotal || 0);
             const restante = Math.max(0, total - yaAbonado);
             const effectiveOrderRate = Number(selectedOrderForCobro.exchangeRate) > 0 ? Number(selectedOrderForCobro.exchangeRate) : (Number(exchangeRate) || 40);
