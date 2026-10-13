@@ -11,7 +11,7 @@ import { Reservation } from '../entities/reservation.entity';
 import { Order } from '../entities/order.entity';
 import { Product } from '../entities/product.entity';
 import { OrderItem } from '../entities/order-item.entity';
-import { UserRole, ReservationStatus, OrderStatus, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
+import { UserRole, ReservationStatus, OrderStatus, PaymentStatus, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 
@@ -595,11 +595,57 @@ export class UsersService implements OnModuleInit {
 
     const servicesTotalBilled = reservations.reduce((sum, r) => sum + Number(r.totalAmount || 0), 0);
     const ordersTotalBilled = standaloneOrders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
-    const totalBilled = Number((servicesTotalBilled + ordersTotalBilled).toFixed(2));
 
+    // Determinar cobros efectivos y montos pendientes por cobrar
+    let totalPaidBilled = 0;
+    let totalPendingBilled = 0;
+
+    const processedReservations = reservations.map(r => {
+      const amt = Number(r.totalAmount || 0);
+      const isPaid = r.paymentStatus === PaymentStatus.PAID || (!r.paymentStatus && r.status === ReservationStatus.COMPLETED);
+      const abono = Number(r.abonosTotal || 0);
+      const paid = isPaid ? amt : (r.paymentStatus === PaymentStatus.PARTIAL && abono > 0 ? Math.min(amt, abono) : 0);
+      const pending = Math.max(0, amt - paid);
+      totalPaidBilled += paid;
+      totalPendingBilled += pending;
+      return {
+        ...r,
+        calcPaid: paid,
+        calcPending: pending,
+        isPaidEffective: isPaid,
+        calcPaymentStatus: isPaid ? 'PAID' : (paid > 0 ? 'PARTIAL' : 'PENDING'),
+      };
+    });
+
+    const processedOrders = standaloneOrders.map(o => {
+      const amt = Number(o.totalAmount || 0);
+      const isPaid = o.paymentStatus === PaymentStatus.PAID || (!o.paymentStatus && o.status === OrderStatus.DELIVERED);
+      const abono = Number(o.abonosTotal || 0);
+      const paid = isPaid ? amt : (o.paymentStatus === PaymentStatus.PARTIAL && abono > 0 ? Math.min(amt, abono) : 0);
+      const pending = Math.max(0, amt - paid);
+      totalPaidBilled += paid;
+      totalPendingBilled += pending;
+      return {
+        ...o,
+        calcPaid: paid,
+        calcPending: pending,
+        isPaidEffective: isPaid,
+        calcPaymentStatus: isPaid ? 'PAID' : (paid > 0 ? 'PARTIAL' : 'PENDING'),
+      };
+    });
+
+    totalPaidBilled = Number(totalPaidBilled.toFixed(2));
+    totalPendingBilled = Number(totalPendingBilled.toFixed(2));
+    const totalBilled = Number((totalPaidBilled + totalPendingBilled).toFixed(2));
+
+    // Comisión liquidable a pagar: SOLO sobre trabajos cobrados
     let commissionEarned = 0;
+    // Comisión por cobrar: trabajos completados pero aún no pagados por el cliente
+    let pendingCommission = 0;
+
     if (compensationType === 'COMISION' || compensationType === 'MIXTO') {
-      commissionEarned = Number(((totalBilled * (commissionPercentage || 0)) / 100).toFixed(2));
+      commissionEarned = Number(((totalPaidBilled * (commissionPercentage || 0)) / 100).toFixed(2));
+      pendingCommission = Number(((totalPendingBilled * (commissionPercentage || 0)) / 100).toFixed(2));
     }
 
     let baseSalary = 0;
@@ -626,7 +672,7 @@ export class UsersService implements OnModuleInit {
     const netPayableUSD = Math.max(0, Number((grossTotal - advancesDeduction).toFixed(2)));
 
     const workItems = [
-      ...reservations.map(r => ({
+      ...processedReservations.map(r => ({
         type: 'RESERVATION' as const,
         id: r.id,
         date: r.date,
@@ -634,8 +680,13 @@ export class UsersService implements OnModuleInit {
         client: r.customerName || 'Cliente',
         description: r.serviceName || 'Servicio realizado',
         amount: Number(r.totalAmount || 0),
+        paidAmount: r.calcPaid,
+        pendingAmount: r.calcPending,
+        isPaid: r.isPaidEffective,
+        paymentStatus: r.calcPaymentStatus,
+        commissionAmount: Number(((r.calcPaid * (commissionPercentage || 0)) / 100).toFixed(2)),
       })),
-      ...standaloneOrders.map(o => ({
+      ...processedOrders.map(o => ({
         type: 'ORDER' as const,
         id: o.id,
         date: o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '',
@@ -643,6 +694,11 @@ export class UsersService implements OnModuleInit {
         client: o.customerName || 'Cliente',
         description: `Pedido #${o.id.substring(0, 6)}`,
         amount: Number(o.totalAmount || 0),
+        paidAmount: o.calcPaid,
+        pendingAmount: o.calcPending,
+        isPaid: o.isPaidEffective,
+        paymentStatus: o.calcPaymentStatus,
+        commissionAmount: Number(((o.calcPaid * (commissionPercentage || 0)) / 100).toFixed(2)),
       })),
     ].sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
 
@@ -661,7 +717,10 @@ export class UsersService implements OnModuleInit {
       ordersCount: standaloneOrders.length,
       ordersTotalBilled: Number(ordersTotalBilled.toFixed(2)),
       totalBilled,
+      totalPaidBilled,
+      totalPendingBilled,
       commissionEarned,
+      pendingCommission,
       baseSalary,
       grossTotal,
       pendingAdvancesTotalUSD,

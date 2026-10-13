@@ -1,5 +1,5 @@
 import { UsersService } from './users.service';
-import { UserRole, ReservationStatus, OrderStatus } from '@finowork/shared-types';
+import { UserRole, ReservationStatus, OrderStatus, PaymentStatus } from '@finowork/shared-types';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Reservation } from '../entities/reservation.entity';
 import { Order } from '../entities/order.entity';
@@ -315,6 +315,70 @@ describe('UsersService', () => {
         { id: 'res-healed' },
         { totalAmount: 30 }
       );
+    });
+
+    it('debe calcular comisiones a pagar SOLO sobre trabajos cobrados y colocar los pendientes en pendingCommission', async () => {
+      const mockAccess = {
+        userId: 'emp-5',
+        tenantId: 'tenant-1',
+        compensationType: 'COMISION',
+        commissionPercentage: 50, // 50%
+        user: { id: 'emp-5', username: 'carla', name: 'Carla Manicurista' },
+      };
+
+      const mockReservations = [
+        {
+          id: 'res-paid',
+          date: '2026-10-13',
+          time: '09:00',
+          customerName: 'Cliente Pagado',
+          serviceName: 'Uñas Acrílicas',
+          totalAmount: 40,
+          status: ReservationStatus.COMPLETED,
+          paymentStatus: PaymentStatus.PAID,
+        },
+        {
+          id: 'res-pending',
+          date: '2026-10-13',
+          time: '11:00',
+          customerName: 'Cliente Debe',
+          serviceName: 'Pedicure Spa',
+          totalAmount: 30,
+          status: ReservationStatus.COMPLETED,
+          paymentStatus: PaymentStatus.PENDING, // Cliente aún no paga
+        },
+      ];
+
+      mockUsersRepo.manager.findOne.mockResolvedValue(mockAccess);
+      mockUsersRepo.manager.createQueryBuilder.mockImplementation((entity: any) => {
+        if (entity === Reservation) {
+          return {
+            where: jest.fn().mockReturnThis(),
+            andWhere: jest.fn().mockReturnThis(),
+            orderBy: jest.fn().mockReturnThis(),
+            addOrderBy: jest.fn().mockReturnThis(),
+            getMany: jest.fn().mockResolvedValue(mockReservations),
+          };
+        }
+        return {
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          orderBy: jest.fn().mockReturnThis(),
+          getMany: jest.fn().mockResolvedValue([]),
+        };
+      });
+      mockUsersRepo.manager.find.mockResolvedValue([]); // Sin vales
+
+      const summary = await service.getPayrollSummary('tenant-1', 'emp-5');
+
+      expect(summary.totalBilled).toBe(70);
+      expect(summary.totalPaidBilled).toBe(40);
+      expect(summary.totalPendingBilled).toBe(30);
+      // Solo debe ganar 50% de 40 = 20 USD a liquidar
+      expect(summary.commissionEarned).toBe(20);
+      // Los 50% de 30 = 15 USD quedan como comisión por cobrar
+      expect(summary.pendingCommission).toBe(15);
+      expect(summary.netPayableUSD).toBe(20);
     });
   });
 

@@ -1587,17 +1587,28 @@ const Users: React.FC = () => {
                       {payrollSummary.servicesCount + (payrollSummary.ordersCount || 0)}
                     </div>
                     <div style={{ fontSize: '10px', color: '#64748B' }}>
-                      ${payrollSummary.totalBilled} facturados
-                      {(payrollSummary.servicesCount > 0 && (payrollSummary.ordersCount || 0) > 0) && (
-                        <span> ({payrollSummary.servicesCount} citas, {payrollSummary.ordersCount} ventas)</span>
+                      ${payrollSummary.totalPaidBilled ?? payrollSummary.totalBilled} cobrados
+                      {Number(payrollSummary.totalPendingBilled || 0) > 0 && (
+                        <span style={{ color: '#D97706', display: 'block', fontWeight: 600 }}>
+                          (${payrollSummary.totalPendingBilled} pendientes)
+                        </span>
                       )}
                     </div>
                   </div>
 
                   {(payrollSummary.compensationType === 'COMISION' || payrollSummary.compensationType === 'MIXTO') && (
                     <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '10px', padding: '10px' }}>
-                      <div style={{ fontSize: '11px', color: '#065F46', fontWeight: 600 }}>Comisión ({payrollSummary.commissionPercentage}%)</div>
+                      <div style={{ fontSize: '11px', color: '#065F46', fontWeight: 600 }}>Comisión Cobrada ({payrollSummary.commissionPercentage}%)</div>
                       <div style={{ fontSize: '16px', fontWeight: 800, color: '#059669' }}>+${payrollSummary.commissionEarned} USD</div>
+                      <div style={{ fontSize: '10px', color: '#047857' }}>A liquidar en nómina</div>
+                    </div>
+                  )}
+
+                  {((payrollSummary.compensationType === 'COMISION' || payrollSummary.compensationType === 'MIXTO') && Number(payrollSummary.pendingCommission || 0) > 0) && (
+                    <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px', padding: '10px' }}>
+                      <div style={{ fontSize: '11px', color: '#B45309', fontWeight: 600 }}>Comisión por Cobrar</div>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#D97706' }}>+${payrollSummary.pendingCommission} USD</div>
+                      <div style={{ fontSize: '10px', color: '#B45309' }}>Clientes aún no pagan</div>
                     </div>
                   )}
 
@@ -1609,7 +1620,7 @@ const Users: React.FC = () => {
                   )}
 
                   <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px' }}>
-                    <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Total Bruto Ganado</div>
+                    <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Total Bruto a Liquidar</div>
                     <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>${payrollSummary.grossTotal} USD</div>
                   </div>
 
@@ -1626,7 +1637,7 @@ const Users: React.FC = () => {
                   <div>
                     <div style={{ fontSize: '12px', fontWeight: 700, color: '#065F46' }}>Neto a Pagar Calculado</div>
                     <div style={{ fontSize: '10px', color: '#047857' }}>
-                      {deductAdvances ? 'Incluye deducción automática de vales' : 'Sin descontar vales'}
+                      {deductAdvances ? 'Incluye deducción automática de vales' : 'Sin descontar vales'} (Solo ventas cobradas)
                     </div>
                   </div>
                   <div style={{ fontSize: '20px', fontWeight: 900, color: '#065F46' }}>
@@ -1647,21 +1658,50 @@ const Users: React.FC = () => {
                     </IonButton>
 
                     {showWorkDetails && (
-                      <div style={{ marginTop: '8px', maxHeight: '180px', overflowY: 'auto', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '6px' }}>
+                      <div style={{ marginTop: '8px', maxHeight: '200px', overflowY: 'auto', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '6px' }}>
                         {payrollSummary.workItems.map((item: any) => (
                           <div
                             key={item.id}
                             style={{
                               display: 'flex',
                               justifyContent: 'space-between',
+                              alignItems: 'center',
                               fontSize: '11px',
-                              padding: '5px 8px',
+                              padding: '6px 8px',
                               borderBottom: '1px solid #F1F5F9',
                               color: '#334155',
                             }}
                           >
-                            <span><strong>{item.date}</strong> - {item.client} ({item.description})</span>
-                            <span style={{ fontWeight: 700, color: '#0F172A' }}>${Number(item.amount).toFixed(2)}</span>
+                            <div>
+                              <div>
+                                <strong>{item.date}</strong> - {item.client} ({item.description})
+                              </div>
+                              <div style={{ marginTop: '2px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                {item.isPaid ? (
+                                  <span style={{ background: '#ECFDF5', color: '#065F46', padding: '1px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: 700 }}>
+                                    ✓ Cobrado
+                                  </span>
+                                ) : item.paymentStatus === 'PARTIAL' ? (
+                                  <span style={{ background: '#FFFBEB', color: '#B45309', padding: '1px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: 700 }}>
+                                    ⏳ Abono: ${Number(item.paidAmount || 0).toFixed(2)}
+                                  </span>
+                                ) : (
+                                  <span style={{ background: '#FEF2F2', color: '#DC2626', padding: '1px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: 700 }}>
+                                    ⏳ Por cobrar
+                                  </span>
+                                )}
+                                {(payrollSummary.compensationType === 'COMISION' || payrollSummary.compensationType === 'MIXTO') && (
+                                  <span style={{ fontSize: '10px', color: item.isPaid ? '#059669' : '#D97706', fontWeight: 600 }}>
+                                    Comisión: ${Number(item.commissionAmount || 0).toFixed(2)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontWeight: 800, color: '#0F172A', fontSize: '12px' }}>
+                                ${Number(item.amount).toFixed(2)}
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
