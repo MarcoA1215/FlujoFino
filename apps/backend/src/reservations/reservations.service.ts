@@ -30,103 +30,105 @@ export class ReservationsService {
       if (!manager?.getRepository) return;
       const orderRepo = manager.getRepository(Order);
       
-      const order = await orderRepo.findOne({
+      const orders = await orderRepo.find({
         where: [
           ...(reservation.orderId ? [{ id: reservation.orderId, tenantId }] : []),
           { linkedReservationId: reservation.id, tenantId }
         ]
       });
 
-      if (!order) return;
+      if (!orders || orders.length === 0) return;
 
-      // Sincronizar fecha/hora requerida y notas
-      if (reservation.date) {
-        const timePart = reservation.time ? (reservation.time.length <= 5 ? `${reservation.time}:00` : reservation.time) : '12:00:00';
-        const parsedD = new Date(`${reservation.date}T${timePart}`);
-        if (!isNaN(parsedD.getTime())) {
-          order.requestedDeliveryDate = parsedD;
+      for (const order of orders) {
+        // Sincronizar fecha/hora requerida y notas
+        if (reservation.date) {
+          const timePart = reservation.time ? (reservation.time.length <= 5 ? `${reservation.time}:00` : reservation.time) : '12:00:00';
+          const parsedD = new Date(`${reservation.date}T${timePart}`);
+          if (!isNaN(parsedD.getTime())) {
+            order.requestedDeliveryDate = parsedD;
+          }
+          const timeShort = reservation.time ? reservation.time.substring(0, 5) : '';
+          const prefix = `[Cita: ${reservation.date} ${timeShort}]`;
+          if (order.notes && order.notes.includes('[Cita:')) {
+            order.notes = order.notes.replace(/\[Cita:[^\]]*\]/, prefix);
+          } else if (order.notes) {
+            order.notes = `${prefix} ${order.notes}`;
+          } else {
+            order.notes = prefix;
+          }
         }
-        const timeShort = reservation.time ? reservation.time.substring(0, 5) : '';
-        const prefix = `[Cita: ${reservation.date} ${timeShort}]`;
-        if (order.notes && order.notes.includes('[Cita:')) {
-          order.notes = order.notes.replace(/\[Cita:[^\]]*\]/, prefix);
-        } else if (order.notes) {
-          order.notes = `${prefix} ${order.notes}`;
-        } else {
-          order.notes = prefix;
+
+        // Sincronizar estados de cita hacia orden
+        if (reservation.status === ReservationStatus.CANCELED) {
+          order.status = OrderStatus.CANCELED;
+        } else if (reservation.status === ReservationStatus.COMPLETED) {
+          order.status = OrderStatus.DELIVERED;
         }
-      }
 
-      // Sincronizar estados de cita hacia orden
-      if (reservation.status === ReservationStatus.CANCELED) {
-        order.status = OrderStatus.CANCELED;
-      } else if (reservation.status === ReservationStatus.COMPLETED) {
-        order.status = OrderStatus.DELIVERED;
-      }
+        // Sincronizar finanzas
+        if (reservation.paymentStatus) {
+          order.paymentStatus = reservation.paymentStatus;
+        }
+        order.paymentReported = Boolean(reservation.paymentReported);
+        order.paymentRejectedReason = reservation.paymentRejectedReason || null as any;
+        if (reservation.paymentProofUrl) {
+          order.paymentProofUrl = reservation.paymentProofUrl;
+        }
+        if (reservation.abonosTotal !== undefined && reservation.abonosTotal !== null) {
+          order.abonosTotal = Number(reservation.abonosTotal);
+        }
+        if (Array.isArray(reservation.abonosHistory)) {
+          order.abonosHistory = reservation.abonosHistory;
+        }
 
-      // Sincronizar finanzas
-      if (reservation.paymentStatus) {
-        order.paymentStatus = reservation.paymentStatus;
-      }
-      order.paymentReported = Boolean(reservation.paymentReported);
-      order.paymentRejectedReason = reservation.paymentRejectedReason || null as any;
-      if (reservation.paymentProofUrl) {
-        order.paymentProofUrl = reservation.paymentProofUrl;
-      }
-      if (reservation.abonosTotal !== undefined && reservation.abonosTotal !== null) {
-        order.abonosTotal = Number(reservation.abonosTotal);
-      }
-      if (Array.isArray(reservation.abonosHistory)) {
-        order.abonosHistory = reservation.abonosHistory;
-      }
-
-      // Sincronizar y auto-curar totalAmount si es 0
-      if (Number(order.totalAmount || 0) <= 0) {
-        if (Number(reservation.totalAmount || 0) > 0) {
-          order.totalAmount = Number(reservation.totalAmount);
-        } else {
-          const orderItemRepo = manager.getRepository(OrderItem);
-          const items = await orderItemRepo.find({ where: { orderId: order.id } });
-          let itemsSum = items.reduce((sum, it) => sum + (Number(it.subtotal) || (Number(it.unitPrice || 0) * Number(it.quantity || 1))), 0);
-          if (itemsSum <= 0 && (reservation.serviceId || reservation.serviceName)) {
-            const productRepo = manager.getRepository(Product);
-            if (reservation.serviceId) {
-              const sIds = reservation.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
-              for (const sId of sIds) {
-                const p = await productRepo.findOne({ where: { id: sId } });
-                if (p?.salePrice) itemsSum += Number(p.salePrice);
+        // Sincronizar y auto-curar totalAmount si es 0
+        if (Number(order.totalAmount || 0) <= 0) {
+          if (Number(reservation.totalAmount || 0) > 0) {
+            order.totalAmount = Number(reservation.totalAmount);
+          } else {
+            const orderItemRepo = manager.getRepository(OrderItem);
+            const items = await orderItemRepo.find({ where: { orderId: order.id } });
+            let itemsSum = items.reduce((sum, it) => sum + (Number(it.subtotal) || (Number(it.unitPrice || 0) * Number(it.quantity || 1))), 0);
+            if (itemsSum <= 0 && (reservation.serviceId || reservation.serviceName)) {
+              const productRepo = manager.getRepository(Product);
+              if (reservation.serviceId) {
+                const sIds = reservation.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
+                for (const sId of sIds) {
+                  const p = await productRepo.findOne({ where: { id: sId } });
+                  if (p?.salePrice) itemsSum += Number(p.salePrice);
+                }
+              }
+              if (itemsSum <= 0 && reservation.serviceName) {
+                const names = reservation.serviceName.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+                const prods = await productRepo.find({ where: { tenantId } });
+                itemsSum = prods.filter(p => names.includes(p.name?.trim().toLowerCase())).reduce((sum, p) => sum + Number(p.salePrice || 0), 0);
               }
             }
-            if (itemsSum <= 0 && reservation.serviceName) {
-              const names = reservation.serviceName.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
-              const prods = await productRepo.find({ where: { tenantId } });
-              itemsSum = prods.filter(p => names.includes(p.name?.trim().toLowerCase())).reduce((sum, p) => sum + Number(p.salePrice || 0), 0);
+            if (itemsSum > 0) {
+              order.totalAmount = itemsSum;
+              if (Number(reservation.totalAmount || 0) <= 0) {
+                reservation.totalAmount = itemsSum;
+                await manager.save(Reservation, reservation);
+              }
             }
           }
-          if (itemsSum > 0) {
-            order.totalAmount = itemsSum;
-            if (Number(reservation.totalAmount || 0) <= 0) {
-              reservation.totalAmount = itemsSum;
-              await manager.save(Reservation, reservation);
-            }
-          }
+        } else if (Number(reservation.totalAmount || 0) <= 0 && Number(order.totalAmount || 0) > 0) {
+          reservation.totalAmount = Number(order.totalAmount);
+          await manager.save(Reservation, reservation);
         }
-      } else if (Number(reservation.totalAmount || 0) <= 0 && Number(order.totalAmount || 0) > 0) {
-        reservation.totalAmount = Number(order.totalAmount);
-        await manager.save(Reservation, reservation);
-      }
 
-      if (reservation.employeeId && !order.employeeId) {
-        order.employeeId = reservation.employeeId;
-      } else if (!reservation.employeeId && order.employeeId) {
-        reservation.employeeId = order.employeeId;
-        await manager.save(Reservation, reservation);
-      }
-      if (reservation.tableNumber) {
-        order.tableNumber = reservation.tableNumber;
-      }
+        if (reservation.employeeId && !order.employeeId) {
+          order.employeeId = reservation.employeeId;
+        } else if (!reservation.employeeId && order.employeeId) {
+          reservation.employeeId = order.employeeId;
+          await manager.save(Reservation, reservation);
+        }
+        if (reservation.tableNumber) {
+          order.tableNumber = reservation.tableNumber;
+        }
 
-      await orderRepo.save(order);
+        await orderRepo.save(order);
+      }
     } catch (err) {
       console.error('Error sincronizando Order vinculada a Reservation:', err);
     }
@@ -799,18 +801,39 @@ export class ReservationsService {
     const reservation = await this.repo.findOne({ where: { id, tenantId } });
     if (!reservation) throw new BadRequestException('Reservación no encontrada');
 
-    // Sincronizar cancelación en la orden vinculada para no dejar tickets huérfanos
+    // Sincronizar cancelación en TODAS las órdenes vinculadas para no dejar tickets huérfanos o duplicados
     try {
       const orderRepo = this.repo.manager.getRepository(Order);
-      const linkedOrder = await orderRepo.findOne({
+      const linkedOrders = await orderRepo.find({
         where: [
           ...(reservation.orderId ? [{ id: reservation.orderId, tenantId }] : []),
           { linkedReservationId: reservation.id, tenantId }
         ]
       });
-      if (linkedOrder && linkedOrder.status !== OrderStatus.CANCELED) {
-        linkedOrder.status = OrderStatus.CANCELED;
-        await orderRepo.save(linkedOrder);
+      for (const linkedOrder of linkedOrders) {
+        if (linkedOrder.status !== OrderStatus.CANCELED) {
+          linkedOrder.status = OrderStatus.CANCELED;
+          await orderRepo.save(linkedOrder);
+        }
+      }
+
+      // Además, si hubo órdenes huérfanas creadas por doble toque para el mismo cliente en el mismo lapso
+      if (reservation.customerName && reservation.customerName.trim()) {
+        const resTime = new Date(reservation.createdAt).getTime();
+        const potentialDuplicates = await orderRepo.createQueryBuilder('o')
+          .where('o.tenantId = :tenantId', { tenantId })
+          .andWhere('o.status != :canceled', { canceled: OrderStatus.CANCELED })
+          .andWhere('LOWER(TRIM(o.customerName)) = LOWER(TRIM(:customerName))', { customerName: reservation.customerName })
+          .andWhere('o.createdAt >= :minCreated', { minCreated: new Date(resTime - 1000 * 60 * 60 * 4) })
+          .andWhere('o.createdAt <= :maxCreated', { maxCreated: new Date(resTime + 1000 * 60 * 60 * 4) })
+          .getMany();
+
+        for (const dup of potentialDuplicates) {
+          if (!dup.linkedReservationId || dup.linkedReservationId === reservation.id) {
+            dup.status = OrderStatus.CANCELED;
+            await orderRepo.save(dup);
+          }
+        }
       }
     } catch (err) {
       console.error('Error sincronizando Order al eliminar Cita:', err);

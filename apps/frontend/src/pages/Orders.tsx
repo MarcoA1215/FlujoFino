@@ -18,7 +18,8 @@ import {
   cashOutline,
   bicycleOutline,
   storefrontOutline,
-  cartOutline
+  cartOutline,
+  trashOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { OrderStatus, PaymentStatus, DeliveryMethod, UserRole } from '@finowork/shared-types';
@@ -1524,13 +1525,16 @@ const Orders: React.FC = () => {
                           </div>
                         )}
 
-                        {selectedOrderForDetails.status !== OrderStatus.DELIVERED && selectedOrderForDetails.status !== OrderStatus.CANCELED && (
+                        {selectedOrderForDetails.status !== OrderStatus.CANCELED && (
                           <button
                             type="button"
                             onClick={() => {
+                              const isDelivered = selectedOrderForDetails.status === OrderStatus.DELIVERED;
                               presentAlert({
                                 header: 'Confirmar Cancelación',
-                                message: '¿Estás seguro de cancelar este pedido? Se liberarán los productos reservados.',
+                                message: isDelivered 
+                                  ? 'Este pedido figura como entregado. Al cancelarlo se anulará su venta en el Dashboard y se desvinculará cualquier cita asociada. ¿Deseas anularlo?'
+                                  : '¿Estás seguro de cancelar este pedido? Se liberarán los productos reservados.',
                                 buttons: [
                                   { text: 'Volver', role: 'cancel' },
                                   {
@@ -1558,6 +1562,51 @@ const Orders: React.FC = () => {
                             Cancelar Pedido
                           </button>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            presentAlert({
+                              header: 'Eliminar Registro',
+                              message: `¿Estás seguro de eliminar el pedido #${(selectedOrderForDetails.orderNumber || selectedOrderForDetails.id.slice(0, 8)).toUpperCase()} definitivamente? Se borrará por completo de la base de datos.`,
+                              buttons: [
+                                { text: 'Volver', role: 'cancel' },
+                                {
+                                  text: 'Eliminar',
+                                  role: 'destructive',
+                                  handler: async () => {
+                                    try {
+                                      await apiClient.delete(`/orders/${selectedOrderForDetails.id}`);
+                                      setSelectedOrderForDetails(null);
+                                      fetchOrders();
+                                      presentToast({ message: 'Pedido eliminado de la base de datos', duration: 2500, color: 'success' });
+                                    } catch (err: any) {
+                                      const msg = err.response?.data?.message || 'Error al eliminar pedido';
+                                      presentToast({ message: msg, duration: 3000, color: 'danger' });
+                                    }
+                                  }
+                                }
+                              ]
+                            });
+                          }}
+                          style={{
+                            padding: '11px',
+                            borderRadius: '12px',
+                            border: '1px solid #e2e8f0',
+                            background: '#ffffff',
+                            color: '#64748b',
+                            fontWeight: '700',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <IonIcon icon={trashOutline} style={{ fontSize: '15px', color: '#ef4444' }} />
+                          <span>Eliminar de Base de Datos</span>
+                        </button>
                       </>
                     )}
                   </div>

@@ -25,6 +25,11 @@ export class OrdersController {
     return this.ordersService.revertAbono(req.user.tenantId, id, index);
   }
 
+  @Delete(':id')
+  deleteOrder(@Request() req: any, @Param('id') id: string) {
+    return this.ordersService.deleteOrder(req.user.tenantId, id);
+  }
+
   constructor(
     private readonly ordersService: OrdersService,
     private readonly storageService: StorageService

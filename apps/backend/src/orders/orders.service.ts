@@ -2679,5 +2679,41 @@ export class OrdersService implements OnModuleInit {
     });
     return updated!;
   }
+
+  async deleteOrder(tenantId: string, id: string) {
+    const orderRepo = this.dataSource.getRepository(Order);
+    const orderItemRepo = this.dataSource.getRepository(OrderItem);
+    const resRepo = this.dataSource.getRepository(Reservation);
+
+    const order = await orderRepo.findOne({ where: { tenantId, id } });
+    if (!order) throw new BadRequestException('Pedido no encontrado');
+
+    // Desvincular o cancelar reserva asociada si existe
+    if (order.linkedReservationId) {
+      try {
+        const res = await resRepo.findOne({ where: { tenantId, id: order.linkedReservationId } });
+        if (res) {
+          if (res.orderId === order.id) {
+            res.orderId = null as any;
+          }
+          if (res.status !== ReservationStatus.CANCELED && res.status !== ReservationStatus.COMPLETED) {
+            res.status = ReservationStatus.CANCELED;
+          }
+          await resRepo.save(res);
+        }
+      } catch (err) {
+        console.error('Error desvinculando reserva al eliminar orden:', err);
+      }
+    }
+
+    // Eliminar items de la orden
+    await orderItemRepo.delete({ orderId: id });
+
+    // Eliminar la orden
+    await orderRepo.remove(order);
+
+    return { success: true, message: 'Pedido eliminado exitosamente' };
+  }
 }
+
 
