@@ -136,6 +136,11 @@ const PublicBooking: React.FC = () => {
   const bookingDepositPct = Number(tenantInfo?.bookingDepositPercentage ?? tenantInfo?.minDepositPercentage ?? 0);
   const isDepositEnabled = Boolean(tenantInfo?.bookingRequireDeposit ?? (bookingDepositPct > 0));
   const minDepositPercentage = isDepositEnabled ? bookingDepositPct : 0;
+  const minDepositAmount = (bookingPaymentOption === 'DEPOSIT' && minDepositPercentage > 0)
+    ? Math.round((totalServicePrice * (minDepositPercentage / 100)) * 100) / 100
+    : 0;
+  const parsedBookingPaymentAmount = parseFloat(bookingPaymentAmount);
+  const isPaymentBelowMin = minDepositAmount > 0 && !isNaN(parsedBookingPaymentAmount) && parsedBookingPaymentAmount < minDepositAmount;
 
   const [paymentProofUrl, setPaymentProofUrl] = useState<string>('');
   const [uploadingProof, setUploadingProof] = useState<boolean>(false);
@@ -150,7 +155,12 @@ const PublicBooking: React.FC = () => {
 
   const copyAllPagoMovil = () => {
     if (!tenantInfo) return;
-    const payAmtNum = parseFloat(bookingPaymentAmount) || 0;
+    let payAmtNum = parseFloat(bookingPaymentAmount) || 0;
+    if (minDepositAmount > 0 && payAmtNum < minDepositAmount) {
+      payAmtNum = minDepositAmount;
+      setBookingPaymentAmount(minDepositAmount.toString());
+      presentToast({ message: `Se ajustó el monto al abono mínimo requerido ($${minDepositAmount.toFixed(2)})`, duration: 2500, color: 'warning' });
+    }
     const amountBs = payAmtNum > 0 ? (Math.round(payAmtNum * rateBs * 100) / 100).toFixed(2) : '';
     const lines = [
       tenantInfo.bankInfo ? `Banco: ${tenantInfo.bankInfo}` : '',
@@ -364,8 +374,9 @@ const PublicBooking: React.FC = () => {
         if (minDepositPercentage > 0) {
           const minReq = Math.round((totalServicePrice * (minDepositPercentage / 100)) * 100) / 100;
           if (payNum < minReq) {
+            setBookingPaymentAmount(minReq.toString());
             presentToast({ 
-              message: `El abono mínimo requerido es de $${minReq.toFixed(2)} (${minDepositPercentage}%)`, 
+              message: `El abono no puede ser inferior a la seña mínima requerida de $${minReq.toFixed(2)} (${minDepositPercentage}%). Se ajustó al monto mínimo.`, 
               duration: 3500, 
               color: 'warning' 
             });
@@ -2029,13 +2040,26 @@ const PublicBooking: React.FC = () => {
                           {/* Amount to report */}
                           <div>
                             <IonLabel style={{ fontWeight: 'bold', fontSize: '12px', color: '#334155', display: 'block', marginBottom: '4px' }}>
-                              Monto a pagar (USD): <span style={{ color: '#64748b', fontWeight: 'normal' }}>(Máx: ${totalServicePrice.toFixed(2)})</span>
+                              Monto a pagar (USD):{' '}
+                              {minDepositAmount > 0 ? (
+                                <span style={{ color: '#047857', fontWeight: '700' }}>(Mín: ${minDepositAmount.toFixed(2)} — Máx: ${totalServicePrice.toFixed(2)})</span>
+                              ) : (
+                                <span style={{ color: '#64748b', fontWeight: 'normal' }}>(Máx: ${totalServicePrice.toFixed(2)})</span>
+                              )}
                             </IonLabel>
-                            <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', backgroundColor: '#ffffff' }}>
+                            <IonItem 
+                              lines="none" 
+                              style={{ 
+                                border: isPaymentBelowMin ? '1.5px solid #EF4444' : '1px solid #cbd5e1', 
+                                borderRadius: '8px', 
+                                backgroundColor: '#ffffff' 
+                              }}
+                            >
                               <IonInput 
                                 type="number"
                                 max={totalServicePrice}
-                                min={0}
+                                min={minDepositAmount > 0 ? minDepositAmount : 0}
+                                step="0.01"
                                 value={bookingPaymentAmount}
                                 disabled={bookingPaymentOption === 'FULL'}
                                 onIonInput={e => {
@@ -2048,10 +2072,28 @@ const PublicBooking: React.FC = () => {
                                     setBookingPaymentAmount(val);
                                   }
                                 }}
-                                placeholder="0.00"
+                                onIonBlur={() => {
+                                  if (minDepositAmount > 0) {
+                                    const num = parseFloat(bookingPaymentAmount);
+                                    if (isNaN(num) || num < minDepositAmount) {
+                                      setBookingPaymentAmount(minDepositAmount.toString());
+                                      presentToast({ 
+                                        message: `El monto mínimo requerido es de $${minDepositAmount.toFixed(2)} (${minDepositPercentage}%). Se ajustó automáticamente.`, 
+                                        duration: 3500, 
+                                        color: 'warning' 
+                                      });
+                                    }
+                                  }
+                                }}
+                                placeholder={minDepositAmount > 0 ? minDepositAmount.toFixed(2) : "0.00"}
                               />
                             </IonItem>
-                            {parseFloat(bookingPaymentAmount) > 0 && (
+                            {isPaymentBelowMin && (
+                              <div style={{ marginTop: '5px', fontSize: '11px', color: '#DC2626', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                ⚠️ No se permite un monto menor al calculado: la seña mínima es ${minDepositAmount.toFixed(2)}. Solo se admiten montos iguales o mayores.
+                              </div>
+                            )}
+                            {parseFloat(bookingPaymentAmount) > 0 && !isPaymentBelowMin && (
                               <div style={{ marginTop: '4px', fontSize: '12px', color: '#059669', fontWeight: 600 }}>
                                 Equivalente: <strong>Bs. {(Math.round((parseFloat(bookingPaymentAmount) || 0) * rateBs * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
                               </div>
@@ -2114,7 +2156,40 @@ const PublicBooking: React.FC = () => {
                                   </IonButton>
                                 </div>
                               )}
-                              {parseFloat(bookingPaymentAmount) > 0 && (
+                              {isPaymentBelowMin ? (
+                                <div style={{ 
+                                  marginTop: '10px', 
+                                  padding: '10px 12px', 
+                                  backgroundColor: '#fef2f2', 
+                                  border: '1.5px solid #ef4444', 
+                                  borderRadius: '8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '8px'
+                                }}>
+                                  <div style={{ fontSize: '12px', color: '#991b1b', fontWeight: 600 }}>
+                                    ⚠️ El monto ingresado (${parseFloat(bookingPaymentAmount).toFixed(2)}) es menor a la seña mínima (${minDepositAmount.toFixed(2)}).
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setBookingPaymentAmount(minDepositAmount.toString())}
+                                    style={{
+                                      padding: '6px 12px',
+                                      backgroundColor: '#ef4444',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '11px',
+                                      fontWeight: '700',
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    Ajustar a ${minDepositAmount.toFixed(2)}
+                                  </button>
+                                </div>
+                              ) : (parseFloat(bookingPaymentAmount) > 0 && (
                                 <div style={{ 
                                   marginTop: '10px', 
                                   padding: '10px 12px', 
@@ -2155,7 +2230,7 @@ const PublicBooking: React.FC = () => {
                                     Copiar Bs
                                   </button>
                                 </div>
-                              )}
+                              ))}
                             </div>
                           )}
 
@@ -2172,7 +2247,40 @@ const PublicBooking: React.FC = () => {
                                   </IonButton>
                                 </div>
                               )}
-                              {parseFloat(bookingPaymentAmount) > 0 && (
+                              {isPaymentBelowMin ? (
+                                <div style={{ 
+                                  marginTop: '10px', 
+                                  padding: '10px 12px', 
+                                  backgroundColor: '#fef2f2', 
+                                  border: '1.5px solid #ef4444', 
+                                  borderRadius: '8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '8px'
+                                }}>
+                                  <div style={{ fontSize: '12px', color: '#991b1b', fontWeight: 600 }}>
+                                    ⚠️ El monto ingresado (${parseFloat(bookingPaymentAmount).toFixed(2)}) es menor a la seña mínima (${minDepositAmount.toFixed(2)}).
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setBookingPaymentAmount(minDepositAmount.toString())}
+                                    style={{
+                                      padding: '6px 12px',
+                                      backgroundColor: '#ef4444',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '11px',
+                                      fontWeight: '700',
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    Ajustar a ${minDepositAmount.toFixed(2)}
+                                  </button>
+                                </div>
+                              ) : (parseFloat(bookingPaymentAmount) > 0 && (
                                 <div style={{ 
                                   marginTop: '10px', 
                                   padding: '10px 12px', 
@@ -2212,7 +2320,7 @@ const PublicBooking: React.FC = () => {
                                     Copiar Bs
                                   </button>
                                 </div>
-                              )}
+                              ))}
                             </div>
                           )}
 
@@ -2234,7 +2342,40 @@ const PublicBooking: React.FC = () => {
                                   </IonButton>
                                 </div>
                               )}
-                              {parseFloat(bookingPaymentAmount) > 0 && (
+                              {isPaymentBelowMin ? (
+                                <div style={{ 
+                                  marginTop: '10px', 
+                                  padding: '10px 12px', 
+                                  backgroundColor: '#fef2f2', 
+                                  border: '1.5px solid #ef4444', 
+                                  borderRadius: '8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '8px'
+                                }}>
+                                  <div style={{ fontSize: '12px', color: '#991b1b', fontWeight: 600 }}>
+                                    ⚠️ El monto ingresado (${parseFloat(bookingPaymentAmount).toFixed(2)}) es menor a la seña mínima (${minDepositAmount.toFixed(2)}).
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setBookingPaymentAmount(minDepositAmount.toString())}
+                                    style={{
+                                      padding: '6px 12px',
+                                      backgroundColor: '#ef4444',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '11px',
+                                      fontWeight: '700',
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    Ajustar a ${minDepositAmount.toFixed(2)}
+                                  </button>
+                                </div>
+                              ) : (parseFloat(bookingPaymentAmount) > 0 && (
                                 <div style={{ 
                                   marginTop: '10px', 
                                   padding: '10px 12px', 
@@ -2273,7 +2414,7 @@ const PublicBooking: React.FC = () => {
                                     Copiar USDT
                                   </button>
                                 </div>
-                              )}
+                              ))}
                             </div>
                           )}
                         </div>
