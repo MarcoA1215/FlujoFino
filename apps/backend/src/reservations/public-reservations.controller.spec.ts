@@ -305,4 +305,52 @@ describe('PublicReservationsController Suite', () => {
       expect(result.id).toBe('res-existente-1');
     });
   });
+
+  describe('Disponibilidad de Horarios (calculateAvailableSlots fallback)', () => {
+    it('debe retornar horarios disponibles incluso si el negocio no ha configurado businessHours (fallback 08:00 a 18:00)', async () => {
+      const tenantId = '00000000-0000-0000-0000-000000000001';
+      jest.spyOn(tenantCrypto, 'decodeTenantId').mockReturnValue(tenantId);
+
+      mockSettingsRepo.findOne.mockResolvedValueOnce({
+        slotInterval: 60,
+        businessHours: null, // Sin configuración de horario
+      });
+
+      mockReservationRepo.createQueryBuilder.mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      });
+
+      const slots = await controller.getAvailability('token-valido', '2026-10-14', '');
+      expect(slots).toBeInstanceOf(Array);
+      expect(slots.length).toBeGreaterThan(0);
+      expect(slots).toContain('08:00');
+      expect(slots).toContain('12:00');
+      expect(slots).toContain('17:00');
+    });
+
+    it('debe retornar horarios para solo-business si no hay staff registrado o asignado', async () => {
+      const tenantId = '00000000-0000-0000-0000-000000000001';
+      jest.spyOn(tenantCrypto, 'decodeTenantId').mockReturnValue(tenantId);
+
+      mockSettingsRepo.findOne.mockResolvedValueOnce({
+        slotInterval: 30,
+        businessHours: {
+          '3': { isOpen: true, startTime: '09:00', endTime: '12:00' },
+        },
+      });
+
+      mockAccessRepo.find.mockResolvedValueOnce([]); // 0 staff accounts
+      mockReservationRepo.createQueryBuilder.mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      });
+
+      const slots = await controller.getAvailability('token-valido', '2026-10-14', '');
+      expect(slots).toBeInstanceOf(Array);
+      expect(slots).toEqual(['09:00', '09:30', '10:00', '10:30', '11:00', '11:30']);
+    });
+  });
 });

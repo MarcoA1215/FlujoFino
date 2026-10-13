@@ -1130,28 +1130,37 @@ export class ReservationsService {
     const settingsRepo = this.repo.manager.getRepository(Settings);
     const settings = await settingsRepo.findOne({ where: { tenantId } });
 
-    const bHours = settings?.businessHours || {};
+    const hasConfiguredHours = settings?.businessHours && Object.keys(settings.businessHours).length > 0;
+    const bHours = hasConfiguredHours ? settings.businessHours : {};
     const d = new Date(date + 'T12:00:00Z');
     const dayOfWeek = d.getUTCDay().toString();
-    const dayConfig = bHours[dayOfWeek];
+    let dayConfig = bHours[dayOfWeek];
 
-    if (!dayConfig || !dayConfig.isOpen) return [];
+    if (!hasConfiguredHours) {
+      // Default fallback when business hasn't configured custom hours yet:
+      // Open all days from 08:00 to 18:00
+      dayConfig = { isOpen: true, startTime: '08:00', endTime: '18:00' };
+    } else if (!dayConfig || !dayConfig.isOpen) {
+      return [];
+    }
 
     const interval = Number(settings?.slotInterval) || 30;
 
     const shifts: { start: number; end: number }[] = [];
     const [sh, sm] = (dayConfig.startTime || '08:00').split(':').map(Number);
     const [eh, em] = (dayConfig.endTime || '18:00').split(':').map(Number);
-    shifts.push({ start: sh * 60 + sm, end: eh * 60 + em });
+    shifts.push({ start: (sh || 8) * 60 + (sm || 0), end: (eh || 18) * 60 + (em || 0) });
 
     if (dayConfig.hasSecondShift && dayConfig.secondStartTime && dayConfig.secondEndTime) {
       const [s2h, s2m] = dayConfig.secondStartTime.split(':').map(Number);
       const [e2h, e2m] = dayConfig.secondEndTime.split(':').map(Number);
-      shifts.push({ start: s2h * 60 + s2m, end: e2h * 60 + e2m });
+      shifts.push({ start: (s2h || 0) * 60 + (s2m || 0), end: (e2h || 0) * 60 + (e2m || 0) });
     }
 
-    const toMins = (t: string) => {
+    const toMins = (t?: string | null) => {
+      if (!t || typeof t !== 'string' || !t.includes(':')) return null;
       const [h, m] = t.split(':').map(Number);
+      if (isNaN(h) || isNaN(m)) return null;
       return h * 60 + m;
     };
 
@@ -1196,36 +1205,45 @@ export class ReservationsService {
     if (serviceId) {
       const requestedServices = serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean);
       const requiredStaffIdSets = requestedServices
-        .map(s => (s as any)?.assignedStaffIds || [])
+        .map(s => {
+          const raw = (s as any)?.assignedStaffIds;
+          if (Array.isArray(raw)) return raw;
+          if (typeof raw === 'string' && raw.trim()) return raw.split(',').map((x: string) => x.trim()).filter(Boolean);
+          return [];
+        })
         .filter(arr => Array.isArray(arr) && arr.length > 0);
 
       if (requiredStaffIdSets.length > 0) {
-        candidateStaff = candidateStaff.filter(st =>
-          requiredStaffIdSets.every(set => set.includes(st.userId))
+        const filtered = candidateStaff.filter(st =>
+          requiredStaffIdSets.every(set =>
+            set.includes(st.userId) || set.includes(st.id) || set.includes(st.user?.id)
+          )
         );
+        if (filtered.length > 0) {
+          candidateStaff = filtered;
+        }
       }
     }
 
     if (employeeId) {
-      candidateStaff = candidateStaff.filter(s => s.userId === employeeId);
-      if (candidateStaff.length === 0) {
+      const empFiltered = candidateStaff.filter(s => s.userId === employeeId || s.id === employeeId || s.user?.id === employeeId);
+      if (empFiltered.length > 0) {
+        candidateStaff = empFiltered;
+      } else {
         const single = await accessRepo.findOne({
           where: { userId: employeeId, tenantId, isActive: true, status: 'ACCEPTED' },
+          relations: { user: true },
         });
         if (single) {
-          if (serviceId) {
-            const requestedServices = serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean);
-            const requiredStaffIdSets = requestedServices
-              .map(s => (s as any)?.assignedStaffIds || [])
-              .filter(arr => Array.isArray(arr) && arr.length > 0);
-            if (requiredStaffIdSets.length === 0 || requiredStaffIdSets.every(set => set.includes(employeeId))) {
-              candidateStaff = [single];
-            }
-          } else {
-            candidateStaff = [single];
-          }
+          candidateStaff = [single];
+        } else {
+          candidateStaff = [];
         }
       }
+    }
+
+    if (employeeId && candidateStaff.length === 0) {
+      return [];
     }
 
     // Fetch existing reservations
@@ -1290,7 +1308,7 @@ export class ReservationsService {
     const [nowH, nowM] = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date()).split(':').map(Number);
     const currentRealMins = (nowH || 0) * 60 + (nowM || 0);
 
-    const isSoloBusiness = staffList.length === 0;
+    const isSoloBusiness = staffList.length === 0 || candidateStaff.length === 0;
 
     for (const shift of shifts) {
       let currentMins = shift.start;
@@ -1314,24 +1332,26 @@ export class ReservationsService {
         } else if (employeeId) {
           const emp = candidateStaff[0];
           if (emp) {
-            if (emp.entryTime && currentMins < toMins(emp.entryTime)) {
+            const empEntry = toMins(emp.entryTime);
+            if (empEntry !== null && currentMins < empEntry) {
               currentMins += interval;
               continue;
             }
-            if (emp.exitTime && slotEnd > toMins(emp.exitTime)) {
+            const empExit = toMins(emp.exitTime);
+            if (empExit !== null && slotEnd > empExit) {
               currentMins += interval;
               continue;
             }
             if (emp.lunchStart && emp.lunchEnd) {
               const lStart = toMins(emp.lunchStart);
               const lEnd = toMins(emp.lunchEnd);
-              if (currentMins < lEnd && slotEnd > lStart) {
+              if (lStart !== null && lEnd !== null && currentMins < lEnd && slotEnd > lStart) {
                 currentMins += interval;
                 continue;
               }
             }
             const empDirectOverlap = busyBookings.some(
-              b => b.employeeId === emp.userId && currentMins < b.end && slotEnd > b.start
+              b => (b.employeeId === emp.userId || b.employeeId === emp.id || b.employeeId === emp.user?.id) && currentMins < b.end && slotEnd > b.start
             );
             if (!empDirectOverlap) {
               const unassignedCount = busyBookings.filter(
@@ -1339,10 +1359,14 @@ export class ReservationsService {
               ).length;
               if (unassignedCount > 0) {
                 const totalFreeWorkingStaff = staffList.filter(s => {
-                  if (s.entryTime && currentMins < toMins(s.entryTime)) return false;
-                  if (s.exitTime && slotEnd > toMins(s.exitTime)) return false;
-                  if (s.lunchStart && s.lunchEnd && currentMins < toMins(s.lunchEnd) && slotEnd > toMins(s.lunchStart)) return false;
-                  return !busyBookings.some(b => b.employeeId === s.userId && currentMins < b.end && slotEnd > b.start);
+                  const sEntry = toMins(s.entryTime);
+                  if (sEntry !== null && currentMins < sEntry) return false;
+                  const sExit = toMins(s.exitTime);
+                  if (sExit !== null && slotEnd > sExit) return false;
+                  const sLStart = toMins(s.lunchStart);
+                  const sLEnd = toMins(s.lunchEnd);
+                  if (sLStart !== null && sLEnd !== null && currentMins < sLEnd && slotEnd > sLStart) return false;
+                  return !busyBookings.some(b => (b.employeeId === s.userId || b.employeeId === s.id || b.employeeId === s.user?.id) && currentMins < b.end && slotEnd > b.start);
                 }).length;
 
                 if (totalFreeWorkingStaff <= unassignedCount) {
@@ -1359,10 +1383,14 @@ export class ReservationsService {
           }
         } else {
           const freeCandidateStaff = candidateStaff.filter(st => {
-            if (st.entryTime && currentMins < toMins(st.entryTime)) return false;
-            if (st.exitTime && slotEnd > toMins(st.exitTime)) return false;
-            if (st.lunchStart && st.lunchEnd && currentMins < toMins(st.lunchEnd) && slotEnd > toMins(st.lunchStart)) return false;
-            return !busyBookings.some(b => b.employeeId === st.userId && currentMins < b.end && slotEnd > b.start);
+            const stEntry = toMins(st.entryTime);
+            if (stEntry !== null && currentMins < stEntry) return false;
+            const stExit = toMins(st.exitTime);
+            if (stExit !== null && slotEnd > stExit) return false;
+            const stLStart = toMins(st.lunchStart);
+            const stLEnd = toMins(st.lunchEnd);
+            if (stLStart !== null && stLEnd !== null && currentMins < stLEnd && slotEnd > stLStart) return false;
+            return !busyBookings.some(b => (b.employeeId === st.userId || b.employeeId === st.id || b.employeeId === st.user?.id) && currentMins < b.end && slotEnd > b.start);
           });
 
           const unassignedOverlapCount = busyBookings.filter(
