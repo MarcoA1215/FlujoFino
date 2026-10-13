@@ -38,6 +38,8 @@ export class SettingsService implements OnModuleInit {
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "ratesCache" jsonb;`,
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "featureDelivery" boolean DEFAULT true;`,
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "allowNegativeStock" boolean DEFAULT false;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "logoShape" character varying DEFAULT 'ROUNDED';`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "logoFit" character varying DEFAULT 'contain';`,
     ];
 
     for (const sql of settingsColumns) {
@@ -461,6 +463,8 @@ export class SettingsService implements OnModuleInit {
     if (payload.themePrimaryColor !== undefined) settings.themePrimaryColor = payload.themePrimaryColor;
     if (payload.themeHeaderColor !== undefined) settings.themeHeaderColor = payload.themeHeaderColor;
     if (payload.companyLogoUrl !== undefined) settings.companyLogoUrl = payload.companyLogoUrl;
+    if (payload.logoShape !== undefined) settings.logoShape = payload.logoShape;
+    if (payload.logoFit !== undefined) settings.logoFit = payload.logoFit;
 
     await this.settingsRepo.save(settings);
     return this.getSettings(tenantId);

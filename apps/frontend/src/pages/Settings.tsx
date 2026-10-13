@@ -120,6 +120,8 @@ interface Settings {
   themePrimaryColor?: string;
   themeHeaderColor?: string;
   companyLogoUrl?: string;
+  logoShape?: 'ROUNDED' | 'CIRCLE' | 'NATURAL';
+  logoFit?: 'contain' | 'cover';
   allowNegativeStock?: boolean;
 }
 
@@ -352,6 +354,8 @@ const SettingsPage: React.FC = () => {
         themePrimaryColor: settings.themePrimaryColor,
         themeHeaderColor: settings.themeHeaderColor,
         companyLogoUrl: settings.companyLogoUrl,
+        logoShape: settings.logoShape || 'ROUNDED',
+        logoFit: settings.logoFit || 'contain',
       };
 
       const res = await apiClient.put<Settings>('/settings', payload);
@@ -1759,28 +1763,41 @@ const SettingsPage: React.FC = () => {
                       justifyContent: 'space-between',
                       gap: '16px',
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
                         {settings.companyLogoUrl ? (
-                          <div style={{ position: 'relative' }}>
+                          <div
+                            style={{
+                              position: 'relative',
+                              width: (settings.logoShape === 'NATURAL' ? 'auto' : '96px'),
+                              maxWidth: (settings.logoShape === 'NATURAL' ? '180px' : '96px'),
+                              height: '96px',
+                              borderRadius: settings.logoShape === 'CIRCLE' ? '50%' : settings.logoShape === 'NATURAL' ? '12px' : '18px',
+                              backgroundColor: '#ffffff',
+                              border: '1.5px solid #cbd5e1',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+                              overflow: 'hidden',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: settings.logoFit === 'cover' ? '0' : '6px',
+                            }}
+                          >
                             <img
                               src={settings.companyLogoUrl}
                               alt="Logo Negocio"
                               style={{
-                                width: '72px',
-                                height: '72px',
-                                borderRadius: '14px',
-                                objectFit: 'contain',
-                                backgroundColor: '#ffffff',
-                                border: '1.5px solid #cbd5e1',
-                                boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                                width: '100%',
+                                height: '100%',
+                                borderRadius: settings.logoShape === 'CIRCLE' ? '50%' : settings.logoShape === 'NATURAL' ? '8px' : '12px',
+                                objectFit: (settings.logoFit === 'cover' ? 'cover' : 'contain') as any,
                               }}
                             />
                           </div>
                         ) : (
                           <div style={{
-                            width: '72px',
-                            height: '72px',
-                            borderRadius: '14px',
+                            width: '96px',
+                            height: '96px',
+                            borderRadius: settings.logoShape === 'CIRCLE' ? '50%' : '18px',
                             backgroundColor: '#ffffff',
                             border: '1.5px dashed #94a3b8',
                             display: 'flex',
@@ -1788,74 +1805,183 @@ const SettingsPage: React.FC = () => {
                             alignItems: 'center',
                             justifyContent: 'center',
                             color: '#64748b',
-                            fontSize: '26px',
+                            fontSize: '32px',
                           }}>
                             🏢
                           </div>
                         )}
-                        <div>
-                          <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>
+                        <div style={{ flex: 1, minWidth: '220px' }}>
+                          <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>
                             Logotipo del Negocio
                           </div>
-                          <p style={{ margin: 0, fontSize: '12px', color: '#64748b', maxWidth: '380px', lineHeight: 1.4 }}>
-                            Aparecerá en la barra superior y en el banner de tu <b>Tienda Virtual</b> y <b>Reserva de Citas Online</b>.
+                          <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#64748b', maxWidth: '420px', lineHeight: 1.4 }}>
+                            Aparecerá en el menú lateral, encabezados y banners de tu <b>Tienda Virtual</b> y <b>Reserva de Citas Online</b>.
                           </p>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <input
+                              ref={logoInputRef}
+                              type="file"
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              onChange={handleLogoUpload}
+                            />
+                            <button
+                              type="button"
+                              disabled={isUploadingLogo}
+                              onClick={() => logoInputRef.current?.click()}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '8px 14px',
+                                borderRadius: '10px',
+                                border: '1px solid #cbd5e1',
+                                backgroundColor: '#ffffff',
+                                color: '#0f172a',
+                                fontWeight: 700,
+                                fontSize: '13px',
+                                cursor: isUploadingLogo ? 'not-allowed' : 'pointer',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                              }}
+                            >
+                              <IonIcon icon={cameraOutline} style={{ fontSize: '16px', color: '#10b981' }} />
+                              <span>{isUploadingLogo ? 'Subiendo...' : settings.companyLogoUrl ? 'Cambiar Logo' : 'Cargar Logo'}</span>
+                            </button>
+                            {settings.companyLogoUrl && (
+                              <button
+                                type="button"
+                                disabled={isUploadingLogo}
+                                onClick={handleDeleteLogo}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '8px 12px',
+                                  borderRadius: '10px',
+                                  border: '1px solid #fecaca',
+                                  backgroundColor: '#fef2f2',
+                                  color: '#dc2626',
+                                  fontWeight: 700,
+                                  fontSize: '13px',
+                                  cursor: isUploadingLogo ? 'not-allowed' : 'pointer',
+                                }}
+                              >
+                                <IonIcon icon={trashOutline} style={{ fontSize: '15px' }} />
+                                <span>Quitar</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <input
-                          ref={logoInputRef}
-                          type="file"
-                          accept="image/*"
-                          style={{ display: 'none' }}
-                          onChange={handleLogoUpload}
-                        />
-                        <button
-                          type="button"
-                          disabled={isUploadingLogo}
-                          onClick={() => logoInputRef.current?.click()}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '8px 14px',
-                            borderRadius: '10px',
-                            border: '1px solid #cbd5e1',
-                            backgroundColor: '#ffffff',
-                            color: '#0f172a',
-                            fontWeight: 700,
-                            fontSize: '13px',
-                            cursor: isUploadingLogo ? 'not-allowed' : 'pointer',
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                          }}
-                        >
-                          <IonIcon icon={cameraOutline} style={{ fontSize: '16px', color: '#10b981' }} />
-                          <span>{isUploadingLogo ? 'Subiendo...' : settings.companyLogoUrl ? 'Cambiar Logo' : 'Cargar Logo'}</span>
-                        </button>
-                        {settings.companyLogoUrl && (
-                          <button
-                            type="button"
-                            disabled={isUploadingLogo}
-                            onClick={handleDeleteLogo}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '8px 12px',
-                              borderRadius: '10px',
-                              border: '1px solid #fecaca',
-                              backgroundColor: '#fef2f2',
-                              color: '#dc2626',
-                              fontWeight: 700,
-                              fontSize: '13px',
-                              cursor: isUploadingLogo ? 'not-allowed' : 'pointer',
-                            }}
-                          >
-                            <IonIcon icon={trashOutline} style={{ fontSize: '15px' }} />
-                            <span>Quitar</span>
-                          </button>
-                        )}
+                      {/* Configuración de Recorte y Ajuste del Logo */}
+                      <div style={{
+                        marginTop: '16px',
+                        padding: '14px 16px',
+                        borderRadius: '14px',
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                        gap: '14px',
+                      }}>
+                        {/* Selector de Forma de Recorte */}
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            fontSize: '11px',
+                            fontWeight: 800,
+                            color: '#475569',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                            marginBottom: '8px',
+                          }}>
+                            📐 Forma del Marco / Recorte
+                          </label>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {([
+                              { id: 'ROUNDED' as const, label: '▢ Redondeado', desc: 'Cuadrado moderno' },
+                              { id: 'CIRCLE' as const, label: '◯ Circular', desc: 'Redondo perfecto' },
+                              { id: 'NATURAL' as const, label: '▭ Adaptable', desc: 'Horizontal / Libre' },
+                            ]).map((opt) => {
+                              const active = (settings.logoShape || 'ROUNDED') === opt.id;
+                              return (
+                                <button
+                                  key={opt.id}
+                                  type="button"
+                                  onClick={() => setSettings({ ...settings, logoShape: opt.id })}
+                                  style={{
+                                    flex: 1,
+                                    minWidth: '90px',
+                                    padding: '8px 10px',
+                                    borderRadius: '10px',
+                                    border: active ? '2px solid #10b981' : '1px solid #cbd5e1',
+                                    backgroundColor: active ? '#ecfdf5' : '#ffffff',
+                                    color: active ? '#065f46' : '#334155',
+                                    fontWeight: active ? 800 : 600,
+                                    fontSize: '12px',
+                                    cursor: 'pointer',
+                                    textAlign: 'center',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: active ? '0 1px 3px rgba(16,185,129,0.2)' : 'none',
+                                  }}
+                                  title={opt.desc}
+                                >
+                                  {opt.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Selector de Ajuste de Imagen */}
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            fontSize: '11px',
+                            fontWeight: 800,
+                            color: '#475569',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                            marginBottom: '8px',
+                          }}>
+                            🖼️ Modo de Ajuste
+                          </label>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {([
+                              { id: 'contain' as const, label: 'Ajustar Completo', desc: 'Muestra todo el logo sin recortar bordes' },
+                              { id: 'cover' as const, label: 'Rellenar Marco', desc: 'Llena todo el espacio recortando bordes' },
+                            ]).map((opt) => {
+                              const active = (settings.logoFit || 'contain') === opt.id;
+                              return (
+                                <button
+                                  key={opt.id}
+                                  type="button"
+                                  onClick={() => setSettings({ ...settings, logoFit: opt.id })}
+                                  style={{
+                                    flex: 1,
+                                    minWidth: '110px',
+                                    padding: '8px 10px',
+                                    borderRadius: '10px',
+                                    border: active ? '2px solid #10b981' : '1px solid #cbd5e1',
+                                    backgroundColor: active ? '#ecfdf5' : '#ffffff',
+                                    color: active ? '#065f46' : '#334155',
+                                    fontWeight: active ? 800 : 600,
+                                    fontSize: '12px',
+                                    cursor: 'pointer',
+                                    textAlign: 'center',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: active ? '0 1px 3px rgba(16,185,129,0.2)' : 'none',
+                                  }}
+                                  title={opt.desc}
+                                >
+                                  {opt.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -2068,7 +2194,14 @@ const SettingsPage: React.FC = () => {
                               <img
                                 src={settings.companyLogoUrl}
                                 alt="Logo"
-                                style={{ width: '22px', height: '22px', borderRadius: '5px', objectFit: 'contain', backgroundColor: '#fff' }}
+                                style={{
+                                  width: settings.logoShape === 'NATURAL' ? 'auto' : '26px',
+                                  maxWidth: '50px',
+                                  height: '26px',
+                                  borderRadius: settings.logoShape === 'CIRCLE' ? '50%' : '6px',
+                                  objectFit: (settings.logoFit === 'cover' ? 'cover' : 'contain') as any,
+                                  backgroundColor: '#fff',
+                                }}
                               />
                             ) : (
                               <span style={{ fontSize: '13px', fontWeight: 800 }}>🏪</span>

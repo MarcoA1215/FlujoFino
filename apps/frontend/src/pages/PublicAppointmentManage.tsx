@@ -88,6 +88,8 @@ const PublicAppointmentManage: React.FC = () => {
   const primaryReadable = ensureReadableColor(primaryColor);
   const primarySoftBg = (primaryColor.startsWith('#') ? primaryColor : `#${primaryColor}`) + '18';
   const companyLogoUrl = appointment?.companyLogoUrl || null;
+  const logoShape = appointment?.logoShape || appointment?.settings?.logoShape || 'ROUNDED';
+  const logoFit = appointment?.logoFit || appointment?.settings?.logoFit || 'contain';
 
   useEffect(() => {
     if (appointment) {
@@ -329,10 +331,11 @@ const PublicAppointmentManage: React.FC = () => {
                 src={companyLogoUrl}
                 alt="Logo"
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  objectFit: 'contain',
+                  width: logoShape === 'NATURAL' ? 'auto' : '36px',
+                  maxWidth: '56px',
+                  height: '36px',
+                  borderRadius: logoShape === 'CIRCLE' ? '50%' : '8px',
+                  objectFit: (logoFit === 'cover' ? 'cover' : 'contain') as any,
                   backgroundColor: '#ffffff',
                   border: '1px solid rgba(255,255,255,0.3)',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
@@ -420,29 +423,32 @@ const PublicAppointmentManage: React.FC = () => {
                   src={companyLogoUrl}
                   alt={appointment.tenantName}
                   style={{
-                    width: '56px',
-                    height: '56px',
-                    borderRadius: '14px',
-                    objectFit: 'contain',
+                    width: logoShape === 'NATURAL' ? 'auto' : '84px',
+                    maxWidth: logoShape === 'NATURAL' ? '160px' : '84px',
+                    height: '84px',
+                    borderRadius: logoShape === 'CIRCLE' ? '50%' : logoShape === 'NATURAL' ? '12px' : '16px',
+                    objectFit: (logoFit === 'cover' ? 'cover' : 'contain') as any,
                     backgroundColor: '#ffffff',
                     border: '1.5px solid #e2e8f0',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
                     flexShrink: 0,
+                    padding: logoFit === 'contain' ? '4px' : '0',
                   }}
                 />
               ) : (
                 <div
                   style={{
-                    width: '52px',
-                    height: '52px',
-                    borderRadius: '14px',
+                    width: '84px',
+                    height: '84px',
+                    borderRadius: logoShape === 'CIRCLE' ? '50%' : '16px',
                     backgroundColor: primarySoftBg,
                     color: primaryReadable,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '24px',
+                    fontSize: '32px',
                     border: `1.5px solid ${primaryReadable}30`,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                     flexShrink: 0,
                   }}
                 >

@@ -646,6 +646,8 @@ const PublicBooking: React.FC = () => {
   const primaryReadable = ensureReadableColor(primaryColor);
   const primarySoftBg = (primaryColor.startsWith('#') ? primaryColor : `#${primaryColor}`) + '18';
   const companyLogoUrl = tenantInfo?.settings?.companyLogoUrl || tenantInfo?.companyLogoUrl || null;
+  const logoShape = tenantInfo?.settings?.logoShape || tenantInfo?.logoShape || 'ROUNDED';
+  const logoFit = tenantInfo?.settings?.logoFit || tenantInfo?.logoFit || 'contain';
 
   useEffect(() => {
     if (tenantInfo) {
@@ -701,15 +703,17 @@ const PublicBooking: React.FC = () => {
                 src={companyLogoUrl}
                 alt={tenantInfo?.name || 'Logo'}
                 style={{
-                  width: '76px',
-                  height: '76px',
-                  borderRadius: '16px',
-                  objectFit: 'contain',
+                  width: logoShape === 'NATURAL' ? 'auto' : '96px',
+                  maxWidth: logoShape === 'NATURAL' ? '180px' : '96px',
+                  height: '96px',
+                  borderRadius: logoShape === 'CIRCLE' ? '50%' : logoShape === 'NATURAL' ? '12px' : '18px',
+                  objectFit: (logoFit === 'cover' ? 'cover' : 'contain') as any,
                   backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                  border: '1.5px solid #e2e8f0',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.06)',
                   margin: '0 auto 16px auto',
-                  display: 'block'
+                  display: 'block',
+                  padding: logoFit === 'contain' ? '4px' : '0',
                 }}
               />
             ) : (
@@ -786,15 +790,17 @@ const PublicBooking: React.FC = () => {
                     src={companyLogoUrl}
                     alt={tenantInfo?.name || 'Logo'}
                     style={{
-                      width: '64px',
-                      height: '64px',
-                      borderRadius: '14px',
-                      objectFit: 'contain',
+                      width: logoShape === 'NATURAL' ? 'auto' : '80px',
+                      maxWidth: logoShape === 'NATURAL' ? '150px' : '80px',
+                      height: '80px',
+                      borderRadius: logoShape === 'CIRCLE' ? '50%' : logoShape === 'NATURAL' ? '12px' : '16px',
+                      objectFit: (logoFit === 'cover' ? 'cover' : 'contain') as any,
                       backgroundColor: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                      border: '1.5px solid #e2e8f0',
+                      boxShadow: '0 4px 10px rgba(0,0,0,0.05)',
                       margin: '0 auto 16px auto',
                       display: 'block',
+                      padding: logoFit === 'contain' ? '4px' : '0',
                     }}
                   />
                 ) : null}
@@ -920,10 +926,11 @@ const PublicBooking: React.FC = () => {
                 src={companyLogoUrl}
                 alt="Logo"
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  objectFit: 'contain',
+                  width: logoShape === 'NATURAL' ? 'auto' : '36px',
+                  maxWidth: '56px',
+                  height: '36px',
+                  borderRadius: logoShape === 'CIRCLE' ? '50%' : '8px',
+                  objectFit: (logoFit === 'cover' ? 'cover' : 'contain') as any,
                   backgroundColor: '#ffffff',
                   border: '1px solid rgba(255,255,255,0.3)',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
@@ -1037,28 +1044,30 @@ const PublicBooking: React.FC = () => {
                   src={companyLogoUrl}
                   alt={tenantInfo?.name}
                   style={{
-                    width: '68px',
-                    height: '68px',
-                    borderRadius: '16px',
-                    objectFit: 'contain',
+                    width: logoShape === 'NATURAL' ? 'auto' : '92px',
+                    maxWidth: logoShape === 'NATURAL' ? '180px' : '92px',
+                    height: '92px',
+                    borderRadius: logoShape === 'CIRCLE' ? '50%' : logoShape === 'NATURAL' ? '12px' : '18px',
+                    objectFit: (logoFit === 'cover' ? 'cover' : 'contain') as any,
                     backgroundColor: '#ffffff',
                     border: '1.5px solid #e2e8f0',
-                    boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-                    flexShrink: 0
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.06)',
+                    flexShrink: 0,
+                    padding: logoFit === 'contain' ? '4px' : '0',
                   }}
                 />
               ) : (
                 <div
                   style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '16px',
+                    width: '92px',
+                    height: '92px',
+                    borderRadius: logoShape === 'CIRCLE' ? '50%' : '18px',
                     backgroundColor: primarySoftBg,
                     color: primaryReadable,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '28px',
+                    fontSize: '36px',
                     border: `1.5px solid ${primaryReadable}30`,
                     boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                     flexShrink: 0

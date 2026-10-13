@@ -144,6 +144,12 @@ export class Settings {
   @Column({ nullable: true })
   companyLogoUrl: string;
 
+  @Column({ nullable: true, default: 'ROUNDED' })
+  logoShape: string; // 'ROUNDED' | 'CIRCLE' | 'NATURAL'
+
+  @Column({ nullable: true, default: 'contain' })
+  logoFit: string; // 'contain' | 'cover'
+
   // --- Saldo Inicial de Tesorería al iniciar en FinoWork ---
   @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
   initialCashUSD: number;

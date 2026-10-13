@@ -145,11 +145,15 @@ export class PublicReservationsController {
         themePrimaryColor: settings?.themePrimaryColor || '#10b981',
         themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
         companyLogoUrl: settings?.companyLogoUrl || null,
+        logoShape: settings?.logoShape || 'ROUNDED',
+        logoFit: settings?.logoFit || 'contain',
         settings: {
           companyPhone: settings?.companyPhone || '',
           themePrimaryColor: settings?.themePrimaryColor || '#10b981',
           themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
           companyLogoUrl: settings?.companyLogoUrl || null,
+          logoShape: settings?.logoShape || 'ROUNDED',
+          logoFit: settings?.logoFit || 'contain',
         },
         services: [],
         staff: []
@@ -261,11 +265,15 @@ export class PublicReservationsController {
       themePrimaryColor: settings?.themePrimaryColor || '#10b981',
       themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
       companyLogoUrl: settings?.companyLogoUrl || null,
+      logoShape: settings?.logoShape || 'ROUNDED',
+      logoFit: settings?.logoFit || 'contain',
       settings: {
         companyPhone: settings?.companyPhone || '',
         themePrimaryColor: settings?.themePrimaryColor || '#10b981',
         themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
         companyLogoUrl: settings?.companyLogoUrl || null,
+        logoShape: settings?.logoShape || 'ROUNDED',
+        logoFit: settings?.logoFit || 'contain',
       },
     };
   }
@@ -687,11 +695,15 @@ export class PublicReservationsController {
       themePrimaryColor: settings?.themePrimaryColor || '#10b981',
       themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
       companyLogoUrl: settings?.companyLogoUrl || null,
+      logoShape: settings?.logoShape || 'ROUNDED',
+      logoFit: settings?.logoFit || 'contain',
       settings: {
         companyPhone: settings?.companyPhone || '',
         themePrimaryColor: settings?.themePrimaryColor || '#10b981',
         themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
         companyLogoUrl: settings?.companyLogoUrl || null,
+        logoShape: settings?.logoShape || 'ROUNDED',
+        logoFit: settings?.logoFit || 'contain',
       },
     };
   }

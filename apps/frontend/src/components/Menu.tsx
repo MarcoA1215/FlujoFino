@@ -289,11 +289,47 @@ const Menu: React.FC = () => {
     >
       <IonContent>
         <div style={{ padding: '20px 16px 16px 16px', textAlign: 'center', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <img 
-            src="/assets/logo.png" 
-            alt={APP_NAME} 
-            style={{ width: '48px', height: '48px', borderRadius: '16px', objectFit: 'cover', marginBottom: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.12)' }}
-          />
+          {(() => {
+            const logoUrl = (!isSuperAdmin && settings?.companyLogoUrl) ? settings.companyLogoUrl : '/assets/logo.png';
+            const shape = (!isSuperAdmin && settings?.logoShape) ? settings.logoShape : 'ROUNDED';
+            const fit = (!isSuperAdmin && settings?.logoFit) ? settings.logoFit : 'contain';
+            const isNatural = shape === 'NATURAL';
+            const borderRadius = shape === 'CIRCLE' ? '50%' : isNatural ? '10px' : '16px';
+
+            return (
+              <div
+                style={{
+                  width: isNatural ? 'auto' : '64px',
+                  maxWidth: isNatural ? '130px' : '64px',
+                  height: '64px',
+                  borderRadius,
+                  backgroundColor: '#ffffff',
+                  border: '1.5px solid #e2e8f0',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  marginBottom: '12px',
+                  padding: fit === 'contain' ? '4px' : '0',
+                }}
+              >
+                <img 
+                  src={logoUrl} 
+                  alt={isSuperAdmin ? APP_NAME : (user?.tenantName || APP_NAME)} 
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: shape === 'CIRCLE' ? '50%' : isNatural ? '8px' : '12px',
+                    objectFit: fit as any,
+                  }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/assets/logo.png';
+                  }}
+                />
+              </div>
+            );
+          })()}
           
           <button 
             type="button"
