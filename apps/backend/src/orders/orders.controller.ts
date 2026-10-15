@@ -15,9 +15,10 @@ export class OrdersController {
     @Param('id') id: string,
     @Body('amount') amount: number,
     @Body('method') method?: string,
-    @Body('ref') ref?: string
+    @Body('ref') ref?: string,
+    @Body('bank') bank?: string
   ) {
-    return this.ordersService.addAbono(req.user.tenantId, id, amount, method, ref);
+    return this.ordersService.addAbono(req.user.tenantId, id, amount, method, ref, bank);
   }
 
   @Delete(':id/abono/:index')

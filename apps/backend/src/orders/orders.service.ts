@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, ForbiddenException, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataSource, Between, In, Not, MoreThanOrEqual, EntityManager } from 'typeorm';
-import { IsOptional, IsArray, IsString, IsNumber, IsBoolean } from 'class-validator';
+import { IsOptional, IsArray, IsString, IsNumber, IsBoolean, IsEnum } from 'class-validator';
 import { Order, SplitPaymentItem } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Product } from '../entities/product.entity';
@@ -227,28 +227,96 @@ export class CreateOrderDto {
 }
 
 export class UpdatePaymentDto {
-  status: PaymentStatus;
+  @IsOptional()
+  @IsEnum(PaymentStatus)
+  status?: PaymentStatus;
+
+  @IsOptional()
+  @IsString()
   paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
   pagoMovilRef?: string;
+
+  @IsOptional()
+  @IsString()
   pagoMovilPhone?: string;
+
+  @IsOptional()
+  @IsString()
   pagoMovilCedula?: string;
+
+  @IsOptional()
+  @IsString()
   pagoMovilBank?: string;
+
+  @IsOptional()
+  @IsString()
   puntoRef?: string;
+
+  @IsOptional()
+  @IsString()
   puntoBank?: string;
+
+  @IsOptional()
+  @IsString()
   binanceRef?: string;
+
+  @IsOptional()
+  @IsString()
   transferRef?: string;
+
+  @IsOptional()
+  @IsString()
   transferBank?: string;
+
+  @IsOptional()
+  @IsNumber()
   usdReceived?: number;
+
+  @IsOptional()
+  @IsNumber()
   changeAmount?: number;
+
+  @IsOptional()
+  @IsNumber()
   changeAmountBs?: number;
+
+  @IsOptional()
+  @IsString()
   changeMethod?: string;
+
+  @IsOptional()
+  @IsString()
   changeRef?: string;
+
+  @IsOptional()
+  @IsString()
   changePhone?: string;
+
+  @IsOptional()
+  @IsString()
   changeBank?: string;
+
+  @IsOptional()
+  @IsNumber()
   amountBs?: number;
+
+  @IsOptional()
+  @IsNumber()
   exchangeRate?: number;
+
+  @IsOptional()
+  @IsNumber()
   exchangeRateBs?: number;
+
+  @IsOptional()
+  @IsArray()
   splitPayments?: SplitPaymentItem[];
 }
 
@@ -285,7 +353,7 @@ export class OrdersService implements OnModuleInit {
     }
   }
 
-  async addAbono(tenantId: string, orderId: string, amount: number, method?: string, ref?: string) {
+  async addAbono(tenantId: string, orderId: string, amount: number, method?: string, ref?: string, bank?: string) {
     if (amount <= 0) throw new BadRequestException('El monto debe ser mayor a 0');
     const order = await this.dataSource.getRepository(Order).findOne({ where: { tenantId, id: orderId } });
     if (!order) throw new NotFoundException('Orden no encontrada');
@@ -302,6 +370,7 @@ export class OrdersService implements OnModuleInit {
       amount: Number(amount), 
       method: method || 'USD',
       ref: ref || undefined,
+      bank: bank || undefined,
       date: new Date().toISOString() 
     });
     order.abonosHistory = history;
@@ -1065,7 +1134,7 @@ export class OrdersService implements OnModuleInit {
     if (order.status === OrderStatus.CANCELED) throw new BadRequestException('El pedido está cancelado');
     const wasPaid = order.paymentStatus === PaymentStatus.PAID;
     
-    order.paymentStatus = dto.status;
+    if (dto.status) order.paymentStatus = dto.status;
     if (dto.paymentMethod) order.paymentMethod = dto.paymentMethod;
     if (dto.notes) order.notes = dto.notes;
     if (dto.pagoMovilRef !== undefined) order.pagoMovilRef = dto.pagoMovilRef;

@@ -24,6 +24,7 @@ import {
 import { apiClient } from '../api/client';
 import { OrderStatus, PaymentStatus, DeliveryMethod, UserRole } from '@finowork/shared-types';
 import { normalizeBankName } from '../constants/banks';
+import { BankSelect } from '../components/BankSelect';
 import type { DeliveryZone } from '../types';
 import { AuthContext } from '../context/AuthContext';
 import AppHeader from '../components/AppHeader';
@@ -151,6 +152,7 @@ const Orders: React.FC = () => {
   const [abonoCurrency, setAbonoCurrency] = useState<'USD' | 'VES'>('USD');
   const [abonoMethod, setAbonoMethod] = useState<string>('USD');
   const [abonoRef, setAbonoRef] = useState<string>('');
+  const [abonoBank, setAbonoBank] = useState<string>('');
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('');
 
@@ -942,6 +944,7 @@ const Orders: React.FC = () => {
                             setAbonoAmount('');
                             setAbonoMethod('USD');
                             setAbonoRef('');
+                            setAbonoBank('');
                           }}
                           style={{
                             flex: 1,
@@ -1508,6 +1511,7 @@ const Orders: React.FC = () => {
                                   setAbonoAmount('');
                                   setAbonoMethod('USD');
                                   setAbonoRef('');
+                                  setAbonoBank('');
                                 }}
                                 style={{
                                   padding: '12px',
@@ -1676,19 +1680,24 @@ const Orders: React.FC = () => {
                 presentToast({ message: 'Por favor indica el N° de Voucher / Aprobación', duration: 3000, color: 'warning' });
                 return;
               }
+              if (abonoMethod === 'TRANSFER' && !abonoRef.trim()) {
+                presentToast({ message: 'Por favor indica la referencia de la Transferencia', duration: 3000, color: 'warning' });
+                return;
+              }
 
               try {
                 await apiClient.post(`/orders/${selectedOrderForAbono.id}/abono`, {
                   amount: effectiveUsd,
                   method: abonoMethod,
-                  ref: abonoRef.trim() || undefined
+                  ref: abonoRef.trim() || undefined,
+                  bank: normalizeBankName(abonoBank) || undefined
                 });
                 presentToast({ message: `✓ ¡Abono de $${effectiveUsd.toFixed(2)} registrado con éxito!`, duration: 2500, color: 'success' });
                 setSelectedOrderForAbono(null);
                 fetchOrders();
               } catch (err: any) {
                 console.error(err);
-                presentToast({ message: 'Error registrando abono', duration: 3000, color: 'danger' });
+                presentToast({ message: 'Error registrando abono: ' + (err.response?.data?.message || err.message), duration: 3000, color: 'danger' });
               }
             };
 
@@ -1868,17 +1877,28 @@ const Orders: React.FC = () => {
                     </div>
 
                     {(abonoMethod === 'PAGO_MOVIL' || abonoMethod === 'PUNTO' || abonoMethod === 'TRANSFER') && (
-                      <div>
-                        <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                          N° Referencia / Voucher *
-                        </label>
-                        <input
-                          type="text"
-                          value={abonoRef}
-                          onChange={e => setAbonoRef(e.target.value)}
-                          placeholder="Ej. 984210"
-                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px' }}
-                        />
+                      <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '12px', border: '1px solid #E2E8F0', marginTop: '10px' }}>
+                        <div style={{ marginBottom: '8px' }}>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                            {abonoMethod === 'PUNTO' ? 'N° de Aprobación del Voucher *' : 'N° Referencia *'}
+                          </label>
+                          <input
+                            type="text"
+                            value={abonoRef}
+                            onChange={e => setAbonoRef(e.target.value)}
+                            placeholder="Ej. 984210"
+                            style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                          />
+                        </div>
+                        <div>
+                          <BankSelect
+                            size="small"
+                            label={abonoMethod === 'PUNTO' ? 'Banco / Punto de Venta' : 'Banco Emisor'}
+                            value={abonoBank}
+                            onChange={val => setAbonoBank(val)}
+                            placeholder={abonoMethod === 'PUNTO' ? 'Selecciona banco del punto...' : 'Selecciona banco emisor...'}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1959,6 +1979,8 @@ const Orders: React.FC = () => {
                   await apiClient.patch(`/orders/${selectedOrderForCobro.id}/payment`, {
                     status: PaymentStatus.PAID,
                     paymentMethod: 'PUNTO',
+                    puntoRef: cobroRef.trim(),
+                    puntoBank: normalizeBankName(cobroBank) || 'Punto de Venta',
                     pagoMovilRef: cobroRef.trim(),
                     pagoMovilBank: normalizeBankName(cobroBank) || 'Punto de Venta',
                     amountBs: restanteBs,
@@ -2101,15 +2123,11 @@ const Orders: React.FC = () => {
                         />
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
-                          Banco emisor (Opcional)
-                        </label>
-                        <input
-                          type="text"
+                        <BankSelect
+                          label={cobroMethod === 'PUNTO' ? 'Banco / Punto de Venta' : 'Banco Emisor'}
                           value={cobroBank}
-                          onChange={e => setCobroBank(e.target.value)}
-                          placeholder="Ej. Banesco, Mercantil, BDV..."
-                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                          onChange={val => setCobroBank(val)}
+                          placeholder={cobroMethod === 'PUNTO' ? 'Selecciona banco del punto...' : 'Selecciona banco emisor...'}
                         />
                       </div>
                     </div>
@@ -2126,6 +2144,7 @@ const Orders: React.FC = () => {
                         setAbonoAmount('');
                         setAbonoMethod('USD');
                         setAbonoRef('');
+                        setAbonoBank('');
                       }}
                       style={{
                         padding: '12px',
