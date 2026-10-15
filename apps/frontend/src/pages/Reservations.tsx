@@ -24,7 +24,9 @@ import {
   chevronForwardOutline,
   closeOutline,
   cameraOutline,
-  imageOutline
+  imageOutline,
+  copyOutline,
+  linkOutline
 } from 'ionicons/icons';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -499,8 +501,53 @@ const Reservations: React.FC = () => {
         await apiClient.put(`/reservations/${editingId}`, payload);
         presentToast({ message: 'Cita actualizada con éxito', duration: 2000, color: 'success' });
       } else {
-        await apiClient.post('/reservations', payload);
+        const createRes = await apiClient.post('/reservations', payload);
+        const newReservation = createRes.data;
         presentToast({ message: 'Cita agendada con éxito', duration: 2000, color: 'success' });
+
+        if (newReservation?.id) {
+          const appointmentUrl = `${window.location.origin}/appointment/${newReservation.id}`;
+          if (customerPhone) {
+            const msg = `Hola ${customerName}, tu cita para ${sNames || 'nuestro servicio'} ha sido agendada con éxito en ${user?.tenantName || 'FinoWork'} para el ${date} a las ${time}.\n\nPuedes ver los detalles, gestionar tu cita o reportar tu pago aquí:\n${appointmentUrl}`;
+            const waUrl = formatWhatsAppUrl(customerPhone, msg);
+
+            presentAlert({
+              header: '✅ Cita Agendada Exitosamente',
+              message: `¿Deseas enviar el enlace de control de la cita a ${customerName} por WhatsApp?`,
+              buttons: [
+                {
+                  text: 'Copiar Enlace 📋',
+                  handler: () => {
+                    navigator.clipboard.writeText(appointmentUrl);
+                    presentToast({ message: '📋 Enlace copiado al portapapeles', duration: 2500, color: 'success' });
+                  }
+                },
+                {
+                  text: 'Enviar WhatsApp 📲',
+                  handler: () => {
+                    window.open(waUrl, '_blank');
+                  }
+                },
+                { text: 'Listo', role: 'cancel' }
+              ]
+            });
+          } else {
+            presentAlert({
+              header: '✅ Cita Agendada Exitosamente',
+              message: `Puedes copiar el enlace de control para que el cliente gestione su cita:`,
+              buttons: [
+                {
+                  text: 'Copiar Enlace 📋',
+                  handler: () => {
+                    navigator.clipboard.writeText(appointmentUrl);
+                    presentToast({ message: '📋 Enlace copiado al portapapeles', duration: 2500, color: 'success' });
+                  }
+                },
+                { text: 'Listo', role: 'cancel' }
+              ]
+            });
+          }
+        }
       }
       setShowModal(false);
       fetchReservations();
@@ -1173,13 +1220,14 @@ const Reservations: React.FC = () => {
 
                         {/* Action buttons footer */}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', paddingTop: '8px', borderTop: '1px solid #F1F5F9', alignItems: 'center' }}>
-                          {/* WhatsApp */}
+                          {/* WhatsApp con Enlace de Control */}
                           {res.customerPhone && (
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const text = `Hola ${res.customerName}, te escribimos de ${user?.tenantName || 'FinoWork'} respecto a tu cita para ${res.serviceName || 'nuestro servicio'} el ${res.date} a las ${res.time}.`;
+                                const appointmentUrl = `${window.location.origin}/appointment/${res.id}`;
+                                const text = `Hola ${res.customerName}, te escribimos de ${user?.tenantName || 'FinoWork'} respecto a tu cita para ${res.serviceName || 'nuestro servicio'} el ${res.date} a las ${res.time}.\n\nPuedes ver los detalles, gestionar tu cita o reportar tu pago aquí:\n${appointmentUrl}`;
                                 window.open(formatWhatsAppUrl(res.customerPhone, text), '_blank');
                               }}
                               style={{
@@ -1196,11 +1244,41 @@ const Reservations: React.FC = () => {
                                 cursor: 'pointer',
                                 whiteSpace: 'nowrap'
                               }}
+                              title="Enviar recordatorio y enlace de cita por WhatsApp"
                             >
                               <IonIcon icon={logoWhatsapp} style={{ fontSize: '13px' }} />
                               WhatsApp
                             </button>
                           )}
+
+                          {/* Copiar Enlace de Control */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const appointmentUrl = `${window.location.origin}/appointment/${res.id}`;
+                              navigator.clipboard.writeText(appointmentUrl);
+                              presentToast({ message: '📋 Enlace de control de cita copiado', duration: 2000, color: 'success' });
+                            }}
+                            style={{
+                              background: '#F8FAFC',
+                              border: '1px solid #CBD5E1',
+                              color: '#334155',
+                              borderRadius: '8px',
+                              padding: '5px 8px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap'
+                            }}
+                            title="Copiar enlace de control de cita del cliente"
+                          >
+                            <IonIcon icon={copyOutline} style={{ fontSize: '13px', color: '#10B981' }} />
+                            Copiar Enlace
+                          </button>
 
                           {/* Avisar Retraso Push */}
                           <button
@@ -2064,6 +2142,86 @@ const Reservations: React.FC = () => {
                         <IonIcon icon={cashOutline} />
                         Enviar a Caja para Cobrar
                       </button>
+
+                      {/* Tarjeta Enlace de Control de Cita para el Cliente */}
+                      <div style={{
+                        background: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '12px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <IonIcon icon={linkOutline} style={{ color: '#10B981', fontSize: '15px' }} />
+                            Enlace de Control del Cliente
+                          </span>
+                          <span style={{ fontSize: '10px', background: '#ECFDF5', color: '#065F46', padding: '2px 6px', borderRadius: '6px', fontWeight: '700' }}>
+                            Autogestión
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '11px', color: '#64748B', lineHeight: '1.4' }}>
+                          Tu cliente puede ver su especialista asignado, reportar su pago o reprogramar su cita desde este enlace.
+                        </p>
+                        <div style={{ display: 'grid', gridTemplateColumns: selectedEvent.customerPhone ? '1fr 1fr' : '1fr', gap: '8px', marginTop: '2px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const url = `${window.location.origin}/appointment/${selectedEvent.id}`;
+                              navigator.clipboard.writeText(url);
+                              presentToast({ message: '📋 Enlace copiado al portapapeles', duration: 2500, color: 'success' });
+                            }}
+                            style={{
+                              padding: '9px 10px',
+                              borderRadius: '8px',
+                              border: '1px solid #CBD5E1',
+                              background: '#FFFFFF',
+                              color: '#0F172A',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              cursor: 'pointer'
+                            }}
+                            title="Copiar enlace para el cliente"
+                          >
+                            <IonIcon icon={copyOutline} style={{ fontSize: '14px', color: '#10B981' }} />
+                            Copiar Enlace
+                          </button>
+                          {selectedEvent.customerPhone && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const appointmentUrl = `${window.location.origin}/appointment/${selectedEvent.id}`;
+                                const msg = `Hola ${selectedEvent.customerName}, te escribimos de ${user?.tenantName || 'FinoWork'} respecto a tu cita para ${selectedEvent.serviceName || 'nuestro servicio'} el ${selectedEvent.date} a las ${selectedEvent.time}.\n\nPuedes ver los detalles, gestionar tu cita o reportar tu pago aquí:\n${appointmentUrl}`;
+                                window.open(formatWhatsAppUrl(selectedEvent.customerPhone, msg), '_blank');
+                              }}
+                              style={{
+                                padding: '9px 10px',
+                                borderRadius: '8px',
+                                border: '1px solid #A7F3D0',
+                                background: '#ECFDF5',
+                                color: '#065F46',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                cursor: 'pointer'
+                              }}
+                              title="Enviar recordatorio y enlace por WhatsApp"
+                            >
+                              <IonIcon icon={logoWhatsapp} style={{ fontSize: '14px' }} />
+                              WhatsApp
+                            </button>
+                          )}
+                        </div>
+                      </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       <button
