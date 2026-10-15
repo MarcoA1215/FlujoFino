@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { SalaryAdvance, SalaryAdvanceStatus } from '../entities/salary-advance.entity';
@@ -9,7 +9,7 @@ import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { CreateSalaryAdvanceDto } from './dto/create-salary-advance.dto';
 
 @Injectable()
-export class SalaryAdvancesService {
+export class SalaryAdvancesService implements OnModuleInit {
   constructor(
     @InjectRepository(SalaryAdvance)
     private readonly advanceRepo: Repository<SalaryAdvance>,
@@ -24,6 +24,18 @@ export class SalaryAdvancesService {
     @InjectRepository(UserTenantAccess)
     private readonly accessRepo?: Repository<UserTenantAccess>,
   ) {}
+
+  async onModuleInit() {
+    try {
+      if (this.advanceRepo?.manager?.query) {
+        await this.advanceRepo.manager.query(`
+          ALTER TABLE "salary_advances" ADD COLUMN IF NOT EXISTS "paymentMethod" character varying DEFAULT 'CASH';
+        `);
+      }
+    } catch (e) {
+      console.warn('[SalaryAdvancesService] Auto-migration check:', e);
+    }
+  }
 
   async create(tenantId: string, dto: CreateSalaryAdvanceDto): Promise<SalaryAdvance> {
     const user = await this.userRepo.findOne({ where: { id: dto.userId } });
@@ -55,6 +67,7 @@ export class SalaryAdvancesService {
     const amountUSD = Number(dto.amountUSD);
     const amountBS = dto.amountBS !== undefined ? Number(dto.amountBS) : Number((amountUSD * rate).toFixed(2));
     const advanceDate = dto.date || new Date().toISOString().split('T')[0];
+    const paymentMethod = dto.paymentMethod ? (dto.paymentMethod.toUpperCase() === 'PAGO_MOVIL' ? 'PAGO_MOVIL' : 'CASH') : 'CASH';
 
     return this.dataSource.transaction(async manager => {
       // 1. Guardar vale
@@ -67,18 +80,20 @@ export class SalaryAdvancesService {
         reason: dto.reason || 'Vale / Anticipo de nómina',
         date: advanceDate,
         status: SalaryAdvanceStatus.PENDIENTE,
+        paymentMethod,
       });
       const savedAdvance = await manager.save(advance);
 
-      // 2. Registrar egreso en caja activa (OperatingExpense)
+      // 2. Registrar egreso en la cuenta correspondiente (OperatingExpense)
       const todayStr = new Date().toISOString().split('T')[0];
       const expenseCreatedAt = advanceDate === todayStr ? new Date() : new Date(advanceDate);
+      const methodLabel = paymentMethod === 'PAGO_MOVIL' ? ' (Pago Móvil / Banco)' : '';
 
       const expense = manager.create(OperatingExpense, {
         tenantId,
-        description: `Vale Empleado: ${dto.reason || 'Anticipo'} - ${user.username} ($${amountUSD.toFixed(2)} / Bs. ${amountBS.toFixed(2)})`,
+        description: `Vale Empleado${methodLabel}: ${dto.reason || 'Anticipo'} - ${user.username} ($${amountUSD.toFixed(2)} / Bs. ${amountBS.toFixed(2)})`,
         amount: amountUSD,
-        paymentMethod: 'CASH',
+        paymentMethod,
         category: 'VALE_EMPLEADO',
         createdAt: expenseCreatedAt,
       });

@@ -25,4 +25,8 @@ export class CreateSalaryAdvanceDto {
   @IsOptional()
   @IsString()
   date?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
 }

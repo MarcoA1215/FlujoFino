@@ -54,6 +54,9 @@ export class SalaryAdvance {
   })
   status: SalaryAdvanceStatus;
 
+  @Column({ type: 'varchar', default: 'CASH', nullable: true })
+  paymentMethod: string;
+
   @CreateDateColumn()
   createdAt: Date;
 }
