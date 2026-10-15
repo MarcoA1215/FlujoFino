@@ -70,6 +70,7 @@ import { AppHeader } from '../components/AppHeader';
 import { BankSelect } from '../components/BankSelect';
 
 interface Settings {
+  businessName?: string;
   exchangeRateBs?: number;
   exchangeRateMode?: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'MANUAL' | 'COP';
   manualExchangeRate?: number | null;
@@ -129,7 +130,8 @@ const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<Settings>({});
   const [subscription, setSubscription] = useState<MySubscriptionDTO | null>(null);
   const [presentToast] = useIonToast();
-  const { user } = useContext(AuthContext);
+  const { user, updateUser } = useContext(AuthContext);
+  const [businessName, setBusinessName] = useState(user?.tenantName || '');
 
   const isAdmin =
     user?.role === UserRole.ADMIN ||
@@ -229,6 +231,11 @@ const SettingsPage: React.FC = () => {
     try {
       const setRes = await apiClient.get<Settings>('/settings');
       setSettings(setRes.data);
+      if (setRes.data?.businessName) {
+        setBusinessName(setRes.data.businessName);
+      } else if (user?.tenantName) {
+        setBusinessName(user.tenantName);
+      }
       if (setRes.data?.exchangeRateBs) {
         setExchangeRate(Number(setRes.data.exchangeRateBs));
       }
@@ -312,8 +319,17 @@ const SettingsPage: React.FC = () => {
       });
     }
 
+    if (!businessName.trim()) {
+      return presentToast({
+        message: '⚠️ El nombre del negocio no puede estar vacío.',
+        duration: 4000,
+        color: 'warning'
+      });
+    }
+
     try {
       const payload: Partial<Settings> = { 
+        businessName: businessName.trim(),
         exchangeRateMode: settings.exchangeRateMode || 'BCV',
         exchangeRateBs: Number(settings.exchangeRateBs) || undefined,
         manualExchangeRate: settings.manualExchangeRate !== undefined && settings.manualExchangeRate !== null ? Number(settings.manualExchangeRate) : null,
@@ -379,6 +395,16 @@ const SettingsPage: React.FC = () => {
       document.documentElement.style.setProperty('--theme-header-contrast', headerContrastText);
       document.documentElement.style.setProperty('--ion-color-primary', primary);
       document.documentElement.style.setProperty('--ion-color-primary-contrast', contrastText);
+
+      if (updateUser && businessName.trim()) {
+        const updatedWorkspaces = user?.workspaces?.map((w: any) =>
+          w.tenantId === user?.tenantId ? { ...w, name: businessName.trim() } : w
+        );
+        await updateUser({
+          tenantName: businessName.trim(),
+          ...(updatedWorkspaces ? { workspaces: updatedWorkspaces } : {}),
+        });
+      }
 
       presentToast({
         message: 'Configuración guardada',
@@ -713,6 +739,14 @@ const SettingsPage: React.FC = () => {
                 </IonCardHeader>
                 <IonCardContent>
                   <p style={{marginBottom: '15px'}}>Estos datos se usarán para autocompletar recibos y textos copiados para WhatsApp.</p>
+                  <IonItem>
+                    <IonLabel position="stacked">Nombre del Negocio / Comercio *</IonLabel>
+                    <IonInput 
+                      value={businessName} 
+                      onIonInput={e => setBusinessName(e.detail.value || '')} 
+                      placeholder="Ej. Mi Negocio Spa" 
+                    />
+                  </IonItem>
                   <IonItem lines="none" style={{ '--background': 'transparent', marginBottom: '8px' }}>
                     <BankSelect
                       label="Banco Receptor"

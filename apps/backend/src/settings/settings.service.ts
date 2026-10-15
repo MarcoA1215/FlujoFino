@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Settings } from '../entities/settings.entity';
 import { Product } from '../entities/product.entity';
+import { Tenant } from '../entities/tenant.entity';
 import { ConfigService } from '@nestjs/config';
 import { StorageService } from '../storage/storage.service';
 
@@ -302,6 +303,17 @@ export class SettingsService implements OnModuleInit {
     const { isValidUUID } = require('../utils/tenant-crypto');
     if (tenantId && isValidUUID(tenantId)) {
       const tenantSettings = await this.settingsRepo.findOne({ where: { tenantId } });
+      let businessName = '';
+      try {
+        const tenantRepo = this.settingsRepo.manager?.getRepository(Tenant);
+        if (tenantRepo) {
+          const tenant = await tenantRepo.findOne({ where: { id: tenantId } });
+          businessName = tenant?.name || '';
+        }
+      } catch (err) {
+        this.logger.warn(`Error obteniendo nombre de tenant: ${err}`);
+      }
+
       if (tenantSettings) {
         const { encodeTenantId } = require('../utils/tenant-crypto');
         const effectiveRate = await this.getEffectiveRate(tenantId);
@@ -311,6 +323,7 @@ export class SettingsService implements OnModuleInit {
 
         return { 
           ...tenantSettings, 
+          businessName,
           exchangeRateBs: effectiveRate,
           exchangeRateMode: mode,
           manualExchangeRate: tenantSettings.manualExchangeRate,
@@ -331,10 +344,26 @@ export class SettingsService implements OnModuleInit {
     };
   }
 
-  async updateSettings(tenantId: string | undefined, payload: Partial<Settings>) {
+  async updateSettings(tenantId: string | undefined, payload: Partial<Settings> & { businessName?: string; name?: string }) {
     let settings;
     const { isValidUUID } = require('../utils/tenant-crypto');
     if (tenantId && isValidUUID(tenantId)) {
+      const newName = (payload?.businessName || payload?.name)?.trim();
+      if (newName) {
+        try {
+          const tenantRepo = this.settingsRepo.manager?.getRepository(Tenant);
+          if (tenantRepo) {
+            const tenant = await tenantRepo.findOne({ where: { id: tenantId } });
+            if (tenant && tenant.name !== newName) {
+              tenant.name = newName;
+              await tenantRepo.save(tenant);
+            }
+          }
+        } catch (err) {
+          this.logger.warn(`Error actualizando nombre del negocio: ${err}`);
+        }
+      }
+
       settings = await this.settingsRepo.findOne({ where: { tenantId } });
       if (!settings) {
         const { randomUUID } = require('crypto');

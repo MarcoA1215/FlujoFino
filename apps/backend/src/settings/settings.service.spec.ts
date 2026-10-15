@@ -239,6 +239,27 @@ describe('SettingsService (Unit Tests)', () => {
         }),
       );
     });
+
+    it('debe actualizar el nombre del tenant si viene businessName en el payload', async () => {
+      const mockTenantRepo = {
+        findOne: jest.fn().mockResolvedValue({ id: TENANT_1_ID, name: 'Nombre Viejo' }),
+        save: jest.fn().mockImplementation(t => Promise.resolve(t)),
+      };
+      (mockSettingsRepo as any).manager = {
+        getRepository: jest.fn().mockReturnValue(mockTenantRepo),
+      };
+
+      await service.updateSettings(TENANT_1_ID, {
+        businessName: 'Nombre Nuevo de Eva',
+      });
+
+      expect(mockTenantRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: TENANT_1_ID,
+          name: 'Nombre Nuevo de Eva',
+        }),
+      );
+    });
   });
 });
 
