@@ -265,10 +265,12 @@ export class PublicReservationsController {
     const depositPct = isDepositReq ? Number(settings?.bookingDepositPercentage ?? settings?.minDepositPercentage ?? 0) : 0;
 
     return {
+      id: token,
       tenantId: tenant.id,
       name: tenant.name,
       businessHours: settings?.businessHours || null,
-        slotInterval: settings?.slotInterval || 30,
+      services: services,
+      slotInterval: settings?.slotInterval || 30,
         featureDelivery: settings?.featureDelivery ?? true,
         featureShowCatalog: settings?.featureShowCatalog || false,
         bookingRequireService: settings?.bookingRequireService ?? true,
