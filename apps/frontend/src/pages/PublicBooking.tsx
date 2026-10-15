@@ -102,10 +102,14 @@ const PublicBooking: React.FC = () => {
 
   // When selected services change, reset staff if current staff cannot do all selected services
   useEffect(() => {
-    if (selectedStaff && availableStaffForService.length > 0) {
-      const isStillAvailable = availableStaffForService.some((st: any) => st.id === selectedStaff.id);
-      if (!isStillAvailable) {
+    if (selectedStaff) {
+      if (availableStaffForService.length === 0) {
         setSelectedStaff(null);
+      } else {
+        const isStillAvailable = availableStaffForService.some((st: any) => st.id === selectedStaff.id);
+        if (!isStillAvailable) {
+          setSelectedStaff(null);
+        }
       }
     }
   }, [selectedServices, availableStaffForService]);

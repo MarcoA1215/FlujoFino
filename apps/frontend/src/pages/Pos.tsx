@@ -68,6 +68,7 @@ type CartItem = {
   product: Product;
   quantity: number;
   unitPrice: number;
+  employeeId?: string;
   removedIngredients?: string[];
   addedExtras?: Array<{ rawMaterialId: string; name: string; priceUSD: number; quantity: number }>;
   hasModifications?: boolean;
@@ -540,11 +541,17 @@ const Pos: React.FC = () => {
               for (const sId of sIds) {
                 const found = pRes.data.find(p => p.id === sId);
                 if (found) {
+                  const spec = Array.isArray(resToLoad.serviceSpecialists)
+                    ? resToLoad.serviceSpecialists.find((s: any) => s.serviceId === found.id)
+                    : null;
+                  const itemEmployeeId = spec?.employeeId || resToLoad.employeeId || undefined;
+
                   matchedItems.push({
                     cartItemId: Date.now() + '_' + Math.random().toString(36).substring(2, 7),
                     product: found,
                     quantity: 1,
                     unitPrice: Number(found.salePrice || 0),
+                    employeeId: itemEmployeeId,
                     hasModifications: false,
                     removedIngredients: [],
                     addedExtras: []
@@ -594,6 +601,7 @@ const Pos: React.FC = () => {
                 },
                 quantity: it.quantity,
                 unitPrice: Number(it.unitPrice || it.product?.salePrice || 0),
+                employeeId: it.employeeId || undefined,
                 removedIngredients: it.removedIngredients || [],
                 addedExtras: it.addedExtras || [],
                 hasModifications: Boolean(it.hasModifications)
@@ -975,6 +983,7 @@ const Pos: React.FC = () => {
         productId: item.product?.id || (item as any).productId,
         quantity: Number(item.quantity) || 1,
         unitPrice: Number(item.unitPrice || item.product?.salePrice || 0),
+        employeeId: item.employeeId || undefined,
         removedIngredients: item.removedIngredients || [],
         addedExtras: item.addedExtras || [],
         hasModifications: Boolean(item.hasModifications)
@@ -1570,6 +1579,11 @@ const Pos: React.FC = () => {
                       <div style={{ flex: 1, paddingRight: '8px' }}>
                         <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           <span>{item.quantity}x {item.product.name}</span>
+                          {item.employeeId && (
+                            <span style={{ fontSize: '10px', fontWeight: '700', background: '#ECFDF5', color: '#065F46', padding: '1px 6px', borderRadius: '4px' }}>
+                              👤 {employees.find(e => e.id === item.employeeId)?.name || employees.find(e => e.id === item.employeeId)?.username || 'Especialista'}
+                            </span>
+                          )}
                           {item.hasModifications && (
                             <span style={{ fontSize: '10px', fontWeight: '800', background: '#FEF3C7', color: '#92400E', padding: '1px 5px', borderRadius: '4px' }}>
                               ⚠️ Modificado

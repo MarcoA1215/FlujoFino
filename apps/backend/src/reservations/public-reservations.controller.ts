@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, IsArray } from 'class-validator';
 import { Controller, Post, Body, Param, Get, NotFoundException, BadRequestException, Put, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ReservationsService } from './reservations.service';
@@ -102,6 +102,10 @@ export class CreatePublicReservationDto {
   @IsOptional()
   @IsString()
   referralSource?: string;
+
+  @IsOptional()
+  @IsArray()
+  serviceSpecialists?: any[];
 }
 
 @Public()
@@ -409,6 +413,7 @@ export class PublicReservationsController {
       serviceName: dto.serviceName,
       numberOfPeople: dto.numberOfPeople || 1,
       employeeId: dto.employeeId,
+      serviceSpecialists: dto.serviceSpecialists || undefined,
       notes: dto.notes?.trim(),
       totalAmount: Number(dto.totalAmount || 0),
       tableNumber: dto.tableNumber?.trim(),
@@ -556,10 +561,19 @@ export class PublicReservationsController {
           if (prod) {
             const price = Number(prod.salePrice || 0);
             itemsSum += price;
+            const spec = Array.isArray(finalReservation.serviceSpecialists)
+              ? finalReservation.serviceSpecialists.find((s: any) => 
+                  (s.serviceId && prod.id && s.serviceId === prod.id) ||
+                  (s.serviceName && prod.name && s.serviceName.trim().toLowerCase() === prod.name.trim().toLowerCase())
+                )
+              : null;
+            const itemEmployeeId = spec?.employeeId || finalReservation.employeeId || undefined;
+
             const item = orderItemRepo.create({
               orderId: savedOrder.id,
               productId: prod.id,
               productName: prod.name,
+              employeeId: itemEmployeeId,
               quantity: 1,
               unitPrice: price,
               subtotal: price,
@@ -1186,8 +1200,10 @@ export class PublicReservationsController {
 
     // Determine candidate staff pool
     let candidateStaff = staffList;
-    if (serviceId) {
-      const requestedServices = serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean);
+    const requestedServices = serviceId
+      ? serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean) as Product[]
+      : [];
+    if (requestedServices.length > 0) {
       const requiredStaffIdSets = requestedServices
         .map(s => {
           const raw = (s as any)?.assignedStaffIds;
@@ -1198,13 +1214,22 @@ export class PublicReservationsController {
         .filter(arr => Array.isArray(arr) && arr.length > 0);
 
       if (requiredStaffIdSets.length > 0) {
-        const filtered = candidateStaff.filter(st =>
+        const staffDoingAll = candidateStaff.filter(st =>
           requiredStaffIdSets.every(set =>
             set.includes(st.userId) || set.includes(st.id) || set.includes(st.user?.id)
           )
         );
-        if (filtered.length > 0) {
-          candidateStaff = filtered;
+        if (staffDoingAll.length > 0) {
+          candidateStaff = staffDoingAll;
+        } else {
+          const partialStaff = candidateStaff.filter(st =>
+            requiredStaffIdSets.some(set =>
+              set.includes(st.userId) || set.includes(st.id) || set.includes(st.user?.id)
+            )
+          );
+          if (partialStaff.length > 0) {
+            candidateStaff = partialStaff;
+          }
         }
       }
     }
@@ -1248,7 +1273,8 @@ export class PublicReservationsController {
       end: number;
     }
 
-    const busyBookings: BusyBooking[] = existing.map(r => {
+    const busyBookings: BusyBooking[] = [];
+    for (const r of existing) {
       const [rh, rm] = (r.time || '00:00').trim().split(':').map(Number);
       const startMins = (rh || 0) * 60 + (rm || 0);
       let rDuration = Number(r.durationMinutes) || 0;
@@ -1279,12 +1305,26 @@ export class PublicReservationsController {
         rDuration = interval;
       }
 
-      return {
-        employeeId: r.employeeId || null,
-        start: startMins,
-        end: startMins + rDuration
-      };
-    });
+      if (Array.isArray(r.serviceSpecialists) && r.serviceSpecialists.length > 0) {
+        let segStart = startMins;
+        for (const s of r.serviceSpecialists) {
+          const sp = s.serviceId ? productMap.get(s.serviceId) : null;
+          const dur = Number(s.durationMinutes) || Number(sp?.durationMinutes) || interval;
+          busyBookings.push({
+            employeeId: s.employeeId || null,
+            start: segStart,
+            end: segStart + dur,
+          });
+          segStart += dur;
+        }
+      } else {
+        busyBookings.push({
+          employeeId: r.employeeId || null,
+          start: startMins,
+          end: startMins + rDuration,
+        });
+      }
+    }
 
     const slots: string[] = [];
     const timeZone = (settings as any)?.timezone || process.env.BUSINESS_TIMEZONE || 'America/Caracas';
@@ -1369,6 +1409,60 @@ export class PublicReservationsController {
               if (!slots.includes(timeStr)) {
                 slots.push(timeStr);
               }
+            }
+          }
+        } else if (requestedServices.length > 1) {
+          // Multi-service coordinated availability:
+          // Check if each sequential service segment has qualified staff available during its specific time window
+          let segStart = currentMins;
+          let allSegmentsFeasible = true;
+
+          for (const sProd of requestedServices) {
+            const sDur = Number((sProd as any).durationMinutes) || interval;
+            const segEnd = segStart + sDur;
+
+            let segQualifiedStaff = staffList;
+            const raw = (sProd as any)?.assignedStaffIds;
+            let assignedIds: string[] = [];
+            if (Array.isArray(raw)) assignedIds = raw;
+            else if (typeof raw === 'string' && raw.trim()) assignedIds = raw.split(',').map((x: string) => x.trim()).filter(Boolean);
+
+            if (assignedIds.length > 0) {
+              segQualifiedStaff = segQualifiedStaff.filter(st =>
+                assignedIds.includes(st.userId) || assignedIds.includes(st.id) || assignedIds.includes(st.user?.id)
+              );
+            }
+
+            const freeForThisSegment = segQualifiedStaff.filter(st => {
+              const stEntry = toMins(st.entryTime);
+              if (stEntry !== null && segStart < stEntry) return false;
+              const stExit = toMins(st.exitTime);
+              if (stExit !== null && segEnd > stExit) return false;
+              const stLStart = toMins(st.lunchStart);
+              const stLEnd = toMins(st.lunchEnd);
+              if (stLStart !== null && stLEnd !== null && segStart < stLEnd && segEnd > stLStart) return false;
+              return !busyBookings.some(b =>
+                (b.employeeId === st.userId || b.employeeId === st.id || b.employeeId === st.user?.id) &&
+                segStart < b.end && segEnd > b.start
+              );
+            });
+
+            const unassignedInSegment = busyBookings.filter(
+              b => !b.employeeId && segStart < b.end && segEnd > b.start
+            ).length;
+
+            if (freeForThisSegment.length - unassignedInSegment <= 0) {
+              allSegmentsFeasible = false;
+              break;
+            }
+
+            segStart = segEnd;
+          }
+
+          if (allSegmentsFeasible) {
+            const timeStr = this.minutesToTime(currentMins).substring(0, 5);
+            if (!slots.includes(timeStr)) {
+              slots.push(timeStr);
             }
           }
         } else {

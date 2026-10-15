@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, OnModuleInit, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, EntityManager } from 'typeorm';
 import { Reservation } from '../entities/reservation.entity';
@@ -11,11 +11,10 @@ import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import { Settings } from '../entities/settings.entity';
-import { NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 
 @Injectable()
-export class ReservationsService {
+export class ReservationsService implements OnModuleInit {
   constructor(
     @InjectRepository(Reservation)
     private repo: Repository<Reservation>,
@@ -24,18 +23,43 @@ export class ReservationsService {
     private readonly storageService: StorageService,
   ) {}
 
+  async onModuleInit() {
+    try {
+      await this.repo.query(`ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "serviceSpecialists" jsonb;`);
+      await this.repo.query(`ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "employeeId" character varying;`);
+    } catch (e: any) {
+      console.warn('[ReservationsService onModuleInit] Notice:', e?.message || e);
+    }
+  }
+
   async syncLinkedOrder(tenantId: string, reservation: Reservation, em?: EntityManager) {
     try {
       const manager = em || this.repo.manager;
       if (!manager?.getRepository) return;
       const orderRepo = manager.getRepository(Order);
       
-      const orders = await orderRepo.find({
-        where: [
-          ...(reservation.orderId ? [{ id: reservation.orderId, tenantId }] : []),
-          { linkedReservationId: reservation.id, tenantId }
-        ]
-      });
+      let orders: Order[] = [];
+      if (typeof orderRepo.find === 'function') {
+        try {
+          orders = await orderRepo.find({
+            where: [
+              ...(reservation.orderId ? [{ id: reservation.orderId, tenantId }] : []),
+              { linkedReservationId: reservation.id, tenantId }
+            ]
+          });
+        } catch (e) {}
+      }
+      if ((!orders || orders.length === 0) && typeof orderRepo.findOne === 'function') {
+        try {
+          const single = await orderRepo.findOne({
+            where: [
+              ...(reservation.orderId ? [{ id: reservation.orderId, tenantId }] : []),
+              { linkedReservationId: reservation.id, tenantId }
+            ]
+          });
+          if (single) orders = [single];
+        } catch (e) {}
+      }
 
       if (!orders || orders.length === 0) return;
 
@@ -158,6 +182,31 @@ export class ReservationsService {
           }
         }
 
+        // Sincronizar employeeId en orderItems si hay serviceSpecialists
+        if (Array.isArray(reservation.serviceSpecialists) && reservation.serviceSpecialists.length > 0) {
+          const orderItemRepo = manager.getRepository(OrderItem);
+          const items = await orderItemRepo.find({ where: { orderId: order.id } });
+          for (const item of items) {
+            const spec = reservation.serviceSpecialists.find(s => 
+              (s.serviceId && item.productId && s.serviceId === item.productId) ||
+              (s.serviceName && item.productName && s.serviceName.trim().toLowerCase() === item.productName.trim().toLowerCase())
+            );
+            if (spec?.employeeId && item.employeeId !== spec.employeeId) {
+              item.employeeId = spec.employeeId;
+              await orderItemRepo.save(item);
+            }
+          }
+        } else if (reservation.employeeId) {
+          const orderItemRepo = manager.getRepository(OrderItem);
+          const items = await orderItemRepo.find({ where: { orderId: order.id } });
+          for (const item of items) {
+            if (item.employeeId !== reservation.employeeId) {
+              item.employeeId = reservation.employeeId;
+              await orderItemRepo.save(item);
+            }
+          }
+        }
+
         await orderRepo.save(order);
       }
     } catch (err) {
@@ -233,10 +282,20 @@ export class ReservationsService {
             const cost = Number(prod.estimatedCost || prod.cost || 0);
             itemsTotal += price;
             itemsCost += cost;
+
+            const spec = Array.isArray(reservation.serviceSpecialists)
+              ? reservation.serviceSpecialists.find(s => 
+                  (s.serviceId && prod.id && s.serviceId === prod.id) ||
+                  (s.serviceName && prod.name && s.serviceName.trim().toLowerCase() === prod.name.trim().toLowerCase())
+                )
+              : null;
+            const itemEmployeeId = spec?.employeeId || reservation.employeeId || undefined;
+
             const item = orderItemRepo.create({
               orderId: savedOrder.id,
               productId: prod.id,
               productName: prod.name,
+              employeeId: itemEmployeeId,
               quantity: 1,
               unitPrice: price,
               unitCost: cost,
@@ -318,9 +377,15 @@ export class ReservationsService {
           `El horario de atención es de ${dayConfig.startTime} a ${dayConfig.endTime} y de ${dayConfig.secondStartTime} a ${dayConfig.secondEndTime}. La cita terminaría a las ${formatTime(reqEndMins)}, pero el local está fuera de los turnos de apertura.`
         );
       } else {
-        throw new BadRequestException(
-          `La cita terminaría a las ${formatTime(reqEndMins)}, pero el local cierra a las ${dayConfig.endTime}.`
-        );
+        if (reqMins < start1) {
+          throw new BadRequestException(
+            `La cita iniciaría a las ${formatTime(reqMins)}, pero el local abre a las ${dayConfig.startTime || '08:00'}.`
+          );
+        } else {
+          throw new BadRequestException(
+            `La cita terminaría a las ${formatTime(reqEndMins)}, pero el local cierra a las ${dayConfig.endTime || '18:00'}.`
+          );
+        }
       }
     }
   }
@@ -335,13 +400,14 @@ export class ReservationsService {
     employeeId?: string,
     manager?: EntityManager,
     explicitDuration?: number,
+    serviceSpecialists?: Array<{ serviceId: string; employeeId?: string; employeeName?: string; durationMinutes?: number; serviceName?: string; price?: number }>,
   ) {
     const em = manager || this.repo.manager;
     const settingsRepo = em.getRepository('Settings');
     const settings: any = await settingsRepo.findOne({ where: { tenantId } });
     const interval = Number(settings?.slotInterval) || 30;
 
-    const productRepo = em.getRepository('Product');
+    const productRepo = em.getRepository(Product);
     const products: any[] = await productRepo.find({ where: { tenantId } });
     const productMap = new Map(products.map(p => [p.id, p]));
     const productNameMap = new Map(products.map(p => [p.name.trim().toLowerCase(), p]));
@@ -416,7 +482,8 @@ export class ReservationsService {
       end: number;
     }
 
-    const busyBookings: BusyBooking[] = existing.map(res => {
+    const busyBookings: BusyBooking[] = [];
+    for (const res of existing) {
       const [rh, rm] = (res.time || '00:00').trim().split(':').map(Number);
       const exStart = (rh || 0) * 60 + (rm || 0);
       let exDuration = Number(res.durationMinutes) || 0;
@@ -437,13 +504,127 @@ export class ReservationsService {
         }
       }
       if (exDuration <= 0) exDuration = interval;
-      return {
-        employeeId: res.employeeId || null,
-        customerName: res.customerName || 'Cliente',
-        start: exStart,
-        end: exStart + exDuration
-      };
-    });
+
+      if (Array.isArray(res.serviceSpecialists) && res.serviceSpecialists.length > 0) {
+        let segStart = exStart;
+        for (const s of res.serviceSpecialists) {
+          const sp = s.serviceId ? productMap.get(s.serviceId) : null;
+          const dur = Number(s.durationMinutes) || Number(sp?.durationMinutes) || interval;
+          busyBookings.push({
+            employeeId: s.employeeId || null,
+            customerName: res.customerName || 'Cliente',
+            start: segStart,
+            end: segStart + dur,
+          });
+          segStart += dur;
+        }
+      } else {
+        busyBookings.push({
+          employeeId: res.employeeId || null,
+          customerName: res.customerName || 'Cliente',
+          start: exStart,
+          end: exStart + exDuration,
+        });
+      }
+    }
+
+    // Si la cita tiene asignación específica de especialistas por servicio
+    if (Array.isArray(serviceSpecialists) && serviceSpecialists.length > 0) {
+      let currentSegStart = reqStart;
+      for (const spec of serviceSpecialists) {
+        const sProd = spec.serviceId ? productMap.get(spec.serviceId) : null;
+        const dur = Number(spec.durationMinutes) || Number(sProd?.durationMinutes) || interval;
+        const segStart = currentSegStart;
+        const segEnd = segStart + dur;
+        currentSegStart = segEnd;
+
+        const rawAssigned = (sProd as any)?.assignedStaffIds;
+        let sAssignedIds: string[] = [];
+        if (Array.isArray(rawAssigned)) sAssignedIds = rawAssigned;
+        else if (typeof rawAssigned === 'string' && rawAssigned.trim()) {
+          sAssignedIds = rawAssigned.split(',').map((x: string) => x.trim()).filter(Boolean);
+        }
+
+        if (spec.employeeId) {
+          // 1. Buscar empleado en staffList por userId, id o user.id
+          let emp = staffList.find(s => s.userId === spec.employeeId || s.id === spec.employeeId || s.user?.id === spec.employeeId);
+          if (!emp) {
+            emp = await accessRepo.findOne({
+              where: [
+                { userId: spec.employeeId, tenantId, isActive: true, status: 'ACCEPTED' },
+                { id: spec.employeeId, tenantId, isActive: true, status: 'ACCEPTED' },
+              ],
+              relations: { user: true },
+            }) as any;
+          }
+
+          // 2. Validar cualificación para el servicio
+          if (sAssignedIds.length > 0) {
+            const isQualified = sAssignedIds.includes(spec.employeeId) ||
+              (emp && (sAssignedIds.includes(emp.userId) || sAssignedIds.includes(emp.id) || (emp.user && sAssignedIds.includes(emp.user.id))));
+            if (!isQualified) {
+              throw new BadRequestException(
+                `El especialista seleccionado para "${spec.serviceName || sProd?.name || 'el servicio'}" no está calificado para realizarlo.`
+              );
+            }
+          }
+
+          // 3. Validar jornada laboral y almuerzo del especialista
+          if (emp) {
+            if (emp.entryTime && segStart < toMins(emp.entryTime)) {
+              throw new BadRequestException(
+                `El especialista ${spec.employeeName || emp.user?.username || ''} ingresa a las ${emp.entryTime.substring(0, 5)}. La parte de "${spec.serviceName || sProd?.name}" (${formatTime(segStart)}) inicia antes de su jornada.`
+              );
+            }
+            if (emp.exitTime && segEnd > toMins(emp.exitTime)) {
+              throw new BadRequestException(
+                `El especialista ${spec.employeeName || emp.user?.username || ''} culmina a las ${emp.exitTime.substring(0, 5)}. La parte de "${spec.serviceName || sProd?.name}" (${formatTime(segEnd)}) excede su jornada.`
+              );
+            }
+            if (emp.lunchStart && emp.lunchEnd) {
+              const lStart = toMins(emp.lunchStart);
+              const lEnd = toMins(emp.lunchEnd);
+              if (segStart < lEnd && segEnd > lStart) {
+                throw new BadRequestException(
+                  `El especialista ${spec.employeeName || emp.user?.username || ''} se encuentra en receso de almuerzo (${emp.lunchStart.substring(0, 5)} a ${emp.lunchEnd.substring(0, 5)}) durante "${spec.serviceName || sProd?.name}".`
+                );
+              }
+            }
+          }
+
+          // 4. Validar choque directo para ese especialista en este bloque
+          const directCollision = busyBookings.find(
+            b => (b.employeeId === spec.employeeId || (emp && (b.employeeId === emp.userId || b.employeeId === emp.id))) &&
+                 segStart < b.end && segEnd > b.start
+          );
+          if (directCollision) {
+            throw new BadRequestException(
+              `El especialista ${spec.employeeName || emp?.user?.username || ''} ya tiene una cita con "${directCollision.customerName}" (${formatTime(directCollision.start)} a ${formatTime(directCollision.end)}). Si deseas agendarla de todas formas, confirma para forzar.`
+            );
+          }
+        } else {
+          // Si no se asignó un especialista específico a este servicio, asegurar que haya al menos uno calificado disponible en este segmento
+          let segmentStaff = staffList;
+          if (sAssignedIds.length > 0) {
+            segmentStaff = segmentStaff.filter(st =>
+              sAssignedIds.includes(st.userId) || sAssignedIds.includes(st.id) || (st.user && sAssignedIds.includes(st.user.id))
+            );
+          }
+          const freeForSegment = segmentStaff.filter(st => {
+            if (st.entryTime && segStart < toMins(st.entryTime)) return false;
+            if (st.exitTime && segEnd > toMins(st.exitTime)) return false;
+            if (st.lunchStart && st.lunchEnd && segStart < toMins(st.lunchEnd) && segEnd > toMins(st.lunchStart)) return false;
+            return !busyBookings.some(b => (b.employeeId === st.userId || b.employeeId === st.id) && segStart < b.end && segEnd > b.start);
+          });
+          if (freeForSegment.length === 0) {
+            throw new BadRequestException(
+              `No hay especialistas disponibles para el servicio "${spec.serviceName || sProd?.name || 'solicitado'}" en el horario ${formatTime(segStart)} a ${formatTime(segEnd)}.`
+            );
+          }
+        }
+      }
+      return;
+    }
 
     const isSoloBusiness = staffList.length === 0;
 
@@ -535,9 +716,24 @@ export class ReservationsService {
           .filter(arr => Array.isArray(arr) && arr.length > 0);
 
         if (requiredStaffIdSets.length > 0) {
-          candidateStaff = candidateStaff.filter(st =>
+          const staffDoingAll = candidateStaff.filter(st =>
             requiredStaffIdSets.every(set => set.includes(st.userId))
           );
+          if (staffDoingAll.length > 0) {
+            candidateStaff = staffDoingAll;
+          } else {
+            // Si ningún empleado individual hace todos los servicios seleccionados a la vez,
+            // verificar que para cada servicio exista al menos un especialista calificado activo
+            const allServicesCovered = requiredStaffIdSets.every(set =>
+              staffList.some(st => set.includes(st.userId))
+            );
+            if (!allServicesCovered) {
+              throw new BadRequestException('Uno o más servicios seleccionados no cuentan con especialistas calificados activos en el establecimiento.');
+            }
+            candidateStaff = candidateStaff.filter(st =>
+              requiredStaffIdSets.some(set => set.includes(st.userId))
+            );
+          }
         }
       }
 
@@ -569,7 +765,7 @@ export class ReservationsService {
     const settings: any = await settingsRepo.findOne({ where: { tenantId } });
     const interval = Number(settings?.slotInterval) || 30;
 
-    const productRepo = this.repo.manager.getRepository('Product');
+    const productRepo = this.repo.manager.getRepository(Product);
     const products: any[] = await productRepo.find({ where: { tenantId } });
     const productMap = new Map(products.map(p => [p.id, p]));
     const productNameMap = new Map(products.map(p => [p.name.trim().toLowerCase(), p]));
@@ -602,9 +798,60 @@ export class ReservationsService {
 
       const duration = dto.durationMinutes || await this.calculateServiceDuration(tenantId, dto.serviceId, dto.serviceName);
 
+      let effectiveSpecialists = dto.serviceSpecialists;
+      if (!effectiveSpecialists && dto.serviceId && dto.serviceId.includes(',')) {
+        const sIds = dto.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
+        const productRepo = manager.getRepository(Product);
+        const autoSpecialists: any[] = [];
+        for (const sId of sIds) {
+          const prod: any = await productRepo.findOne({ where: { id: sId, tenantId } });
+          if (prod) {
+            let itemEmpId: string | undefined = dto.employeeId || undefined;
+            let itemEmpName: string | undefined = dto.employeeName || undefined;
+            const raw = prod.assignedStaffIds;
+            let staffIds: string[] = [];
+            if (Array.isArray(raw)) staffIds = raw;
+            else if (typeof raw === 'string') staffIds = raw.split(',').map((x: string) => x.trim()).filter(Boolean);
+
+            if (staffIds.length === 1) {
+              itemEmpId = staffIds[0];
+            } else if (dto.employeeId && staffIds.includes(dto.employeeId)) {
+              itemEmpId = dto.employeeId;
+            }
+
+            if (itemEmpId && (!itemEmpName || itemEmpId !== dto.employeeId)) {
+              try {
+                const accessRepo = manager.getRepository(UserTenantAccess);
+                const empAcc: any = await accessRepo.findOne({
+                  where: { userId: itemEmpId, tenantId },
+                  relations: { user: true },
+                });
+                if (empAcc?.user?.username) {
+                  itemEmpName = empAcc.user.username;
+                }
+              } catch (e) {
+                // Non-fatal, continue with undefined name
+              }
+            }
+
+            autoSpecialists.push({
+              serviceId: prod.id,
+              serviceName: prod.name,
+              employeeId: itemEmpId,
+              employeeName: itemEmpName,
+              price: Number(prod.salePrice || 0),
+              durationMinutes: Number(prod.durationMinutes || 30),
+            });
+          }
+        }
+        if (autoSpecialists.length > 0) {
+          effectiveSpecialists = autoSpecialists;
+        }
+      }
+
       if (dto.date && dto.time && !dto.force) {
         await this.validateBusinessHours(tenantId, dto.date, dto.time, duration);
-        await this.validateSlotOverlap(tenantId, dto.date, dto.time, dto.serviceId, dto.serviceName, undefined, dto.employeeId, manager, duration);
+        await this.validateSlotOverlap(tenantId, dto.date, dto.time, dto.serviceId, dto.serviceName, undefined, dto.employeeId, manager, duration, effectiveSpecialists);
       }
       if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
       if (dto.totalAmount !== undefined && dto.totalAmount < 0) throw new BadRequestException('El monto total no puede ser negativo');
@@ -613,6 +860,9 @@ export class ReservationsService {
       Object.assign(reservation, dto);
       reservation.tenantId = tenantId;
       reservation.durationMinutes = duration;
+      if (effectiveSpecialists) {
+        reservation.serviceSpecialists = effectiveSpecialists;
+      }
 
       if (dto.customerName && dto.customerPhone && !dto.customerId) {
         try {
@@ -686,9 +936,12 @@ export class ReservationsService {
 
       const duration = dto.durationMinutes || reservation.durationMinutes || await this.calculateServiceDuration(tenantId, dto.serviceId || reservation.serviceId, dto.serviceName || reservation.serviceName);
 
-      if ((dto.date || dto.time) && !dto.force) {
-        await this.validateBusinessHours(tenantId, targetDate, targetTime, duration);
-        await this.validateSlotOverlap(tenantId, targetDate, targetTime, dto.serviceId || reservation.serviceId, dto.serviceName || reservation.serviceName, id, dto.employeeId !== undefined ? dto.employeeId : reservation.employeeId, manager, duration);
+      const shouldValidateSlot = (dto.date || dto.time || dto.employeeId !== undefined || dto.serviceSpecialists !== undefined) && !dto.force;
+      if (shouldValidateSlot) {
+        if (dto.date || dto.time) {
+          await this.validateBusinessHours(tenantId, targetDate, targetTime, duration);
+        }
+        await this.validateSlotOverlap(tenantId, targetDate, targetTime, dto.serviceId || reservation.serviceId, dto.serviceName || reservation.serviceName, id, dto.employeeId !== undefined ? dto.employeeId : reservation.employeeId, manager, duration, dto.serviceSpecialists !== undefined ? dto.serviceSpecialists : reservation.serviceSpecialists);
       }
       if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
       if (dto.totalAmount !== undefined && dto.totalAmount < 0) throw new BadRequestException('El monto total no puede ser negativo');
@@ -709,6 +962,9 @@ export class ReservationsService {
       
       Object.assign(reservation, dto);
       reservation.durationMinutes = duration;
+      if (dto.serviceSpecialists !== undefined) {
+        reservation.serviceSpecialists = dto.serviceSpecialists;
+      }
 
       // Auto-calcular totalAmount si quedó en 0 o no vino y hay servicios
       if ((!reservation.totalAmount || Number(reservation.totalAmount) <= 0) && (reservation.serviceId || reservation.serviceName)) {
@@ -751,7 +1007,7 @@ export class ReservationsService {
     });
   }
 
-  async reschedule(tenantId: string, id: string, dto: { date: string; time: string; reason?: string }) {
+  async reschedule(tenantId: string, id: string, dto: { date: string; time: string; reason?: string; force?: boolean }) {
     if (!dto.date || !dto.time) throw new BadRequestException('Fecha y hora requeridas para reprogramar');
     return this.repo.manager.transaction(async (manager) => {
       const reservationRepo = manager.getRepository(Reservation);
@@ -766,8 +1022,10 @@ export class ReservationsService {
       const duration = reservation.durationMinutes || await this.calculateServiceDuration(tenantId, reservation.serviceId, reservation.serviceName);
       const tfFormatted = dto.time.length <= 5 ? dto.time + ':00' : dto.time;
 
-      await this.validateBusinessHours(tenantId, dto.date, tfFormatted, duration);
-      await this.validateSlotOverlap(tenantId, dto.date, tfFormatted, reservation.serviceId, reservation.serviceName, id, reservation.employeeId, manager, duration);
+      if (!dto.force) {
+        await this.validateBusinessHours(tenantId, dto.date, tfFormatted, duration);
+        await this.validateSlotOverlap(tenantId, dto.date, tfFormatted, reservation.serviceId, reservation.serviceName, id, reservation.employeeId, manager, duration, reservation.serviceSpecialists);
+      }
 
       const oldDate = reservation.date;
       const oldTime = reservation.time.substring(0, 5);
@@ -845,12 +1103,28 @@ export class ReservationsService {
     // Sincronizar cancelación en TODAS las órdenes vinculadas para no dejar tickets huérfanos o duplicados
     try {
       const orderRepo = this.repo.manager.getRepository(Order);
-      const linkedOrders = await orderRepo.find({
-        where: [
-          ...(reservation.orderId ? [{ id: reservation.orderId, tenantId }] : []),
-          { linkedReservationId: reservation.id, tenantId }
-        ]
-      });
+      let linkedOrders: Order[] = [];
+      if (typeof orderRepo.find === 'function') {
+        try {
+          linkedOrders = await orderRepo.find({
+            where: [
+              ...(reservation.orderId ? [{ id: reservation.orderId, tenantId }] : []),
+              { linkedReservationId: reservation.id, tenantId }
+            ]
+          });
+        } catch (e) {}
+      }
+      if ((!linkedOrders || linkedOrders.length === 0) && typeof orderRepo.findOne === 'function') {
+        try {
+          const single = await orderRepo.findOne({
+            where: [
+              ...(reservation.orderId ? [{ id: reservation.orderId, tenantId }] : []),
+              { linkedReservationId: reservation.id, tenantId }
+            ]
+          });
+          if (single) linkedOrders = [single];
+        } catch (e) {}
+      }
       for (const linkedOrder of linkedOrders) {
         if (linkedOrder.status !== OrderStatus.CANCELED) {
           linkedOrder.status = OrderStatus.CANCELED;
@@ -1119,7 +1393,7 @@ export class ReservationsService {
         .orderBy('res.time', 'ASC')
         .getMany();
 
-      const productRepo = manager.getRepository('Product');
+      const productRepo = manager.getRepository(Product);
       const products: any[] = await productRepo.find({ where: { tenantId } });
       const productMap = new Map(products.map(p => [p.id, p]));
       const productNameMap = new Map(products.map(p => [p.name.trim().toLowerCase(), p]));
@@ -1386,8 +1660,10 @@ export class ReservationsService {
 
     // Determine candidate staff pool
     let candidateStaff = staffList;
-    if (serviceId) {
-      const requestedServices = serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean);
+    const requestedServices = serviceId
+      ? serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean) as Product[]
+      : [];
+    if (requestedServices.length > 0) {
       const requiredStaffIdSets = requestedServices
         .map(s => {
           const raw = (s as any)?.assignedStaffIds;
@@ -1398,13 +1674,22 @@ export class ReservationsService {
         .filter(arr => Array.isArray(arr) && arr.length > 0);
 
       if (requiredStaffIdSets.length > 0) {
-        const filtered = candidateStaff.filter(st =>
+        const staffDoingAll = candidateStaff.filter(st =>
           requiredStaffIdSets.every(set =>
             set.includes(st.userId) || set.includes(st.id) || set.includes(st.user?.id)
           )
         );
-        if (filtered.length > 0) {
-          candidateStaff = filtered;
+        if (staffDoingAll.length > 0) {
+          candidateStaff = staffDoingAll;
+        } else {
+          const partialStaff = candidateStaff.filter(st =>
+            requiredStaffIdSets.some(set =>
+              set.includes(st.userId) || set.includes(st.id) || set.includes(st.user?.id)
+            )
+          );
+          if (partialStaff.length > 0) {
+            candidateStaff = partialStaff;
+          }
         }
       }
     }
@@ -1448,7 +1733,8 @@ export class ReservationsService {
       end: number;
     }
 
-    const busyBookings: BusyBooking[] = existing.map(r => {
+    const busyBookings: BusyBooking[] = [];
+    for (const r of existing) {
       const [rh, rm] = (r.time || '00:00').trim().split(':').map(Number);
       const startMins = (rh || 0) * 60 + (rm || 0);
       let rDuration = Number(r.durationMinutes) || 0;
@@ -1479,12 +1765,26 @@ export class ReservationsService {
         rDuration = interval;
       }
 
-      return {
-        employeeId: r.employeeId || null,
-        start: startMins,
-        end: startMins + rDuration
-      };
-    });
+      if (Array.isArray(r.serviceSpecialists) && r.serviceSpecialists.length > 0) {
+        let segStart = startMins;
+        for (const s of r.serviceSpecialists) {
+          const sp = s.serviceId ? productMap.get(s.serviceId) : null;
+          const dur = Number(s.durationMinutes) || Number(sp?.durationMinutes) || interval;
+          busyBookings.push({
+            employeeId: s.employeeId || null,
+            start: segStart,
+            end: segStart + dur,
+          });
+          segStart += dur;
+        }
+      } else {
+        busyBookings.push({
+          employeeId: r.employeeId || null,
+          start: startMins,
+          end: startMins + rDuration,
+        });
+      }
+    }
 
     const slots: string[] = [];
     const timeZone = (settings as any)?.timezone || process.env.BUSINESS_TIMEZONE || 'America/Caracas';
@@ -1563,6 +1863,60 @@ export class ReservationsService {
               if (!slots.includes(timeStr)) {
                 slots.push(timeStr);
               }
+            }
+          }
+        } else if (requestedServices.length > 1) {
+          // Multi-service coordinated availability:
+          // Check if each sequential service segment has qualified staff available during its specific time window
+          let segStart = currentMins;
+          let allSegmentsFeasible = true;
+
+          for (const sProd of requestedServices) {
+            const sDur = Number((sProd as any).durationMinutes) || interval;
+            const segEnd = segStart + sDur;
+
+            let segQualifiedStaff = staffList;
+            const raw = (sProd as any)?.assignedStaffIds;
+            let assignedIds: string[] = [];
+            if (Array.isArray(raw)) assignedIds = raw;
+            else if (typeof raw === 'string' && raw.trim()) assignedIds = raw.split(',').map((x: string) => x.trim()).filter(Boolean);
+
+            if (assignedIds.length > 0) {
+              segQualifiedStaff = segQualifiedStaff.filter(st =>
+                assignedIds.includes(st.userId) || assignedIds.includes(st.id) || assignedIds.includes(st.user?.id)
+              );
+            }
+
+            const freeForThisSegment = segQualifiedStaff.filter(st => {
+              const stEntry = toMins(st.entryTime);
+              if (stEntry !== null && segStart < stEntry) return false;
+              const stExit = toMins(st.exitTime);
+              if (stExit !== null && segEnd > stExit) return false;
+              const stLStart = toMins(st.lunchStart);
+              const stLEnd = toMins(st.lunchEnd);
+              if (stLStart !== null && stLEnd !== null && segStart < stLEnd && segEnd > stLStart) return false;
+              return !busyBookings.some(b =>
+                (b.employeeId === st.userId || b.employeeId === st.id || b.employeeId === st.user?.id) &&
+                segStart < b.end && segEnd > b.start
+              );
+            });
+
+            const unassignedInSegment = busyBookings.filter(
+              b => !b.employeeId && segStart < b.end && segEnd > b.start
+            ).length;
+
+            if (freeForThisSegment.length - unassignedInSegment <= 0) {
+              allSegmentsFeasible = false;
+              break;
+            }
+
+            segStart = segEnd;
+          }
+
+          if (allSegmentsFeasible) {
+            const timeStr = this.minutesToTime(currentMins).substring(0, 5);
+            if (!slots.includes(timeStr)) {
+              slots.push(timeStr);
             }
           }
         } else {

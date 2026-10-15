@@ -380,6 +380,63 @@ describe('UsersService', () => {
       expect(summary.pendingCommission).toBe(15);
       expect(summary.netPayableUSD).toBe(20);
     });
+
+    it('debe calcular comisiones proporcionadas cuando una reserva tiene múltiples especialistas por servicio', async () => {
+      const mockAccessEmp1 = {
+        userId: 'emp-1',
+        tenantId: 'tenant-1',
+        compensationType: 'COMISION',
+        commissionPercentage: 40,
+        salaryAmount: 0,
+        user: { id: 'emp-1', username: 'ana_estilista', name: 'Ana' },
+      };
+
+      const sharedReservation = {
+        id: 'res-shared-1',
+        date: '2026-10-14',
+        time: '11:00',
+        customerName: 'Cliente VIP',
+        serviceName: 'Corte, Tinte',
+        totalAmount: 100,
+        status: ReservationStatus.COMPLETED,
+        paymentStatus: PaymentStatus.PAID,
+        serviceSpecialists: [
+          { serviceId: 's-1', serviceName: 'Corte', employeeId: 'emp-1', employeeName: 'Ana', price: 30, durationMinutes: 30 },
+          { serviceId: 's-2', serviceName: 'Tinte', employeeId: 'emp-2', employeeName: 'Carlos', price: 70, durationMinutes: 60 },
+        ],
+      };
+
+      mockUsersRepo.manager.findOne.mockResolvedValue(mockAccessEmp1);
+
+      const reservationQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([sharedReservation]),
+      };
+
+      const orderQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+
+      mockUsersRepo.manager.createQueryBuilder.mockImplementation((entity: any) => {
+        if (entity === Reservation) return reservationQb;
+        return orderQb;
+      });
+      mockUsersRepo.manager.find.mockResolvedValue([]);
+
+      const summary = await service.getPayrollSummary('tenant-1', 'emp-1');
+
+      expect(summary.servicesCount).toBe(1);
+      expect(summary.totalBilled).toBe(30); // Solo su parte de $30, NO los $100 totales
+      expect(summary.commissionEarned).toBe(12); // 40% de $30 = $12
+      expect(summary.workItems[0].amount).toBe(30);
+      expect(summary.workItems[0].description).toBe('Corte');
+    });
   });
 
   describe('paySalary', () => {

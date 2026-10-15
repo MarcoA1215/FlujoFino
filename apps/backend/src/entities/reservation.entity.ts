@@ -104,6 +104,16 @@ export class Reservation {
   @Column({ nullable: true })
   rescheduleReason: string;
 
+  @Column('jsonb', { nullable: true })
+  serviceSpecialists?: Array<{
+    serviceId: string;
+    serviceName?: string;
+    employeeId?: string;
+    employeeName?: string;
+    durationMinutes?: number;
+    price?: number;
+  }>;
+
   @Column({ type: 'text', nullable: true })
   imageUrl?: string | null;
 

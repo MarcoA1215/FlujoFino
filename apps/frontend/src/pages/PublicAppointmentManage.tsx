@@ -560,6 +560,27 @@ const PublicAppointmentManage: React.FC = () => {
                   <p style={{ margin: '0 0 10px 0', color: '#334155' }}>
                     <strong style={{ color: '#0f172a' }}>Servicio:</strong> {appointment.serviceName || 'Reserva Estándar'} ({Number(appointment.durationMinutes) || 30} min)
                   </p>
+                  {Array.isArray(appointment.serviceSpecialists) && appointment.serviceSpecialists.length > 1 ? (
+                    <div style={{ margin: '8px 0 12px 0', background: '#ffffff', borderRadius: '10px', padding: '10px 12px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                        Desglose de Servicios
+                      </div>
+                      {appointment.serviceSpecialists.map((s: any, idx: number) => (
+                        <div key={idx} style={{ fontSize: '13px', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: idx < appointment.serviceSpecialists.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                          <span style={{ fontWeight: '600' }}>• {s.serviceName || 'Servicio'} ({s.durationMinutes || 30} min)</span>
+                          {s.employeeName && (
+                            <span style={{ fontSize: '11px', fontWeight: '700', color: '#047857', background: '#ecfdf5', padding: '1px 6px', borderRadius: '4px' }}>
+                              👤 {s.employeeName}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : appointment.employeeName ? (
+                    <p style={{ margin: '0 0 10px 0', color: '#334155' }}>
+                      <strong style={{ color: '#0f172a' }}>Especialista:</strong> {appointment.employeeName}
+                    </p>
+                  ) : null}
                   {appointment.rescheduleStatus === 'DELAYED' && (
                     <div style={{ backgroundColor: '#fffbe8', border: '1px solid #fde68a', borderRadius: '8px', padding: '8px 12px', marginBottom: '10px', fontSize: '12px', color: '#92400e', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <IonIcon icon={timeOutline} style={{ fontSize: '16px', color: '#d97706' }} />

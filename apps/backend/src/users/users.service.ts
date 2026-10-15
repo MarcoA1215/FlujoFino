@@ -447,7 +447,10 @@ export class UsersService implements OnModuleInit {
     // Reservas completadas atendidas por el empleado (o vinculadas a órdenes entregadas)
     const reservationQuery = this.usersRepo.manager.createQueryBuilder(Reservation, 'res')
       .where('res.tenantId = :tenantId', { tenantId })
-      .andWhere('res.employeeId = :userId', { userId })
+      .andWhere(
+        '(res.employeeId = :userId OR (res."serviceSpecialists" IS NOT NULL AND CAST(res."serviceSpecialists" AS text) LIKE :userSearch))',
+        { tenantId, userId, userSearch: `%"employeeId":"${userId}"%` }
+      )
       .andWhere('(res.status = :resStatus OR EXISTS (SELECT 1 FROM "order" ord_link WHERE (CAST(ord_link.id AS text) = res."orderId" OR ord_link."linkedReservationId" = CAST(res.id AS text)) AND ord_link.status = :ordDelivered))', {
         resStatus: ReservationStatus.COMPLETED,
         ordDelivered: OrderStatus.DELIVERED,
@@ -460,11 +463,37 @@ export class UsersService implements OnModuleInit {
       reservationQuery.andWhere('res.date <= :endDate', { endDate });
     }
     reservationQuery.orderBy('res.date', 'DESC').addOrderBy('res.time', 'DESC');
-    const reservations = await reservationQuery.getMany();
+    const rawReservations = await reservationQuery.getMany();
+    const reservations = rawReservations.filter(r => {
+      if (Array.isArray(r.serviceSpecialists) && r.serviceSpecialists.length > 0) {
+        return r.serviceSpecialists.some(s => s.employeeId === userId);
+      }
+      return !r.employeeId || r.employeeId === userId;
+    });
 
     // Auto-curar y calcular montos de reservas que tengan totalAmount <= 0
     for (const r of reservations) {
       try {
+        // Identificar desglose por especialista si existe serviceSpecialists
+        if (Array.isArray(r.serviceSpecialists) && r.serviceSpecialists.length > 0) {
+          const myServices = r.serviceSpecialists.filter(s => s.employeeId === userId);
+          if (myServices.length > 0) {
+            (r as any).userServicesDescription = myServices.map(s => s.serviceName || 'Servicio').join(', ');
+            let sum = myServices.reduce((acc, s) => acc + Number(s.price || 0), 0);
+            if (sum <= 0) {
+              for (const ms of myServices) {
+                if (ms.serviceId) {
+                  try {
+                    const p = await this.usersRepo.manager.findOne(Product, { where: { id: ms.serviceId, tenantId } });
+                    if (p?.salePrice) sum += Number(p.salePrice);
+                  } catch (e) {}
+                }
+              }
+            }
+            (r as any).userPortion = sum;
+          }
+        }
+
         let rAmount = Number(r.totalAmount || 0);
         if (rAmount <= 0) {
           // 1. Buscar orden vinculada
@@ -559,7 +588,10 @@ export class UsersService implements OnModuleInit {
     // Pedidos entregados atendidos por el empleado (excluyendo órdenes vinculadas a reservas ya contadas)
     const orderQuery = this.usersRepo.manager.createQueryBuilder(Order, 'ord')
       .where('ord.tenantId = :tenantId', { tenantId })
-      .andWhere('ord.employeeId = :userId', { userId })
+      .andWhere(
+        '(ord.employeeId = :userId OR EXISTS (SELECT 1 FROM order_item oi WHERE oi."orderId" = ord.id AND oi."employeeId" = :userId))',
+        { tenantId, userId }
+      )
       .andWhere('ord.status = :orderStatus', { orderStatus: OrderStatus.DELIVERED });
 
     if (startDate) {
@@ -574,42 +606,74 @@ export class UsersService implements OnModuleInit {
     const reservationIds = new Set(reservations.map(r => r.id));
     const standaloneOrders = orders.filter(o => !o.linkedReservationId || !reservationIds.has(o.linkedReservationId));
 
+    const relevantStandaloneOrders: Order[] = [];
     // Auto-curar y calcular montos de órdenes independientes si totalAmount <= 0
     for (const o of standaloneOrders) {
       try {
+        const items = await this.usersRepo.manager.find(OrderItem, {
+          where: { orderId: o.id },
+        });
+
+        // Identificar si la orden tiene ítems con especialistas específicos
+        const hasSpecificEmployees = items.some(it => !!it.employeeId);
+        if (hasSpecificEmployees) {
+          const userItems = items.filter(it => it.employeeId === userId);
+          if (userItems.length === 0) {
+            // Este empleado no participó en los ítems de esta orden compartida
+            continue;
+          }
+          const userPortion = userItems.reduce((s, it) => s + (Number(it.subtotal || 0) || (Number(it.quantity || 1) * Number(it.unitPrice || 0))), 0);
+          (o as any).userPortion = userPortion;
+          (o as any).userItemsDescription = userItems.map(it => it.productName || 'Servicio').join(', ');
+        } else if (o.employeeId && o.employeeId !== userId) {
+          // Si la orden no tiene especialistas por ítem y el empleado general es de otra persona, no corresponde
+          continue;
+        }
+
         let oAmount = Number(o.totalAmount || 0);
         if (oAmount <= 0) {
-          const items = await this.usersRepo.manager.find(OrderItem, {
-            where: { orderId: o.id },
-          });
           const itemsSum = items.reduce((s, it) => s + (Number(it.subtotal || 0) || (Number(it.quantity || 1) * Number(it.unitPrice || 0))), 0);
           if (itemsSum > 0) {
             o.totalAmount = itemsSum;
             this.usersRepo.manager.update(Order, { id: o.id }, { totalAmount: itemsSum }).catch(() => {});
           }
         }
+        relevantStandaloneOrders.push(o);
       } catch (err) {
         console.warn(`[getPayrollSummary] Advertencia curando orden ${o.id}:`, err);
+        relevantStandaloneOrders.push(o);
       }
     }
-
-    const servicesTotalBilled = reservations.reduce((sum, r) => sum + Number(r.totalAmount || 0), 0);
-    const ordersTotalBilled = standaloneOrders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
 
     // Determinar cobros efectivos y montos pendientes por cobrar
     let totalPaidBilled = 0;
     let totalPendingBilled = 0;
 
     const processedReservations = reservations.map(r => {
-      const amt = Number(r.totalAmount || 0);
+      const fullAmt = Number(r.totalAmount || 0);
+      const isCustomUser = (r as any).userPortion !== null && (r as any).userPortion !== undefined;
+      const amt = isCustomUser ? Number((r as any).userPortion) : fullAmt;
+
       const isPaid = r.paymentStatus === PaymentStatus.PAID || (!r.paymentStatus && r.status === ReservationStatus.COMPLETED);
       const abono = Number(r.abonosTotal || 0);
-      const paid = isPaid ? amt : (r.paymentStatus === PaymentStatus.PARTIAL && abono > 0 ? Math.min(amt, abono) : 0);
+
+      let paid = 0;
+      if (isPaid) {
+        paid = amt;
+      } else if (r.paymentStatus === PaymentStatus.PARTIAL && abono > 0) {
+        if (isCustomUser && fullAmt > 0) {
+          const ratio = Math.min(1, abono / fullAmt);
+          paid = Number((amt * ratio).toFixed(2));
+        } else {
+          paid = Math.min(amt, abono);
+        }
+      }
       const pending = Math.max(0, amt - paid);
       totalPaidBilled += paid;
       totalPendingBilled += pending;
       return {
         ...r,
+        userBilledAmount: amt,
         calcPaid: paid,
         calcPending: pending,
         isPaidEffective: isPaid,
@@ -617,22 +681,40 @@ export class UsersService implements OnModuleInit {
       };
     });
 
-    const processedOrders = standaloneOrders.map(o => {
-      const amt = Number(o.totalAmount || 0);
+    const processedOrders = relevantStandaloneOrders.map(o => {
+      const fullAmt = Number(o.totalAmount || 0);
+      const isCustomUser = (o as any).userPortion !== null && (o as any).userPortion !== undefined;
+      const amt = isCustomUser ? Number((o as any).userPortion) : fullAmt;
+
       const isPaid = o.paymentStatus === PaymentStatus.PAID || (!o.paymentStatus && o.status === OrderStatus.DELIVERED);
       const abono = Number(o.abonosTotal || 0);
-      const paid = isPaid ? amt : (o.paymentStatus === PaymentStatus.PARTIAL && abono > 0 ? Math.min(amt, abono) : 0);
+
+      let paid = 0;
+      if (isPaid) {
+        paid = amt;
+      } else if (o.paymentStatus === PaymentStatus.PARTIAL && abono > 0) {
+        if (isCustomUser && fullAmt > 0) {
+          const ratio = Math.min(1, abono / fullAmt);
+          paid = Number((amt * ratio).toFixed(2));
+        } else {
+          paid = Math.min(amt, abono);
+        }
+      }
       const pending = Math.max(0, amt - paid);
       totalPaidBilled += paid;
       totalPendingBilled += pending;
       return {
         ...o,
+        userBilledAmount: amt,
         calcPaid: paid,
         calcPending: pending,
         isPaidEffective: isPaid,
         calcPaymentStatus: isPaid ? 'PAID' : (paid > 0 ? 'PARTIAL' : 'PENDING'),
       };
     });
+
+    const servicesTotalBilled = processedReservations.reduce((sum, r) => sum + Number(r.userBilledAmount || 0), 0);
+    const ordersTotalBilled = processedOrders.reduce((sum, o) => sum + Number(o.userBilledAmount || 0), 0);
 
     totalPaidBilled = Number(totalPaidBilled.toFixed(2));
     totalPendingBilled = Number(totalPendingBilled.toFixed(2));
@@ -678,8 +760,8 @@ export class UsersService implements OnModuleInit {
         date: r.date,
         time: r.time,
         client: r.customerName || 'Cliente',
-        description: r.serviceName || 'Servicio realizado',
-        amount: Number(r.totalAmount || 0),
+        description: (r as any).userServicesDescription || r.serviceName || 'Servicio realizado',
+        amount: Number(r.userBilledAmount !== undefined ? r.userBilledAmount : (r.totalAmount || 0)),
         paidAmount: r.calcPaid,
         pendingAmount: r.calcPending,
         isPaid: r.isPaidEffective,
@@ -692,8 +774,8 @@ export class UsersService implements OnModuleInit {
         date: o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '',
         time: o.createdAt ? new Date(o.createdAt).toISOString().split('T')[1]?.substring(0, 5) : '',
         client: o.customerName || 'Cliente',
-        description: `Pedido #${o.id.substring(0, 6)}`,
-        amount: Number(o.totalAmount || 0),
+        description: (o as any).userItemsDescription ? `Pedido #${o.id.substring(0, 6)} (${(o as any).userItemsDescription})` : `Pedido #${o.id.substring(0, 6)}`,
+        amount: Number(o.userBilledAmount !== undefined ? o.userBilledAmount : (o.totalAmount || 0)),
         paidAmount: o.calcPaid,
         pendingAmount: o.calcPending,
         isPaid: o.isPaidEffective,
@@ -712,9 +794,9 @@ export class UsersService implements OnModuleInit {
       salaryAmount,
       salaryPeriod,
       commissionPercentage,
-      servicesCount: reservations.length,
+      servicesCount: processedReservations.length,
       servicesTotalBilled: Number(servicesTotalBilled.toFixed(2)),
-      ordersCount: standaloneOrders.length,
+      ordersCount: processedOrders.length,
       ordersTotalBilled: Number(ordersTotalBilled.toFixed(2)),
       totalBilled,
       totalPaidBilled,

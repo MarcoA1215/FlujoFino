@@ -165,6 +165,7 @@ export class CreateOrderDto {
     productId: string;
     quantity: number;
     unitPrice: number;
+    employeeId?: string;
     removedIngredients?: string[];
     addedExtras?: Array<{ rawMaterialId: string; name: string; priceUSD: number; quantity: number }>;
     hasModifications?: boolean;
@@ -277,6 +278,7 @@ export class OrdersService implements OnModuleInit {
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "binanceRef" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferRef" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferBank" character varying;
+        ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "employeeId" character varying;
       `);
     } catch (e: any) {
       // Ignorar si las columnas ya existen o si no hay permisos DDL
@@ -874,6 +876,7 @@ export class OrdersService implements OnModuleInit {
           orderId: savedOrder.id,
           productId: extraMaterial ? extraMaterial.id : product!.id,
           productName: extraMaterial ? `Extra: ${extraMaterial.name}` : product!.name,
+          employeeId: itemDto.employeeId || undefined,
           quantity: itemDto.quantity,
           unitPrice: itemDto.unitPrice,
           unitCost: unitCost,
@@ -1767,6 +1770,9 @@ export class OrdersService implements OnModuleInit {
           oldItem.quantity = newItem.quantity;
           oldItem.unitPrice = newItem.unitPrice;
           oldItem.subtotal = newItem.quantity * newItem.unitPrice;
+          if (newItem.employeeId !== undefined) {
+            oldItem.employeeId = newItem.employeeId || null;
+          }
           oldItem.removedIngredients = newItem.removedIngredients || [];
           oldItem.addedExtras = newItem.addedExtras || [];
           oldItem.hasModifications = Boolean(newItem.hasModifications || (newItem.removedIngredients && newItem.removedIngredients.length > 0) || (newItem.addedExtras && newItem.addedExtras.length > 0));
@@ -1823,6 +1829,7 @@ export class OrdersService implements OnModuleInit {
             orderId: order.id,
             productId: productId,
             productName: itemName,
+            employeeId: newItem.employeeId || undefined,
             quantity: newItem.quantity,
             unitPrice: newItem.unitPrice,
             unitCost: unitCost,

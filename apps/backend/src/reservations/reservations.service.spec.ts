@@ -7,6 +7,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import { Reservation } from '../entities/reservation.entity';
 import { Order } from '../entities/order.entity';
+import { Product } from '../entities/product.entity';
+import { OrderItem } from '../entities/order-item.entity';
 import { ReservationStatus, PaymentStatus } from '@finowork/shared-types';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 
@@ -14,6 +16,8 @@ describe('ReservationsService Suite', () => {
   let service: ReservationsService;
   let mockRepo: any;
   let mockOrderRepo: any;
+  let mockOrderItemRepo: any;
+  let mockProductRepo: any;
   let mockNotificationsService: any;
   let mockCustomersService: any;
   let mockStorageService: any;
@@ -24,6 +28,19 @@ describe('ReservationsService Suite', () => {
       findOne: jest.fn().mockResolvedValue(null),
       save: jest.fn((e) => Promise.resolve(e)),
       create: jest.fn((dto) => dto),
+    };
+
+    mockOrderItemRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+      save: jest.fn((e) => Promise.resolve(e)),
+      create: jest.fn((dto) => dto),
+    };
+
+    mockProductRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+      save: jest.fn((e) => Promise.resolve(e)),
     };
 
     const mockQueryBuilder = {
@@ -68,6 +85,12 @@ describe('ReservationsService Suite', () => {
         }
         if (entity === Reservation || entity?.name === 'Reservation') {
           return mockRepo;
+        }
+        if (entity === Product || entity === 'Product' || entity?.name === 'Product') {
+          return mockProductRepo;
+        }
+        if (entity === OrderItem || entity === 'OrderItem' || entity?.name === 'OrderItem') {
+          return mockOrderItemRepo;
         }
         return {
           findOne: jest.fn().mockResolvedValue(null),
@@ -481,6 +504,105 @@ describe('ReservationsService Suite', () => {
       expect(mockOrderRepo.save).toHaveBeenCalled();
       expect(mockLinkedOrder.status).toBe('CANCELED');
       expect(mockRepo.remove).toHaveBeenCalledWith(mockReservation);
+    });
+  });
+
+  describe('Gestión de Especialistas por Servicio y Órdenes Vinculadas', () => {
+    it('al crear una reserva con múltiples servicios debe auto-asignar especialistas calificados a serviceSpecialists', async () => {
+      const tenantId = 'tenant-123';
+      const prodA = { id: 'svc-1', name: 'Corte', salePrice: 20, durationMinutes: 30, assignedStaffIds: ['emp-ana'] };
+      const prodB = { id: 'svc-2', name: 'Manicura', salePrice: 15, durationMinutes: 30, assignedStaffIds: ['emp-carlos'] };
+
+      mockProductRepo.findOne.mockImplementation(({ where }: any) => {
+        if (where?.id === 'svc-1') return Promise.resolve(prodA);
+        if (where?.id === 'svc-2') return Promise.resolve(prodB);
+        return Promise.resolve(null);
+      });
+      mockProductRepo.find.mockResolvedValue([prodA, prodB]);
+
+      const res = await service.create(tenantId, {
+        customerName: 'Cliente Prueba',
+        customerPhone: '123456',
+        date: '2026-10-15',
+        time: '10:00:00',
+        serviceId: 'svc-1,svc-2',
+        force: true,
+      });
+
+      expect(res.serviceSpecialists).toBeDefined();
+      expect(res.serviceSpecialists).toHaveLength(2);
+      expect(res.serviceSpecialists[0].serviceId).toBe('svc-1');
+      expect(res.serviceSpecialists[0].employeeId).toBe('emp-ana');
+      expect(res.serviceSpecialists[1].serviceId).toBe('svc-2');
+      expect(res.serviceSpecialists[1].employeeId).toBe('emp-carlos');
+    });
+
+    it('al actualizar el especialista de un servicio en la cita debe sincronizar el employeeId en los OrderItems de la orden vinculada', async () => {
+      const tenantId = 'tenant-123';
+      const resId = 'res-spec-sync';
+
+      const mockReservation = {
+        id: resId,
+        tenantId,
+        date: '2026-10-15',
+        time: '10:00:00',
+        serviceId: 'svc-1,svc-2',
+        serviceSpecialists: [
+          { serviceId: 'svc-1', serviceName: 'Corte', employeeId: 'emp-ana' },
+          { serviceId: 'svc-2', serviceName: 'Manicura', employeeId: 'emp-carlos' },
+        ],
+      };
+
+      const mockLinkedOrder = {
+        id: 'ord-linked-123',
+        tenantId,
+        linkedReservationId: resId,
+      };
+
+      const item1 = { id: 'item-1', orderId: 'ord-linked-123', productId: 'svc-1', productName: 'Corte', employeeId: 'emp-ana' };
+      const item2 = { id: 'item-2', orderId: 'ord-linked-123', productId: 'svc-2', productName: 'Manicura', employeeId: 'emp-carlos' };
+
+      mockRepo.findOne.mockResolvedValue(mockReservation);
+      mockOrderRepo.findOne.mockResolvedValue(mockLinkedOrder);
+      mockOrderItemRepo.find.mockResolvedValue([item1, item2]);
+
+      // El admin cambia el especialista de Corte a 'emp-maria'
+      const updatedSpecialists = [
+        { serviceId: 'svc-1', serviceName: 'Corte', employeeId: 'emp-maria' },
+        { serviceId: 'svc-2', serviceName: 'Manicura', employeeId: 'emp-carlos' },
+      ];
+
+      await service.update(tenantId, resId, {
+        serviceSpecialists: updatedSpecialists,
+        force: true,
+      });
+
+      expect(mockOrderItemRepo.save).toHaveBeenCalled();
+      expect(item1.employeeId).toBe('emp-maria');
+      expect(item2.employeeId).toBe('emp-carlos');
+    });
+
+    it('debe rechazar la cita si el especialista asignado a un servicio no está calificado para el mismo', async () => {
+      const tenantId = 'tenant-123';
+      const prodA = { id: 'svc-1', name: 'Corte', salePrice: 20, durationMinutes: 30, assignedStaffIds: ['emp-ana'] };
+
+      mockProductRepo.findOne.mockResolvedValue(prodA);
+      mockProductRepo.find.mockResolvedValue([prodA]);
+
+      // Intentamos asignar a 'emp-no-calificado' para 'svc-1' sin force
+      await expect(
+        service.create(tenantId, {
+          customerName: 'Cliente',
+          customerPhone: '123',
+          date: '2026-10-15',
+          time: '10:00:00',
+          serviceId: 'svc-1',
+          serviceSpecialists: [
+            { serviceId: 'svc-1', serviceName: 'Corte', employeeId: 'emp-no-calificado' },
+          ],
+          force: false,
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

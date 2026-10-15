@@ -38,6 +38,7 @@ type OrderItem = {
     name?: string;
   };
   unitPrice?: number;
+  employeeId?: string;
   hasModifications?: boolean;
   removedIngredients?: string[];
   addedExtras?: Array<{
@@ -152,6 +153,17 @@ const Orders: React.FC = () => {
   const [abonoRef, setAbonoRef] = useState<string>('');
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('');
+
+  const employeesMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    employees.forEach(e => {
+      const id = e.id || e.userId;
+      if (id) {
+        map[id] = e.name || e.username;
+      }
+    });
+    return map;
+  }, [employees]);
 
   const handleApprovePayment = async (orderId: string) => {
     try {
@@ -344,7 +356,11 @@ const Orders: React.FC = () => {
       if (tab === 'por_confirmar' && !isPorConfirmar) return false;
       if (tab === 'historial' && !isHistorial) return false;
 
-      if (selectedEmployeeFilter && o.employeeId !== selectedEmployeeFilter && o.employee?.id !== selectedEmployeeFilter) {
+      if (selectedEmployeeFilter && 
+          o.employeeId !== selectedEmployeeFilter && 
+          o.employee?.id !== selectedEmployeeFilter &&
+          !o.items?.some((it: any) => it.employeeId === selectedEmployeeFilter)
+      ) {
         return false;
       }
 
@@ -681,7 +697,14 @@ const Orders: React.FC = () => {
                         return (
                           <div key={it.id || idx} style={{ fontSize: '13px', color: '#334155', padding: '4px 0', borderBottom: idx < orderItems.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontWeight: '600' }}>{qty}x {pName}</span>
+                              <span style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                {qty}x {pName}
+                                {it.employeeId && (
+                                  <span style={{ fontSize: '10px', fontWeight: '700', color: '#047857', background: '#ECFDF5', padding: '1px 6px', borderRadius: '4px' }}>
+                                    👤 {employeesMap[it.employeeId] || 'Especialista'}
+                                  </span>
+                                )}
+                              </span>
                               {!isKitchen && (
                                 <span style={{ fontWeight: '700', color: '#0F172A' }}>
                                   ${(uPrice * qty).toFixed(2)}
@@ -1128,8 +1151,13 @@ const Orders: React.FC = () => {
                       return (
                         <div key={it.id || idx} style={{ padding: '8px 0', borderBottom: '1px solid #EEF2F6', fontSize: '13px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                               {qty}x {pName}
+                              {it.employeeId && (
+                                <span style={{ fontSize: '11px', fontWeight: '700', color: '#047857', background: '#ECFDF5', padding: '2px 8px', borderRadius: '6px' }}>
+                                  👤 {employeesMap[it.employeeId] || 'Especialista'}
+                                </span>
+                              )}
                               {it.hasModifications && (
                                 <span style={{ fontSize: '10px', fontWeight: '800', background: '#FEF3C7', color: '#92400E', padding: '1px 5px', borderRadius: '4px' }}>
                                   ⚠️ Modificado

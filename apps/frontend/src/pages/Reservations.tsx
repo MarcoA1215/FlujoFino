@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useContext } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import {
   IonPage,
   IonContent,
@@ -75,6 +75,7 @@ const Reservations: React.FC = () => {
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState<boolean>(false);
   const [employeeId, setEmployeeId] = useState('');
+  const [serviceSpecialistMap, setServiceSpecialistMap] = useState<Record<string, string>>({});
   const [products, setProducts] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
 
@@ -102,7 +103,7 @@ const Reservations: React.FC = () => {
     setShowRescheduleModal(true);
   };
 
-  const handleConfirmReschedule = async () => {
+  const handleConfirmReschedule = async (force: boolean = false) => {
     if (!selectedEvent || !rescheduleDate || !rescheduleTime) {
       presentToast({ message: 'Selecciona fecha y hora para reprogramar', duration: 2000, color: 'warning' });
       return;
@@ -112,7 +113,8 @@ const Reservations: React.FC = () => {
       const res = await apiClient.post(`/reservations/${selectedEvent.id}/reschedule`, {
         date: rescheduleDate,
         time: rescheduleTime,
-        reason: rescheduleReason
+        reason: rescheduleReason,
+        force
       });
       setShowRescheduleModal(false);
       setShowDetails(false);
@@ -141,8 +143,47 @@ const Reservations: React.FC = () => {
         });
       }
     } catch (e: any) {
-      const msg = e.response?.data?.message || e.message || 'Error al reprogramar la cita';
-      presentToast({ message: msg, duration: 4000, color: 'danger' });
+      const rawMsg = e.response?.data?.message;
+      const msg = Array.isArray(rawMsg)
+        ? rawMsg.join('. ')
+        : (typeof rawMsg === 'string' ? rawMsg : (e.message || 'Error al reprogramar la cita'));
+
+      const isWarningSchedule = 
+        msg.includes('choca con la cita') || 
+        msg.includes('horario laboral') || 
+        msg.includes('jornada laboral') ||
+        msg.includes('horario de atención') ||
+        msg.includes('cierra a las') ||
+        msg.includes('abre a las') ||
+        msg.includes('iniciaría a las') ||
+        msg.includes('terminaría a las') ||
+        msg.includes('fuera de los turnos') ||
+        msg.includes('cerrado') ||
+        msg.includes('almuerzo') ||
+        msg.includes('receso') ||
+        msg.includes('cita asignada') ||
+        msg.includes('confirma para forzar') ||
+        msg.includes('capacidad disponible') ||
+        msg.includes('especialistas disponibles') ||
+        msg.includes('copados');
+
+      if (isWarningSchedule) {
+        presentAlert({
+          header: '⚠️ Reprogramación fuera de horario / Solapada',
+          message: `${msg}\n\n¿Deseas autorizar la excepción y reprogramar esta cita de todas formas?`,
+          buttons: [
+            { text: 'Cancelar', role: 'cancel' },
+            {
+              text: 'Sí, Forzar Reprogramación',
+              handler: () => {
+                handleConfirmReschedule(true);
+              }
+            }
+          ]
+        });
+      } else {
+        presentToast({ message: msg, duration: 4000, color: 'danger' });
+      }
     } finally {
       setIsRescheduling(false);
     }
@@ -299,6 +340,14 @@ const Reservations: React.FC = () => {
 
   const fetchEmployees = async () => {
     try {
+      const res = await apiClient.get('/users/employees');
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setEmployees(res.data);
+        return;
+      }
+    } catch (e) {}
+
+    try {
       const res = await apiClient.get('/users');
       setEmployees(res.data || []);
     } catch (e) {}
@@ -355,6 +404,7 @@ const Reservations: React.FC = () => {
     setDate(selectedDate);
     setTime('09:00');
     setSelectedServiceIds([]);
+    setServiceSpecialistMap({});
     setEmployeeId('');
     setNumberOfPeople(1);
     setTableNumber('');
@@ -368,6 +418,14 @@ const Reservations: React.FC = () => {
     setSelectedServiceIds(prev => {
       const isSelected = prev.includes(sId);
       const next = isSelected ? prev.filter(id => id !== sId) : [...prev, sId];
+
+      if (isSelected) {
+        setServiceSpecialistMap(prevMap => {
+          const copy = { ...prevMap };
+          delete copy[sId];
+          return copy;
+        });
+      }
 
       const newSelected = products.filter(p => next.includes(p.id));
       const newSum = newSelected.reduce((sum, p) => sum + (Number(p.salePrice) || 0), 0);
@@ -384,7 +442,7 @@ const Reservations: React.FC = () => {
           })
           .filter(arr => arr.length > 0);
         if (requiredStaffIdSets.length > 0 && !requiredStaffIdSets.every(arr => arr.includes(employeeId))) {
-          setEmployeeId('');
+          // Si el especialista general no aplica a todos, no lo borramos si hay especialistas por servicio
         }
       }
 
@@ -404,6 +462,21 @@ const Reservations: React.FC = () => {
       : undefined;
     const durationMinutes = totalDurationMinutes;
 
+    const serviceSpecialists = selectedServices.map(s => {
+      const empId = serviceSpecialistMap[s.id] || employeeId || undefined;
+      const empObj = employees.find(e => e.id === empId || e.userId === empId);
+      return {
+        serviceId: s.id,
+        serviceName: s.name,
+        employeeId: empId,
+        employeeName: empObj ? (empObj.name || empObj.username) : undefined,
+        durationMinutes: Number(s.durationMinutes) || 30,
+        price: Number(s.salePrice) || 0,
+      };
+    });
+
+    const primaryEmployeeId = employeeId || serviceSpecialists.find(s => s.employeeId)?.employeeId || undefined;
+
     const payload = {
       customerName,
       customerPhone,
@@ -412,7 +485,8 @@ const Reservations: React.FC = () => {
       serviceId: sIds || undefined,
       serviceName: sNames,
       durationMinutes,
-      employeeId: employeeId || undefined,
+      employeeId: primaryEmployeeId,
+      serviceSpecialists,
       numberOfPeople,
       tableNumber,
       totalAmount,
@@ -431,13 +505,29 @@ const Reservations: React.FC = () => {
       setShowModal(false);
       fetchReservations();
     } catch (e: any) {
-      const errMsg = e.response?.data?.message || '';
+      const rawMsg = e.response?.data?.message;
+      const errMsg = Array.isArray(rawMsg)
+        ? rawMsg.join('. ')
+        : (typeof rawMsg === 'string' ? rawMsg : (e.message || ''));
+
       const isWarningSchedule = 
         errMsg.includes('choca con la cita') || 
         errMsg.includes('horario laboral') || 
+        errMsg.includes('jornada laboral') ||
+        errMsg.includes('horario de atención') ||
         errMsg.includes('cierra a las') ||
+        errMsg.includes('abre a las') ||
+        errMsg.includes('iniciaría a las') ||
+        errMsg.includes('terminaría a las') ||
         errMsg.includes('fuera de los turnos') ||
-        errMsg.includes('almuerzo');
+        errMsg.includes('cerrado') ||
+        errMsg.includes('almuerzo') ||
+        errMsg.includes('receso') ||
+        errMsg.includes('cita asignada') ||
+        errMsg.includes('confirma para forzar') ||
+        errMsg.includes('capacidad disponible') ||
+        errMsg.includes('especialistas disponibles') ||
+        errMsg.includes('copados');
 
       if (isWarningSchedule) {
         presentAlert({
@@ -524,6 +614,19 @@ const Reservations: React.FC = () => {
       ? rawSId.split(',').map((s: string) => s.trim()).filter(Boolean)
       : [];
     setSelectedServiceIds(parsedIds);
+
+    const specMap: Record<string, string> = {};
+    if (Array.isArray(res.serviceSpecialists) && res.serviceSpecialists.length > 0) {
+      for (const item of res.serviceSpecialists) {
+        if (item.serviceId && item.employeeId) {
+          specMap[item.serviceId] = item.employeeId;
+        }
+      }
+    } else if (res.employeeId && parsedIds.length === 1) {
+      specMap[parsedIds[0]] = res.employeeId;
+    }
+    setServiceSpecialistMap(specMap);
+
     setEmployeeId(res.employeeId || '');
     setNumberOfPeople(res.numberOfPeople || 1);
     setTableNumber(res.tableNumber || '');
@@ -614,17 +717,20 @@ const Reservations: React.FC = () => {
   }, [selectedServices]);
 
   const availableSpecialists = useMemo(() => {
-    // 1. Descartar usuarios que solo sean DELIVERY u OPERATIVO
+    if (!employees || employees.length === 0) return [];
+
+    // 1. Descartar únicamente usuarios que sean estrictamente DELIVERY / Repartidor
     const qualifiedStaff = employees.filter(emp => {
       const roles: string[] = emp.roles && emp.roles.length > 0 ? emp.roles : [emp.role];
       const isDeliveryOnly = roles.every(r => r === 'DELIVERY' || r === 'Repartidor');
-      const isOperativoOnly = roles.every(r => r === 'OPERATIVO');
-      if (isDeliveryOnly || isOperativoOnly) return false;
+      if (isDeliveryOnly) return false;
       if (emp.username?.toLowerCase() === 'delivery' || emp.name?.toLowerCase() === 'delivery') return false;
       return true;
     });
 
-    // 2. Si hay servicios seleccionados, filtrar por sus especialistas asignados
+    const basePool = qualifiedStaff.length > 0 ? qualifiedStaff : employees;
+
+    // 2. Si hay servicios seleccionados, intentar filtrar por sus especialistas asignados
     if (selectedServiceIds.length > 0) {
       const selectedProds = products.filter(p => selectedServiceIds.includes(p.id));
       const requiredStaffIdSets = selectedProds
@@ -638,14 +744,45 @@ const Reservations: React.FC = () => {
         .filter(arr => arr.length > 0);
 
       if (requiredStaffIdSets.length > 0) {
-        return qualifiedStaff.filter(st =>
-          requiredStaffIdSets.every(set => set.includes(st.id))
+        // Coincidencia con todos los servicios seleccionados (intersección)
+        const intersection = basePool.filter(st =>
+          requiredStaffIdSets.every(set => set.includes(st.id) || set.includes(st.userId))
         );
+        if (intersection.length > 0) return intersection;
+
+        // Coincidencia con al menos uno de los servicios seleccionados (unión)
+        const union = basePool.filter(st =>
+          requiredStaffIdSets.some(set => set.includes(st.id) || set.includes(st.userId))
+        );
+        if (union.length > 0) return union;
       }
     }
 
-    return qualifiedStaff;
+    return basePool;
   }, [employees, selectedServiceIds, products]);
+
+  const getStaffForSingleService = useCallback((service: any) => {
+    if (!employees || employees.length === 0) return [];
+    const nonDelivery = employees.filter(emp => {
+      const roles: string[] = emp.roles && emp.roles.length > 0 ? emp.roles : [emp.role];
+      const isDeliveryOnly = roles.every(r => r === 'DELIVERY' || r === 'Repartidor');
+      if (isDeliveryOnly) return false;
+      if (emp.username?.toLowerCase() === 'delivery' || emp.name?.toLowerCase() === 'delivery') return false;
+      return true;
+    });
+
+    const basePool = nonDelivery.length > 0 ? nonDelivery : employees;
+    const raw = service?.assignedStaffIds;
+    let staffIds: string[] = [];
+    if (Array.isArray(raw)) staffIds = raw;
+    else if (typeof raw === 'string') staffIds = raw.split(',').map((s: string) => s.trim()).filter(Boolean);
+
+    if (staffIds.length > 0) {
+      const qualified = basePool.filter(emp => staffIds.includes(emp.id) || staffIds.includes(emp.userId));
+      if (qualified.length > 0) return qualified;
+    }
+    return basePool;
+  }, [employees]);
 
   // Fetch availability slots whenever modal is open and date/services/employee/editingId change
   useEffect(() => {
@@ -971,10 +1108,22 @@ const Reservations: React.FC = () => {
                         </div>
 
                         {/* Specialist & Station */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#64748B', marginBottom: '8px' }}>
-                          <IonIcon icon={personOutline} style={{ fontSize: '14px' }} />
-                          <span>{res.employee?.name || res.employee?.username || 'Especialista Asignado'}</span>
-                        </div>
+                        {Array.isArray(res.serviceSpecialists) && res.serviceSpecialists.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '8px' }}>
+                            {res.serviceSpecialists.map((ss: any, idx: number) => (
+                              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#475569' }}>
+                                <IonIcon icon={personOutline} style={{ fontSize: '12px', color: '#10B981' }} />
+                                <span style={{ fontWeight: '600', color: '#0F172A' }}>{ss.serviceName || 'Servicio'}:</span>
+                                <span style={{ color: '#047857', fontWeight: '700' }}>{ss.employeeName || 'Sin asignar'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#64748B', marginBottom: '8px' }}>
+                            <IonIcon icon={personOutline} style={{ fontSize: '14px' }} />
+                            <span>{res.employee?.name || res.employee?.username || 'Especialista Asignado'}</span>
+                          </div>
+                        )}
 
                         {/* TAREA 1: Pago Reportado Por Verificar en Cita */}
                         {!isConfirmed && res.paymentStatus !== 'PAID' && (Boolean(res.paymentReported) || (Array.isArray(res.abonosHistory) && res.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) && (
@@ -1355,21 +1504,110 @@ const Reservations: React.FC = () => {
 
                 {/* 2. Especialista Asignado */}
                 <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
-                    Especialista Asignado
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '6px' }}>
+                    {selectedServices.length > 1 ? 'Especialistas por Servicio' : 'Especialista Asignado'}
                   </label>
-                  <select
-                    value={employeeId}
-                    onChange={e => setEmployeeId(e.target.value)}
-                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#ffffff', color: '#0F172A', outline: 'none' }}
-                  >
-                    <option value="">Sin asignar / Cualquiera disponible</option>
-                    {availableSpecialists.map(emp => (
-                      <option key={emp.id} value={emp.id}>
-                        👤 {emp.username || emp.name} {emp.jobTitle ? `(${emp.jobTitle})` : ''}
-                      </option>
-                    ))}
-                  </select>
+
+                  {selectedServices.length > 1 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {selectedServices.map(srv => {
+                        const qualifiedStaff = getStaffForSingleService(srv);
+                        const assignedEmpId = serviceSpecialistMap[srv.id] || '';
+                        return (
+                          <div
+                            key={srv.id}
+                            style={{
+                              background: '#FFFFFF',
+                              border: '1px solid #CBD5E1',
+                              borderRadius: '12px',
+                              padding: '10px 12px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A' }}>
+                                ✂️ {srv.name}
+                              </span>
+                              <span style={{ fontSize: '11px', color: '#047857', fontWeight: '700', background: '#ECFDF5', padding: '2px 8px', borderRadius: '8px' }}>
+                                ⏱️ {srv.durationMinutes || 30}m &bull; ${Number(srv.salePrice || 0).toFixed(2)}
+                              </span>
+                            </div>
+
+                            <IonSelect
+                              interface="popover"
+                              value={assignedEmpId}
+                              placeholder="Sin asignar / Cualquiera disponible"
+                              onIonChange={e => {
+                                const val = e.detail.value ?? '';
+                                setServiceSpecialistMap(prev => ({ ...prev, [srv.id]: val }));
+                              }}
+                              style={{
+                                width: '100%',
+                                minHeight: '40px',
+                                padding: '2px 10px',
+                                borderRadius: '8px',
+                                border: '1px solid #CBD5E1',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                color: '#0F172A',
+                                background: '#F8FAFC',
+                                '--padding-start': '0px',
+                                '--padding-end': '0px',
+                                '--placeholder-color': '#64748B',
+                                '--placeholder-opacity': '1'
+                              } as any}
+                            >
+                              <IonSelectOption value="">Sin asignar / Cualquiera disponible</IonSelectOption>
+                              {qualifiedStaff.map((emp: any) => (
+                                <IonSelectOption key={emp.id} value={emp.id}>
+                                  👤 {emp.name || emp.username} {emp.jobTitle ? `(${emp.jobTitle})` : ''}
+                                </IonSelectOption>
+                              ))}
+                            </IonSelect>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <IonSelect
+                      interface="popover"
+                      value={employeeId}
+                      placeholder="Sin asignar / Cualquiera disponible"
+                      onIonChange={e => {
+                        const val = e.detail.value ?? '';
+                        setEmployeeId(val);
+                        if (selectedServices.length === 1) {
+                          setServiceSpecialistMap({ [selectedServices[0].id]: val });
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        minHeight: '44px',
+                        padding: '4px 14px',
+                        borderRadius: '12px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: '#0F172A',
+                        background: '#FFFFFF',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                        '--padding-start': '0px',
+                        '--padding-end': '0px',
+                        '--placeholder-color': '#64748B',
+                        '--placeholder-opacity': '1'
+                      } as any}
+                    >
+                      <IonSelectOption value="">Sin asignar / Cualquiera disponible</IonSelectOption>
+                      {(selectedServices.length === 1 ? getStaffForSingleService(selectedServices[0]) : availableSpecialists).map(emp => (
+                        <IonSelectOption key={emp.id} value={emp.id}>
+                          👤 {emp.name || emp.username} {emp.jobTitle ? `(${emp.jobTitle})` : ''}
+                        </IonSelectOption>
+                      ))}
+                    </IonSelect>
+                  )}
                 </div>
 
                 {/* 3. Fecha */}
@@ -1542,10 +1780,33 @@ const Reservations: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    {selectedEvent.serviceName && (
-                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#047857', marginTop: '6px' }}>
-                        ✂️ {selectedEvent.serviceName}
+                    {Array.isArray(selectedEvent.serviceSpecialists) && selectedEvent.serviceSpecialists.length > 0 ? (
+                      <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '800', color: '#64748B', textTransform: 'uppercase' }}>
+                          Servicios y Especialistas Asignados:
+                        </div>
+                        {selectedEvent.serviceSpecialists.map((ss: any, idx: number) => (
+                          <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FFFFFF', padding: '6px 10px', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }}>
+                            <span style={{ fontWeight: '700', color: '#0F172A' }}>✂️ {ss.serviceName || 'Servicio'}</span>
+                            <span style={{ color: '#047857', fontWeight: '700', background: '#ECFDF5', padding: '2px 8px', borderRadius: '6px' }}>
+                              👤 {ss.employeeName || 'Sin asignar'} {ss.price ? `($${Number(ss.price).toFixed(2)})` : ''}
+                            </span>
+                          </div>
+                        ))}
                       </div>
+                    ) : (
+                      <>
+                        {selectedEvent.serviceName && (
+                          <div style={{ fontSize: '13px', fontWeight: '700', color: '#047857', marginTop: '6px' }}>
+                            ✂️ {selectedEvent.serviceName}
+                          </div>
+                        )}
+                        {selectedEvent.employee && (
+                          <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
+                            👤 Especialista: <b>{selectedEvent.employee.name || selectedEvent.employee.username}</b>
+                          </div>
+                        )}
+                      </>
                     )}
                     <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '13px', color: '#64748B' }}>Total Servicio:</span>
@@ -1998,7 +2259,7 @@ const Reservations: React.FC = () => {
               <button
                 type="button"
                 disabled={isRescheduling}
-                onClick={handleConfirmReschedule}
+                onClick={() => handleConfirmReschedule(false)}
                 className="ff-btn-primary"
                 style={{ width: '100%', padding: '13px', fontSize: '14px', borderRadius: '12px' }}
               >

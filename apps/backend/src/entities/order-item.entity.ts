@@ -20,6 +20,9 @@ export class OrderItem {
   @Column({ nullable: true })
   productName: string;
 
+  @Column({ nullable: true })
+  employeeId?: string;
+
   @Column('int')
   quantity: number;
 

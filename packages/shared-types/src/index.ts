@@ -117,6 +117,7 @@ export interface OrderItemDTO {
   id?: string;
   productId: string;
   productName?: string;
+  employeeId?: string;
   quantity: number;
   deliveredQuantity?: number;
   unitPrice: number;
@@ -208,6 +209,15 @@ export enum ReservationStatus {
   CANCELED = 'CANCELED',
 }
 
+export interface ReservationServiceSpecialistDTO {
+  serviceId: string;
+  serviceName?: string;
+  employeeId?: string;
+  employeeName?: string;
+  durationMinutes?: number;
+  price?: number;
+}
+
 export interface ReservationDTO {
   id?: string;
   customerName: string;
@@ -233,6 +243,7 @@ export interface ReservationDTO {
   rescheduleStatus?: string;
   employeeId?: string;
   employeeName?: string;
+  serviceSpecialists?: ReservationServiceSpecialistDTO[];
 }
 
 export interface BusinessHourDay {

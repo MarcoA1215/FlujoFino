@@ -98,7 +98,7 @@ export class ReservationsController {
   reschedule(
     @Request() req,
     @Param('id') id: string,
-    @Body() dto: { date: string; time: string; reason?: string },
+    @Body() dto: { date: string; time: string; reason?: string; force?: boolean },
   ) {
     return this.service.reschedule(req.user.tenantId, id, dto);
   }

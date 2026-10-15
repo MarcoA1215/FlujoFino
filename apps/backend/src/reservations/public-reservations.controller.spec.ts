@@ -322,7 +322,7 @@ describe('PublicReservationsController Suite', () => {
         getMany: jest.fn().mockResolvedValue([]),
       });
 
-      const slots = await controller.getAvailability('token-valido', '2026-10-14', '');
+      const slots = await controller.getAvailability('token-valido', '2026-10-21', '');
       expect(slots).toBeInstanceOf(Array);
       expect(slots.length).toBeGreaterThan(0);
       expect(slots).toContain('08:00');
@@ -348,9 +348,42 @@ describe('PublicReservationsController Suite', () => {
         getMany: jest.fn().mockResolvedValue([]),
       });
 
-      const slots = await controller.getAvailability('token-valido', '2026-10-14', '');
+      const slots = await controller.getAvailability('token-valido', '2026-10-21', '');
       expect(slots).toBeInstanceOf(Array);
       expect(slots).toEqual(['09:00', '09:30', '10:00', '10:30', '11:00', '11:30']);
+    });
+
+    it('debe calcular disponibilidad coordinada para múltiples servicios con especialistas distintos', async () => {
+      const tenantId = '00000000-0000-0000-0000-000000000001';
+      jest.spyOn(tenantCrypto, 'decodeTenantId').mockReturnValue(tenantId);
+
+      mockSettingsRepo.findOne.mockResolvedValueOnce({
+        slotInterval: 30,
+        businessHours: {
+          '3': { isOpen: true, startTime: '10:00', endTime: '12:00' },
+        },
+      });
+
+      mockAccessRepo.find.mockResolvedValueOnce([
+        { userId: 'staff-1', role: 'ADMIN', user: { id: 'staff-1', username: 'Ana' } },
+        { userId: 'staff-2', role: 'ADMIN', user: { id: 'staff-2', username: 'Carlos' } },
+      ]);
+
+      mockProductRepo.find.mockResolvedValueOnce([
+        { id: 'svc-a', name: 'Corte', durationMinutes: 30, assignedStaffIds: ['staff-1'] },
+        { id: 'svc-b', name: 'Uñas', durationMinutes: 30, assignedStaffIds: ['staff-2'] },
+      ]);
+
+      mockReservationRepo.createQueryBuilder.mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          { time: '11:00', durationMinutes: 30, employeeId: 'staff-1' },
+        ]),
+      });
+
+      const slots = await controller.getAvailability('token-valido', '2026-10-21', 'svc-a,svc-b');
+      expect(slots).toEqual(['10:00', '10:30']);
     });
   });
 });
