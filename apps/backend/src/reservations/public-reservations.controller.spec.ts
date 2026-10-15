@@ -10,7 +10,7 @@ import { Settings } from '../entities/settings.entity';
 import { Product } from '../entities/product.entity';
 import { Reservation } from '../entities/reservation.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
-import { UserRole, ReservationStatus } from '@finowork/shared-types';
+import { UserRole, ReservationStatus, PaymentStatus } from '@finowork/shared-types';
 import * as tenantCrypto from '../utils/tenant-crypto';
 
 describe('PublicReservationsController Suite', () => {
@@ -21,6 +21,7 @@ describe('PublicReservationsController Suite', () => {
   let mockAccessRepo: any;
   let mockReservationRepo: any;
   let mockNotificationsService: any;
+  let mockReservationsService: any;
 
   beforeEach(async () => {
     mockSettingsRepo = {
@@ -60,6 +61,11 @@ describe('PublicReservationsController Suite', () => {
       sendNotificationToNegocio: jest.fn().mockResolvedValue(true),
       notifyCustomerAppointment: jest.fn().mockResolvedValue(true),
       sendNotificationToIdentifier: jest.fn().mockResolvedValue(true),
+      notifyNewReservation: jest.fn().mockResolvedValue(true),
+    };
+
+    mockReservationsService = {
+      create: jest.fn(),
     };
 
     const manager = {
@@ -82,7 +88,7 @@ describe('PublicReservationsController Suite', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PublicReservationsController],
       providers: [
-        { provide: ReservationsService, useValue: {} },
+        { provide: ReservationsService, useValue: mockReservationsService },
         { provide: CustomersService, useValue: {} },
         { provide: StorageService, useValue: {} },
         { provide: NotificationsService, useValue: mockNotificationsService },
@@ -411,6 +417,74 @@ describe('PublicReservationsController Suite', () => {
 
       const slots = await controller.getAvailability('token-valido', '2026-10-21', 'svc-a,svc-b');
       expect(slots).toEqual(['10:00', '10:30', '11:00']);
+    });
+  });
+
+  describe('Pago en Efectivo (CASH) en Reservas Públicas', () => {
+    it('debe permitir agendar con pago en efectivo (CASH) incluso si el negocio tiene abono mínimo configurado', async () => {
+      const tenantId = '00000000-0000-0000-0000-000000000001';
+      jest.spyOn(tenantCrypto, 'decodeTenantId').mockReturnValue(tenantId);
+      mockTenantRepo.findOne.mockResolvedValue({ id: tenantId, name: 'Salon Spa', isActive: true, status: 'ACTIVE' });
+      mockReservationRepo.findOne.mockResolvedValue(null);
+
+      mockSettingsRepo.findOne.mockResolvedValue({
+        bookingRequireDeposit: true,
+        bookingDepositPercentage: 20,
+        acceptCashUsd: true,
+      });
+
+      jest.spyOn<any, any>(controller, 'checkSlotAvailability').mockResolvedValue(true);
+
+      mockReservationsService.create.mockResolvedValue({
+        id: 'new-res-cash',
+        tenantId,
+        customerName: 'Carlos Cash',
+        customerPhone: '04147778899',
+        totalAmount: 50,
+        notes: '[Pago en Efectivo al asistir]',
+      });
+
+      const res = await controller.createPublicReservation('token-valido', {
+        date: '2026-10-25',
+        time: '14:00',
+        customerName: 'Carlos Cash',
+        customerPhone: '04147778899',
+        totalAmount: 50,
+        paymentMethod: 'CASH',
+      });
+
+      expect(res).toBeDefined();
+      expect(mockReservationsService.create).toHaveBeenCalledWith(
+        tenantId,
+        expect.objectContaining({
+          totalAmount: 50,
+          paymentStatus: PaymentStatus.PENDING,
+          abonosTotal: 0,
+          notes: '[Pago en Efectivo al asistir]',
+        })
+      );
+    });
+
+    it('debe rechazar pago en efectivo (CASH) si el negocio desactivó explícitamente acceptCashUsd', async () => {
+      const tenantId = '00000000-0000-0000-0000-000000000001';
+      jest.spyOn(tenantCrypto, 'decodeTenantId').mockReturnValue(tenantId);
+      mockTenantRepo.findOne.mockResolvedValue({ id: tenantId, name: 'Salon Spa', isActive: true, status: 'ACTIVE' });
+      mockReservationRepo.findOne.mockResolvedValue(null);
+
+      mockSettingsRepo.findOne.mockResolvedValue({
+        acceptCashUsd: false,
+      });
+
+      jest.spyOn<any, any>(controller, 'checkSlotAvailability').mockResolvedValue(true);
+
+      await expect(controller.createPublicReservation('token-valido', {
+        date: '2026-10-25',
+        time: '14:00',
+        customerName: 'Carlos Cash',
+        customerPhone: '04147778899',
+        totalAmount: 50,
+        paymentMethod: 'CASH',
+      })).rejects.toThrow('Este negocio no tiene habilitado el pago en efectivo.');
     });
   });
 });

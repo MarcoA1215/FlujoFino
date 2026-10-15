@@ -389,10 +389,12 @@ export class PublicReservationsController {
     const minDepositPct = isDepositRequired ? Number(settings?.bookingDepositPercentage ?? settings?.minDepositPercentage ?? 0) : 0;
 
     // Validate payment reference and minimum deposit
-    if (minDepositPct > 0 && totalAmount > 0) {
-      if (dto.paymentMethod === 'CASH') {
-        throw new BadRequestException(`Este negocio requiere un abono mínimo del ${minDepositPct}% para agendar citas. Debes abonar mediante un método electrónico.`);
+    if (dto.paymentMethod === 'CASH') {
+      if (settings?.acceptCashUsd === false) {
+        throw new BadRequestException('Este negocio no tiene habilitado el pago en efectivo.');
       }
+      // El cliente pagará en efectivo directamente al asistir a su cita
+    } else if (minDepositPct > 0 && totalAmount > 0) {
       if (!dto.paymentReference || !dto.paymentReference.trim()) {
         throw new BadRequestException(`Este negocio requiere un abono mínimo del ${minDepositPct}% para reservar. Por favor ingresa el comprobante de pago.`);
       }
@@ -403,7 +405,7 @@ export class PublicReservationsController {
           `El monto abonado ($${payAmount.toFixed(2)}) es inferior al abono mínimo requerido del ${minDepositPct}% ($${requiredMin.toFixed(2)}).`
         );
       }
-    } else if (dto.paymentMethod && dto.paymentMethod !== 'CASH') {
+    } else if (dto.paymentMethod) {
       if (!dto.paymentReference || !dto.paymentReference.trim()) {
         throw new BadRequestException('Por favor ingresa el número de referencia del comprobante de pago.');
       }
@@ -440,7 +442,9 @@ export class PublicReservationsController {
       numberOfPeople: dto.numberOfPeople || 1,
       employeeId: dto.employeeId,
       serviceSpecialists: dto.serviceSpecialists || undefined,
-      notes: dto.notes?.trim(),
+      notes: dto.paymentMethod === 'CASH'
+        ? (dto.notes?.trim() ? `${dto.notes.trim()} | [Pago en Efectivo al asistir]` : '[Pago en Efectivo al asistir]')
+        : dto.notes?.trim(),
       totalAmount: Number(dto.totalAmount || 0),
       tableNumber: dto.tableNumber?.trim(),
       // Sanitización estricta: nunca permitir que el payload del cliente fuerce estos estados

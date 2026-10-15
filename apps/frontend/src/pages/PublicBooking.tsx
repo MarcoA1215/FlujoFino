@@ -294,7 +294,6 @@ const PublicBooking: React.FC = () => {
         }
 
         // Select first active payment method dynamically
-        const minDep = Number(res.data.minDepositPercentage || 0);
         let defaultMethod = 'PAGO_MOVIL';
         if (res.data.acceptPagoMovil !== false) {
           defaultMethod = 'PAGO_MOVIL';
@@ -302,7 +301,7 @@ const PublicBooking: React.FC = () => {
           defaultMethod = 'TRANSFER';
         } else if (res.data.acceptBinance === true) {
           defaultMethod = 'BINANCE';
-        } else if (minDep === 0 && res.data.acceptCashUsd !== false) {
+        } else if (res.data.acceptCashUsd !== false) {
           defaultMethod = 'CASH';
         }
         setBookingPaymentMethod(defaultMethod);
@@ -396,15 +395,6 @@ const PublicBooking: React.FC = () => {
             return;
           }
         }
-      } else {
-        if (minDepositPercentage > 0) {
-          presentToast({ 
-            message: `Este negocio requiere un abono previo del ${minDepositPercentage}% para apartar la cita. Selecciona un método de pago electrónico e ingresa la referencia.`, 
-            duration: 4000, 
-            color: 'warning' 
-          });
-          return;
-        }
       }
     }
 
@@ -431,12 +421,14 @@ const PublicBooking: React.FC = () => {
         paymentReference: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? bookingPaymentRef.trim() : undefined,
         paymentAmount: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? payAmtNum : undefined,
         paymentAmountBs: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? Math.round(payAmtNum * rateBs * 100) / 100 : undefined,
-        paymentProofUrl: paymentProofUrl || undefined,
+        paymentProofUrl: bookingPaymentMethod !== 'CASH' ? (paymentProofUrl || undefined) : undefined,
         paymentNotes: totalServicePrice > 0 ? (
-          [
-            bookingOriginBank ? `Banco origen: ${bookingOriginBank}` : '',
-            bookingPaymentNotes.trim()
-          ].filter(Boolean).join(' | ') || undefined
+          bookingPaymentMethod === 'CASH'
+            ? 'Pago en Efectivo al asistir'
+            : [
+                bookingOriginBank ? `Banco origen: ${bookingOriginBank}` : '',
+                bookingPaymentNotes.trim()
+              ].filter(Boolean).join(' | ') || undefined
         ) : undefined,
       });
 
@@ -2010,9 +2002,9 @@ const PublicBooking: React.FC = () => {
                         </div>
                       </div>
 
-                      {minDepositPercentage > 0 && (
+                      {bookingPaymentMethod !== 'CASH' && minDepositPercentage > 0 && (
                         <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px', marginBottom: '12px', fontSize: '12px', color: '#92400e' }}>
-                          ⚠️ <strong>Abono previo requerido:</strong> Este negocio requiere un abono o seña mínima del <strong>{minDepositPercentage}% (${(totalServicePrice * (minDepositPercentage / 100)).toFixed(2)})</strong> para apartar tu turno en agenda.
+                          ⚠️ <strong>Abono previo requerido:</strong> Este negocio requiere un abono o seña mínima del <strong>{minDepositPercentage}% (${(totalServicePrice * (minDepositPercentage / 100)).toFixed(2)})</strong> para apartar tu turno en agenda mediante métodos electrónicos.
                         </div>
                       )}
 
@@ -2037,12 +2029,39 @@ const PublicBooking: React.FC = () => {
                             {tenantInfo?.acceptPagoMovil !== false && <IonSelectOption value="PAGO_MOVIL">📲 Pago Móvil</IonSelectOption>}
                             {tenantInfo?.acceptTransfer && <IonSelectOption value="TRANSFER">🏦 Transferencia Bancaria</IonSelectOption>}
                             {tenantInfo?.acceptBinance && <IonSelectOption value="BINANCE">🟡 Binance Pay (USDT)</IonSelectOption>}
-                            {minDepositPercentage === 0 && tenantInfo?.acceptCashUsd !== false && (
+                            {tenantInfo?.acceptCashUsd !== false && (
                               <IonSelectOption value="CASH">💵 Pagar en Efectivo (Al asistir)</IonSelectOption>
                             )}
                           </IonSelect>
                         </IonItem>
                       </div>
+
+                      {/* Cash Payment Notice */}
+                      {bookingPaymentMethod === 'CASH' && (
+                        <div style={{ 
+                          backgroundColor: '#ecfdf5', 
+                          border: '1px solid #a7f3d0', 
+                          borderRadius: '12px', 
+                          padding: '14px', 
+                          marginBottom: '14px', 
+                          fontSize: '13px', 
+                          color: '#065f46', 
+                          display: 'flex', 
+                          alignItems: 'flex-start', 
+                          gap: '12px',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                        }}>
+                          <span style={{ fontSize: '24px', lineHeight: 1 }}>💵</span>
+                          <div>
+                            <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#065f46', marginBottom: '4px' }}>
+                              Pago en Efectivo (Al asistir)
+                            </div>
+                            <div style={{ fontSize: '12.5px', color: '#047857', lineHeight: '1.45' }}>
+                              Tu cita quedará registrada y apartada en agenda. Pagarás el total de <strong>${totalServicePrice.toFixed(2)}</strong> {rateBs > 0 && <>(aprox. <strong>Bs. {(Math.round(totalServicePrice * rateBs * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>)</>} directamente en efectivo al momento de ser atendido en el local.
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Type of payment: Full vs Deposit (if electronic) */}
                       {bookingPaymentMethod !== 'CASH' && (
