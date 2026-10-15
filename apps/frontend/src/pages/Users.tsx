@@ -94,6 +94,7 @@ export const formatDateLocal = (d: Date): string => {
 const Users: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'delivery' | 'requests'>('users');
   const [users, setUsers] = useState<UserData[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(true);
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -227,9 +228,10 @@ const Users: React.FC = () => {
   };
 
   const fetchUsers = async () => {
+    setIsLoadingUsers(true);
     try {
       const res = await apiClient.get<UserData[]>('/users');
-      setUsers(res.data);
+      setUsers(Array.isArray(res.data) ? res.data : []);
       try {
         const setRes = await apiClient.get<any>('/settings');
         setSettings(setRes.data || {});
@@ -239,8 +241,15 @@ const Users: React.FC = () => {
       fetchAccessRequests();
       fetchPendingAdvances();
       fetchDeliverySummary();
-    } catch (e) {
-      presentToast({ message: 'Error cargando usuarios', duration: 3000, color: 'danger' });
+    } catch (e: any) {
+      console.error('Error cargando usuarios:', e);
+      presentToast({
+        message: 'Error al cargar usuarios: ' + (e.response?.data?.message || e.message || 'Verifica tu conexión'),
+        duration: 3500,
+        color: 'danger',
+      });
+    } finally {
+      setIsLoadingUsers(false);
     }
   };
 
@@ -946,9 +955,14 @@ const Users: React.FC = () => {
                 <IonCol size="12" sizeMd="8">
                   <div className="ff-card" style={{ padding: 0, overflow: 'hidden' }}>
                     <div style={{ padding: '14px 18px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                      <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
-                        Equipo de Trabajo ({users.length})
-                      </h3>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
+                          Equipo de Trabajo ({users.length})
+                        </h3>
+                        <IonButton size="small" fill="clear" color="primary" onClick={fetchUsers} title="Actualizar lista">
+                          <IonIcon icon={refreshOutline} slot="icon-only" />
+                        </IonButton>
+                      </div>
                       <span style={{ fontSize: '12px', fontWeight: '600', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         ↔ Desliza para ver pagos y vales
                       </span>
@@ -1087,7 +1101,21 @@ const Users: React.FC = () => {
                             );
                           })}
                           {users.length === 0 && (
-                            <tr><td colSpan={7} className="ion-text-center">Cargando...</td></tr>
+                            <tr>
+                              <td colSpan={7} className="ion-text-center" style={{ padding: '28px 16px', color: '#64748B' }}>
+                                {isLoadingUsers ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                    <IonSpinner name="crescent" color="primary" />
+                                    <span style={{ fontSize: '13px', fontWeight: 600 }}>Cargando equipo de trabajo...</span>
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ fontSize: '14px', fontWeight: 600, color: '#334155' }}>No hay usuarios registrados en este negocio</span>
+                                    <span style={{ fontSize: '12px', color: '#94A3B8' }}>Usa el formulario a la izquierda para crear o registrar miembros de tu equipo.</span>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
                           )}
                         </tbody>
                       </table>

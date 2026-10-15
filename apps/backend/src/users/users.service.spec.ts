@@ -72,6 +72,79 @@ describe('UsersService', () => {
     );
   });
 
+  describe('findAll', () => {
+    it('debe retornar array vacío si tenantId no es provisto', async () => {
+      const result = await service.findAll(undefined);
+      expect(result).toEqual([]);
+    });
+
+    it('debe retornar todos los usuarios de usersRepo si tenantId no es un UUID (ej: admin-system o platform-admin)', async () => {
+      const mockUsers = [
+        { id: 'u1', username: 'admin', role: UserRole.ADMIN, passwordHash: 'hash1' },
+        { id: 'u2', username: 'empleado1', role: UserRole.POS, passwordHash: 'hash2' },
+      ];
+      mockUsersRepo.find.mockResolvedValue(mockUsers);
+
+      const result = await service.findAll('admin-system');
+
+      expect(mockUsersRepo.find).toHaveBeenCalledWith({ order: { createdAt: 'DESC' } });
+      expect(result).toHaveLength(2);
+      expect((result[0] as any).passwordHash).toBeUndefined();
+      expect(result[0].username).toBe('admin');
+    });
+
+    it('debe consultar UserTenantAccess si tenantId es un UUID válido y mapear roles correctamente', async () => {
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      const mockAccesses = [
+        {
+          id: 'acc-1',
+          tenantId: validUuid,
+          role: UserRole.ADMIN,
+          roles: [UserRole.ADMIN, UserRole.POS],
+          status: 'ACCEPTED',
+          jobTitle: 'Gerente General',
+          user: { id: 'u-admin', username: 'admin', name: 'Administrador', passwordHash: 'secret' },
+        },
+        {
+          id: 'acc-2',
+          tenantId: validUuid,
+          role: UserRole.POS,
+          roles: [UserRole.POS],
+          status: 'ACCEPTED',
+          jobTitle: 'Cajero',
+          user: { id: 'u-pos', username: 'cajero1', name: 'Cajero Uno', passwordHash: 'secret' },
+        },
+      ];
+      mockUsersRepo.manager.find.mockResolvedValue(mockAccesses);
+
+      const result = await service.findAll(validUuid);
+
+      expect(mockUsersRepo.manager.find).toHaveBeenCalledWith(
+        UserTenantAccess,
+        expect.objectContaining({ where: { tenantId: validUuid } })
+      );
+      expect(result).toHaveLength(2);
+      expect(result[0].username).toBe('admin');
+      expect((result[0] as any).roles).toEqual([UserRole.ADMIN, UserRole.POS]);
+      expect((result[0] as any).jobTitle).toBe('Gerente General');
+      expect((result[0] as any).passwordHash).toBeUndefined();
+    });
+
+    it('debe hacer fallback a usersRepo.find si el tenant UUID no tiene accesos creados aún', async () => {
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      mockUsersRepo.manager.find.mockResolvedValue([]);
+      mockUsersRepo.find.mockResolvedValue([
+        { id: 'u-fallback', username: 'admin', role: UserRole.ADMIN, passwordHash: 'hash' }
+      ]);
+
+      const result = await service.findAll(validUuid);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].username).toBe('admin');
+      expect((result[0] as any).passwordHash).toBeUndefined();
+    });
+  });
+
   describe('getPayrollSummary', () => {
     it('debe calcular correctamente la nómina por comisión pura con descuento de vales', async () => {
       const mockAccess = {

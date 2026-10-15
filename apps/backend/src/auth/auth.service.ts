@@ -118,6 +118,35 @@ export class AuthService {
 
     if (!access) {
       if ((user.role as string) === 'ADMIN' || isSuperAdmin) {
+        try {
+          const tenantRepo = this.dataSource.getRepository(Tenant);
+          const firstTenant = await tenantRepo.findOne({ where: {} });
+          if (firstTenant) {
+            const accessRepo = this.dataSource.getRepository(UserTenantAccess);
+            let createdAccess = await accessRepo.findOne({ where: { userId: user.id, tenantId: firstTenant.id } });
+            if (!createdAccess) {
+              createdAccess = accessRepo.create({
+                userId: user.id,
+                tenantId: firstTenant.id,
+                role: user.role,
+                roles: [user.role],
+                isActive: true,
+                status: 'ACCEPTED',
+              });
+              await accessRepo.save(createdAccess);
+            }
+            return {
+              user: result,
+              tenantId: firstTenant.id,
+              role: user.role,
+              roles: [user.role],
+              tenantName: firstTenant.name,
+              workspaces: [{ tenantId: firstTenant.id, name: firstTenant.name, role: user.role, roles: [user.role], status: 'ACCEPTED' }],
+            };
+          }
+        } catch (e) {
+          console.warn('[validateUser] Tenant auto-link fallback error:', e);
+        }
         return { user: result, tenantId: requestedTenantId || 'admin-system', role: user.role, roles: [user.role], tenantName: 'Sistema Central', workspaces };
       }
       if (user.role === UserRole.PROMOTOR || (user.role as string) === 'PROMOTOR') {

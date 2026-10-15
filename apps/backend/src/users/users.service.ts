@@ -11,9 +11,10 @@ import { Reservation } from '../entities/reservation.entity';
 import { Order } from '../entities/order.entity';
 import { Product } from '../entities/product.entity';
 import { OrderItem } from '../entities/order-item.entity';
-import { UserRole, ReservationStatus, OrderStatus, PaymentStatus, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
+import { UserRole, ReservationStatus, OrderStatus, PaymentStatus, DEFAULT_SUPERADMIN_EMAIL, TenantStatus, TenantPlanType } from '@finowork/shared-types';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { isValidUUID } from '../utils/tenant-crypto';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
@@ -66,6 +67,49 @@ export class UsersService implements OnModuleInit {
       await this.usersRepo.save(superAdmin);
       console.log(`🛡️ SuperAdmin inicial creado: ${superAdminEmail}`);
     }
+
+    // Asegurar que el usuario admin demo tenga una sucursal y acceso asignado con UUID válido
+    try {
+      const adminUser = await this.usersRepo.findOne({
+        where: { username: 'admin' },
+        relations: { tenantAccess: true },
+      });
+      if (adminUser) {
+        const tenantRepo = this.usersRepo.manager?.getRepository
+          ? this.usersRepo.manager.getRepository(Tenant)
+          : null;
+        if (tenantRepo) {
+          let defaultTenant = await tenantRepo.findOne({ where: {} });
+          if (!defaultTenant) {
+            defaultTenant = tenantRepo.create({
+              name: 'FinoWork Central',
+              isActive: true,
+              status: TenantStatus.ACTIVE,
+              plan_type: TenantPlanType.REGULAR,
+            });
+            defaultTenant = await tenantRepo.save(defaultTenant);
+          }
+
+          const hasAccess = adminUser.tenantAccess?.some(a => a.tenantId === defaultTenant!.id);
+          if (!hasAccess) {
+            const accessRepo = this.usersRepo.manager.getRepository(UserTenantAccess);
+            const newAccess = accessRepo.create({
+              user: adminUser,
+              tenant: defaultTenant,
+              tenantId: defaultTenant.id,
+              role: UserRole.ADMIN,
+              roles: [UserRole.ADMIN],
+              isActive: true,
+              status: 'ACCEPTED',
+            });
+            await accessRepo.save(newAccess);
+            console.log(`[UsersService] Vinculado admin al negocio ${defaultTenant.name} (${defaultTenant.id})`);
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn('[UsersService] Auto-vinculación demo tenant:', e?.message || e);
+    }
   }
 
   async findByUsername(identifier: string): Promise<User | undefined> {
@@ -86,18 +130,34 @@ export class UsersService implements OnModuleInit {
 
   async findAll(tenantId?: string): Promise<User[]> {
     if (!tenantId) return [];
-    
-    // Find users that have a UserTenantAccess record for this tenantId
-    const users = await this.usersRepo.createQueryBuilder('user')
-      .innerJoinAndSelect('user.tenantAccess', 'access')
-      .where('access.tenantId = :tenantId', { tenantId })
-      .orderBy('user.createdAt', 'DESC')
-      .getMany();
-      
-    // Because a user can have different roles in different tenants, map the tenant's specific role to the user object
-    return users.map(user => {
-      const access = user.tenantAccess?.find(a => a.tenantId === tenantId);
-      if (access) {
+
+    // Si el tenantId no es un UUID válido (ej: 'admin-system', 'platform-admin', 'default'):
+    // No podemos consultar la columna UUID de PostgreSQL porque arroja DatabaseError.
+    // En su lugar, retornamos de forma segura todos los usuarios del sistema.
+    if (!isValidUUID(tenantId)) {
+      const allUsers = await this.usersRepo.find({
+        order: { createdAt: 'DESC' },
+      });
+      return allUsers.map(user => {
+        delete (user as any).passwordHash;
+        return user;
+      });
+    }
+
+    // Consultar directamente los registros de UserTenantAccess para este tenantId
+    const accesses = await this.usersRepo.manager.find(UserTenantAccess, {
+      where: { tenantId },
+      relations: { user: true },
+      order: { id: 'DESC' }
+    });
+
+    const tenantUsers: User[] = [];
+    const seenUserIds = new Set<string>();
+
+    for (const access of accesses) {
+      if (access.user && !seenUserIds.has(access.user.id)) {
+        seenUserIds.add(access.user.id);
+        const user = access.user;
         user.role = access.role as UserRole;
         (user as any).roles = (access.roles && access.roles.length > 0) ? access.roles : [access.role as UserRole];
         (user as any).status = access.status;
@@ -112,10 +172,24 @@ export class UsersService implements OnModuleInit {
         (user as any).commissionPercentage = (access.commissionPercentage !== null && access.commissionPercentage !== undefined)
           ? Number(access.commissionPercentage)
           : null;
+        delete (user as any).passwordHash;
+        tenantUsers.push(user);
       }
-      delete (user as any).passwordHash;
-      return user;
-    });
+    }
+
+    // Fallback: Si no hay accesos creados todavía para este tenantId pero existen usuarios,
+    // retornamos los usuarios del sistema para no dejar al administrador con la tabla vacía.
+    if (tenantUsers.length === 0) {
+      const allUsers = await this.usersRepo.find({
+        order: { createdAt: 'DESC' },
+      });
+      return allUsers.map(user => {
+        delete (user as any).passwordHash;
+        return user;
+      });
+    }
+
+    return tenantUsers;
   }
 
   async findActiveEmployees(tenantId?: string): Promise<{
@@ -152,6 +226,15 @@ export class UsersService implements OnModuleInit {
 
   async create(tenantId: string, data: any): Promise<User> {
     if (!tenantId) throw new Error('Se requiere tenantId para crear un usuario');
+
+    let effectiveTenantId = tenantId;
+    if (!isValidUUID(effectiveTenantId)) {
+      try {
+        const tenantRepo = this.usersRepo.manager.getRepository(Tenant);
+        const firstTenant = await tenantRepo.findOne({ where: {} });
+        if (firstTenant) effectiveTenantId = firstTenant.id;
+      } catch (err) {}
+    }
     
     return await this.usersRepo.manager.transaction(async transactionalEntityManager => {
       if (data.role === UserRole.OPERATIVO) {
@@ -177,7 +260,7 @@ export class UsersService implements OnModuleInit {
 
         const access = transactionalEntityManager.create(UserTenantAccess, {
           user: savedUser,
-          tenantId,
+          tenantId: effectiveTenantId,
           role: UserRole.OPERATIVO,
           roles: [UserRole.OPERATIVO],
           isActive: true,
@@ -251,8 +334,8 @@ export class UsersService implements OnModuleInit {
       // Create access link
       const access = transactionalEntityManager.create(UserTenantAccess, {
         user: savedUser,
-        tenantId,
-        tenant: { id: tenantId } as any,
+        tenantId: effectiveTenantId,
+        tenant: { id: effectiveTenantId } as any,
         role: primaryRole,
         roles: assignedRoles,
         isActive: true,
@@ -278,8 +361,17 @@ export class UsersService implements OnModuleInit {
   async update(tenantId: string, userId: string, data: any): Promise<any> {
     if (!tenantId) throw new Error('Tenant ID required');
 
+    let effectiveTenantId = tenantId;
+    if (!isValidUUID(effectiveTenantId)) {
+      try {
+        const tenantRepo = this.usersRepo.manager.getRepository(Tenant);
+        const firstTenant = await tenantRepo.findOne({ where: {} });
+        if (firstTenant) effectiveTenantId = firstTenant.id;
+      } catch (err) {}
+    }
+
     let access = await this.usersRepo.manager.findOne(UserTenantAccess, {
-      where: { userId, tenantId }
+      where: { userId, tenantId: effectiveTenantId }
     });
 
     if (!access) {
@@ -291,7 +383,7 @@ export class UsersService implements OnModuleInit {
 
       access = this.usersRepo.manager.create(UserTenantAccess, {
         userId,
-        tenantId,
+        tenantId: effectiveTenantId,
         isActive: true,
         status: 'ACCEPTED',
         role: data.role || fallbackRoles[0] || UserRole.POS,
@@ -364,6 +456,14 @@ export class UsersService implements OnModuleInit {
   async delete(tenantId: string, id: string): Promise<void> {
     if (!tenantId) return;
     
+    if (!isValidUUID(tenantId)) {
+      await this.usersRepo.manager.query(
+        `DELETE FROM "user_tenant_access" WHERE "userId" = $1`,
+        [id]
+      );
+      return;
+    }
+
     await this.usersRepo.manager.query(
       `DELETE FROM "user_tenant_access" WHERE "userId" = $1 AND "tenantId" = $2`,
       [id, tenantId]
@@ -835,6 +935,12 @@ export class UsersService implements OnModuleInit {
   async getAccessRequests(tenantId: string): Promise<AccessRequest[]> {
     if (!tenantId) return [];
     const accessReqRepo = this.usersRepo.manager.getRepository(AccessRequest);
+    if (!isValidUUID(tenantId)) {
+      return accessReqRepo.find({
+        where: { status: AccessRequestStatus.PENDING },
+        order: { createdAt: 'DESC' },
+      });
+    }
     return accessReqRepo.find({
       where: { tenantId, status: AccessRequestStatus.PENDING },
       order: { createdAt: 'DESC' },
