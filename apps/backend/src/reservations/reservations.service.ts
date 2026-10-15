@@ -610,18 +610,21 @@ export class ReservationsService implements OnModuleInit {
             );
           }
         } else {
-          // Si no se asignó un especialista específico a este servicio, asegurar que haya al menos uno calificado disponible en este segmento
+          // Si no se asignó un especialista específico a este servicio, asegurar que haya al menos uno disponible en este segmento
           let segmentStaff = staffList;
           if (sAssignedIds.length > 0) {
-            segmentStaff = segmentStaff.filter(st =>
+            const qualifiedSegmentStaff = segmentStaff.filter(st =>
               sAssignedIds.includes(st.userId) || sAssignedIds.includes(st.id) || (st.user && sAssignedIds.includes(st.user.id))
             );
+            if (qualifiedSegmentStaff.length > 0) {
+              segmentStaff = qualifiedSegmentStaff;
+            }
           }
           const freeForSegment = segmentStaff.filter(st => {
             if (st.entryTime && segStart < toMins(st.entryTime)) return false;
             if (st.exitTime && segEnd > toMins(st.exitTime)) return false;
             if (st.lunchStart && st.lunchEnd && segStart < toMins(st.lunchEnd) && segEnd > toMins(st.lunchStart)) return false;
-            return !busyBookings.some(b => (b.employeeId === st.userId || b.employeeId === st.id) && segStart < b.end && segEnd > b.start);
+            return !busyBookings.some(b => (b.employeeId === st.userId || b.employeeId === st.id || (st.user && b.employeeId === st.user.id)) && segStart < b.end && segEnd > b.start);
           });
           if (freeForSegment.length === 0) {
             throw new BadRequestException(
@@ -719,27 +722,37 @@ export class ReservationsService implements OnModuleInit {
       if (serviceId) {
         const requestedServices = serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean);
         const requiredStaffIdSets = requestedServices
-          .map(s => (s as any)?.assignedStaffIds || [])
+          .map(s => {
+            const raw = (s as any)?.assignedStaffIds;
+            if (Array.isArray(raw)) return raw;
+            if (typeof raw === 'string' && raw.trim()) return raw.split(',').map((x: string) => x.trim()).filter(Boolean);
+            return [];
+          })
           .filter(arr => Array.isArray(arr) && arr.length > 0);
 
         if (requiredStaffIdSets.length > 0) {
-          const staffDoingAll = candidateStaff.filter(st =>
-            requiredStaffIdSets.every(set => set.includes(st.userId))
+          const isStaffQualified = (st: any, set: string[]) =>
+            set.includes(st.userId) || set.includes(st.id) || (st.user && set.includes(st.user.id));
+
+          // Considerar únicamente conjuntos de especialistas que tengan al menos 1 miembro de personal activo en el negocio
+          const activeStaffIdSets = requiredStaffIdSets.filter(set =>
+            staffList.some(st => isStaffQualified(st, set))
           );
-          if (staffDoingAll.length > 0) {
-            candidateStaff = staffDoingAll;
-          } else {
-            // Si ningún empleado individual hace todos los servicios seleccionados a la vez,
-            // verificar que para cada servicio exista al menos un especialista calificado activo
-            const allServicesCovered = requiredStaffIdSets.every(set =>
-              staffList.some(st => set.includes(st.userId))
+
+          if (activeStaffIdSets.length > 0) {
+            const staffDoingAll = candidateStaff.filter(st =>
+              activeStaffIdSets.every(set => isStaffQualified(st, set))
             );
-            if (!allServicesCovered) {
-              throw new BadRequestException('Uno o más servicios seleccionados no cuentan con especialistas calificados activos en el establecimiento.');
+            if (staffDoingAll.length > 0) {
+              candidateStaff = staffDoingAll;
+            } else {
+              const partialStaff = candidateStaff.filter(st =>
+                activeStaffIdSets.some(set => isStaffQualified(st, set))
+              );
+              if (partialStaff.length > 0) {
+                candidateStaff = partialStaff;
+              }
             }
-            candidateStaff = candidateStaff.filter(st =>
-              requiredStaffIdSets.some(set => set.includes(st.userId))
-            );
           }
         }
       }
@@ -820,15 +833,31 @@ export class ReservationsService implements OnModuleInit {
             if (Array.isArray(raw)) staffIds = raw;
             else if (typeof raw === 'string') staffIds = raw.split(',').map((x: string) => x.trim()).filter(Boolean);
 
-            if (staffIds.length === 1) {
-              itemEmpId = staffIds[0];
-            } else if (dto.employeeId && staffIds.includes(dto.employeeId)) {
+            const accessRepo = manager.getRepository(UserTenantAccess);
+            let activeStaffIds = staffIds;
+            try {
+              const activeStaffList = await accessRepo.find({
+                where: { tenantId, isActive: true, status: 'ACCEPTED' },
+                relations: { user: true },
+              });
+              if (activeStaffList && activeStaffList.length > 0) {
+                const filtered = staffIds.filter(sid =>
+                  activeStaffList.some(st => st.userId === sid || st.id === sid || (st.user && st.user.id === sid))
+                );
+                if (filtered.length > 0) {
+                  activeStaffIds = filtered;
+                }
+              }
+            } catch (e) {}
+
+            if (activeStaffIds.length === 1) {
+              itemEmpId = activeStaffIds[0];
+            } else if (dto.employeeId && activeStaffIds.includes(dto.employeeId)) {
               itemEmpId = dto.employeeId;
             }
 
             if (itemEmpId && (!itemEmpName || itemEmpId !== dto.employeeId)) {
               try {
-                const accessRepo = manager.getRepository(UserTenantAccess);
                 const empAcc: any = await accessRepo.findOne({
                   where: { userId: itemEmpId, tenantId },
                   relations: { user: true },
@@ -1700,21 +1729,26 @@ export class ReservationsService implements OnModuleInit {
         .filter(arr => Array.isArray(arr) && arr.length > 0);
 
       if (requiredStaffIdSets.length > 0) {
-        const staffDoingAll = candidateStaff.filter(st =>
-          requiredStaffIdSets.every(set =>
-            set.includes(st.userId) || set.includes(st.id) || set.includes(st.user?.id)
-          )
+        const isStaffInSet = (st: any, set: string[]) =>
+          set.includes(st.userId) || set.includes(st.id) || (st.user && set.includes(st.user.id));
+
+        const activeStaffIdSets = requiredStaffIdSets.filter(set =>
+          staffList.some(st => isStaffInSet(st, set))
         );
-        if (staffDoingAll.length > 0) {
-          candidateStaff = staffDoingAll;
-        } else {
-          const partialStaff = candidateStaff.filter(st =>
-            requiredStaffIdSets.some(set =>
-              set.includes(st.userId) || set.includes(st.id) || set.includes(st.user?.id)
-            )
+
+        if (activeStaffIdSets.length > 0) {
+          const staffDoingAll = candidateStaff.filter(st =>
+            activeStaffIdSets.every(set => isStaffInSet(st, set))
           );
-          if (partialStaff.length > 0) {
-            candidateStaff = partialStaff;
+          if (staffDoingAll.length > 0) {
+            candidateStaff = staffDoingAll;
+          } else {
+            const partialStaff = candidateStaff.filter(st =>
+              activeStaffIdSets.some(set => isStaffInSet(st, set))
+            );
+            if (partialStaff.length > 0) {
+              candidateStaff = partialStaff;
+            }
           }
         }
       }

@@ -1263,21 +1263,26 @@ export class PublicReservationsController {
         .filter(arr => Array.isArray(arr) && arr.length > 0);
 
       if (requiredStaffIdSets.length > 0) {
-        const staffDoingAll = candidateStaff.filter(st =>
-          requiredStaffIdSets.every(set =>
-            set.includes(st.userId) || set.includes(st.id) || set.includes(st.user?.id)
-          )
+        const isStaffInSet = (st: any, set: string[]) =>
+          set.includes(st.userId) || set.includes(st.id) || (st.user && set.includes(st.user.id));
+
+        const activeStaffIdSets = requiredStaffIdSets.filter(set =>
+          staffList.some(st => isStaffInSet(st, set))
         );
-        if (staffDoingAll.length > 0) {
-          candidateStaff = staffDoingAll;
-        } else {
-          const partialStaff = candidateStaff.filter(st =>
-            requiredStaffIdSets.some(set =>
-              set.includes(st.userId) || set.includes(st.id) || set.includes(st.user?.id)
-            )
+
+        if (activeStaffIdSets.length > 0) {
+          const staffDoingAll = candidateStaff.filter(st =>
+            activeStaffIdSets.every(set => isStaffInSet(st, set))
           );
-          if (partialStaff.length > 0) {
-            candidateStaff = partialStaff;
+          if (staffDoingAll.length > 0) {
+            candidateStaff = staffDoingAll;
+          } else {
+            const partialStaff = candidateStaff.filter(st =>
+              activeStaffIdSets.some(set => isStaffInSet(st, set))
+            );
+            if (partialStaff.length > 0) {
+              candidateStaff = partialStaff;
+            }
           }
         }
       }
