@@ -166,9 +166,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     return localStaffUsers.filter(emp => {
       const roles: string[] = emp.roles && emp.roles.length > 0 ? emp.roles : [emp.role];
       const isDeliveryOnly = roles.every(r => r === 'DELIVERY' || r === 'Repartidor');
-      const isOperativoOnly = roles.every(r => r === 'OPERATIVO');
-      if (isDeliveryOnly || isOperativoOnly) return false;
+      if (isDeliveryOnly) return false;
       if (emp.username?.toLowerCase() === 'delivery' || emp.name?.toLowerCase() === 'delivery') return false;
+
+      const titleAndName = `${emp.jobTitle || ''} ${emp.name || ''} ${emp.username || ''}`.toLowerCase();
+      const isJanitorial = /limpieza|mantenimiento|vigilancia|seguridad|aseo/i.test(titleAndName);
+      if (isJanitorial) return false;
+
       return true;
     });
   }, [localStaffUsers]);

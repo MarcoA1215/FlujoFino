@@ -40,6 +40,8 @@ export class SettingsService implements OnModuleInit {
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "allowNegativeStock" boolean DEFAULT false;`,
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "logoShape" character varying DEFAULT 'ROUNDED';`,
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "logoFit" character varying DEFAULT 'contain';`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingAllowStaffSelection" boolean DEFAULT true;`,
+      `UPDATE "settings" SET "bookingAllowStaffSelection" = true WHERE "bookingAllowStaffSelection" IS NULL;`,
     ];
 
     for (const sql of settingsColumns) {

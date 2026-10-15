@@ -189,9 +189,10 @@ export class PublicReservationsController {
       image: p.images && p.images.length > 0 ? (Array.isArray(p.images) ? p.images[p.images.length - 1] : String(p.images).split(',').pop()?.trim()) : null
     }));
 
-    // Fetch active staff if staff selection is allowed
+    // Fetch active staff if staff selection is allowed (defaults to true unless explicitly disabled)
     let staff: any[] = [];
-    if (settings?.bookingAllowStaffSelection) {
+    const allowStaffSelection = settings?.bookingAllowStaffSelection !== false;
+    if (allowStaffSelection) {
       try {
         const accessRepo = this.tenantRepo.manager.getRepository(UserTenantAccess);
         const accesses = await accessRepo.find({
@@ -199,14 +200,39 @@ export class PublicReservationsController {
           relations: { user: true },
           order: { user: { username: 'ASC' } }
         });
+
+        // Collect all assigned staff IDs across services to ensure any designated specialist is always included
+        const allAssignedStaffIds = new Set<string>();
+        for (const p of products) {
+          const raw = (p as any)?.assignedStaffIds;
+          if (Array.isArray(raw)) {
+            raw.forEach(sid => allAssignedStaffIds.add(String(sid).trim()));
+          } else if (typeof raw === 'string' && raw.trim()) {
+            raw.split(',').forEach(sid => allAssignedStaffIds.add(sid.trim()));
+          }
+        }
+
         staff = accesses
           .filter(a => {
             if (!a.user) return false;
             const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
               ? a.roles
               : [a.role || a.user.role].filter(Boolean);
-            const isExclusivelyNonStaff = userRoles.length > 0 && userRoles.every(r => r === UserRole.DELIVERY || r === UserRole.OPERATIVO);
-            return !isExclusivelyNonStaff;
+            
+            // Exclude delivery drivers completely from appointment specialists
+            const isExclusivelyDelivery = userRoles.length > 0 && userRoles.every(r => r === UserRole.DELIVERY);
+            if (isExclusivelyDelivery) return false;
+
+            // If explicitly assigned to a service, always include as qualified specialist
+            const isAssigned = allAssignedStaffIds.has(a.user.id) || allAssignedStaffIds.has(a.id);
+            if (isAssigned) return true;
+
+            // Exclude employees whose role/title indicates purely janitorial/security duties
+            const titleAndName = `${a.jobTitle || ''} ${a.user?.name || ''} ${a.user?.username || ''}`.toLowerCase();
+            const isJanitorial = /limpieza|mantenimiento|vigilancia|seguridad|aseo/i.test(titleAndName);
+            if (isJanitorial) return false;
+
+            return true;
           })
           .map(a => {
             const rawName = (a.user.name && a.user.name.trim()) ? a.user.name.trim() : '';
@@ -243,7 +269,7 @@ export class PublicReservationsController {
       slotInterval: settings?.slotInterval || 30,
       featureShowCatalog: settings?.featureShowCatalog || false,
       bookingRequireService: settings?.bookingRequireService ?? true,
-      bookingAllowStaffSelection: settings?.bookingAllowStaffSelection ?? false,
+      bookingAllowStaffSelection: allowStaffSelection,
       bookingMaxAdvanceDays: Number(settings?.bookingMaxAdvanceDays || 365),
       featureBuySell: settings?.featureBuySell ?? false,
       featureRecipes: settings?.featureRecipes ?? false,
@@ -1169,7 +1195,14 @@ export class PublicReservationsController {
         const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
           ? a.roles
           : [a.role || a.user.role].filter(Boolean);
-        return !userRoles.every(r => r === UserRole.DELIVERY || r === UserRole.OPERATIVO);
+        const isExclusivelyDelivery = userRoles.length > 0 && userRoles.every(r => r === UserRole.DELIVERY);
+        if (isExclusivelyDelivery) return false;
+
+        const titleAndName = `${a.jobTitle || ''} ${a.user?.name || ''} ${a.user?.username || ''}`.toLowerCase();
+        const isJanitorial = /limpieza|mantenimiento|vigilancia|seguridad|aseo/i.test(titleAndName);
+        if (isJanitorial) return false;
+
+        return true;
       });
     } catch (staffErr) {
       console.warn('[PublicReservations] Error consultando staff en slots:', staffErr);

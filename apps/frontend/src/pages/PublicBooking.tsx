@@ -86,9 +86,9 @@ const PublicBooking: React.FC = () => {
 
   // Specialists available specifically for all currently selected services
   const availableStaffForService = useMemo(() => {
-    if (!tenantInfo?.staff || !tenantInfo?.bookingAllowStaffSelection || selectedServices.length === 0) return [];
+    if (!tenantInfo?.staff || tenantInfo?.bookingAllowStaffSelection === false || selectedServices.length === 0) return [];
     
-    return tenantInfo.staff.filter((st: any) => {
+    const matched = tenantInfo.staff.filter((st: any) => {
       return selectedServices.every((svc: any) => {
         const assigned = svc.assignedStaffIds;
         if (!assigned || (Array.isArray(assigned) && assigned.length === 0) || (typeof assigned === 'string' && !assigned.trim())) {
@@ -98,6 +98,15 @@ const PublicBooking: React.FC = () => {
         return ids.includes(st.id);
       });
     });
+
+    // Graceful fallback: If only 1 service is selected and no active staff matched the configured IDs
+    // (e.g. assigned specialist was removed or obsolete ID), fallback to all active staff
+    // so the customer can still pick a specialist rather than hiding the selector completely.
+    if (matched.length === 0 && selectedServices.length === 1 && tenantInfo.staff.length > 0) {
+      return tenantInfo.staff;
+    }
+
+    return matched;
   }, [tenantInfo?.staff, tenantInfo?.bookingAllowStaffSelection, selectedServices]);
 
   // When selected services change, reset staff if current staff cannot do all selected services
@@ -1298,7 +1307,7 @@ const PublicBooking: React.FC = () => {
                       )}
 
                       {/* Specialist Selection: Exclusively shown once a service is selected */}
-                      {selectedServices.length > 0 && tenantInfo?.bookingAllowStaffSelection && availableStaffForService.length > 0 && (
+                      {selectedServices.length > 0 && tenantInfo?.bookingAllowStaffSelection !== false && availableStaffForService.length > 0 && (
                         <div style={{ marginTop: '16px', marginBottom: '8px', backgroundColor: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                           <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <IonIcon icon={personOutline} color="primary" />
@@ -1356,7 +1365,7 @@ const PublicBooking: React.FC = () => {
                       )}
 
                       {/* Info box when staff selection is enabled, but no single specialist performs ALL selected services */}
-                      {selectedServices.length > 1 && tenantInfo?.bookingAllowStaffSelection && availableStaffForService.length === 0 && (
+                      {selectedServices.length > 1 && tenantInfo?.bookingAllowStaffSelection !== false && availableStaffForService.length === 0 && (
                         <div style={{
                           marginTop: '16px',
                           marginBottom: '8px',
@@ -1410,7 +1419,7 @@ const PublicBooking: React.FC = () => {
                     </div>
                   ) : (
                     <div style={{ textAlign: 'center', padding: '20px 10px', color: '#64748b' }}>
-                      {tenantInfo?.bookingAllowStaffSelection && tenantInfo?.staff && tenantInfo.staff.length > 0 && (
+                      {tenantInfo?.bookingAllowStaffSelection !== false && tenantInfo?.staff && tenantInfo.staff.length > 0 && (
                         <div style={{ marginBottom: '20px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0', textAlign: 'left' }}>
                           <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <IonIcon icon={personOutline} color="primary" />

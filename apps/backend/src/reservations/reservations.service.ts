@@ -460,7 +460,14 @@ export class ReservationsService implements OnModuleInit {
       const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
         ? a.roles
         : [a.role || a.user.role].filter(Boolean);
-      return !userRoles.every(r => r === UserRole.DELIVERY || r === UserRole.OPERATIVO);
+      const isExclusivelyDelivery = userRoles.length > 0 && userRoles.every(r => r === UserRole.DELIVERY);
+      if (isExclusivelyDelivery) return false;
+
+      const titleAndName = `${a.jobTitle || ''} ${a.user?.name || ''} ${a.user?.username || ''}`.toLowerCase();
+      const isJanitorial = /limpieza|mantenimiento|vigilancia|seguridad|aseo/i.test(titleAndName);
+      if (isJanitorial) return false;
+
+      return true;
     });
 
     // Query existing pending/confirmed reservations
@@ -1633,7 +1640,14 @@ export class ReservationsService implements OnModuleInit {
       const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
         ? a.roles
         : [a.role || a.user.role].filter(Boolean);
-      return !userRoles.every(r => r === UserRole.DELIVERY || r === UserRole.OPERATIVO);
+      const isExclusivelyDelivery = userRoles.length > 0 && userRoles.every(r => r === UserRole.DELIVERY);
+      if (isExclusivelyDelivery) return false;
+
+      const titleAndName = `${a.jobTitle || ''} ${a.user?.name || ''} ${a.user?.username || ''}`.toLowerCase();
+      const isJanitorial = /limpieza|mantenimiento|vigilancia|seguridad|aseo/i.test(titleAndName);
+      if (isJanitorial) return false;
+
+      return true;
     });
 
     // Query products for service durations (match by ID and name)

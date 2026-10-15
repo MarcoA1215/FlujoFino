@@ -110,7 +110,7 @@ export class Settings {
   @Column('boolean', { default: true })
   bookingRequireService: boolean;
 
-  @Column('boolean', { default: false })
+  @Column('boolean', { default: true })
   bookingAllowStaffSelection: boolean;
 
   // --- Booking Configuration ---
