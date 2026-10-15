@@ -261,25 +261,28 @@ export class PublicReservationsController {
       rate = Number(globalSettings?.exchangeRateBs || 40.0);
     }
 
-    return { 
-      id: token, 
+    const isDepositReq = settings?.bookingRequireDeposit === true;
+    const depositPct = isDepositReq ? Number(settings?.bookingDepositPercentage ?? settings?.minDepositPercentage ?? 0) : 0;
+
+    return {
+      tenantId: tenant.id,
       name: tenant.name,
       businessHours: settings?.businessHours || null,
-      services: services,
-      slotInterval: settings?.slotInterval || 30,
-      featureShowCatalog: settings?.featureShowCatalog || false,
-      bookingRequireService: settings?.bookingRequireService ?? true,
-      bookingAllowStaffSelection: allowStaffSelection,
-      bookingMaxAdvanceDays: Number(settings?.bookingMaxAdvanceDays || 365),
-      featureBuySell: settings?.featureBuySell ?? false,
-      featureRecipes: settings?.featureRecipes ?? false,
-      featureCustomerSchedules: settings?.featureCustomerSchedules ?? false,
-      hasStore: Boolean(hasStore),
-      staff: staff,
-      exchangeRateBs: rate,
-      minDepositPercentage: Number(settings?.bookingDepositPercentage ?? settings?.minDepositPercentage ?? 0),
-      bookingRequireDeposit: settings?.bookingRequireDeposit ?? (Number(settings?.bookingDepositPercentage ?? settings?.minDepositPercentage) > 0),
-      bookingDepositPercentage: Number(settings?.bookingDepositPercentage ?? settings?.minDepositPercentage ?? 0),
+        slotInterval: settings?.slotInterval || 30,
+        featureDelivery: settings?.featureDelivery ?? true,
+        featureShowCatalog: settings?.featureShowCatalog || false,
+        bookingRequireService: settings?.bookingRequireService ?? true,
+        bookingAllowStaffSelection: allowStaffSelection,
+        bookingMaxAdvanceDays: Number(settings?.bookingMaxAdvanceDays || 365),
+        featureBuySell: settings?.featureBuySell ?? false,
+        featureRecipes: settings?.featureRecipes ?? false,
+        featureCustomerSchedules: settings?.featureCustomerSchedules ?? false,
+        hasStore: Boolean(hasStore),
+        staff: staff,
+        exchangeRateBs: rate,
+        minDepositPercentage: depositPct,
+        bookingRequireDeposit: isDepositReq,
+        bookingDepositPercentage: depositPct,
       allowPartialPayments: settings?.allowPartialPayments ?? true,
       bankInfo: settings?.companyBank || '',
       companyCedula: settings?.companyCedula || '',
@@ -385,15 +388,16 @@ export class PublicReservationsController {
     const settings = await settingsRepo.findOne({ where: { tenantId: id } });
 
     const totalAmount = Number(dto.totalAmount || 0);
-    const isDepositRequired = settings?.bookingRequireDeposit ?? (Number(settings?.bookingDepositPercentage ?? settings?.minDepositPercentage) > 0);
+    const isDepositRequired = settings?.bookingRequireDeposit === true;
     const minDepositPct = isDepositRequired ? Number(settings?.bookingDepositPercentage ?? settings?.minDepositPercentage ?? 0) : 0;
+    const isPayOnArrival = ['ON_ARRIVAL', 'PENDING', 'CASH'].includes((dto.paymentMethod || '').toUpperCase());
 
     // Validate payment reference and minimum deposit
-    if (dto.paymentMethod === 'CASH') {
-      if (settings?.acceptCashUsd === false) {
+    if (isPayOnArrival) {
+      if (dto.paymentMethod === 'CASH' && settings?.acceptCashUsd === false) {
         throw new BadRequestException('Este negocio no tiene habilitado el pago en efectivo.');
       }
-      // El cliente pagará en efectivo directamente al asistir a su cita
+      // El cliente pagará en el local / cuenta abierta al asistir a su cita
     } else if (minDepositPct > 0 && totalAmount > 0) {
       if (!dto.paymentReference || !dto.paymentReference.trim()) {
         throw new BadRequestException(`Este negocio requiere un abono mínimo del ${minDepositPct}% para reservar. Por favor ingresa el comprobante de pago.`);
@@ -405,10 +409,8 @@ export class PublicReservationsController {
           `El monto abonado ($${payAmount.toFixed(2)}) es inferior al abono mínimo requerido del ${minDepositPct}% ($${requiredMin.toFixed(2)}).`
         );
       }
-    } else if (dto.paymentMethod) {
-      if (!dto.paymentReference || !dto.paymentReference.trim()) {
-        throw new BadRequestException('Por favor ingresa el número de referencia del comprobante de pago.');
-      }
+    } else if (dto.paymentReference && dto.paymentReference.trim()) {
+      // Abono opcional o voluntario
     }
 
     // Synchronize customer profile
@@ -442,7 +444,9 @@ export class PublicReservationsController {
       numberOfPeople: dto.numberOfPeople || 1,
       employeeId: dto.employeeId,
       serviceSpecialists: dto.serviceSpecialists || undefined,
-      notes: dto.paymentMethod === 'CASH'
+      notes: (dto.paymentMethod === 'ON_ARRIVAL' || dto.paymentMethod === 'PENDING')
+        ? (dto.notes?.trim() ? `${dto.notes.trim()} | [Por pagar al asistir (Cuenta abierta)]` : '[Por pagar al asistir (Cuenta abierta)]')
+        : dto.paymentMethod === 'CASH'
         ? (dto.notes?.trim() ? `${dto.notes.trim()} | [Pago en Efectivo al asistir]` : '[Pago en Efectivo al asistir]')
         : dto.notes?.trim(),
       totalAmount: Number(dto.totalAmount || 0),

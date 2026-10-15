@@ -147,13 +147,14 @@ const PublicBooking: React.FC = () => {
 
   const rateBs = Number(tenantInfo?.exchangeRateBs || 40.0);
   const bookingDepositPct = Number(tenantInfo?.bookingDepositPercentage ?? tenantInfo?.minDepositPercentage ?? 0);
-  const isDepositEnabled = Boolean(tenantInfo?.bookingRequireDeposit ?? (bookingDepositPct > 0));
+  const isDepositEnabled = Boolean(tenantInfo?.bookingRequireDeposit === true && bookingDepositPct > 0);
   const minDepositPercentage = isDepositEnabled ? bookingDepositPct : 0;
   const minDepositAmount = (bookingPaymentOption === 'DEPOSIT' && minDepositPercentage > 0)
     ? Math.round((totalServicePrice * (minDepositPercentage / 100)) * 100) / 100
     : 0;
   const parsedBookingPaymentAmount = parseFloat(bookingPaymentAmount);
   const isPaymentBelowMin = minDepositAmount > 0 && !isNaN(parsedBookingPaymentAmount) && parsedBookingPaymentAmount < minDepositAmount;
+  const isPayOnArrival = bookingPaymentMethod === 'ON_ARRIVAL' || bookingPaymentMethod === 'CASH';
 
   const [paymentProofUrl, setPaymentProofUrl] = useState<string>('');
   const [uploadingProof, setUploadingProof] = useState<boolean>(false);
@@ -294,15 +295,20 @@ const PublicBooking: React.FC = () => {
         }
 
         // Select first active payment method dynamically
-        let defaultMethod = 'PAGO_MOVIL';
-        if (res.data.acceptPagoMovil !== false) {
-          defaultMethod = 'PAGO_MOVIL';
-        } else if (res.data.acceptTransfer === true) {
-          defaultMethod = 'TRANSFER';
-        } else if (res.data.acceptBinance === true) {
-          defaultMethod = 'BINANCE';
-        } else if (res.data.acceptCashUsd !== false) {
-          defaultMethod = 'CASH';
+        const depositReq = res.data.bookingRequireDeposit === true && Number(res.data.bookingDepositPercentage ?? res.data.minDepositPercentage ?? 0) > 0;
+        let defaultMethod = 'ON_ARRIVAL';
+        if (depositReq) {
+          if (res.data.acceptPagoMovil !== false) {
+            defaultMethod = 'PAGO_MOVIL';
+          } else if (res.data.acceptTransfer === true) {
+            defaultMethod = 'TRANSFER';
+          } else if (res.data.acceptBinance === true) {
+            defaultMethod = 'BINANCE';
+          } else if (res.data.acceptCashUsd !== false) {
+            defaultMethod = 'CASH';
+          }
+        } else {
+          defaultMethod = 'ON_ARRIVAL';
         }
         setBookingPaymentMethod(defaultMethod);
 
@@ -356,44 +362,42 @@ const PublicBooking: React.FC = () => {
       return;
     }
 
-    if (totalServicePrice > 0) {
-      if (bookingPaymentMethod !== 'CASH') {
-        if (!bookingPaymentRef.trim()) {
+    if (totalServicePrice > 0 && !isPayOnArrival) {
+      if (!bookingPaymentRef.trim()) {
+        presentToast({ 
+          message: 'Por favor, ingresa el número de referencia del comprobante de pago.', 
+          duration: 3500, 
+          color: 'warning' 
+        });
+        return;
+      }
+      const payNum = parseFloat(bookingPaymentAmount);
+      if (isNaN(payNum) || payNum <= 0) {
+        presentToast({ 
+          message: 'El monto de abono o pago debe ser mayor a 0.', 
+          duration: 3000, 
+          color: 'warning' 
+        });
+        return;
+      }
+      if (payNum > totalServicePrice) {
+        presentToast({ 
+          message: `El monto a pagar no puede superar el total del servicio ($${totalServicePrice.toFixed(2)})`, 
+          duration: 3500, 
+          color: 'warning' 
+        });
+        return;
+      }
+      if (minDepositPercentage > 0) {
+        const minReq = Math.round((totalServicePrice * (minDepositPercentage / 100)) * 100) / 100;
+        if (payNum < minReq) {
+          setBookingPaymentAmount(minReq.toString());
           presentToast({ 
-            message: 'Por favor, ingresa el número de referencia del comprobante de pago.', 
+            message: `El abono no puede ser inferior a la seña mínima requerida de $${minReq.toFixed(2)} (${minDepositPercentage}%). Se ajustó al monto mínimo.`, 
             duration: 3500, 
             color: 'warning' 
           });
           return;
-        }
-        const payNum = parseFloat(bookingPaymentAmount);
-        if (isNaN(payNum) || payNum <= 0) {
-          presentToast({ 
-            message: 'El monto de abono o pago debe ser mayor a 0.', 
-            duration: 3000, 
-            color: 'warning' 
-          });
-          return;
-        }
-        if (payNum > totalServicePrice) {
-          presentToast({ 
-            message: `El monto a pagar no puede superar el total del servicio ($${totalServicePrice.toFixed(2)})`, 
-            duration: 3500, 
-            color: 'warning' 
-          });
-          return;
-        }
-        if (minDepositPercentage > 0) {
-          const minReq = Math.round((totalServicePrice * (minDepositPercentage / 100)) * 100) / 100;
-          if (payNum < minReq) {
-            setBookingPaymentAmount(minReq.toString());
-            presentToast({ 
-              message: `El abono no puede ser inferior a la seña mínima requerida de $${minReq.toFixed(2)} (${minDepositPercentage}%). Se ajustó al monto mínimo.`, 
-              duration: 3500, 
-              color: 'warning' 
-            });
-            return;
-          }
         }
       }
     }
@@ -418,13 +422,15 @@ const PublicBooking: React.FC = () => {
         employeeName: selectedStaff?.name || undefined,
         totalAmount: totalServicePrice,
         paymentMethod: totalServicePrice > 0 ? bookingPaymentMethod : undefined,
-        paymentReference: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? bookingPaymentRef.trim() : undefined,
-        paymentAmount: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? payAmtNum : undefined,
-        paymentAmountBs: totalServicePrice > 0 && bookingPaymentMethod !== 'CASH' ? Math.round(payAmtNum * rateBs * 100) / 100 : undefined,
-        paymentProofUrl: bookingPaymentMethod !== 'CASH' ? (paymentProofUrl || undefined) : undefined,
+        paymentReference: totalServicePrice > 0 && !isPayOnArrival ? bookingPaymentRef.trim() : undefined,
+        paymentAmount: totalServicePrice > 0 && !isPayOnArrival ? payAmtNum : undefined,
+        paymentAmountBs: totalServicePrice > 0 && !isPayOnArrival ? Math.round(payAmtNum * rateBs * 100) / 100 : undefined,
+        paymentProofUrl: !isPayOnArrival ? (paymentProofUrl || undefined) : undefined,
         paymentNotes: totalServicePrice > 0 ? (
           bookingPaymentMethod === 'CASH'
             ? 'Pago en Efectivo al asistir'
+            : bookingPaymentMethod === 'ON_ARRIVAL'
+            ? 'Cuenta abierta / Por pagar al asistir'
             : [
                 bookingOriginBank ? `Banco origen: ${bookingOriginBank}` : '',
                 bookingPaymentNotes.trim()
@@ -839,6 +845,12 @@ const PublicBooking: React.FC = () => {
                       <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Servicio(s):</b> {selectedServiceNames}</p>
                       <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Duración estimada:</b> {totalDurationMinutes} min</p>
                       <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Total:</b> <span style={{ color: primaryReadable, fontWeight: 700 }}>${totalServicePrice.toFixed(2)}</span></p>
+                      {bookingPaymentMethod === 'ON_ARRIVAL' && (
+                        <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Modalidad:</b> <span style={{ color: '#059669', fontWeight: 600 }}>Por pagar al asistir (Cuenta abierta)</span></p>
+                      )}
+                      {bookingPaymentMethod === 'CASH' && (
+                        <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Modalidad:</b> <span style={{ color: '#059669', fontWeight: 600 }}>Pago en Efectivo al asistir</span></p>
+                      )}
                     </>
                   )}
                   {selectedStaff ? (
@@ -2002,7 +2014,7 @@ const PublicBooking: React.FC = () => {
                         </div>
                       </div>
 
-                      {bookingPaymentMethod !== 'CASH' && minDepositPercentage > 0 && (
+                      {!isPayOnArrival && minDepositPercentage > 0 && (
                         <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px', marginBottom: '12px', fontSize: '12px', color: '#92400e' }}>
                           ⚠️ <strong>Abono previo requerido:</strong> Este negocio requiere un abono o seña mínima del <strong>{minDepositPercentage}% (${(totalServicePrice * (minDepositPercentage / 100)).toFixed(2)})</strong> para apartar tu turno en agenda mediante métodos electrónicos.
                         </div>
@@ -2011,7 +2023,7 @@ const PublicBooking: React.FC = () => {
                       {/* Payment Method Selector */}
                       <div style={{ marginBottom: '12px' }}>
                         <IonLabel style={{ fontWeight: 'bold', fontSize: '13px', color: '#334155', display: 'block', marginBottom: '6px' }}>
-                          Método de Pago: *
+                          Modalidad / Método de Pago: *
                         </IonLabel>
                         <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', backgroundColor: '#ffffff' }}>
                           <IonSelect 
@@ -2019,13 +2031,16 @@ const PublicBooking: React.FC = () => {
                             onIonChange={e => {
                               const m = e.detail.value;
                               setBookingPaymentMethod(m);
-                              if (m === 'CASH') {
+                              if (m === 'ON_ARRIVAL' || m === 'CASH') {
                                 setBookingPaymentOption('FULL');
                                 setBookingPaymentAmount(totalServicePrice.toString());
                               }
                             }}
                             placeholder="Selecciona método de pago"
                           >
+                            {!isDepositEnabled && (
+                              <IonSelectOption value="ON_ARRIVAL">✨ Por pagar al asistir (Cuenta abierta)</IonSelectOption>
+                            )}
                             {tenantInfo?.acceptPagoMovil !== false && <IonSelectOption value="PAGO_MOVIL">📲 Pago Móvil</IonSelectOption>}
                             {tenantInfo?.acceptTransfer && <IonSelectOption value="TRANSFER">🏦 Transferencia Bancaria</IonSelectOption>}
                             {tenantInfo?.acceptBinance && <IonSelectOption value="BINANCE">🟡 Binance Pay (USDT)</IonSelectOption>}
@@ -2035,6 +2050,33 @@ const PublicBooking: React.FC = () => {
                           </IonSelect>
                         </IonItem>
                       </div>
+
+                      {/* On Arrival Notice */}
+                      {bookingPaymentMethod === 'ON_ARRIVAL' && (
+                        <div style={{ 
+                          backgroundColor: '#ecfdf5', 
+                          border: '1px solid #a7f3d0', 
+                          borderRadius: '12px', 
+                          padding: '14px', 
+                          marginBottom: '14px', 
+                          fontSize: '13px', 
+                          color: '#065f46', 
+                          display: 'flex', 
+                          alignItems: 'flex-start', 
+                          gap: '12px',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                        }}>
+                          <span style={{ fontSize: '24px', lineHeight: 1 }}>✨</span>
+                          <div>
+                            <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#065f46', marginBottom: '4px' }}>
+                              Por pagar al asistir (Cuenta abierta)
+                            </div>
+                            <div style={{ fontSize: '12.5px', color: '#047857', lineHeight: '1.45' }}>
+                              Tu cita quedará registrada y confirmada al instante. Podrás pagar el total de <strong>${totalServicePrice.toFixed(2)}</strong> {rateBs > 0 && <>(aprox. <strong>Bs. {(Math.round(totalServicePrice * rateBs * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>)</>} directamente al momento de tu atención en el negocio con el método de pago que prefieras (Efectivo, Pago Móvil, Punto de Venta o Transferencia).
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Cash Payment Notice */}
                       {bookingPaymentMethod === 'CASH' && (
@@ -2064,7 +2106,7 @@ const PublicBooking: React.FC = () => {
                       )}
 
                       {/* Type of payment: Full vs Deposit (if electronic) */}
-                      {bookingPaymentMethod !== 'CASH' && (
+                      {!isPayOnArrival && (
                         <div style={{ marginBottom: '14px' }}>
                           <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
                             <IonButton 
@@ -2162,7 +2204,7 @@ const PublicBooking: React.FC = () => {
                       )}
 
                       {/* Bank Coordinates */}
-                      {bookingPaymentMethod !== 'CASH' && (
+                      {!isPayOnArrival && (
                         <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px', marginBottom: '14px', fontSize: '13px', color: '#334155', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
                           <div style={{ fontWeight: 'bold', color: '#0f172a', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <IonIcon icon={businessOutline} style={{ color: '#10B981', fontSize: '16px' }} /> 
@@ -2479,7 +2521,7 @@ const PublicBooking: React.FC = () => {
                         </div>
                       )}
 
-                      {bookingPaymentMethod !== 'CASH' && (
+                      {!isPayOnArrival && (
                         <>
                           {(bookingPaymentMethod === 'PAGO_MOVIL' || bookingPaymentMethod === 'TRANSFER') && (
                             <div style={{ marginBottom: '12px' }}>

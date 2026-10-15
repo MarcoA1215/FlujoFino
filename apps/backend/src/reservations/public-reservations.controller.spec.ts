@@ -486,5 +486,50 @@ describe('PublicReservationsController Suite', () => {
         paymentMethod: 'CASH',
       })).rejects.toThrow('Este negocio no tiene habilitado el pago en efectivo.');
     });
+
+    it('debe permitir agendar con modalidad ON_ARRIVAL (Cuenta abierta / Por pagar al asistir) sin exigir comprobante ni referencia', async () => {
+      const tenantId = '00000000-0000-0000-0000-000000000001';
+      jest.spyOn(tenantCrypto, 'decodeTenantId').mockReturnValue(tenantId);
+      mockTenantRepo.findOne.mockResolvedValue({ id: tenantId, name: 'Exotica Nails', isActive: true, status: 'ACTIVE' });
+      mockReservationRepo.findOne.mockResolvedValue(null);
+
+      mockSettingsRepo.findOne.mockResolvedValue({
+        bookingRequireDeposit: false,
+        bookingDepositPercentage: 30, // Aunque tenga un porcentaje guardado previo, bookingRequireDeposit es false
+        acceptPagoMovil: true,
+      });
+
+      jest.spyOn<any, any>(controller, 'checkSlotAvailability').mockResolvedValue(true);
+
+      mockReservationsService.create.mockResolvedValue({
+        id: 'new-res-arrival',
+        tenantId,
+        customerName: 'Clienta Feliz',
+        customerPhone: '04121234567',
+        totalAmount: 25,
+        notes: '[Por pagar al asistir (Cuenta abierta)]',
+      });
+
+      const res = await controller.createPublicReservation('token-valido', {
+        date: '2026-10-25',
+        time: '15:00',
+        customerName: 'Clienta Feliz',
+        customerPhone: '04121234567',
+        totalAmount: 25,
+        paymentMethod: 'ON_ARRIVAL',
+      });
+
+      expect(res).toBeDefined();
+      expect(mockReservationsService.create).toHaveBeenCalledWith(
+        tenantId,
+        expect.objectContaining({
+          totalAmount: 25,
+          paymentStatus: PaymentStatus.PENDING,
+          abonosTotal: 0,
+          notes: '[Por pagar al asistir (Cuenta abierta)]',
+        })
+      );
+    });
   });
 });
+
