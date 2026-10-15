@@ -47,6 +47,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+
+        // Verificación proactiva de sesión con el servidor en segundo plano:
+        // Si el usuario fue eliminado o revocado, el backend responderá 401 y el interceptor
+        // de apiClient limpiará automáticamente las credenciales y redirigirá al login.
+        apiClient.get('/auth/me').catch(() => {
+          // Si no hay conexión (offline), no hacemos nada para permitir uso sin conexión.
+        });
       }
       setIsLoading(false);
     };
