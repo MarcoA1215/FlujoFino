@@ -119,35 +119,46 @@ export class AuthService {
     if (!access) {
       if ((user.role as string) === 'ADMIN' || isSuperAdmin) {
         try {
-          const tenantRepo = this.dataSource.getRepository(Tenant);
-          const firstTenant = await tenantRepo.findOne({ where: {} });
-          if (firstTenant) {
-            const accessRepo = this.dataSource.getRepository(UserTenantAccess);
-            let createdAccess = await accessRepo.findOne({ where: { userId: user.id, tenantId: firstTenant.id } });
-            if (!createdAccess) {
-              createdAccess = accessRepo.create({
-                userId: user.id,
-                tenantId: firstTenant.id,
+          if (user.username === 'admin') {
+            const tenantRepo = this.dataSource.getRepository(Tenant);
+            const centralTenant = await tenantRepo.findOne({ where: { name: 'FinoWork Central' } });
+            if (centralTenant) {
+              return {
+                user: result,
+                tenantId: centralTenant.id,
                 role: user.role,
                 roles: [user.role],
-                isActive: true,
-                status: 'ACCEPTED',
-              });
-              await accessRepo.save(createdAccess);
+                tenantName: centralTenant.name,
+                workspaces: [{ tenantId: centralTenant.id, name: centralTenant.name, role: user.role, roles: [user.role], status: 'ACCEPTED' }],
+              };
+            }
+          }
+
+          const accessRepo = this.dataSource.getRepository(UserTenantAccess);
+          let userAccess = await accessRepo.findOne({
+            where: { userId: user.id },
+            relations: { tenant: true },
+          });
+
+          if (userAccess && userAccess.tenant) {
+            if (!userAccess.isActive || userAccess.status !== 'ACCEPTED') {
+              userAccess.isActive = true;
+              userAccess.status = 'ACCEPTED';
+              await accessRepo.save(userAccess);
             }
             return {
               user: result,
-              tenantId: firstTenant.id,
-              role: user.role,
-              roles: [user.role],
-              tenantName: firstTenant.name,
-              workspaces: [{ tenantId: firstTenant.id, name: firstTenant.name, role: user.role, roles: [user.role], status: 'ACCEPTED' }],
+              tenantId: userAccess.tenantId,
+              role: userAccess.role || user.role,
+              roles: (userAccess.roles && userAccess.roles.length > 0) ? userAccess.roles : [userAccess.role || user.role],
+              tenantName: userAccess.tenant.name,
+              workspaces: [{ tenantId: userAccess.tenantId, name: userAccess.tenant.name, role: userAccess.role || user.role, roles: [userAccess.role || user.role], status: 'ACCEPTED' }],
             };
           }
         } catch (e) {
-          console.warn('[validateUser] Tenant auto-link fallback error:', e);
+          console.warn('[validateUser] Tenant resolution error:', e);
         }
-        return { user: result, tenantId: requestedTenantId || 'admin-system', role: user.role, roles: [user.role], tenantName: 'Sistema Central', workspaces };
+        return { user: result, tenantId: requestedTenantId || null, role: user.role, roles: [user.role], tenantName: 'Mi Negocio', workspaces };
       }
       if (user.role === UserRole.PROMOTOR || (user.role as string) === 'PROMOTOR') {
         return { user: result, tenantId: requestedTenantId || 'promoter-space', role: UserRole.PROMOTOR, roles: [UserRole.PROMOTOR], tenantName: 'Red de Promotores', workspaces };
@@ -508,11 +519,14 @@ export class AuthService {
 
       // 3. Link User to Tenant
       const access = queryRunner.manager.create(UserTenantAccess, {
+        userId: savedUser.id,
+        tenantId: savedTenant.id,
         user: savedUser,
         tenant: savedTenant,
         role: UserRole.ADMIN, // Local role
         roles: [UserRole.ADMIN],
         isActive: true,
+        status: 'ACCEPTED',
       });
       await queryRunner.manager.save(access);
 

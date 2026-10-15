@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Tenant } from '../entities/tenant.entity';
@@ -68,47 +68,113 @@ export class UsersService implements OnModuleInit {
       console.log(`🛡️ SuperAdmin inicial creado: ${superAdminEmail}`);
     }
 
-    // Asegurar que el usuario admin demo tenga una sucursal y acceso asignado con UUID válido
+    // Asegurar aislamiento multi-inquilino estricto y auto-curación de negocios
     try {
-      const adminUser = await this.usersRepo.findOne({
-        where: { username: 'admin' },
-        relations: { tenantAccess: true },
-      });
-      if (adminUser) {
-        const tenantRepo = this.usersRepo.manager?.getRepository
-          ? this.usersRepo.manager.getRepository(Tenant)
-          : null;
-        if (tenantRepo) {
-          let defaultTenant = await tenantRepo.findOne({ where: {} });
-          if (!defaultTenant) {
-            defaultTenant = tenantRepo.create({
-              name: 'FinoWork Central',
-              isActive: true,
-              status: TenantStatus.ACTIVE,
-              plan_type: TenantPlanType.REGULAR,
-            });
-            defaultTenant = await tenantRepo.save(defaultTenant);
-          }
+      if (this.usersRepo.manager?.query) {
+        // 1. Desvincular inmediatamente al usuario demo 'admin' de cualquier negocio real de clientes (como 'Techno')
+        await this.usersRepo.manager.query(`
+          DELETE FROM "user_tenant_access"
+          WHERE "userId" IN (SELECT id FROM users WHERE username = 'admin')
+            AND "tenantId" IN (SELECT id FROM tenant WHERE name != 'FinoWork Central');
+        `);
 
-          const hasAccess = adminUser.tenantAccess?.some(a => a.tenantId === defaultTenant!.id);
-          if (!hasAccess) {
-            const accessRepo = this.usersRepo.manager.getRepository(UserTenantAccess);
-            const newAccess = accessRepo.create({
+        // 2. Normalizar espacios residuales en nombres de usuario y correos
+        await this.usersRepo.manager.query(`
+          UPDATE users SET username = TRIM(username) WHERE username != TRIM(username);
+          UPDATE users SET email = LOWER(TRIM(email)) WHERE email != LOWER(TRIM(email));
+        `);
+      }
+
+      const tenantRepo = this.usersRepo.manager?.getRepository
+        ? this.usersRepo.manager.getRepository(Tenant)
+        : null;
+      const accessRepo = this.usersRepo.manager?.getRepository
+        ? this.usersRepo.manager.getRepository(UserTenantAccess)
+        : null;
+
+      if (tenantRepo && accessRepo) {
+        // 3. Crear o asegurar sucursal demo dedicada 'FinoWork Central' para el usuario demo 'admin'
+        let centralTenant = await tenantRepo.findOne({ where: { name: 'FinoWork Central' } });
+        if (!centralTenant) {
+          centralTenant = tenantRepo.create({
+            name: 'FinoWork Central',
+            isActive: true,
+            status: TenantStatus.ACTIVE,
+            plan_type: TenantPlanType.REGULAR,
+          });
+          centralTenant = await tenantRepo.save(centralTenant);
+        }
+
+        const adminUser = await this.usersRepo.findOne({
+          where: { username: 'admin' },
+          relations: { tenantAccess: true },
+        });
+
+        if (adminUser) {
+          const hasCentralAccess = adminUser.tenantAccess?.some(a => a.tenantId === centralTenant!.id);
+          if (!hasCentralAccess) {
+            const demoAccess = accessRepo.create({
               user: adminUser,
-              tenant: defaultTenant,
-              tenantId: defaultTenant.id,
+              userId: adminUser.id,
+              tenant: centralTenant,
+              tenantId: centralTenant.id,
               role: UserRole.ADMIN,
               roles: [UserRole.ADMIN],
               isActive: true,
               status: 'ACCEPTED',
             });
-            await accessRepo.save(newAccess);
-            console.log(`[UsersService] Vinculado admin al negocio ${defaultTenant.name} (${defaultTenant.id})`);
+            await accessRepo.save(demoAccess);
+            console.log(`[UsersService] Vinculado admin demo a sucursal dedicada: ${centralTenant.name} (${centralTenant.id})`);
+          }
+        }
+
+        // 4. Auto-curación de negocios reales (como 'Techno'):
+        // Asegurar que cada negocio de cliente tenga a su verdadero administrador registrado en user_tenant_access
+        const nonDemoTenants = await tenantRepo.find({
+          where: { name: Not('FinoWork Central') },
+        });
+
+        for (const t of nonDemoTenants) {
+          const existingRealAdmin = await accessRepo.findOne({
+            where: {
+              tenantId: t.id,
+              role: UserRole.ADMIN,
+            },
+            relations: { user: true },
+          });
+
+          // Si el tenant no tiene ningún admin asignado o el asignado es 'admin' demo
+          if (!existingRealAdmin || existingRealAdmin.user?.username === 'admin') {
+            if (existingRealAdmin && existingRealAdmin.user?.username === 'admin') {
+              await accessRepo.delete(existingRealAdmin.id);
+            }
+
+            // Buscar administradores reales registrados (excluyendo admin demo y superadmin)
+            const realAdmins = await this.usersRepo.find({
+              where: { role: UserRole.ADMIN },
+              order: { createdAt: 'ASC' },
+            });
+            const candidate = realAdmins.find(u => u.username !== 'admin' && u.username !== 'superadmin');
+
+            if (candidate) {
+              const newRealAccess = accessRepo.create({
+                user: candidate,
+                userId: candidate.id,
+                tenant: t,
+                tenantId: t.id,
+                role: UserRole.ADMIN,
+                roles: [UserRole.ADMIN],
+                isActive: true,
+                status: 'ACCEPTED',
+              });
+              await accessRepo.save(newRealAccess);
+              console.log(`[UsersService] ✅ Administrador real ${candidate.username} (${candidate.email}) restaurado en negocio ${t.name} (${t.id})`);
+            }
           }
         }
       }
     } catch (e: any) {
-      console.warn('[UsersService] Auto-vinculación demo tenant:', e?.message || e);
+      console.warn('[UsersService] Auto-vinculación y limpieza de sucursales:', e?.message || e);
     }
   }
 
@@ -147,7 +213,7 @@ export class UsersService implements OnModuleInit {
     // Consultar directamente los registros de UserTenantAccess para este tenantId
     const accesses = await this.usersRepo.manager.find(UserTenantAccess, {
       where: { tenantId },
-      relations: { user: true },
+      relations: { user: true, tenant: true },
       order: { id: 'DESC' }
     });
 
@@ -156,6 +222,12 @@ export class UsersService implements OnModuleInit {
 
     for (const access of accesses) {
       if (access.user && !seenUserIds.has(access.user.id)) {
+        // AISLAMIENTO ESTRICTO:
+        // El usuario demo 'admin' NUNCA debe figurar en negocios reales de clientes
+        if (access.user.username === 'admin' && access.tenant?.name && access.tenant.name !== 'FinoWork Central') {
+          continue;
+        }
+
         seenUserIds.add(access.user.id);
         const user = access.user;
         user.role = access.role as UserRole;
@@ -177,13 +249,32 @@ export class UsersService implements OnModuleInit {
       }
     }
 
+    // Asegurar que si el tenant tiene un administrador registrado, aparezca como líder del equipo
+    const hasAdminInList = tenantUsers.some(u => u.role === UserRole.ADMIN);
+    if (!hasAdminInList) {
+      const adminAccess = await this.usersRepo.manager.findOne(UserTenantAccess, {
+        where: { tenantId, role: UserRole.ADMIN },
+        relations: { user: true },
+      });
+      if (adminAccess?.user && !seenUserIds.has(adminAccess.user.id) && adminAccess.user.username !== 'admin') {
+        const u = adminAccess.user;
+        u.role = UserRole.ADMIN;
+        (u as any).roles = [UserRole.ADMIN];
+        (u as any).status = 'ACCEPTED';
+        delete (u as any).passwordHash;
+        tenantUsers.unshift(u);
+      }
+    }
+
     // Fallback: Si no hay accesos creados todavía para este tenantId pero existen usuarios,
     // retornamos los usuarios del sistema para no dejar al administrador con la tabla vacía.
     if (tenantUsers.length === 0) {
       const allUsers = await this.usersRepo.find({
         order: { createdAt: 'DESC' },
       });
-      return allUsers.map(user => {
+      const filtered = allUsers.filter(u => u.username !== 'admin' && u.username !== 'superadmin');
+      const listToReturn = filtered.length > 0 ? filtered : allUsers;
+      return listToReturn.map(user => {
         delete (user as any).passwordHash;
         return user;
       });
@@ -230,9 +321,12 @@ export class UsersService implements OnModuleInit {
     let effectiveTenantId = tenantId;
     if (!isValidUUID(effectiveTenantId)) {
       try {
-        const tenantRepo = this.usersRepo.manager.getRepository(Tenant);
-        const firstTenant = await tenantRepo.findOne({ where: {} });
-        if (firstTenant) effectiveTenantId = firstTenant.id;
+        const accessRepo = this.usersRepo.manager.getRepository(UserTenantAccess);
+        const userAccess = await accessRepo.findOne({
+          where: { role: UserRole.ADMIN, isActive: true },
+          order: { id: 'DESC' },
+        });
+        if (userAccess?.tenantId) effectiveTenantId = userAccess.tenantId;
       } catch (err) {}
     }
     
@@ -364,9 +458,12 @@ export class UsersService implements OnModuleInit {
     let effectiveTenantId = tenantId;
     if (!isValidUUID(effectiveTenantId)) {
       try {
-        const tenantRepo = this.usersRepo.manager.getRepository(Tenant);
-        const firstTenant = await tenantRepo.findOne({ where: {} });
-        if (firstTenant) effectiveTenantId = firstTenant.id;
+        const accessRepo = this.usersRepo.manager.getRepository(UserTenantAccess);
+        const userAccess = await accessRepo.findOne({
+          where: { role: UserRole.ADMIN, isActive: true },
+          order: { id: 'DESC' },
+        });
+        if (userAccess?.tenantId) effectiveTenantId = userAccess.tenantId;
       } catch (err) {}
     }
 
