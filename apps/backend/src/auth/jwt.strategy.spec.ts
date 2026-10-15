@@ -187,4 +187,69 @@ describe('JwtStrategy - Seguridad y Revocación Inmediata de Sesiones', () => {
     await strategy.validate(payload);
     expect(mockUserRepo.findOne).toHaveBeenCalledTimes(2);
   });
+
+  it('debe reflejar los roles actualizados de UserTenantAccess cuando difieren del JWT', async () => {
+    mockUserRepo.findOne.mockResolvedValue({
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      username: 'usuario_demote',
+      role: UserRole.POS,
+    });
+
+    // En la base de datos el usuario ahora solo tiene rol POS (fue degradado de ADMIN)
+    mockAccessRepo.findOne.mockResolvedValue({
+      id: 'acc-1',
+      isActive: true,
+      status: 'ACCEPTED',
+      role: UserRole.POS,
+      roles: [UserRole.POS],
+    });
+
+    // Pero su token JWT antiguo todavía decía ADMIN:
+    const oldJwtPayload = {
+      sub: '550e8400-e29b-41d4-a716-446655440000',
+      username: 'usuario_demote',
+      tenantId: '660e8400-e29b-41d4-a716-446655440001',
+      role: UserRole.ADMIN,
+      roles: [UserRole.ADMIN],
+    };
+
+    const result = await strategy.validate(oldJwtPayload);
+    expect(result.role).toBe(UserRole.POS);
+    expect(result.roles).toEqual([UserRole.POS]);
+  });
+
+  it('debe servir los roles actualizados directamente desde sessionValidationCache', async () => {
+    mockUserRepo.findOne.mockResolvedValue({
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      username: 'usuario_cached_role',
+      role: UserRole.INVENTORY,
+    });
+
+    mockAccessRepo.findOne.mockResolvedValue({
+      id: 'acc-1',
+      isActive: true,
+      status: 'ACCEPTED',
+      role: UserRole.INVENTORY,
+      roles: [UserRole.INVENTORY, UserRole.POS],
+    });
+
+    const payload = {
+      sub: '550e8400-e29b-41d4-a716-446655440000',
+      username: 'usuario_cached_role',
+      tenantId: '660e8400-e29b-41d4-a716-446655440001',
+      role: UserRole.POS,
+    };
+
+    // Primera validación: guarda en caché con los roles de la BD
+    const firstResult = await strategy.validate(payload);
+    expect(firstResult.role).toBe(UserRole.POS);
+    expect(firstResult.roles).toEqual([UserRole.INVENTORY, UserRole.POS]);
+
+    // Segunda validación: debe responder desde caché con los roles almacenados
+    const cachedResult = await strategy.validate(payload);
+    expect(cachedResult.role).toBe(UserRole.POS);
+    expect(cachedResult.roles).toEqual([UserRole.INVENTORY, UserRole.POS]);
+    expect(mockUserRepo.findOne).toHaveBeenCalledTimes(1);
+  });
 });
+

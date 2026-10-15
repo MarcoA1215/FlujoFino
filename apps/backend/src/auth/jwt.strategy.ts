@@ -11,6 +11,8 @@ import { UserRole } from '@finowork/shared-types';
 interface CachedSessionValidation {
   userId: string;
   tenantId?: string;
+  role: UserRole;
+  roles: UserRole[];
   expiresAt: number;
 }
 
@@ -62,8 +64,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           identification: payload.identification,
           phone: payload.phone,
           isEmailVerified: !!payload.isEmailVerified,
-          role: payload.role,
-          roles: payload.roles,
+          role: cached.role,
+          roles: cached.roles,
           tenantId: payload.tenantId,
           tenantName: payload.tenantName,
         };
@@ -88,8 +90,24 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         throw new UnauthorizedException('El usuario no existe o su sesión ha sido revocada.');
       }
 
+      let effectiveRole = payload.role as UserRole;
+      let effectiveRoles: UserRole[] =
+        payload.roles && payload.roles.length > 0
+          ? payload.roles
+          : [payload.role as UserRole];
+
       // Validar acceso activo al tenant si el payload tiene tenantId y no es SUPERADMIN
-      if (payload.tenantId && isValidUUID(payload.tenantId) && user.role !== UserRole.SUPERADMIN && payload.role !== UserRole.SUPERADMIN) {
+      if (user.role === UserRole.SUPERADMIN || payload.role === UserRole.SUPERADMIN) {
+        effectiveRole = UserRole.SUPERADMIN;
+        effectiveRoles = [
+          UserRole.SUPERADMIN,
+          UserRole.ADMIN,
+          UserRole.POS,
+          UserRole.INVENTORY,
+          UserRole.DELIVERY,
+          UserRole.KITCHEN,
+        ];
+      } else if (payload.tenantId && isValidUUID(payload.tenantId)) {
         const access = await this.dataSource.getRepository(UserTenantAccess).findOne({
           where: { userId: user.id, tenantId: payload.tenantId },
           select: { id: true, isActive: true, status: true, role: true, roles: true },
@@ -99,12 +117,33 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           sessionValidationCache.delete(cacheKey);
           throw new UnauthorizedException('El acceso a este espacio de trabajo ha sido revocado o suspendido.');
         }
+
+        const dbRoles: UserRole[] =
+          Array.isArray(access.roles) && access.roles.length > 0
+            ? (access.roles as UserRole[])
+            : [access.role as UserRole];
+
+        if (access.role && !dbRoles.includes(access.role as UserRole)) {
+          dbRoles.unshift(access.role as UserRole);
+        }
+
+        effectiveRoles = dbRoles;
+
+        // Si el usuario solicitó un targetRole (switch-mode) y este sigue estando autorizado en la BD:
+        if (payload.role && dbRoles.includes(payload.role as UserRole)) {
+          effectiveRole = payload.role as UserRole;
+        } else {
+          // Si el rol en el token ya no está autorizado, usar el rol principal vigente en la BD
+          effectiveRole = (access.role as UserRole) || dbRoles[0] || UserRole.POS;
+        }
       }
 
       // Guardar validación exitosa en memoria RAM por 60 segundos
       sessionValidationCache.set(cacheKey, {
         userId: user.id,
         tenantId,
+        role: effectiveRole,
+        roles: effectiveRoles,
         expiresAt: now + SESSION_CACHE_TTL_MS,
       });
 
@@ -114,6 +153,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           if (v.expiresAt <= now) sessionValidationCache.delete(k);
         }
       }
+
+      return {
+        id: payload.sub,
+        username: payload.username,
+        email: payload.email,
+        identification: payload.identification,
+        phone: payload.phone,
+        isEmailVerified: !!payload.isEmailVerified,
+        role: effectiveRole,
+        roles: effectiveRoles,
+        tenantId: payload.tenantId,
+        tenantName: payload.tenantName,
+      };
     }
 
     return {

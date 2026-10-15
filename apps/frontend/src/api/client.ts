@@ -29,29 +29,32 @@ export function isExemptFromLoginRedirect(pathname: string): boolean {
   return PUBLIC_AUTH_EXEMPT_ROUTES.some((route) => pathname.startsWith(route));
 }
 
-apiClient.interceptors.request.use(
-  async (config) => {
-    // Garantizar que toda petición lleve el token actual aunque defaults aún no haya sincronizado
-    if (!config.headers.Authorization) {
-      const { value: token } = await Preferences.get({ key: 'token' });
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+if (apiClient?.interceptors?.request) {
+  apiClient.interceptors.request.use(
+    async (config) => {
+      // Garantizar que toda petición lleve el token actual aunque defaults aún no haya sincronizado
+      if (!config.headers.Authorization) {
+        const { value: token } = await Preferences.get({ key: 'token' });
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
       }
-    }
 
-    const method = config.method?.toLowerCase() || '';
-    if (MUTATION_METHODS.includes(method) && !config.skipGlobalLoading) {
-      activeRequestsCount++;
-      getGlobalLoadingHandler()?.show(config.loadingMessage || 'Procesando...');
+      const method = config.method?.toLowerCase() || '';
+      if (MUTATION_METHODS.includes(method) && !config.skipGlobalLoading) {
+        activeRequestsCount++;
+        getGlobalLoadingHandler()?.show(config.loadingMessage || 'Procesando...');
+      }
+      return config;
+    },
+    (error) => {
+      return Promise.reject(error);
     }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+  );
+}
 
-apiClient.interceptors.response.use(
+if (apiClient?.interceptors?.response) {
+  apiClient.interceptors.response.use(
   (response) => {
     const method = response.config.method?.toLowerCase() || '';
     if (MUTATION_METHODS.includes(method) && !response.config.skipGlobalLoading) {
@@ -104,3 +107,5 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+}
+

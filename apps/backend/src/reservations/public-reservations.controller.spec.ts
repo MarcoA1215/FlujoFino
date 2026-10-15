@@ -385,5 +385,32 @@ describe('PublicReservationsController Suite', () => {
       const slots = await controller.getAvailability('token-valido', '2026-10-21', 'svc-a,svc-b');
       expect(slots).toEqual(['10:00', '10:30']);
     });
+
+    it('debe hacer fallback al equipo activo si uno de los servicios tiene un assignedStaffId obsoleto o inexistente', async () => {
+      mockSettingsRepo.findOne.mockResolvedValueOnce({
+        slotInterval: 30,
+        businessHours: {
+          '3': { isOpen: true, startTime: '10:00', endTime: '12:00' },
+        },
+      });
+
+      mockAccessRepo.find.mockResolvedValueOnce([
+        { userId: 'staff-1', role: 'ADMIN', user: { id: 'staff-1', username: 'Ana' } },
+      ]);
+
+      mockProductRepo.find.mockResolvedValueOnce([
+        { id: 'svc-a', name: 'Corte', durationMinutes: 30, assignedStaffIds: ['staff-1'] },
+        { id: 'svc-b', name: 'Uñas', durationMinutes: 30, assignedStaffIds: ['id-antiguo-inexistente'] },
+      ]);
+
+      mockReservationRepo.createQueryBuilder.mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      });
+
+      const slots = await controller.getAvailability('token-valido', '2026-10-21', 'svc-a,svc-b');
+      expect(slots).toEqual(['10:00', '10:30', '11:00']);
+    });
   });
 });

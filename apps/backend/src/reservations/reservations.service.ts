@@ -1629,6 +1629,18 @@ export class ReservationsService implements OnModuleInit {
       return h * 60 + m;
     };
 
+    const getStaffBounds = (st: any) => {
+      const entry = toMins(st?.entryTime);
+      let exit = toMins(st?.exitTime);
+      // Auto-corrección defensiva: si salida < entrada pero sumar 12 horas la hace válida (error común 12h vs 24h, ej: 05:00 o 06:00 en vez de 17:00 o 18:00)
+      if (entry !== null && exit !== null && exit < entry && exit + 720 <= 1440 && exit + 720 > entry) {
+        exit += 720;
+      }
+      const lStart = toMins(st?.lunchStart);
+      const lEnd = toMins(st?.lunchEnd);
+      return { entry, exit, lStart, lEnd };
+    };
+
     // Query active staff in tenant
     const accessRepo = this.repo.manager.getRepository(UserTenantAccess);
     const allAccesses = await accessRepo.find({
@@ -1830,23 +1842,18 @@ export class ReservationsService implements OnModuleInit {
         } else if (employeeId) {
           const emp = candidateStaff[0];
           if (emp) {
-            const empEntry = toMins(emp.entryTime);
+            const { entry: empEntry, exit: empExit, lStart, lEnd } = getStaffBounds(emp);
             if (empEntry !== null && currentMins < empEntry) {
               currentMins += interval;
               continue;
             }
-            const empExit = toMins(emp.exitTime);
             if (empExit !== null && slotEnd > empExit) {
               currentMins += interval;
               continue;
             }
-            if (emp.lunchStart && emp.lunchEnd) {
-              const lStart = toMins(emp.lunchStart);
-              const lEnd = toMins(emp.lunchEnd);
-              if (lStart !== null && lEnd !== null && currentMins < lEnd && slotEnd > lStart) {
-                currentMins += interval;
-                continue;
-              }
+            if (lStart !== null && lEnd !== null && currentMins < lEnd && slotEnd > lStart) {
+              currentMins += interval;
+              continue;
             }
             const empDirectOverlap = busyBookings.some(
               b => (b.employeeId === emp.userId || b.employeeId === emp.id || b.employeeId === emp.user?.id) && currentMins < b.end && slotEnd > b.start
@@ -1857,12 +1864,9 @@ export class ReservationsService implements OnModuleInit {
               ).length;
               if (unassignedCount > 0) {
                 const totalFreeWorkingStaff = staffList.filter(s => {
-                  const sEntry = toMins(s.entryTime);
+                  const { entry: sEntry, exit: sExit, lStart: sLStart, lEnd: sLEnd } = getStaffBounds(s);
                   if (sEntry !== null && currentMins < sEntry) return false;
-                  const sExit = toMins(s.exitTime);
                   if (sExit !== null && slotEnd > sExit) return false;
-                  const sLStart = toMins(s.lunchStart);
-                  const sLEnd = toMins(s.lunchEnd);
                   if (sLStart !== null && sLEnd !== null && currentMins < sLEnd && slotEnd > sLStart) return false;
                   return !busyBookings.some(b => (b.employeeId === s.userId || b.employeeId === s.id || b.employeeId === s.user?.id) && currentMins < b.end && slotEnd > b.start);
                 }).length;
@@ -1896,18 +1900,18 @@ export class ReservationsService implements OnModuleInit {
             else if (typeof raw === 'string' && raw.trim()) assignedIds = raw.split(',').map((x: string) => x.trim()).filter(Boolean);
 
             if (assignedIds.length > 0) {
-              segQualifiedStaff = segQualifiedStaff.filter(st =>
+              const matched = segQualifiedStaff.filter(st =>
                 assignedIds.includes(st.userId) || assignedIds.includes(st.id) || assignedIds.includes(st.user?.id)
               );
+              // Graceful fallback: Si los especialistas asignados no están activos o ya no existen,
+              // no bloquear la disponibilidad completa del día; usar el equipo activo disponible
+              segQualifiedStaff = matched.length > 0 ? matched : staffList;
             }
 
             const freeForThisSegment = segQualifiedStaff.filter(st => {
-              const stEntry = toMins(st.entryTime);
+              const { entry: stEntry, exit: stExit, lStart: stLStart, lEnd: stLEnd } = getStaffBounds(st);
               if (stEntry !== null && segStart < stEntry) return false;
-              const stExit = toMins(st.exitTime);
               if (stExit !== null && segEnd > stExit) return false;
-              const stLStart = toMins(st.lunchStart);
-              const stLEnd = toMins(st.lunchEnd);
               if (stLStart !== null && stLEnd !== null && segStart < stLEnd && segEnd > stLStart) return false;
               return !busyBookings.some(b =>
                 (b.employeeId === st.userId || b.employeeId === st.id || b.employeeId === st.user?.id) &&
@@ -1935,12 +1939,9 @@ export class ReservationsService implements OnModuleInit {
           }
         } else {
           const freeCandidateStaff = candidateStaff.filter(st => {
-            const stEntry = toMins(st.entryTime);
+            const { entry: stEntry, exit: stExit, lStart: stLStart, lEnd: stLEnd } = getStaffBounds(st);
             if (stEntry !== null && currentMins < stEntry) return false;
-            const stExit = toMins(st.exitTime);
             if (stExit !== null && slotEnd > stExit) return false;
-            const stLStart = toMins(st.lunchStart);
-            const stLEnd = toMins(st.lunchEnd);
             if (stLStart !== null && stLEnd !== null && currentMins < stLEnd && slotEnd > stLStart) return false;
             return !busyBookings.some(b => (b.employeeId === st.userId || b.employeeId === st.id || b.employeeId === st.user?.id) && currentMins < b.end && slotEnd > b.start);
           });

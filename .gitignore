@@ -54,3 +54,5 @@ repomix-frontend.xml
 # Keystores y certificados Android
 *.keystore
 *.jks
+keystore.properties
+apps/frontend/android/keystore.properties

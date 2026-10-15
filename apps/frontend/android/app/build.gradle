@@ -7,8 +7,8 @@ android {
         applicationId "com.flujofino.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -19,11 +19,20 @@ android {
     signingConfigs {
         release {
             def keystoreFile = file("release.keystore")
+            def keystorePropertiesFile = file("keystore.properties")
+            if (!keystorePropertiesFile.exists()) {
+                keystorePropertiesFile = rootProject.file("keystore.properties")
+            }
+            def keystoreProperties = new Properties()
+            if (keystorePropertiesFile.exists()) {
+                keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+            }
+
             if (keystoreFile.exists()) {
                 storeFile keystoreFile
-                storePassword System.getenv("KEYSTORE_PASSWORD") ?: "finowork2026"
-                keyAlias System.getenv("KEY_ALIAS") ?: "finowork"
-                keyPassword System.getenv("KEY_PASSWORD") ?: "finowork2026"
+                storePassword System.getenv("KEYSTORE_PASSWORD") ?: keystoreProperties.getProperty('storePassword') ?: "finowork2026"
+                keyAlias System.getenv("KEY_ALIAS") ?: keystoreProperties.getProperty('keyAlias') ?: "finowork"
+                keyPassword System.getenv("KEY_PASSWORD") ?: keystoreProperties.getProperty('keyPassword') ?: "finowork2026"
             }
         }
     }

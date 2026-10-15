@@ -631,7 +631,10 @@ const PublicBooking: React.FC = () => {
       try {
         const dStr = formatDateLocal(selectedDate);
         const sId = selectedServiceIds ? `&serviceId=${selectedServiceIds}` : '';
-        const empId = selectedStaff?.id ? `&employeeId=${selectedStaff.id}` : '';
+        const effectiveStaff = (selectedServices.length > 1 && (!selectedStaff || !availableStaffForService.some((st: any) => st.id === selectedStaff.id)))
+          ? null
+          : selectedStaff;
+        const empId = effectiveStaff?.id ? `&employeeId=${effectiveStaff.id}` : '';
         const res = await axios.get(`${apiBase}/public/reservations/tenant/${tenantId}/availability?date=${dStr}${sId}${empId}`);
         setAvailableSlots(res.data);
       } catch (e) {
@@ -641,7 +644,7 @@ const PublicBooking: React.FC = () => {
       }
     };
     fetchSlots();
-  }, [selectedDate, selectedServiceIds, selectedStaff, tenantId]);
+  }, [selectedDate, selectedServiceIds, selectedStaff, tenantId, availableStaffForService, selectedServices.length]);
 
   const isServiceRequired = tenantInfo?.bookingRequireService !== false;
 
@@ -1834,8 +1837,23 @@ const PublicBooking: React.FC = () => {
                     {loadingSlots ? (
                       <div style={{ gridColumn: 'span 3', textAlign: 'center', padding: '20px' }}><IonSpinner /></div>
                     ) : availableSlots.length === 0 ? (
-                      <div style={{ gridColumn: 'span 3', textAlign: 'center', color: '#999', padding: '20px' }}>
-                        No hay horarios disponibles para este día.
+                      <div style={{
+                        gridColumn: 'span 3',
+                        textAlign: 'center',
+                        color: '#64748b',
+                        padding: '24px 16px',
+                        backgroundColor: '#f8fafc',
+                        borderRadius: '12px',
+                        border: '1px dashed #cbd5e1'
+                      }}>
+                        <p style={{ margin: '0 0 6px 0', fontWeight: 600, color: '#334155', fontSize: '14px' }}>
+                          No hay horarios disponibles para este día
+                        </p>
+                        {selectedServices.length > 1 && totalDurationMinutes > 120 && (
+                          <p style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: 1.4 }}>
+                            La duración combinada es de <b>{totalDurationMinutes} min</b>. Si los turnos del negocio son más cortos o ya están ocupados, prueba otra fecha o agenda cada servicio por separado.
+                          </p>
+                        )}
                       </div>
                     ) : availableSlots.map((t, i) => (
                       <div 

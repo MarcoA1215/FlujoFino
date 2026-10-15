@@ -158,20 +158,7 @@ export class UsersService implements OnModuleInit {
   }
 
   async findAll(tenantId?: string): Promise<User[]> {
-    if (!tenantId) return [];
-
-    // Si el tenantId no es un UUID válido (ej: 'admin-system', 'platform-admin', 'default'):
-    // No podemos consultar la columna UUID de PostgreSQL porque arroja DatabaseError.
-    // En su lugar, retornamos de forma segura todos los usuarios del sistema.
-    if (!isValidUUID(tenantId)) {
-      const allUsers = await this.usersRepo.find({
-        order: { createdAt: 'DESC' },
-      });
-      return allUsers.map(user => {
-        delete (user as any).passwordHash;
-        return user;
-      });
-    }
+    if (!tenantId || !isValidUUID(tenantId)) return [];
 
     // Consultar directamente los registros de UserTenantAccess para este tenantId
     const accesses = await this.usersRepo.manager.find(UserTenantAccess, {
@@ -227,20 +214,6 @@ export class UsersService implements OnModuleInit {
         delete (u as any).passwordHash;
         tenantUsers.unshift(u);
       }
-    }
-
-    // Fallback: Si no hay accesos creados todavía para este tenantId pero existen usuarios,
-    // retornamos los usuarios del sistema para no dejar al administrador con la tabla vacía.
-    if (tenantUsers.length === 0) {
-      const allUsers = await this.usersRepo.find({
-        order: { createdAt: 'DESC' },
-      });
-      const filtered = allUsers.filter(u => u.username !== 'admin' && u.username !== 'superadmin');
-      const listToReturn = filtered.length > 0 ? filtered : allUsers;
-      return listToReturn.map(user => {
-        delete (user as any).passwordHash;
-        return user;
-      });
     }
 
     return tenantUsers;
@@ -515,17 +488,9 @@ export class UsersService implements OnModuleInit {
   }
 
   async delete(tenantId: string, id: string): Promise<void> {
-    if (!tenantId) return;
+    if (!tenantId || !isValidUUID(tenantId) || !id) return;
 
     invalidateSessionCache(id);
-    
-    if (!isValidUUID(tenantId)) {
-      await this.usersRepo.manager.query(
-        `DELETE FROM "user_tenant_access" WHERE "userId" = $1`,
-        [id]
-      );
-      return;
-    }
 
     await this.usersRepo.manager.query(
       `DELETE FROM "user_tenant_access" WHERE "userId" = $1 AND "tenantId" = $2`,

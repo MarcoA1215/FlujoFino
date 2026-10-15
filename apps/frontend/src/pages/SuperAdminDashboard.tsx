@@ -327,7 +327,8 @@ const SuperAdminDashboard: React.FC = () => {
   const handleSavePlatformConfig = async () => {
     try {
       setIsSavingConfig(true);
-      await apiClient.put('/superadmin/platform-config', platformConfig);
+      const { id, updatedAt, ...cleanConfig } = platformConfig as any;
+      await apiClient.put('/superadmin/platform-config', cleanConfig);
       presentToast({
         message: 'Cuentas de cobro SaaS actualizadas con éxito.',
         duration: 2500,

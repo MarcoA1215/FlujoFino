@@ -5,6 +5,7 @@ import {
   type PushNotificationSchema,
   type Token,
 } from '@capacitor/push-notifications';
+import { Preferences } from '@capacitor/preferences';
 import axios from 'axios';
 import { useEffect } from 'react';
 import { DEFAULT_SUPERADMIN_EMAIL, UserRole } from '@finowork/shared-types';
@@ -12,6 +13,18 @@ import { DEFAULT_SUPERADMIN_EMAIL, UserRole } from '@finowork/shared-types';
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const FALLBACK_VAPID_PUBLIC_KEY =
   'BOVNV5aBYlzYON15tj1DdHNuR-YNYsotD3BRGgoCjIOEchUZ2C8rRd7nhDOP-Qis-x5rPKcmpdXOJ9N2hPNGsAI';
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  try {
+    const { value: token } = await Preferences.get({ key: 'token' });
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
+    }
+  } catch {
+    // ignore
+  }
+  return {};
+}
 
 export function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -118,12 +131,13 @@ export async function subscribeWebPush(
     }
 
     if (subscription) {
+      const headers = await getAuthHeaders();
       await axios.post(`${apiBase}/notifications/subscribe`, {
         identifier: identifier.trim().toLowerCase(),
         subscription: subscription.toJSON(),
         negocioId,
         role,
-      });
+      }, { headers });
       console.log(`[Web Push] Dispositivo suscrito con éxito (${role}):`, identifier);
       return { success: true };
     }
@@ -162,6 +176,7 @@ export async function registerPushNotifications(
 
       PushNotifications.addListener('registration', async (token: Token) => {
         try {
+          const headers = await getAuthHeaders();
           await axios.post(`${apiBase}/notifications/subscribe`, {
             identifier: identifier.trim().toLowerCase(),
             subscription: {
@@ -170,7 +185,7 @@ export async function registerPushNotifications(
             },
             negocioId,
             role,
-          });
+          }, { headers });
           console.log(`[Capacitor Native] Token push registrado (${role}):`, token.value);
         } catch (err) {
           console.error('[Capacitor Native] Error registrando push token con backend:', err);
@@ -246,10 +261,11 @@ export async function testPushNotification(
 
   // 2. Probar backend push endpoint
   try {
+    const headers = await getAuthHeaders();
     const res = await axios.post(`${apiBase}/notifications/test`, {
       identifier: identifier?.trim().toLowerCase(),
       negocioId,
-    });
+    }, { headers });
     return {
       success: true,
       message: res.data?.message || 'Prueba de notificación enviada con éxito.',

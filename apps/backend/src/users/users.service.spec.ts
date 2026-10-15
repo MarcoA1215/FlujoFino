@@ -78,19 +78,10 @@ describe('UsersService', () => {
       expect(result).toEqual([]);
     });
 
-    it('debe retornar todos los usuarios de usersRepo si tenantId no es un UUID (ej: admin-system o platform-admin)', async () => {
-      const mockUsers = [
-        { id: 'u1', username: 'admin', role: UserRole.ADMIN, passwordHash: 'hash1' },
-        { id: 'u2', username: 'empleado1', role: UserRole.POS, passwordHash: 'hash2' },
-      ];
-      mockUsersRepo.find.mockResolvedValue(mockUsers);
-
+    it('debe retornar array vacío de forma segura si tenantId no es un UUID válido para evitar fuga multi-tenant', async () => {
       const result = await service.findAll('admin-system');
-
-      expect(mockUsersRepo.find).toHaveBeenCalledWith({ order: { createdAt: 'DESC' } });
-      expect(result).toHaveLength(2);
-      expect((result[0] as any).passwordHash).toBeUndefined();
-      expect(result[0].username).toBe('admin');
+      expect(result).toEqual([]);
+      expect(mockUsersRepo.find).not.toHaveBeenCalled();
     });
 
     it('debe consultar UserTenantAccess si tenantId es un UUID válido y mapear roles correctamente', async () => {
@@ -130,18 +121,32 @@ describe('UsersService', () => {
       expect((result[0] as any).passwordHash).toBeUndefined();
     });
 
-    it('debe hacer fallback a usersRepo.find si el tenant UUID no tiene accesos creados aún', async () => {
+    it('debe retornar array vacío si el tenant UUID no tiene accesos creados aún (sin fuga multi-tenant)', async () => {
       const validUuid = '123e4567-e89b-12d3-a456-426614174000';
       mockUsersRepo.manager.find.mockResolvedValue([]);
-      mockUsersRepo.find.mockResolvedValue([
-        { id: 'u-fallback', username: 'admin', role: UserRole.ADMIN, passwordHash: 'hash' }
-      ]);
 
       const result = await service.findAll(validUuid);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].username).toBe('admin');
-      expect((result[0] as any).passwordHash).toBeUndefined();
+      expect(result).toEqual([]);
+      expect(mockUsersRepo.find).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('delete', () => {
+    it('no debe ejecutar eliminación si tenantId no es un UUID válido', async () => {
+      mockUsersRepo.manager.query = jest.fn();
+      await service.delete('invalid-tenant', 'u-1');
+      expect(mockUsersRepo.manager.query).not.toHaveBeenCalled();
+    });
+
+    it('debe eliminar filtrando estrictamente por userId y tenantId cuando tenantId es válido', async () => {
+      mockUsersRepo.manager.query = jest.fn();
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+      await service.delete(validUuid, 'u-1');
+      expect(mockUsersRepo.manager.query).toHaveBeenCalledWith(
+        `DELETE FROM "user_tenant_access" WHERE "userId" = $1 AND "tenantId" = $2`,
+        ['u-1', validUuid]
+      );
     });
   });
 

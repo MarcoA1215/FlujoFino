@@ -720,7 +720,8 @@ export class SuperAdminService implements OnModuleInit {
    */
   async updatePlatformConfig(dto: UpdatePlatformConfigDto): Promise<PlatformConfig> {
     const config = await this.getPlatformConfig();
-    Object.assign(config, dto);
+    const { id, updatedAt, ...cleanDto } = dto as any;
+    Object.assign(config, cleanDto);
     return await this.platformConfigRepo.save(config);
   }
 
