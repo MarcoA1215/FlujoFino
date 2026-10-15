@@ -78,6 +78,13 @@ export class UsersService implements OnModuleInit {
             AND "tenantId" IN (SELECT id FROM tenant WHERE name != 'FinoWork Central');
         `);
 
+        // Desvincular cualquier vinculación accidental de Eva (exitoca) con Techno
+        await this.usersRepo.manager.query(`
+          DELETE FROM "user_tenant_access"
+          WHERE "userId" IN (SELECT id FROM users WHERE username = 'exitoca' OR username = 'exitoca ')
+            AND "tenantId" IN (SELECT id FROM tenant WHERE name = 'Techno');
+        `);
+
         // 2. Normalizar espacios residuales en nombres de usuario y correos
         await this.usersRepo.manager.query(`
           UPDATE users SET username = TRIM(username) WHERE username != TRIM(username);
@@ -127,54 +134,9 @@ export class UsersService implements OnModuleInit {
             console.log(`[UsersService] Vinculado admin demo a sucursal dedicada: ${centralTenant.name} (${centralTenant.id})`);
           }
         }
-
-        // 4. Auto-curación de negocios reales (como 'Techno'):
-        // Asegurar que cada negocio de cliente tenga a su verdadero administrador registrado en user_tenant_access
-        const nonDemoTenants = await tenantRepo.find({
-          where: { name: Not('FinoWork Central') },
-        });
-
-        for (const t of nonDemoTenants) {
-          const existingRealAdmin = await accessRepo.findOne({
-            where: {
-              tenantId: t.id,
-              role: UserRole.ADMIN,
-            },
-            relations: { user: true },
-          });
-
-          // Si el tenant no tiene ningún admin asignado o el asignado es 'admin' demo
-          if (!existingRealAdmin || existingRealAdmin.user?.username === 'admin') {
-            if (existingRealAdmin && existingRealAdmin.user?.username === 'admin') {
-              await accessRepo.delete(existingRealAdmin.id);
-            }
-
-            // Buscar administradores reales registrados (excluyendo admin demo y superadmin)
-            const realAdmins = await this.usersRepo.find({
-              where: { role: UserRole.ADMIN },
-              order: { createdAt: 'ASC' },
-            });
-            const candidate = realAdmins.find(u => u.username !== 'admin' && u.username !== 'superadmin');
-
-            if (candidate) {
-              const newRealAccess = accessRepo.create({
-                user: candidate,
-                userId: candidate.id,
-                tenant: t,
-                tenantId: t.id,
-                role: UserRole.ADMIN,
-                roles: [UserRole.ADMIN],
-                isActive: true,
-                status: 'ACCEPTED',
-              });
-              await accessRepo.save(newRealAccess);
-              console.log(`[UsersService] ✅ Administrador real ${candidate.username} (${candidate.email}) restaurado en negocio ${t.name} (${t.id})`);
-            }
-          }
-        }
       }
     } catch (e: any) {
-      console.warn('[UsersService] Auto-vinculación y limpieza de sucursales:', e?.message || e);
+      console.warn('[UsersService] Limpieza de sucursales:', e?.message || e);
     }
   }
 
