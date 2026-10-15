@@ -74,12 +74,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       if (isValidUUID(userId)) {
         user = await this.dataSource.getRepository(User).findOne({
           where: { id: userId },
-          select: ['id', 'username', 'email', 'role', 'identification', 'phone', 'isEmailVerified'],
+          select: { id: true, username: true, email: true, role: true, identification: true, phone: true, isEmailVerified: true },
         });
       } else if (payload.username) {
         user = await this.dataSource.getRepository(User).findOne({
           where: { username: payload.username },
-          select: ['id', 'username', 'email', 'role', 'identification', 'phone', 'isEmailVerified'],
+          select: { id: true, username: true, email: true, role: true, identification: true, phone: true, isEmailVerified: true },
         });
       }
 
@@ -92,7 +92,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       if (payload.tenantId && isValidUUID(payload.tenantId) && user.role !== UserRole.SUPERADMIN && payload.role !== UserRole.SUPERADMIN) {
         const access = await this.dataSource.getRepository(UserTenantAccess).findOne({
           where: { userId: user.id, tenantId: payload.tenantId },
-          select: ['id', 'isActive', 'status', 'role', 'roles'],
+          select: { id: true, isActive: true, status: true, role: true, roles: true },
         });
 
         if (!access || access.isActive === false || access.status === 'REJECTED') {
