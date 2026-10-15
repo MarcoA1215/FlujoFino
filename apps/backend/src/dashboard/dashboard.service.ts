@@ -430,7 +430,8 @@ export class DashboardService {
           } else if (['TRANSFER', 'TRANSFERENCIA'].includes(method)) {
             transferBs += amtBs;
           } else if (['USD', 'CASH', 'CASH_USD', 'EFECTIVO'].includes(method)) {
-            cashUSDIn += amtUsd;
+            const usdIn = Number(o.usdReceived) || amtUsd;
+            cashUSDIn += usdIn;
           } else if (['BINANCE', 'BINANCE_USDT', 'USDT', 'ZELLE'].includes(method)) {
             digitalUSDIn += amtUsd;
           }
@@ -456,10 +457,24 @@ export class DashboardService {
     const expenses = (await this.expenseRepo.find({ where: { tenantId } })) || [];
     let cashExpensesUSD = 0;
     let bankExpensesBs = 0;
+    let baseFondoCajaUSD = 0;
+    let baseFondoCajaBs = 0;
 
     for (const exp of expenses) {
       const amt = Number(exp.amount || 0);
+      const cat = (exp.category || '').toUpperCase();
       const m = (exp.paymentMethod || '').toUpperCase();
+
+      // Las bases de fondo de caja NO son gastos operativos: son liquidez base para dar vuelto
+      if (cat === 'FONDO_CAJA') {
+        if (['CASH_BS', 'BS', 'PAGO_MOVIL'].includes(m) || exp.description?.includes('Bs.')) {
+          baseFondoCajaBs += (amt * rate);
+        } else {
+          baseFondoCajaUSD += amt;
+        }
+        continue;
+      }
+
       if (['CASH', 'CASH_USD', 'USD', 'EFECTIVO'].includes(m)) {
         cashExpensesUSD += amt;
       } else if (['PAGO_MOVIL', 'TRANSFER', 'BANCO', 'BS'].includes(m)) {
@@ -501,10 +516,10 @@ export class DashboardService {
     const initialBank = Number(settings?.initialBankBs || 0);
     const initialDigital = Number(settings?.initialDigitalUSD || 0);
 
-    const netCashUSD = Number((initialCash + cashUSDIn - cashUSDOut - cashExpensesUSD + totalExchangedCashUSDIn).toFixed(2));
+    const netCashUSD = Number((initialCash + baseFondoCajaUSD + cashUSDIn - cashUSDOut - cashExpensesUSD + totalExchangedCashUSDIn).toFixed(2));
     const netDigitalUSD = Number((initialDigital + digitalUSDIn + totalExchangedDigitalUSDIn).toFixed(2));
     const totalBankBsIn = Number((puntoBs + pagoMovilBs + transferBs).toFixed(2));
-    const netBankBs = Number((initialBank + totalBankBsIn - bsOut - bankExpensesBs - totalExchangedBsOut).toFixed(2));
+    const netBankBs = Number((initialBank + baseFondoCajaBs + totalBankBsIn - bsOut - bankExpensesBs - totalExchangedBsOut).toFixed(2));
     const bankBsEquivalentUSD = rate > 0 ? Number((netBankBs / rate).toFixed(2)) : 0;
     const totalRealUSD = Number((netCashUSD + netDigitalUSD + bankBsEquivalentUSD).toFixed(2));
 

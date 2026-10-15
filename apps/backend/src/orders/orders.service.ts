@@ -427,7 +427,7 @@ export class OrdersService implements OnModuleInit {
       amount: Number(amtUSD.toFixed(2)),
       description: desc,
       category: 'FONDO_CAJA',
-      paymentMethod: 'CASH',
+      paymentMethod: currency === 'BS' ? 'CASH_BS' : 'CASH_USD',
     });
     return repo.save(expense);
   }

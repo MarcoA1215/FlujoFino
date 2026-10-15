@@ -236,11 +236,11 @@ const Dashboard: React.FC = () => {
                         <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                           💵 Gaveta Física (Efectivo USD)
                         </div>
-                        <div style={{ fontSize: '22px', fontWeight: '900', color: '#047857', marginTop: '2px' }}>
+                        <div style={{ fontSize: '22px', fontWeight: '900', color: (summary.treasury.cashUSD || 0) < 0 ? '#DC2626' : '#047857', marginTop: '2px' }}>
                           ${(summary.treasury.cashUSD || 0).toFixed(2)}
                         </div>
-                        <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
-                          Billetes reales en caja
+                        <div style={{ fontSize: '11px', color: (summary.treasury.cashUSD || 0) < 0 ? '#DC2626' : '#64748B', marginTop: '2px', fontWeight: (summary.treasury.cashUSD || 0) < 0 ? '700' : 'normal' }}>
+                          {(summary.treasury.cashUSD || 0) < 0 ? '⚠️ Gaveta en negativo (revisa Saldo Inicial)' : 'Billetes reales en caja'}
                         </div>
                       </div>
                       <div
@@ -248,8 +248,8 @@ const Dashboard: React.FC = () => {
                           width: '40px',
                           height: '40px',
                           borderRadius: '10px',
-                          backgroundColor: '#ECFDF5',
-                          color: '#10B981',
+                          backgroundColor: (summary.treasury.cashUSD || 0) < 0 ? '#FEE2E2' : '#ECFDF5',
+                          color: (summary.treasury.cashUSD || 0) < 0 ? '#DC2626' : '#10B981',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',

@@ -104,7 +104,10 @@ export const FondoCajaModal: React.FC<FondoCajaModalProps> = ({
           >
             <IonIcon icon={cashOutline} style={{ color: '#047857', fontSize: '24px', flexShrink: 0 }} />
             <div style={{ fontSize: '12px', color: '#065F46', lineHeight: 1.4 }}>
-              <b>Apertura de turno:</b> Registra el sencillo o menudo que colocas en la gaveta para dar vuelto a los clientes. Se sumará al arqueo del día.
+              <b>Apertura de turno (Gaveta física):</b> Registra únicamente el efectivo menudo o billetes que colocas físicamente en la gaveta para dar vuelto.
+              <div style={{ marginTop: '4px', fontSize: '11px', color: '#047857' }}>
+                💡 <i>Si deseas registrar dinero que ya tienes en tus cuentas bancarias para Pago Móvil o Punto, hazlo desde <b>"Saldo Inicial"</b> en el inicio.</i>
+              </div>
             </div>
           </div>
 
