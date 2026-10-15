@@ -1,6 +1,6 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtStrategy } from './jwt.strategy';
+import { JwtStrategy, invalidateSessionCache } from './jwt.strategy';
 import { UserRole } from '@finowork/shared-types';
 import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
@@ -13,6 +13,8 @@ describe('JwtStrategy - Seguridad y Revocación Inmediata de Sesiones', () => {
   let mockDataSource: any;
 
   beforeEach(() => {
+    invalidateSessionCache(); // Limpiar caché antes de cada prueba
+
     mockConfigService = {
       get: jest.fn().mockReturnValue('test-secret'),
     };
@@ -146,5 +148,43 @@ describe('JwtStrategy - Seguridad y Revocación Inmediata de Sesiones', () => {
     expect(result).toBeDefined();
     expect(result.role).toBe(UserRole.SUPERADMIN);
     expect(mockAccessRepo.findOne).not.toHaveBeenCalled();
+  });
+
+  it('debe utilizar la caché en memoria para llamadas sucesivas sin volver a consultar la base de datos', async () => {
+    mockUserRepo.findOne.mockResolvedValue({
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      username: 'usuario_frecuente',
+      role: UserRole.POS,
+    });
+
+    mockAccessRepo.findOne.mockResolvedValue({
+      id: 'acc-1',
+      isActive: true,
+      status: 'ACCEPTED',
+      role: UserRole.POS,
+    });
+
+    const payload = {
+      sub: '550e8400-e29b-41d4-a716-446655440000',
+      username: 'usuario_frecuente',
+      tenantId: '660e8400-e29b-41d4-a716-446655440001',
+      role: UserRole.POS,
+    };
+
+    // Primera llamada: consulta BD
+    await strategy.validate(payload);
+    expect(mockUserRepo.findOne).toHaveBeenCalledTimes(1);
+
+    // Segunda y tercera llamada inmediata: debe responder desde memoria (0 llamadas adicionales a BD)
+    await strategy.validate(payload);
+    await strategy.validate(payload);
+    expect(mockUserRepo.findOne).toHaveBeenCalledTimes(1);
+
+    // Invalidar caché (ej. al despedir o editar empleado):
+    invalidateSessionCache('550e8400-e29b-41d4-a716-446655440000');
+
+    // Siguiente llamada: vuelve a consultar BD
+    await strategy.validate(payload);
+    expect(mockUserRepo.findOne).toHaveBeenCalledTimes(2);
   });
 });

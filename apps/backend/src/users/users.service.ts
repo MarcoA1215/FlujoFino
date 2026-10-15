@@ -15,6 +15,7 @@ import { UserRole, ReservationStatus, OrderStatus, PaymentStatus, DEFAULT_SUPERA
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { isValidUUID } from '../utils/tenant-crypto';
+import { invalidateSessionCache } from '../auth/jwt.strategy';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
@@ -508,12 +509,15 @@ export class UsersService implements OnModuleInit {
       });
     }
 
+    invalidateSessionCache(userId);
     await this.usersRepo.manager.save(access);
     return { success: true, access };
   }
 
   async delete(tenantId: string, id: string): Promise<void> {
     if (!tenantId) return;
+
+    invalidateSessionCache(id);
     
     if (!isValidUUID(tenantId)) {
       await this.usersRepo.manager.query(
