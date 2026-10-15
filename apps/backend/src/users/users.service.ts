@@ -72,6 +72,16 @@ export class UsersService implements OnModuleInit {
     // Asegurar aislamiento multi-inquilino estricto y auto-curación de negocios
     try {
       if (this.usersRepo.manager?.query) {
+        // 0. Auto-curación de columnas esenciales para nómina, reservas y órdenes
+        await this.usersRepo.manager.query(`
+          ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "salaryAmount" numeric(12,2);
+          ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "salaryPeriod" character varying;
+          ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "compensation_type" character varying DEFAULT 'FIJO';
+          ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "commission_percentage" numeric(5,2);
+          ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "serviceSpecialists" jsonb;
+          ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "employeeId" character varying;
+        `);
+
         // 1. Desvincular inmediatamente al usuario demo 'admin' de cualquier negocio real de clientes (como 'Techno')
         await this.usersRepo.manager.query(`
           DELETE FROM "user_tenant_access"
@@ -519,7 +529,7 @@ export class UsersService implements OnModuleInit {
           await manager.createQueryBuilder()
             .update(SalaryAdvance)
             .set({ status: SalaryAdvanceStatus.DESCONTADO })
-            .where('id IN (:...advanceIds) AND negocioId = :tenantId AND userId = :userId', {
+            .where('id IN (:...advanceIds) AND "negocioId" = :tenantId AND "userId" = :userId', {
               advanceIds: data.advanceIds,
               tenantId,
               userId,
@@ -529,7 +539,7 @@ export class UsersService implements OnModuleInit {
           await manager.createQueryBuilder()
             .update(SalaryAdvance)
             .set({ status: SalaryAdvanceStatus.DESCONTADO })
-            .where('negocioId = :tenantId AND userId = :userId AND status = :status', {
+            .where('"negocioId" = :tenantId AND "userId" = :userId AND status = :status', {
               tenantId,
               userId,
               status: SalaryAdvanceStatus.PENDIENTE,
@@ -576,10 +586,10 @@ export class UsersService implements OnModuleInit {
     const reservationQuery = this.usersRepo.manager.createQueryBuilder(Reservation, 'res')
       .where('res.tenantId = :tenantId', { tenantId })
       .andWhere(
-        '(res.employeeId = :userId OR (res."serviceSpecialists" IS NOT NULL AND CAST(res."serviceSpecialists" AS text) LIKE :userSearch))',
+        '(CAST(res.employeeId AS text) = :userId OR (res."serviceSpecialists" IS NOT NULL AND CAST(res."serviceSpecialists" AS text) LIKE :userSearch))',
         { tenantId, userId, userSearch: `%"employeeId":"${userId}"%` }
       )
-      .andWhere('(res.status = :resStatus OR EXISTS (SELECT 1 FROM "order" ord_link WHERE (CAST(ord_link.id AS text) = res."orderId" OR ord_link."linkedReservationId" = CAST(res.id AS text)) AND ord_link.status = :ordDelivered))', {
+      .andWhere('(res.status = :resStatus OR EXISTS (SELECT 1 FROM "order" ord_link WHERE (CAST(ord_link.id AS text) = res."orderId" OR ord_link."linkedReservationId" = CAST(res.id AS text)) AND CAST(ord_link.status AS text) = :ordDelivered))', {
         resStatus: ReservationStatus.COMPLETED,
         ordDelivered: OrderStatus.DELIVERED,
       });
@@ -717,7 +727,7 @@ export class UsersService implements OnModuleInit {
     const orderQuery = this.usersRepo.manager.createQueryBuilder(Order, 'ord')
       .where('ord.tenantId = :tenantId', { tenantId })
       .andWhere(
-        '(ord.employeeId = :userId OR EXISTS (SELECT 1 FROM order_item oi WHERE oi."orderId" = ord.id AND oi."employeeId" = :userId))',
+        '(CAST(ord.employeeId AS text) = :userId OR EXISTS (SELECT 1 FROM "order_item" oi WHERE oi."orderId" = ord.id AND CAST(oi."employeeId" AS text) = :userId))',
         { tenantId, userId }
       )
       .andWhere('ord.status = :orderStatus', { orderStatus: OrderStatus.DELIVERED });

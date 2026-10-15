@@ -1,3 +1,4 @@
+import * as path from 'path';
 import { Tenant } from './entities/tenant.entity';
 import { UserTenantAccess } from './entities/user-tenant-access.entity';
 import { WorkSchedule } from './entities/work-schedule.entity';
@@ -77,6 +78,8 @@ import { SentryModule } from '@sentry/nestjs/setup';
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
         entities: [RawMaterial, StockMovement, RecipeItem, Product, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription, SalaryAdvance, Investment, Promoter, PromoterCommission, CashExchange],
+        migrations: [path.join(__dirname, './database/migrations/*{.ts,.js}')],
+        migrationsRun: true,
         synchronize: configService.get<string>('DB_SYNCHRONIZE') === 'true',
       }),
       inject: [ConfigService],
