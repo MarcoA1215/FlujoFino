@@ -11,6 +11,9 @@
     "build:backend": "yarn workspace @finowork/shared-types build && yarn workspace finowork-backend build",
     "build:frontend": "yarn workspace @finowork/shared-types build && yarn workspace frontend build",
     "build": "yarn workspace @finowork/shared-types build && yarn workspace finowork-backend build",
+    "seed": "yarn workspace finowork-backend seed",
+    "seed:demo": "yarn workspace finowork-backend seed:demo",
+    "seed:prod": "yarn workspace finowork-backend seed:prod",
     "start": "yarn workspace finowork-backend start:prod"
   }
 }

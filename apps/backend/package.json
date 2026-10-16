@@ -7,7 +7,9 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
+    "seed": "ts-node -r tsconfig-paths/register src/database/seeds/demo-promoters.seed.ts",
     "seed:demo": "ts-node -r tsconfig-paths/register src/database/seeds/demo-promoters.seed.ts",
+    "seed:prod": "node dist/database/seeds/demo-promoters.seed.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
