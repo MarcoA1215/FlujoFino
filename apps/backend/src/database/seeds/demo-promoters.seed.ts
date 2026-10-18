@@ -84,7 +84,7 @@ async function runSeed() {
     process.exit(1);
   }
 
-  // Asegurar que columnas opcionales requeridas por las entidades existan sin tocar esquemas ni borrar datos
+  // Columnas seguras en caso de faltar en esquemas previos
   const safeColumns = [
     `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "companyLogoUrl" character varying;`,
     `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "logoShape" character varying DEFAULT 'ROUNDED';`,
@@ -99,7 +99,7 @@ async function runSeed() {
     try {
       await dataSource.query(sql);
     } catch {
-      // Ignorar si la tabla aún no existe o ya posee la columna
+      // Ignorar
     }
   }
 
@@ -123,8 +123,13 @@ async function runSeed() {
     const passwordHash = await bcrypt.hash('123456', 10);
     const superPasswordHash = await bcrypt.hash('SuperAdmin2026!', 10);
     const tasaActual = 855.66;
+    const todayIso = new Date().toISOString().split('T')[0];
 
-    // Helper no destructivo: Si el usuario existe, se respeta intacto sin alterar claves ni datos previos
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowIso = tomorrow.toISOString().split('T')[0];
+
+    // Helpers seguros e idempotentes
     async function getOrCreateUser(email: string, username: string, role: UserRole, name?: string, customHash?: string) {
       const normalizedEmail = email.toLowerCase().trim();
       let user = await userRepo.findOne({ 
@@ -144,14 +149,11 @@ async function runSeed() {
           isEmailVerified: true,
         });
         user = await userRepo.save(user);
-        console.log(` ✅ [NUEVO] Usuario creado: ${normalizedEmail} (rol: ${role})`);
-      } else {
-        console.log(` ℹ️ [EXISTENTE] Usuario conservado sin modificaciones: ${user.email}`);
+        console.log(` ✅ [NUEVO] Usuario creado: ${normalizedEmail} (${role})`);
       }
       return user;
     }
 
-    // Helper no destructivo para vincular acceso
     async function linkAccess(userId: string, tenantId: string, role: UserRole, jobTitle: string) {
       let access = await accessRepo.findOne({ where: { userId, tenantId } });
       if (!access) {
@@ -165,20 +167,116 @@ async function runSeed() {
           jobTitle,
         });
         access = await accessRepo.save(access);
-        console.log(`   ✅ [NUEVO] Acceso vinculado: usuario ${userId} -> negocio ${tenantId} (${jobTitle})`);
+        console.log(`   ✅ [ACCESO] ${jobTitle}: usuario vinculado a negocio`);
       }
       return access;
     }
 
-    // 0. Cuentas de Acceso Globales
-    console.log('\n👥 Verificando cuentas maestras del sistema...');
+    async function getOrCreateCustomer(tenantId: string, data: Partial<Customer>) {
+      let cust = await customerRepo.findOne({ 
+        where: [
+          { tenantId, phone: data.phone },
+          { tenantId, name: data.name }
+        ] 
+      });
+      if (!cust) {
+        cust = customerRepo.create({ ...data, tenantId });
+        cust = await customerRepo.save(cust);
+        console.log(`   ✅ [CLIENTE] ${cust.name} (${cust.phone})`);
+      }
+      return cust;
+    }
+
+    async function getOrCreateProduct(tenantId: string, data: Partial<Product>) {
+      let prod = await productRepo.findOne({ where: { tenantId, name: data.name } });
+      if (!prod) {
+        prod = productRepo.create({ ...data, tenantId });
+        prod = await productRepo.save(prod);
+        console.log(`   ✅ [PRODUCTO] ${prod.name} ($${prod.salePrice})`);
+      }
+      return prod;
+    }
+
+    async function getOrCreateExpense(tenantId: string, data: Partial<OperatingExpense>) {
+      let exp = await expenseRepo.findOne({ where: { tenantId, description: data.description } });
+      if (!exp) {
+        exp = expenseRepo.create({ ...data, tenantId });
+        exp = await expenseRepo.save(exp);
+        console.log(`   ✅ [GASTO] ${exp.description} ($${exp.amount})`);
+      }
+      return exp;
+    }
+
+    async function getOrCreateReservation(tenantId: string, data: Partial<Reservation>) {
+      let res = await reservationRepo.findOne({ 
+        where: { tenantId, customerName: data.customerName, date: data.date, time: data.time } 
+      });
+      if (!res) {
+        res = reservationRepo.create({ ...data, tenantId });
+        res = await reservationRepo.save(res);
+        console.log(`   ✅ [CITA] ${res.customerName} - ${res.serviceName} (${res.date} ${res.time})`);
+      }
+      return res;
+    }
+
+    async function getOrCreateOrder(
+      tenantId: string, 
+      orderData: Partial<Order>, 
+      items: { productId: string; productName: string; quantity: number; unitPrice: number; unitCost: number }[]
+    ) {
+      let ord = await orderRepo.findOne({ 
+        where: { tenantId, notes: orderData.notes } 
+      });
+      if (!ord) {
+        ord = orderRepo.create({ ...orderData, tenantId });
+        ord = await orderRepo.save(ord);
+        for (const item of items) {
+          await orderItemRepo.save(orderItemRepo.create({
+            orderId: ord.id,
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            unitCost: item.unitCost,
+            subtotal: item.quantity * item.unitPrice,
+          }));
+        }
+        console.log(`   ✅ [ORDEN] ${ord.customerName} -> $${ord.totalAmount} (${ord.status})`);
+      }
+      return ord;
+    }
+
+    // =========================================================================
+    // 0. USUARIOS Y EQUIPOS DE TRABAJO MULTI-ROL
+    // =========================================================================
+    console.log('\n👥 Verificando cuentas de usuarios del sistema...');
+    // Cuentas Maestras
     const superAdmin = await getOrCreateUser('superadmin@finowork.com', 'superadmin', UserRole.SUPERADMIN, 'Super Administrador', superPasswordHash);
     const promoter = await getOrCreateUser('promotor@finowork.com', 'promotor', UserRole.ADMIN, 'Promotor Oficial FinoWork');
     const demoAdmin = await getOrCreateUser('admin@finowork.com', 'admin', UserRole.ADMIN, 'Administrador Demo');
-    const deliveryUser = await getOrCreateUser('delivery@finowork.com', 'delivery_carlos', UserRole.DELIVERY, 'Carlos Delivery');
+
+    // Cuentas de Especialistas / Roles específicos
+    const deliveryUser = await getOrCreateUser('delivery@finowork.com', 'delivery_carlos', UserRole.DELIVERY, 'Carlos Repartidor');
+    const delivery2User = await getOrCreateUser('delivery2.burger@finowork.com', 'delivery_javier', UserRole.DELIVERY, 'Javier Repartidor Moto');
     const kitchenUser = await getOrCreateUser('cocina@finowork.com', 'cocina_chef', UserRole.KITCHEN, 'Chef Ramón Cocina');
+    const parrilleroUser = await getOrCreateUser('parrillero.burger@finowork.com', 'parrillero_alvaro', UserRole.OPERATIVO, 'Álvaro Maestro Parrillero');
     const cashierUser = await getOrCreateUser('cajero@finowork.com', 'cajero_maria', UserRole.POS, 'María Cajera');
+    const meseroUser = await getOrCreateUser('mesero@finowork.com', 'mesero_pedro', UserRole.POS, 'Pedro Capitán de Meseros');
+    const mesera2User = await getOrCreateUser('mesera2.burger@finowork.com', 'mesera_lucia', UserRole.POS, 'Lucía Mesonera');
     const specialistUser = await getOrCreateUser('especialista@finowork.com', 'especialista_ana', UserRole.OPERATIVO, 'Dra. Ana Especialista');
+    const terapeutaUser = await getOrCreateUser('terapeuta.glow@finowork.com', 'terapeuta_claudia', UserRole.OPERATIVO, 'Claudia Fisioterapeuta');
+    const recepcionGlowUser = await getOrCreateUser('recepcion.glow@finowork.com', 'recepcion_camila', UserRole.POS, 'Camila Recepción');
+    const panaderoUser = await getOrCreateUser('panadero@finowork.com', 'panadero_luis', UserRole.OPERATIVO, 'Luis Maestro Panadero');
+    const pasteleroUser = await getOrCreateUser('pastelero.pan@finowork.com', 'pastelero_gabriel', UserRole.OPERATIVO, 'Gabriel Maestro Pastelero');
+    const despachoPanUser = await getOrCreateUser('despacho.pan@finowork.com', 'despacho_rosa', UserRole.POS, 'Rosa Atención & Mostrador');
+    const barberoUser = await getOrCreateUser('barbero@finowork.com', 'barbero_victor', UserRole.OPERATIVO, 'Víctor Master Barber');
+    const barbero2User = await getOrCreateUser('barbero2.spa@finowork.com', 'barbero_daniel', UserRole.OPERATIVO, 'Daniel Fades & Barbas');
+    const manicuristaUser = await getOrCreateUser('manicurista.spa@finowork.com', 'manicurista_sofia', UserRole.OPERATIVO, 'Sofía Especialista Nails');
+    const lavadorUser = await getOrCreateUser('lavador@finowork.com', 'lavador_jose', UserRole.OPERATIVO, 'José Lavador Pro');
+    const lavador2User = await getOrCreateUser('lavador2.autolavado@finowork.com', 'lavador_miguel', UserRole.OPERATIVO, 'Miguel Detailing & Pulitura');
+    const supervisorLavadoUser = await getOrCreateUser('supervisor.autolavado@finowork.com', 'supervisor_fernando', UserRole.OPERATIVO, 'Fernando Supervisor Bahías');
+    const asesorBoutiqueUser = await getOrCreateUser('asesor1.boutique@finowork.com', 'asesora_valentina', UserRole.POS, 'Valentina Asesora de Moda');
+    const almacenBoutiqueUser = await getOrCreateUser('almacen.boutique@finowork.com', 'almacen_andres', UserRole.OPERATIVO, 'Andrés Encargado Almacén');
 
     // Registrar perfil de promotor si no existe
     let promoterProfile = await promoterRepo.findOne({ where: { userId: promoter.id } });
@@ -197,9 +295,9 @@ async function runSeed() {
     }
 
     // =========================================================================
-    // 1. ESPACIO 1: BOUTIQUE MODA URBANA (Retail Puro / Ropa)
+    // 1. ESPACIO 1: BOUTIQUE MODA URBANA (demo-retail) -> Tri-Moneda COP + Variantes + Crédito
     // =========================================================================
-    console.log('\n🛍️ Verificando Espacio 1: Boutique Moda Urbana (demo-retail)...');
+    console.log('\n🛍️ Espacio 1: Boutique Moda Urbana (demo-retail)...');
     let tenantRetail = await tenantRepo.findOne({ where: [{ referral_code: 'demo-retail' }, { name: 'Boutique Moda Urbana' }] });
     if (!tenantRetail) {
       tenantRetail = await tenantRepo.save(tenantRepo.create({
@@ -211,11 +309,13 @@ async function runSeed() {
         isActive: true,
         promoterId: promoterProfile.id,
       }));
-      console.log(' ✅ [NUEVO] Espacio creado: Boutique Moda Urbana');
     }
-    await linkAccess(promoter.id, tenantRetail.id, UserRole.ADMIN, 'Gerente de Boutique');
+    // Accesos del equipo Boutique
+    await linkAccess(promoter.id, tenantRetail.id, UserRole.ADMIN, 'Gerente General');
     await linkAccess(demoAdmin.id, tenantRetail.id, UserRole.ADMIN, 'Administrador');
     await linkAccess(cashierUser.id, tenantRetail.id, UserRole.POS, 'Cajera Principal');
+    await linkAccess(asesorBoutiqueUser.id, tenantRetail.id, UserRole.POS, 'Asesora de Moda & Ventas');
+    await linkAccess(almacenBoutiqueUser.id, tenantRetail.id, UserRole.OPERATIVO, 'Control de Stock & Almacén');
 
     let settingsRetail = await settingsRepo.findOne({ where: { tenantId: tenantRetail.id } });
     if (!settingsRetail) {
@@ -245,48 +345,30 @@ async function runSeed() {
         acceptPagoMovil: true,
       });
       await settingsRepo.save(settingsRetail);
-      console.log('   ✅ Configuración de Boutique creada con Tri-Moneda COP');
     } else {
       settingsRetail.enableCopCurrency = true;
       settingsRetail.exchangeRateCop = 4000.0;
-      settingsRetail.companyCopBank = 'Bancolombia / Nequi';
-      settingsRetail.companyCopAccountNumber = '3129876543';
-      settingsRetail.companyCopAccountHolder = 'Boutique Moda Urbana SAS';
-      settingsRetail.acceptCashCop = true;
-      settingsRetail.acceptTransferCop = true;
       await settingsRepo.save(settingsRetail);
     }
 
-    // Fondo Inicial de Apertura en Caja (Gaveta Física)
-    const existingRetailFund = await expenseRepo.findOne({ where: { tenantId: tenantRetail.id, category: 'FONDO_CAJA' } });
-    if (!existingRetailFund) {
-      await expenseRepo.save(expenseRepo.create({
-        tenantId: tenantRetail.id,
-        description: 'Base de Apertura en Gaveta (Efectivo)',
-        amount: 80.00,
-        category: 'FONDO_CAJA',
-        paymentMethod: 'CASH_USD',
-      }));
-      console.log('   ✅ [NUEVO] Fondo base de gaveta registrado: $80.00 USD');
-    }
+    // Clientes de Boutique
+    const cFuentes = await getOrCreateCustomer(tenantRetail.id, { name: 'Elena Fuentes', phone: '0414-1112233', identification: 'V-18456123', totalVisits: 6, notes: 'Clienta VIP con línea de crédito.' });
+    const cGomez = await getOrCreateCustomer(tenantRetail.id, { name: 'Santiago Gómez', phone: '0414-9988776', identification: 'V-23456789', totalVisits: 4, notes: 'Paga habitualmente en Pesos Colombianos (COP).' });
+    const cCastillo = await getOrCreateCustomer(tenantRetail.id, { name: 'Mariana Castillo', phone: '0412-5544332', identification: 'V-25678901', totalVisits: 3, notes: 'Compra vestidos y accesorios.' });
+    const cPena = await getOrCreateCustomer(tenantRetail.id, { name: 'Carlos Eduardo Peña', phone: '0416-3322114', identification: 'V-19876543', totalVisits: 2, notes: 'Prefiere pagar por Pago Móvil Banesco.' });
+    const cMorales = await getOrCreateCustomer(tenantRetail.id, { name: 'Gabriela Morales', phone: '0424-7788990', identification: 'V-27123456', totalVisits: 5, notes: 'Clienta frecuente de fin de semana.' });
 
-    const retailProducts = [
-      { name: 'Pantalón Jean Clásico', salePrice: 22.0, cost: 10.0, estimatedCost: 10.0, stock: 15, stockQuantity: 15, physicalStock: 15, category: 'Ropa Dama', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=600&auto=format&fit=crop&q=80'] },
-      { name: 'Vestido Casual Floral', salePrice: 28.0, cost: 12.0, estimatedCost: 12.0, stock: 10, stockQuantity: 10, physicalStock: 10, category: 'Vestidos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=600&auto=format&fit=crop&q=80'] },
-    ];
-    for (const rp of retailProducts) {
-      let prod = await productRepo.findOne({ where: { tenantId: tenantRetail.id, name: rp.name } });
-      if (!prod) {
-        prod = productRepo.create({ ...rp, tenantId: tenantRetail.id });
-        await productRepo.save(prod);
-        console.log(`   ✅ [NUEVO] Producto creado: ${rp.name}`);
-      }
-    }
+    // Productos Boutique
+    const pJean = await getOrCreateProduct(tenantRetail.id, { name: 'Pantalón Jean Clásico', salePrice: 22.0, cost: 10.0, estimatedCost: 10.0, stock: 20, stockQuantity: 20, physicalStock: 20, category: 'Pantalones', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=600&auto=format&fit=crop&q=80'] });
+    const pVestido = await getOrCreateProduct(tenantRetail.id, { name: 'Vestido Casual Floral', salePrice: 28.0, cost: 12.0, estimatedCost: 12.0, stock: 15, stockQuantity: 15, physicalStock: 15, category: 'Vestidos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=600&auto=format&fit=crop&q=80'] });
+    const pChaqueta = await getOrCreateProduct(tenantRetail.id, { name: 'Chaqueta Denim Vintage', salePrice: 38.0, cost: 18.0, estimatedCost: 18.0, stock: 10, stockQuantity: 10, physicalStock: 10, category: 'Chaquetas', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600&auto=format&fit=crop&q=80'] });
+    const pFranela = await getOrCreateProduct(tenantRetail.id, { name: 'Franela Básica Cuello Redondo', salePrice: 10.0, cost: 4.0, estimatedCost: 4.0, stock: 30, stockQuantity: 30, physicalStock: 30, category: 'Camisetas', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80'] });
+    const pCinturon = await getOrCreateProduct(tenantRetail.id, { name: 'Cinturón de Cuero Genuino', salePrice: 12.0, cost: 4.5, estimatedCost: 4.5, stock: 25, stockQuantity: 25, physicalStock: 25, category: 'Accesorios', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1624222247344-550fb60583dc?w=600&auto=format&fit=crop&q=80'] });
 
-    // Producto Estrella con Sub-divisiones / Variantes (Tallas y Colores con stock propio)
-    let camisaVariants = await productRepo.findOne({ where: { tenantId: tenantRetail.id, name: 'Camisa Oversize Algodón' } });
-    if (!camisaVariants) {
-      camisaVariants = await productRepo.save(productRepo.create({
+    // Producto Estrella con Variantes
+    let pCamisa = await productRepo.findOne({ where: { tenantId: tenantRetail.id, name: 'Camisa Oversize Algodón' } });
+    if (!pCamisa) {
+      pCamisa = await productRepo.save(productRepo.create({
         name: 'Camisa Oversize Algodón',
         salePrice: 15.0,
         cost: 7.0,
@@ -294,204 +376,132 @@ async function runSeed() {
         stock: 35,
         stockQuantity: 35,
         physicalStock: 35,
-        category: 'Ropa Dama',
+        category: 'Camisas',
         is_service: false,
         product_type: 'REVENTA',
         hasVariants: true,
         tenantId: tenantRetail.id,
-        images: [
-          'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=600&auto=format&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80'
-        ],
+        images: ['https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=600&auto=format&fit=crop&q=80'],
       }));
 
       await variantRepo.save([
-        variantRepo.create({
-          productId: camisaVariants.id,
-          tenantId: tenantRetail.id,
-          name: 'Blanco / Talla S',
-          sku: 'CAM-OVR-WHT-S',
-          stockQuantity: 8,
-          salePrice: 15.0,
-          cost: 7.0,
-          images: ['https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80'],
-          attributes: { color: 'Blanco', talla: 'S' },
-        }),
-        variantRepo.create({
-          productId: camisaVariants.id,
-          tenantId: tenantRetail.id,
-          name: 'Blanco / Talla M',
-          sku: 'CAM-OVR-WHT-M',
-          stockQuantity: 12,
-          salePrice: 15.0,
-          cost: 7.0,
-          images: ['https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80'],
-          attributes: { color: 'Blanco', talla: 'M' },
-        }),
-        variantRepo.create({
-          productId: camisaVariants.id,
-          tenantId: tenantRetail.id,
-          name: 'Negro / Talla M',
-          sku: 'CAM-OVR-BLK-M',
-          stockQuantity: 10,
-          salePrice: 16.0,
-          cost: 7.5,
-          images: ['https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=600&auto=format&fit=crop&q=80'],
-          attributes: { color: 'Negro', talla: 'M' },
-        }),
-        variantRepo.create({
-          productId: camisaVariants.id,
-          tenantId: tenantRetail.id,
-          name: 'Negro / Talla L',
-          sku: 'CAM-OVR-BLK-L',
-          stockQuantity: 5,
-          salePrice: 16.0,
-          cost: 7.5,
-          images: ['https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=600&auto=format&fit=crop&q=80'],
-          attributes: { color: 'Negro', talla: 'L' },
-        }),
+        variantRepo.create({ productId: pCamisa.id, tenantId: tenantRetail.id, name: 'Blanco / Talla S', sku: 'CAM-WHT-S', stockQuantity: 8, salePrice: 15.0, cost: 7.0, attributes: { color: 'Blanco', talla: 'S' } }),
+        variantRepo.create({ productId: pCamisa.id, tenantId: tenantRetail.id, name: 'Blanco / Talla M', sku: 'CAM-WHT-M', stockQuantity: 12, salePrice: 15.0, cost: 7.0, attributes: { color: 'Blanco', talla: 'M' } }),
+        variantRepo.create({ productId: pCamisa.id, tenantId: tenantRetail.id, name: 'Negro / Talla M', sku: 'CAM-BLK-M', stockQuantity: 10, salePrice: 16.0, cost: 7.5, attributes: { color: 'Negro', talla: 'M' } }),
+        variantRepo.create({ productId: pCamisa.id, tenantId: tenantRetail.id, name: 'Negro / Talla L', sku: 'CAM-BLK-L', stockQuantity: 5, salePrice: 16.0, cost: 7.5, attributes: { color: 'Negro', talla: 'L' } }),
       ]);
-      console.log('   ✅ [NUEVO] Camisa Oversize creada con 4 variantes de Talla/Color y stock independiente');
     }
 
-    // Cliente demo para Boutique
-    let clientBoutique = await customerRepo.findOne({ where: { tenantId: tenantRetail.id, phone: '0414-1112233' } });
-    if (!clientBoutique) {
-      clientBoutique = await customerRepo.save(customerRepo.create({
-        tenantId: tenantRetail.id,
-        name: 'Elena Fuentes',
-        phone: '0414-1112233',
-        identification: 'V-18456123',
-        totalVisits: 3,
-        notes: 'Clienta frecuente con línea de crédito abierta.',
-      }));
-      console.log('   ✅ [NUEVO] Cliente demo creado: Elena Fuentes');
-    }
+    // Gastos y Fondo
+    await getOrCreateExpense(tenantRetail.id, { description: 'Base de Apertura en Gaveta (Efectivo)', amount: 80.00, category: 'FONDO_CAJA', paymentMethod: 'CASH_USD' });
+    await getOrCreateExpense(tenantRetail.id, { description: 'Servicio de Internet Fibra Óptica', amount: 30.00, category: 'UTILITIES', paymentMethod: 'PAGO_MOVIL' });
+    await getOrCreateExpense(tenantRetail.id, { description: 'Bolsas y Empaques Ecológicos', amount: 25.00, category: 'SUPPLIES', paymentMethod: 'CASH_USD' });
+    await getOrCreateExpense(tenantRetail.id, { description: 'Quincena Nómina Asesora Valentina', amount: 70.00, category: 'PAYROLL', paymentMethod: 'PAGO_MOVIL' });
 
-    // Comandas demo en Boutique
-    const existingRetailOrders = await orderRepo.count({ where: { tenantId: tenantRetail.id } });
-    if (existingRetailOrders === 0) {
-      const sampleVestido = await productRepo.findOne({ where: { tenantId: tenantRetail.id, name: 'Vestido Casual Floral' } });
-      const samplePantalon = await productRepo.findOne({ where: { tenantId: tenantRetail.id, name: 'Pantalón Jean Clásico' } });
+    // Ventas de Boutique
+    await getOrCreateOrder(tenantRetail.id, {
+      customerName: cCastillo.name,
+      customerPhone: cCastillo.phone,
+      customerId: cCastillo.id,
+      employeeId: cashierUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 30.00,
+      changeAmount: 2.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 28.00,
+      totalCost: 12.00,
+      netProfit: 16.00,
+      exchangeRate: tasaActual,
+      notes: 'Venta de mostrador vestido casual. Pagó $30 billete, vuelto $2 USD.',
+    }, [{ productId: pVestido.id, productName: pVestido.name, quantity: 1, unitPrice: 28.00, unitCost: 12.00 }]);
 
-      // 1. Venta pagada en Efectivo USD ($28 USD) atendida por María Cajera
-      if (sampleVestido) {
-        const order1 = orderRepo.create({
-          tenantId: tenantRetail.id,
-          customerName: clientBoutique.name,
-          customerPhone: clientBoutique.phone,
-          customerId: clientBoutique.id,
-          employeeId: cashierUser.id,
-          status: OrderStatus.DELIVERED,
-          paymentStatus: PaymentStatus.PAID,
-          paymentMethod: 'USD',
-          usdReceived: 30.00,
-          changeAmount: 2.00,
-          changeMethod: 'CASH_USD',
-          deliveryMethod: DeliveryMethod.IN_STORE,
-          totalAmount: 28.00,
-          totalCost: 12.00,
-          netProfit: 16.00,
-          exchangeRate: tasaActual,
-          notes: 'Venta de mostrador. Pagó con billete de $30, vuelto $2 en gaveta.',
-        });
-        const savedOrder1 = await orderRepo.save(order1);
-        await orderItemRepo.save(orderItemRepo.create({
-          orderId: savedOrder1.id,
-          productId: sampleVestido.id,
-          productName: sampleVestido.name,
-          quantity: 1,
-          unitPrice: 28.00,
-          unitCost: 12.00,
-          subtotal: 28.00,
-        }));
-      }
+    await getOrCreateOrder(tenantRetail.id, {
+      customerName: cGomez.name,
+      customerPhone: cGomez.phone,
+      customerId: cGomez.id,
+      employeeId: cashierUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'CASH_COP',
+      amountCop: 60000,
+      exchangeRateCop: 4000,
+      copReceived: 100000,
+      changeAmountCop: 40000,
+      changeMethod: 'CASH_COP',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 15.00,
+      totalCost: 7.00,
+      netProfit: 8.00,
+      exchangeRate: tasaActual,
+      notes: 'Pago en Efectivo Pesos COP: $60.000 COP. Billete $100k, vuelto $40k COP.',
+    }, [{ productId: pCamisa.id, productName: 'Camisa Oversize Algodón (Blanco / Talla M)', quantity: 1, unitPrice: 15.00, unitCost: 7.00 }]);
 
-      // 2. Venta pagada en Pesos Colombianos (COP) ($15 USD = $60.000 COP)
-      if (camisaVariants) {
-        const orderCop = orderRepo.create({
-          tenantId: tenantRetail.id,
-          customerName: 'Santiago Gómez',
-          customerPhone: '0414-9988776',
-          employeeId: cashierUser.id,
-          status: OrderStatus.DELIVERED,
-          paymentStatus: PaymentStatus.PAID,
-          paymentMethod: 'CASH_COP',
-          amountCop: 60000,
-          exchangeRateCop: 4000,
-          copReceived: 100000,
-          changeAmountCop: 40000,
-          changeMethod: 'CASH_COP',
-          deliveryMethod: DeliveryMethod.IN_STORE,
-          totalAmount: 15.00,
-          totalCost: 7.00,
-          netProfit: 8.00,
-          exchangeRate: tasaActual,
-          notes: 'Pago en Efectivo Pesos COP: $60.000. Billete de $100k, vuelto $40k COP.',
-        });
-        const savedOrderCop = await orderRepo.save(orderCop);
-        await orderItemRepo.save(orderItemRepo.create({
-          orderId: savedOrderCop.id,
-          productId: camisaVariants.id,
-          productName: 'Camisa Oversize Algodón (Blanco / Talla M)',
-          quantity: 1,
-          unitPrice: 15.00,
-          unitCost: 7.00,
-          subtotal: 15.00,
-        }));
-      }
+    const due5Days = new Date();
+    due5Days.setDate(due5Days.getDate() + 5);
+    await getOrCreateOrder(tenantRetail.id, {
+      customerName: cFuentes.name,
+      customerPhone: cFuentes.phone,
+      customerId: cFuentes.id,
+      employeeId: cashierUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PARTIAL,
+      paymentMethod: 'PAGO_MOVIL',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 44.00,
+      totalCost: 20.00,
+      netProfit: 24.00,
+      exchangeRate: tasaActual,
+      abonosTotal: 20.00,
+      nextAbonoDueDate: due5Days,
+      abonosHistory: [{ amount: 20.00, date: new Date().toISOString(), method: 'PAGO_MOVIL', ref: 'PM-99238', notes: 'Abono inicial 45% al retirar' }],
+      notes: 'Prendas entregadas bajo abono parcial. Próximo abono acordado en 5 días.',
+    }, [{ productId: pJean.id, productName: pJean.name, quantity: 2, unitPrice: 22.00, unitCost: 10.00 }]);
 
-      // 3. Cuenta abierta con Abono Parcial y Fecha de Vencimiento ($44 USD total, abonó $20 USD, restan $24)
-      if (samplePantalon) {
-        const dueDate = new Date();
-        dueDate.setDate(dueDate.getDate() + 5); // Vence en 5 días (activa alerta)
+    await getOrCreateOrder(tenantRetail.id, {
+      customerName: cPena.name,
+      customerPhone: cPena.phone,
+      customerId: cPena.id,
+      employeeId: asesorBoutiqueUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 38.00 * tasaActual,
+      pagoMovilRef: 'PM-772109',
+      pagoMovilBank: '0134 - Banesco',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 38.00,
+      totalCost: 18.00,
+      netProfit: 20.00,
+      exchangeRate: tasaActual,
+      notes: 'Compra de chaqueta denim pagada por Pago Móvil Banesco.',
+    }, [{ productId: pChaqueta.id, productName: pChaqueta.name, quantity: 1, unitPrice: 38.00, unitCost: 18.00 }]);
 
-        const creditOrder = orderRepo.create({
-          tenantId: tenantRetail.id,
-          customerName: clientBoutique.name,
-          customerPhone: clientBoutique.phone,
-          customerId: clientBoutique.id,
-          employeeId: cashierUser.id,
-          status: OrderStatus.DELIVERED,
-          paymentStatus: PaymentStatus.PARTIAL,
-          paymentMethod: 'PAGO_MOVIL',
-          deliveryMethod: DeliveryMethod.IN_STORE,
-          totalAmount: 44.00,
-          totalCost: 20.00,
-          netProfit: 24.00,
-          exchangeRate: tasaActual,
-          abonosTotal: 20.00,
-          nextAbonoDueDate: dueDate,
-          abonosHistory: [
-            {
-              amount: 20.00,
-              date: new Date().toISOString(),
-              method: 'PAGO_MOVIL',
-              ref: 'PM-99238',
-              notes: 'Abono inicial 45% al retirar',
-            }
-          ],
-          notes: 'Prendas entregadas bajo compromiso de abono. Próximo abono acordado a 5 días.',
-        });
-        const savedCreditOrder = await orderRepo.save(creditOrder);
-        await orderItemRepo.save(orderItemRepo.create({
-          orderId: savedCreditOrder.id,
-          productId: samplePantalon.id,
-          productName: samplePantalon.name,
-          quantity: 2,
-          unitPrice: 22.00,
-          unitCost: 10.00,
-          subtotal: 44.00,
-        }));
-      }
-
-      console.log('   ✅ [NUEVO] 3 ventas demo registradas: Efectivo USD, Efectivo COP y Cuenta abierta con Abono');
-    }
+    await getOrCreateOrder(tenantRetail.id, {
+      customerName: cMorales.name,
+      customerPhone: cMorales.phone,
+      customerId: cMorales.id,
+      employeeId: asesorBoutiqueUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 20.00,
+      changeAmount: 8.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 12.00,
+      totalCost: 4.50,
+      netProfit: 7.50,
+      exchangeRate: tasaActual,
+      notes: 'Venta rápida mostrador de cinturón en efectivo.',
+    }, [{ productId: pCinturon.id, productName: pCinturon.name, quantity: 1, unitPrice: 12.00, unitCost: 4.50 }]);
 
     // =========================================================================
-    // 2. ESPACIO 2: PANADERÍA LA ESPIGA (Producción / Lotes / Fórmulas)
+    // 2. ESPACIO 2: PANADERÍA LA ESPIGA (demo-panaderia) -> Producción + Fórmulas
     // =========================================================================
-    console.log('\n🥖 Verificando Espacio 2: Panadería La Espiga (demo-panaderia)...');
+    console.log('\n🥖 Espacio 2: Panadería La Espiga (demo-panaderia)...');
     let tenantPan = await tenantRepo.findOne({ where: [{ referral_code: 'demo-panaderia' }, { name: 'Panadería La Espiga' }] });
     if (!tenantPan) {
       tenantPan = await tenantRepo.save(tenantRepo.create({
@@ -503,17 +513,20 @@ async function runSeed() {
         isActive: true,
         promoterId: promoterProfile.id,
       }));
-      console.log(' ✅ [NUEVO] Espacio creado: Panadería La Espiga');
     }
-    await linkAccess(promoter.id, tenantPan.id, UserRole.ADMIN, 'Maestro Panadero');
+    // Accesos Panadería
+    await linkAccess(promoter.id, tenantPan.id, UserRole.ADMIN, 'Gerente');
     await linkAccess(demoAdmin.id, tenantPan.id, UserRole.ADMIN, 'Administrador');
+    await linkAccess(panaderoUser.id, tenantPan.id, UserRole.OPERATIVO, 'Jefe de Producción & Panadero');
+    await linkAccess(pasteleroUser.id, tenantPan.id, UserRole.OPERATIVO, 'Maestro Pastelero');
+    await linkAccess(despachoPanUser.id, tenantPan.id, UserRole.POS, 'Atención Mostrador & Despacho');
 
     let settingsPan = await settingsRepo.findOne({ where: { tenantId: tenantPan.id } });
     if (!settingsPan) {
       settingsPan = settingsRepo.create({
         id: randomUUID(),
         tenantId: tenantPan.id,
-        featureBuySell: false,
+        featureBuySell: true,
         featureCustomerSchedules: false,
         featureRecipes: true,
         featureProduction: true,
@@ -525,14 +538,16 @@ async function runSeed() {
         acceptPagoMovil: true,
       });
       await settingsRepo.save(settingsPan);
-      console.log('   ✅ Configuración de Panadería creada');
     }
 
-    // Insumos panadería
+    // Insumos
     const panInsumos = [
-      { name: 'Harina de Trigo Panadera', unit: 'kg', costPerUnit: 1.2, stockQuantity: 60, minStockAlert: 10 },
-      { name: 'Azúcar Refinada', unit: 'kg', costPerUnit: 1.1, stockQuantity: 30, minStockAlert: 5 },
-      { name: 'Mantequilla Industrial', unit: 'kg', costPerUnit: 3.5, stockQuantity: 15, minStockAlert: 3 },
+      { name: 'Harina de Trigo Panadera', unit: 'kg', costPerUnit: 1.2, stockQuantity: 80, minStockAlert: 15 },
+      { name: 'Azúcar Refinada', unit: 'kg', costPerUnit: 1.1, stockQuantity: 40, minStockAlert: 8 },
+      { name: 'Mantequilla Industrial', unit: 'kg', costPerUnit: 3.5, stockQuantity: 25, minStockAlert: 5 },
+      { name: 'Levadura Seca Instantánea', unit: 'kg', costPerUnit: 6.0, stockQuantity: 12, minStockAlert: 3 },
+      { name: 'Jamón Ahumado Cocido', unit: 'kg', costPerUnit: 5.5, stockQuantity: 18, minStockAlert: 4 },
+      { name: 'Queso Crema Pasteurizado', unit: 'kg', costPerUnit: 4.8, stockQuantity: 15, minStockAlert: 3 },
     ];
     const savedInsumosPan: Record<string, RawMaterial> = {};
     for (const raw of panInsumos) {
@@ -540,39 +555,116 @@ async function runSeed() {
       if (!r) {
         r = rawMaterialRepo.create({ ...raw, tenantId: tenantPan.id });
         r = await rawMaterialRepo.save(r);
-        console.log(`   ✅ [NUEVO] Insumo creado: ${raw.name}`);
       }
       savedInsumosPan[raw.name] = r;
     }
 
-    // Pan Campesino con Receta
-    let panCampesino = await productRepo.findOne({ where: { tenantId: tenantPan.id, name: 'Pan Campesino Tradicional' } });
-    if (!panCampesino) {
-      panCampesino = await productRepo.save(productRepo.create({
-        name: 'Pan Campesino Tradicional',
-        salePrice: 1.5,
-        cost: 0.6,
-        estimatedCost: 0.6,
-        stock: 15,
-        stockQuantity: 15,
-        physicalStock: 15,
-        category: 'Panadería',
-        is_service: false,
-        product_type: 'FORMULA',
-        tenantId: tenantPan.id,
-        images: ['https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&auto=format&fit=crop&q=80'],
-      }));
-      await recipeRepo.save([
-        recipeRepo.create({ productId: panCampesino.id, rawMaterialId: savedInsumosPan['Harina de Trigo Panadera'].id, quantity: 0.35 }),
-        recipeRepo.create({ productId: panCampesino.id, rawMaterialId: savedInsumosPan['Azúcar Refinada'].id, quantity: 0.05 }),
-      ]);
-      console.log('   ✅ [NUEVO] Receta creada: Pan Campesino Tradicional');
-    }
+    // Productos Panadería
+    let panCampesino = await getOrCreateProduct(tenantPan.id, { name: 'Pan Campesino Tradicional', salePrice: 1.5, cost: 0.6, estimatedCost: 0.6, stock: 40, stockQuantity: 40, physicalStock: 40, category: 'Panadería', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&auto=format&fit=crop&q=80'] });
+    let croissant = await getOrCreateProduct(tenantPan.id, { name: 'Croissant Francés de Mantequilla', salePrice: 2.0, cost: 0.8, estimatedCost: 0.8, stock: 30, stockQuantity: 30, physicalStock: 30, category: 'Bollería', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=600&auto=format&fit=crop&q=80'] });
+    let cachito = await getOrCreateProduct(tenantPan.id, { name: 'Cachito Tradicional de Jamón', salePrice: 2.5, cost: 1.1, estimatedCost: 1.1, stock: 25, stockQuantity: 25, physicalStock: 25, category: 'Bollería', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=600&auto=format&fit=crop&q=80'] });
+    let canilla = await getOrCreateProduct(tenantPan.id, { name: 'Pan Canilla Artesanal', salePrice: 1.0, cost: 0.4, estimatedCost: 0.4, stock: 50, stockQuantity: 50, physicalStock: 50, category: 'Panadería', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=600&auto=format&fit=crop&q=80'] });
+    let tortaChoco = await getOrCreateProduct(tenantPan.id, { name: 'Torta Húmeda de Chocolate', salePrice: 18.0, cost: 7.0, estimatedCost: 7.0, stock: 8, stockQuantity: 8, physicalStock: 8, category: 'Pastelería', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&auto=format&fit=crop&q=80'] });
+    let cafeEspresso = await getOrCreateProduct(tenantPan.id, { name: 'Café Espresso Doble', salePrice: 1.5, cost: 0.3, estimatedCost: 0.3, stock: 100, stockQuantity: 100, physicalStock: 100, category: 'Cafetería', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?w=600&auto=format&fit=crop&q=80'] });
+
+    // Clientes Panadería
+    const panBenitez = await getOrCreateCustomer(tenantPan.id, { name: 'Sra. Carmen Benítez', phone: '0414-2223344', identification: 'V-11223344', totalVisits: 12, notes: 'Compra pan caliente todas las tardes.' });
+    const panRincon = await getOrCreateCustomer(tenantPan.id, { name: 'Restaurante El Rincón', phone: '0416-3334455', identification: 'J-31415926', totalVisits: 8, notes: 'Cliente corporativo con despacho matutino.' });
+    const panDelgado = await getOrCreateCustomer(tenantPan.id, { name: 'Marcos Delgado', phone: '0412-4445566', identification: 'V-22334455', totalVisits: 5, notes: 'Prefiere pagar en divisa o Pago Móvil.' });
+    const panDuarte = await getOrCreateCustomer(tenantPan.id, { name: 'Lic. Patricia Duarte', phone: '0424-8899002', identification: 'V-19445566', totalVisits: 7, notes: 'Clienta habitual de desayunos y cachitos.' });
+
+    // Gastos y Fondo Panadería
+    await getOrCreateExpense(tenantPan.id, { description: 'Base de Caja / Gaveta Panadería', amount: 40.00, category: 'FONDO_CAJA', paymentMethod: 'CASH_USD' });
+    await getOrCreateExpense(tenantPan.id, { description: 'Servicio de Gas Industrial Hornos', amount: 20.00, category: 'UTILITIES', paymentMethod: 'CASH_USD' });
+    await getOrCreateExpense(tenantPan.id, { description: 'Mantenimiento Preventivo Horno Convector', amount: 35.00, category: 'MAINTENANCE', paymentMethod: 'PAGO_MOVIL' });
+    await getOrCreateExpense(tenantPan.id, { description: 'Quincena Nómina Ayudante de Panadería', amount: 60.00, category: 'PAYROLL', paymentMethod: 'PAGO_MOVIL' });
+
+    // Ventas Panadería
+    await getOrCreateOrder(tenantPan.id, {
+      customerName: panBenitez.name,
+      customerPhone: panBenitez.phone,
+      customerId: panBenitez.id,
+      employeeId: despachoPanUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 10.00,
+      changeAmount: 0,
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 10.00,
+      totalCost: 4.00,
+      netProfit: 6.00,
+      exchangeRate: tasaActual,
+      notes: '5 panes campesinos y 1 croissant crujiente.',
+    }, [
+      { productId: panCampesino.id, productName: panCampesino.name, quantity: 5, unitPrice: 1.5, unitCost: 0.6 },
+      { productId: croissant.id, productName: croissant.name, quantity: 1, unitPrice: 2.0, unitCost: 0.8 },
+    ]);
+
+    await getOrCreateOrder(tenantPan.id, {
+      customerName: panRincon.name,
+      customerPhone: panRincon.phone,
+      customerId: panRincon.id,
+      employeeId: despachoPanUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 30.00 * tasaActual,
+      pagoMovilRef: 'PM-883921',
+      pagoMovilBank: '0134 - Banesco',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 30.00,
+      totalCost: 12.00,
+      netProfit: 18.00,
+      exchangeRate: tasaActual,
+      notes: 'Despacho mayorista de 20 panes campesinos para restaurante.',
+    }, [{ productId: panCampesino.id, productName: panCampesino.name, quantity: 20, unitPrice: 1.5, unitCost: 0.6 }]);
+
+    await getOrCreateOrder(tenantPan.id, {
+      customerName: panDuarte.name,
+      customerPhone: panDuarte.phone,
+      customerId: panDuarte.id,
+      employeeId: despachoPanUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 10.00,
+      changeAmount: 2.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 8.00,
+      totalCost: 3.10,
+      netProfit: 4.90,
+      exchangeRate: tasaActual,
+      notes: '2 cachitos de jamón y 2 cafés dobles espresso.',
+    }, [
+      { productId: cachito.id, productName: cachito.name, quantity: 2, unitPrice: 2.5, unitCost: 1.1 },
+      { productId: cafeEspresso.id, productName: cafeEspresso.name, quantity: 2, unitPrice: 1.5, unitCost: 0.3 },
+    ]);
+
+    await getOrCreateOrder(tenantPan.id, {
+      customerName: panDelgado.name,
+      customerPhone: panDelgado.phone,
+      customerId: panDelgado.id,
+      employeeId: despachoPanUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 20.00,
+      changeAmount: 2.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 18.00,
+      totalCost: 7.00,
+      netProfit: 11.00,
+      exchangeRate: tasaActual,
+      notes: 'Torta húmeda de chocolate para cumpleaños.',
+    }, [{ productId: tortaChoco.id, productName: tortaChoco.name, quantity: 1, unitPrice: 18.0, unitCost: 7.0 }]);
 
     // =========================================================================
-    // 3. ESPACIO 3: BARBERÍA & SPA ÉLITE (Citas con Agenda y Especialistas)
+    // 3. ESPACIO 3: BARBERÍA & SPA ÉLITE (demo-servicios) -> Citas con Agenda + Turnos
     // =========================================================================
-    console.log('\n💇 Verificando Espacio 3: Barbería & Spa Élite (demo-servicios)...');
+    console.log('\n💇 Espacio 3: Barbería & Spa Élite (demo-servicios)...');
     let tenantSpa = await tenantRepo.findOne({ where: [{ referral_code: 'demo-servicios' }, { name: 'Barbería & Spa Élite' }] });
     if (!tenantSpa) {
       tenantSpa = await tenantRepo.save(tenantRepo.create({
@@ -584,10 +676,13 @@ async function runSeed() {
         isActive: true,
         promoterId: promoterProfile.id,
       }));
-      console.log(' ✅ [NUEVO] Espacio creado: Barbería & Spa Élite');
     }
-    await linkAccess(promoter.id, tenantSpa.id, UserRole.ADMIN, 'Administrador Spa');
+    // Accesos Barbería & Spa
+    await linkAccess(promoter.id, tenantSpa.id, UserRole.ADMIN, 'Gerente');
     await linkAccess(demoAdmin.id, tenantSpa.id, UserRole.ADMIN, 'Administrador');
+    await linkAccess(barberoUser.id, tenantSpa.id, UserRole.OPERATIVO, 'Master Barber');
+    await linkAccess(barbero2User.id, tenantSpa.id, UserRole.OPERATIVO, 'Especialista Fades & Barbas');
+    await linkAccess(manicuristaUser.id, tenantSpa.id, UserRole.OPERATIVO, 'Especialista Manicura & Spa');
 
     let settingsSpa = await settingsRepo.findOne({ where: { tenantId: tenantSpa.id } });
     if (!settingsSpa) {
@@ -596,7 +691,7 @@ async function runSeed() {
         tenantId: tenantSpa.id,
         featureCustomerSchedules: true,
         featureRecipes: false,
-        featureBuySell: false,
+        featureBuySell: true,
         featureProduction: false,
         featureShowCatalog: true,
         exchangeRateBs: tasaActual,
@@ -606,74 +701,152 @@ async function runSeed() {
         bookingAllowStaffSelection: true,
         slotInterval: 30,
         businessHours: {
-          '1': { isOpen: true, startTime: '09:00', endTime: '18:00' },
-          '2': { isOpen: true, startTime: '09:00', endTime: '18:00' },
-          '3': { isOpen: true, startTime: '09:00', endTime: '18:00' },
-          '4': { isOpen: true, startTime: '09:00', endTime: '18:00' },
-          '5': { isOpen: true, startTime: '09:00', endTime: '19:00' },
-          '6': { isOpen: true, startTime: '09:00', endTime: '19:00' },
+          '1': { isOpen: true, startTime: '09:00', endTime: '19:00' },
+          '2': { isOpen: true, startTime: '09:00', endTime: '19:00' },
+          '3': { isOpen: true, startTime: '09:00', endTime: '19:00' },
+          '4': { isOpen: true, startTime: '09:00', endTime: '19:00' },
+          '5': { isOpen: true, startTime: '09:00', endTime: '20:00' },
+          '6': { isOpen: true, startTime: '09:00', endTime: '20:00' },
           '0': { isOpen: false, startTime: '09:00', endTime: '14:00' },
         },
       });
       await settingsRepo.save(settingsSpa);
-      console.log('   ✅ Configuración de Barbería y Agenda creada');
     }
 
-    const spaServices = [
-      { name: 'Corte Degradado & Barba', salePrice: 10.0, cost: 1.0, estimatedCost: 1.0, durationMinutes: 45, category: 'Barbería', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=600&auto=format&fit=crop&q=80'] },
-      { name: 'Limpieza Facial Profunda', salePrice: 18.0, cost: 3.0, estimatedCost: 3.0, durationMinutes: 60, category: 'Faciales', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=600&auto=format&fit=crop&q=80'] },
-    ];
-    for (const s of spaServices) {
-      let prod = await productRepo.findOne({ where: { tenantId: tenantSpa.id, name: s.name } });
-      if (!prod) {
-        prod = productRepo.create({ ...s, tenantId: tenantSpa.id, stock: 0, stockQuantity: 0, physicalStock: 0 });
-        await productRepo.save(prod);
-        console.log(`   ✅ [NUEVO] Servicio creado: ${s.name}`);
-      }
-    }
+    // Clientes Barbería
+    const bMorales = await getOrCreateCustomer(tenantSpa.id, { name: 'Alejandro Morales', phone: '0412-3334455', identification: 'V-20123987', totalVisits: 6, notes: 'Cliente frecuente, fade bajo y perfilado de cejas.' });
+    const bColmenares = await getOrCreateCustomer(tenantSpa.id, { name: 'Javier Colmenares', phone: '0414-5566778', identification: 'V-24112233', totalVisits: 4, notes: 'Corte y afeitado tradicional con navaja.' });
+    const bHenriquez = await getOrCreateCustomer(tenantSpa.id, { name: 'Mauricio Henríquez', phone: '0424-6677889', identification: 'V-17890123', totalVisits: 5, notes: 'Limpieza facial y vapor de ozono mensual.' });
+    const bBriceno = await getOrCreateCustomer(tenantSpa.id, { name: 'Andrea Briceño', phone: '0412-1122334', identification: 'V-21987654', totalVisits: 3, notes: 'Manicura rusa y spa de manos.' });
 
-    // Cliente y Cita Demo para Barbería
-    let clientSpa = await customerRepo.findOne({ where: { tenantId: tenantSpa.id, phone: '0412-3334455' } });
-    if (!clientSpa) {
-      clientSpa = await customerRepo.save(customerRepo.create({
-        tenantId: tenantSpa.id,
-        name: 'Alejandro Morales',
-        phone: '0412-3334455',
-        identification: 'V-20123987',
-        totalVisits: 1,
-        notes: 'Prefiere corte con tijera arriba y fade bajo.',
-      }));
-      console.log('   ✅ [NUEVO] Cliente demo creado: Alejandro Morales');
-    }
+    // Servicios & Productos Barbería
+    const sCorte = await getOrCreateProduct(tenantSpa.id, { name: 'Corte Degradado & Barba', salePrice: 10.0, cost: 1.0, estimatedCost: 1.0, durationMinutes: 45, category: 'Barbería', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=600&auto=format&fit=crop&q=80'] });
+    const sFacial = await getOrCreateProduct(tenantSpa.id, { name: 'Limpieza Facial Profunda & Mascarilla Negra', salePrice: 18.0, cost: 3.0, estimatedCost: 3.0, durationMinutes: 60, category: 'Faciales', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=600&auto=format&fit=crop&q=80'] });
+    const sAfeitado = await getOrCreateProduct(tenantSpa.id, { name: 'Afeitado Clásico Toalla Caliente', salePrice: 7.0, cost: 0.8, estimatedCost: 0.8, durationMinutes: 30, category: 'Barbería', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1517832606299-7ae9b720a186?w=600&auto=format&fit=crop&q=80'] });
+    const sManicura = await getOrCreateProduct(tenantSpa.id, { name: 'Manicura Rusa & Esmaltado', salePrice: 14.0, cost: 2.5, estimatedCost: 2.5, durationMinutes: 50, category: 'Estética', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1604654894610-df63bc536371?w=600&auto=format&fit=crop&q=80'] });
+    const pPomada = await getOrCreateProduct(tenantSpa.id, { name: 'Pomada Fijadora Mate Arcilla 100g', salePrice: 12.0, cost: 5.0, estimatedCost: 5.0, stock: 15, stockQuantity: 15, physicalStock: 15, category: 'Productos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1597854710119-a5a8fc52c28d?w=600&auto=format&fit=crop&q=80'] });
+    const pAceite = await getOrCreateProduct(tenantSpa.id, { name: 'Aceite Nutritivo Barba con Gotero', salePrice: 9.0, cost: 3.5, estimatedCost: 3.5, stock: 12, stockQuantity: 12, physicalStock: 12, category: 'Productos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1621607512214-68297480165e?w=600&auto=format&fit=crop&q=80'] });
 
-    const existingSpaReservations = await reservationRepo.count({ where: { tenantId: tenantSpa.id } });
-    if (existingSpaReservations === 0) {
-      const corteService = await productRepo.findOne({ where: { tenantId: tenantSpa.id, name: 'Corte Degradado & Barba' } });
-      const todayIso = new Date().toISOString().split('T')[0];
-      await reservationRepo.save(reservationRepo.create({
-        tenantId: tenantSpa.id,
-        customerName: clientSpa.name,
-        customerPhone: clientSpa.phone,
-        customerId: clientSpa.id,
-        date: todayIso,
-        time: '14:30',
-        durationMinutes: 45,
-        serviceId: corteService?.id,
-        serviceName: corteService?.name || 'Corte Degradado & Barba',
-        employeeId: promoter.id,
-        employeeName: 'Promotor FinoWork',
-        status: ReservationStatus.CONFIRMED,
-        paymentStatus: PaymentStatus.PAID,
-        totalAmount: 10.00,
-        notes: 'Cita reservada desde catálogo online.',
-      }));
-      console.log('   ✅ [NUEVO] Cita demo agendada en Barbería');
-    }
+    // Gastos y Fondo Barbería
+    await getOrCreateExpense(tenantSpa.id, { description: 'Base de Apertura en Barbería', amount: 30.00, category: 'FONDO_CAJA', paymentMethod: 'CASH_USD' });
+    await getOrCreateExpense(tenantSpa.id, { description: 'Cuchillas, Toallas Desechables y Aftershave', amount: 20.00, category: 'SUPPLIES', paymentMethod: 'CASH_USD' });
+    await getOrCreateExpense(tenantSpa.id, { description: 'Comisión / Nómina Semanal Barbero Daniel', amount: 40.00, category: 'PAYROLL', paymentMethod: 'PAGO_MOVIL' });
+
+    // Citas Agendadas Barbería
+    await getOrCreateReservation(tenantSpa.id, {
+      customerName: bMorales.name,
+      customerPhone: bMorales.phone,
+      customerId: bMorales.id,
+      date: todayIso,
+      time: '10:00',
+      durationMinutes: 45,
+      serviceId: sCorte.id,
+      serviceName: sCorte.name,
+      employeeId: barberoUser.id,
+      employeeName: 'Víctor Master Barber',
+      status: ReservationStatus.COMPLETED,
+      paymentStatus: PaymentStatus.PAID,
+      totalAmount: 10.00,
+      notes: 'Corte y barba completado y cobrado.',
+    });
+
+    await getOrCreateReservation(tenantSpa.id, {
+      customerName: bHenriquez.name,
+      customerPhone: bHenriquez.phone,
+      customerId: bHenriquez.id,
+      date: todayIso,
+      time: '14:30',
+      durationMinutes: 60,
+      serviceId: sFacial.id,
+      serviceName: sFacial.name,
+      employeeId: barberoUser.id,
+      employeeName: 'Víctor Master Barber',
+      status: ReservationStatus.CONFIRMED,
+      paymentStatus: PaymentStatus.PAID,
+      totalAmount: 18.00,
+      notes: 'Cita de limpieza facial confirmada para hoy.',
+    });
+
+    await getOrCreateReservation(tenantSpa.id, {
+      customerName: bColmenares.name,
+      customerPhone: bColmenares.phone,
+      customerId: bColmenares.id,
+      date: todayIso,
+      time: '16:30',
+      durationMinutes: 45,
+      serviceId: sCorte.id,
+      serviceName: sCorte.name,
+      employeeId: barbero2User.id,
+      employeeName: 'Daniel Fades & Barbas',
+      status: ReservationStatus.CONFIRMED,
+      paymentStatus: PaymentStatus.PAID,
+      totalAmount: 10.00,
+      notes: 'Cita con Daniel programada por catálogo online.',
+    });
+
+    await getOrCreateReservation(tenantSpa.id, {
+      customerName: bBriceno.name,
+      customerPhone: bBriceno.phone,
+      customerId: bBriceno.id,
+      date: tomorrowIso,
+      time: '11:00',
+      durationMinutes: 50,
+      serviceId: sManicura.id,
+      serviceName: sManicura.name,
+      employeeId: manicuristaUser.id,
+      employeeName: 'Sofía Especialista Nails',
+      status: ReservationStatus.CONFIRMED,
+      paymentStatus: PaymentStatus.PENDING,
+      totalAmount: 14.00,
+      notes: 'Manicura rusa agendada para mañana.',
+    });
+
+    // Ventas de Mostrador Barbería
+    await getOrCreateOrder(tenantSpa.id, {
+      customerName: bMorales.name,
+      customerPhone: bMorales.phone,
+      customerId: bMorales.id,
+      employeeId: barberoUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 25.00,
+      changeAmount: 3.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 22.00,
+      totalCost: 6.00,
+      netProfit: 16.00,
+      exchangeRate: tasaActual,
+      notes: 'Corte Degradado + Pomada Mate Arcilla pagados en efectivo.',
+    }, [
+      { productId: sCorte.id, productName: sCorte.name, quantity: 1, unitPrice: 10.00, unitCost: 1.00 },
+      { productId: pPomada.id, productName: pPomada.name, quantity: 1, unitPrice: 12.00, unitCost: 5.00 },
+    ]);
+
+    await getOrCreateOrder(tenantSpa.id, {
+      customerName: bHenriquez.name,
+      customerPhone: bHenriquez.phone,
+      customerId: bHenriquez.id,
+      employeeId: barberoUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 18.00 * tasaActual,
+      pagoMovilRef: 'PM-904321',
+      pagoMovilBank: '0102 - Banco de Venezuela',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 18.00,
+      totalCost: 3.00,
+      netProfit: 15.00,
+      exchangeRate: tasaActual,
+      notes: 'Limpieza facial profunda pagada por Pago Móvil BDV.',
+    }, [{ productId: sFacial.id, productName: sFacial.name, quantity: 1, unitPrice: 18.00, unitCost: 3.00 }]);
 
     // =========================================================================
-    // 4. ESPACIO 4: AUTO LAVADO EXPRESS (Servicios Rápidos sin Citas)
+    // 4. ESPACIO 4: AUTO LAVADO EXPRESS (demo-autolavado) -> Servicios Rápidos
     // =========================================================================
-    console.log('\n🚗 Verificando Espacio 4: Auto Lavado Express (demo-autolavado)...');
+    console.log('\n🚗 Espacio 4: Auto Lavado Express (demo-autolavado)...');
     let tenantLavado = await tenantRepo.findOne({ where: [{ referral_code: 'demo-autolavado' }, { name: 'Auto Lavado Express' }] });
     if (!tenantLavado) {
       tenantLavado = await tenantRepo.save(tenantRepo.create({
@@ -685,10 +858,13 @@ async function runSeed() {
         isActive: true,
         promoterId: promoterProfile.id,
       }));
-      console.log(' ✅ [NUEVO] Espacio creado: Auto Lavado Express');
     }
-    await linkAccess(promoter.id, tenantLavado.id, UserRole.ADMIN, 'Encargado de Patio');
+    // Accesos Auto Lavado
+    await linkAccess(promoter.id, tenantLavado.id, UserRole.ADMIN, 'Gerente');
     await linkAccess(demoAdmin.id, tenantLavado.id, UserRole.ADMIN, 'Administrador');
+    await linkAccess(lavadorUser.id, tenantLavado.id, UserRole.OPERATIVO, 'Lavador Principal');
+    await linkAccess(lavador2User.id, tenantLavado.id, UserRole.OPERATIVO, 'Detailing & Pulitura');
+    await linkAccess(supervisorLavadoUser.id, tenantLavado.id, UserRole.OPERATIVO, 'Supervisor de Bahías');
 
     let settingsLavado = await settingsRepo.findOne({ where: { tenantId: tenantLavado.id } });
     if (!settingsLavado) {
@@ -697,7 +873,7 @@ async function runSeed() {
         tenantId: tenantLavado.id,
         featureCustomerSchedules: false,
         featureRecipes: false,
-        featureBuySell: false,
+        featureBuySell: true,
         featureProduction: false,
         featureShowCatalog: true,
         exchangeRateBs: tasaActual,
@@ -707,26 +883,110 @@ async function runSeed() {
         acceptPagoMovil: true,
       });
       await settingsRepo.save(settingsLavado);
-      console.log('   ✅ Configuración de Auto Lavado creada');
     }
 
-    const lavadoServices = [
-      { name: 'Lavado Completo Camioneta', salePrice: 12.0, cost: 2.0, estimatedCost: 2.0, category: 'Lavado', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?w=600&auto=format&fit=crop&q=80'] },
-      { name: 'Lavado Sencillo Sedan', salePrice: 7.0, cost: 1.2, estimatedCost: 1.2, category: 'Lavado', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1601362840469-51e4d8d58785?w=600&auto=format&fit=crop&q=80'] },
-    ];
-    for (const ls of lavadoServices) {
-      let prod = await productRepo.findOne({ where: { tenantId: tenantLavado.id, name: ls.name } });
-      if (!prod) {
-        prod = productRepo.create({ ...ls, tenantId: tenantLavado.id, stock: 0, stockQuantity: 0, physicalStock: 0 });
-        await productRepo.save(prod);
-        console.log(`   ✅ [NUEVO] Servicio creado: ${ls.name}`);
-      }
-    }
+    // Clientes Auto Lavado
+    const lMendez = await getOrCreateCustomer(tenantLavado.id, { name: 'Ricardo Méndez', phone: '0414-8899001', identification: 'V-14234567', totalVisits: 8, notes: 'Toyota Hilux Placa A45BB01. Lavado chasis y cera.' });
+    const lVelasquez = await getOrCreateCustomer(tenantLavado.id, { name: 'Dr. Gustavo Velásquez', phone: '0412-7788990', identification: 'V-12987654', totalVisits: 5, notes: 'Ford Explorer Placa AF120CD. Pulitura 3M periódica.' });
+    const lValera = await getOrCreateCustomer(tenantLavado.id, { name: 'Karina Valera', phone: '0424-3344556', identification: 'V-25443322', totalVisits: 3, notes: 'Chevrolet Spark Placa AC778EE.' });
+    const lLugo = await getOrCreateCustomer(tenantLavado.id, { name: 'Ing. Marcos Lugo', phone: '0414-1122334', identification: 'V-18556677', totalVisits: 4, notes: 'Mitsubishi Montero Placa AH892BB.' });
+
+    // Servicios & Productos Auto Lavado
+    const sCamioneta = await getOrCreateProduct(tenantLavado.id, { name: 'Lavado Completo Camioneta', salePrice: 12.0, cost: 2.0, estimatedCost: 2.0, category: 'Lavado', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?w=600&auto=format&fit=crop&q=80'] });
+    const sSedan = await getOrCreateProduct(tenantLavado.id, { name: 'Lavado Sencillo Sedan', salePrice: 7.0, cost: 1.2, estimatedCost: 1.2, category: 'Lavado', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1601362840469-51e4d8d58785?w=600&auto=format&fit=crop&q=80'] });
+    const sMotor = await getOrCreateProduct(tenantLavado.id, { name: 'Lavado de Motor & Chasis a Vapor', salePrice: 15.0, cost: 3.0, estimatedCost: 3.0, category: 'Especiales', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=600&auto=format&fit=crop&q=80'] });
+    const sPulitura = await getOrCreateProduct(tenantLavado.id, { name: 'Pulitura y Encerado 3M Orbital', salePrice: 35.0, cost: 8.0, estimatedCost: 8.0, category: 'Detailing', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1607860108855-64acf2078ed9?w=600&auto=format&fit=crop&q=80'] });
+    const pAroma = await getOrCreateProduct(tenantLavado.id, { name: 'Aromatizante Little Trees Black Ice', salePrice: 3.0, cost: 1.2, estimatedCost: 1.2, stock: 40, stockQuantity: 40, physicalStock: 40, category: 'Accesorios', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1616423640778-28d1b53229bd?w=600&auto=format&fit=crop&q=80'] });
+
+    // Gastos y Fondo Auto Lavado
+    await getOrCreateExpense(tenantLavado.id, { description: 'Base de Apertura en Patio', amount: 35.00, category: 'FONDO_CAJA', paymentMethod: 'CASH_USD' });
+    await getOrCreateExpense(tenantLavado.id, { description: 'Detergente Espumógeno y Desengrasante Motor', amount: 25.00, category: 'SUPPLIES', paymentMethod: 'CASH_USD' });
+    await getOrCreateExpense(tenantLavado.id, { description: 'Quincena Nómina Lavador Miguel', amount: 50.00, category: 'PAYROLL', paymentMethod: 'PAGO_MOVIL' });
+
+    // Ventas Auto Lavado
+    await getOrCreateOrder(tenantLavado.id, {
+      customerName: lMendez.name,
+      customerPhone: lMendez.phone,
+      customerId: lMendez.id,
+      employeeId: lavadorUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 20.00,
+      changeAmount: 8.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 12.00,
+      totalCost: 2.00,
+      netProfit: 10.00,
+      exchangeRate: tasaActual,
+      notes: 'Lavado completo Hilux con aspirado y cera express.',
+    }, [{ productId: sCamioneta.id, productName: sCamioneta.name, quantity: 1, unitPrice: 12.00, unitCost: 2.00 }]);
+
+    await getOrCreateOrder(tenantLavado.id, {
+      customerName: lValera.name,
+      customerPhone: lValera.phone,
+      customerId: lValera.id,
+      employeeId: lavadorUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 7.00 * tasaActual,
+      pagoMovilRef: 'PM-332145',
+      pagoMovilBank: '0134 - Banesco',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 7.00,
+      totalCost: 1.20,
+      netProfit: 5.80,
+      exchangeRate: tasaActual,
+      notes: 'Lavado sencillo carro Sedan Spark.',
+    }, [{ productId: sSedan.id, productName: sSedan.name, quantity: 1, unitPrice: 7.00, unitCost: 1.20 }]);
+
+    await getOrCreateOrder(tenantLavado.id, {
+      customerName: lLugo.name,
+      customerPhone: lLugo.phone,
+      customerId: lLugo.id,
+      employeeId: supervisorLavadoUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 20.00,
+      changeAmount: 5.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 15.00,
+      totalCost: 3.00,
+      netProfit: 12.00,
+      exchangeRate: tasaActual,
+      notes: 'Lavado a vapor de motor y chasis de Montero.',
+    }, [{ productId: sMotor.id, productName: sMotor.name, quantity: 1, unitPrice: 15.00, unitCost: 3.00 }]);
+
+    await getOrCreateOrder(tenantLavado.id, {
+      customerName: lVelasquez.name,
+      customerPhone: lVelasquez.phone,
+      customerId: lVelasquez.id,
+      employeeId: lavador2User.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 38.00 * tasaActual,
+      pagoMovilRef: 'PM-456789',
+      pagoMovilBank: '0102 - Banco de Venezuela',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 38.00,
+      totalCost: 9.20,
+      netProfit: 28.80,
+      exchangeRate: tasaActual,
+      notes: 'Pulitura orbital 3M + aromatizante Black Ice para Ford Explorer.',
+    }, [
+      { productId: sPulitura.id, productName: sPulitura.name, quantity: 1, unitPrice: 35.00, unitCost: 8.00 },
+      { productId: pAroma.id, productName: pAroma.name, quantity: 1, unitPrice: 3.00, unitCost: 1.20 },
+    ]);
 
     // =========================================================================
-    // 5. ESPACIO 5: BURGER HOUSE GOURMET (Híbrido: Cocina/Lotes + Delivery)
+    // 5. ESPACIO 5: BURGER HOUSE GOURMET (demo-gastronomia) -> Cocina + Salón + Delivery
     // =========================================================================
-    console.log('\n🍔 Verificando Espacio 5: Burger House Gourmet (demo-gastronomia)...');
+    console.log('\n🍔 Espacio 5: Burger House Gourmet (demo-gastronomia)...');
     let tenantBurger = await tenantRepo.findOne({ where: [{ referral_code: 'demo-gastronomia' }, { name: 'Burger House Gourmet' }] });
     if (!tenantBurger) {
       tenantBurger = await tenantRepo.save(tenantRepo.create({
@@ -738,12 +998,16 @@ async function runSeed() {
         isActive: true,
         promoterId: promoterProfile.id,
       }));
-      console.log(' ✅ [NUEVO] Espacio creado: Burger House Gourmet');
     }
-    await linkAccess(promoter.id, tenantBurger.id, UserRole.ADMIN, 'Gerente Gastronómico');
-    await linkAccess(deliveryUser.id, tenantBurger.id, UserRole.DELIVERY, 'Repartidor Oficial');
-    await linkAccess(kitchenUser.id, tenantBurger.id, UserRole.KITCHEN, 'Jefe de Cocina');
+    // Accesos Burger House
+    await linkAccess(promoter.id, tenantBurger.id, UserRole.ADMIN, 'Gerente General');
     await linkAccess(demoAdmin.id, tenantBurger.id, UserRole.ADMIN, 'Administrador');
+    await linkAccess(kitchenUser.id, tenantBurger.id, UserRole.KITCHEN, 'Jefe de Cocina');
+    await linkAccess(parrilleroUser.id, tenantBurger.id, UserRole.OPERATIVO, 'Maestro Parrillero');
+    await linkAccess(meseroUser.id, tenantBurger.id, UserRole.POS, 'Capitán de Mesoneros');
+    await linkAccess(mesera2User.id, tenantBurger.id, UserRole.POS, 'Mesonera de Salón');
+    await linkAccess(deliveryUser.id, tenantBurger.id, UserRole.DELIVERY, 'Repartidor Principal Moto');
+    await linkAccess(delivery2User.id, tenantBurger.id, UserRole.DELIVERY, 'Repartidor Express');
 
     let settingsBurger = await settingsRepo.findOne({ where: { tenantId: tenantBurger.id } });
     if (!settingsBurger) {
@@ -762,38 +1026,30 @@ async function runSeed() {
         acceptPagoMovil: true,
       });
       await settingsRepo.save(settingsBurger);
-      console.log('   ✅ Configuración de Burger House creada');
-    }
-
-    // Fondo Base de Gaveta en Burger House
-    const existingBurgerFund = await expenseRepo.findOne({ where: { tenantId: tenantBurger.id, category: 'FONDO_CAJA' } });
-    if (!existingBurgerFund) {
-      await expenseRepo.save(expenseRepo.create({
-        tenantId: tenantBurger.id,
-        description: 'Fondo Inicial de Caja / Gaveta',
-        amount: 50.00,
-        category: 'FONDO_CAJA',
-        paymentMethod: 'CASH_USD',
-      }));
     }
 
     // Zonas Delivery
     let zoneCentro = await deliveryZoneRepo.findOne({ where: { tenantId: tenantBurger.id, name: 'Zona Centro' } });
     if (!zoneCentro) {
       zoneCentro = await deliveryZoneRepo.save(deliveryZoneRepo.create({ name: 'Zona Centro', feePrice: 1.5, tenantId: tenantBurger.id }));
-      console.log('   ✅ [NUEVO] Zona Delivery: Zona Centro');
     }
     let zoneVaryna = await deliveryZoneRepo.findOne({ where: { tenantId: tenantBurger.id, name: 'Ciudad Varyná' } });
     if (!zoneVaryna) {
       zoneVaryna = await deliveryZoneRepo.save(deliveryZoneRepo.create({ name: 'Ciudad Varyná', feePrice: 2.0, tenantId: tenantBurger.id }));
-      console.log('   ✅ [NUEVO] Zona Delivery: Ciudad Varyná');
     }
 
-    // Insumos Burger
+    // Clientes Burger House
+    const bSilva = await getOrCreateCustomer(tenantBurger.id, { name: 'Andrés Silva', phone: '0416-5551234', identification: 'V-19223344', totalVisits: 6, notes: 'Av. Bolívar, Edf. Rosal, Apto 4B. Prefiere entrega en moto rápida.' });
+    const bRivas = await getOrCreateCustomer(tenantBurger.id, { name: 'Karla Rivas', phone: '0412-8877665', identification: 'V-22112233', totalVisits: 5, notes: 'Urb. Los Criollitos, Casa 14. Pide combos dobles con papas.' });
+    const bMendoza = await getOrCreateCustomer(tenantBurger.id, { name: 'Miguel Mendoza', phone: '0414-3322114', identification: 'V-17889900', totalVisits: 4, notes: 'Cliente corporativo almuerzos oficina.' });
+    const bFamilia = await getOrCreateCustomer(tenantBurger.id, { name: 'Familia Colmenares', phone: '0414-9988112', identification: 'V-15443322', totalVisits: 7, notes: 'Frecuentes de fin de semana en salón (Mesa 2).' });
+
+    // Insumos y Receta Burger
     const burgerInsumos = [
-      { name: 'Pan de Hamburguesa Brioche', unit: 'und', costPerUnit: 0.5, stockQuantity: 50, minStockAlert: 10 },
-      { name: 'Carne Molida Premium', unit: 'kg', costPerUnit: 4.0, stockQuantity: 20, minStockAlert: 3 },
-      { name: 'Queso Cheddar Rebanado', unit: 'kg', costPerUnit: 5.0, stockQuantity: 10, minStockAlert: 2 },
+      { name: 'Pan de Hamburguesa Brioche', unit: 'und', costPerUnit: 0.5, stockQuantity: 60, minStockAlert: 15 },
+      { name: 'Carne Molida Premium', unit: 'kg', costPerUnit: 4.0, stockQuantity: 25, minStockAlert: 5 },
+      { name: 'Queso Cheddar Rebanado', unit: 'kg', costPerUnit: 5.0, stockQuantity: 12, minStockAlert: 3 },
+      { name: 'Tocineta Ahumada Crujiente', unit: 'kg', costPerUnit: 6.5, stockQuantity: 10, minStockAlert: 2 },
     ];
     const savedInsumosBurger: Record<string, RawMaterial> = {};
     for (const raw of burgerInsumos) {
@@ -801,133 +1057,134 @@ async function runSeed() {
       if (!r) {
         r = rawMaterialRepo.create({ ...raw, tenantId: tenantBurger.id });
         r = await rawMaterialRepo.save(r);
-        console.log(`   ✅ [NUEVO] Insumo creado: ${raw.name}`);
       }
       savedInsumosBurger[raw.name] = r;
     }
 
-    // Hamburguesa con Receta
-    let burger = await productRepo.findOne({ where: { tenantId: tenantBurger.id, name: 'Hamburguesa Doble Queso' } });
-    if (!burger) {
-      burger = await productRepo.save(productRepo.create({
-        name: 'Hamburguesa Doble Queso',
-        salePrice: 7.5,
-        cost: 2.5,
-        estimatedCost: 2.5,
-        stock: 10,
-        stockQuantity: 10,
-        physicalStock: 10,
-        category: 'Hamburguesas',
-        is_service: false,
-        product_type: 'FORMULA',
-        images: ['https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80'],
-        tenantId: tenantBurger.id,
-      }));
-      await recipeRepo.save([
-        recipeRepo.create({ productId: burger.id, rawMaterialId: savedInsumosBurger['Pan de Hamburguesa Brioche'].id, quantity: 1 }),
-        recipeRepo.create({ productId: burger.id, rawMaterialId: savedInsumosBurger['Carne Molida Premium'].id, quantity: 0.25 }),
-        recipeRepo.create({ productId: burger.id, rawMaterialId: savedInsumosBurger['Queso Cheddar Rebanado'].id, quantity: 0.05 }),
-      ]);
-      console.log('   ✅ [NUEVO] Receta creada: Hamburguesa Doble Queso');
-    }
+    // Productos Burger
+    let pBurgerDoble = await getOrCreateProduct(tenantBurger.id, { name: 'Hamburguesa Doble Queso', salePrice: 7.5, cost: 2.5, estimatedCost: 2.5, stock: 20, stockQuantity: 20, physicalStock: 20, category: 'Hamburguesas', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80'] });
+    let pBurgerEspecial = await getOrCreateProduct(tenantBurger.id, { name: 'Burger House Especial Tocineta', salePrice: 9.5, cost: 3.2, estimatedCost: 3.2, stock: 15, stockQuantity: 15, physicalStock: 15, category: 'Hamburguesas', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1553979459-d2229ba7433b?w=600&auto=format&fit=crop&q=80'] });
+    let pPapas = await getOrCreateProduct(tenantBurger.id, { name: 'Papas Fritas Rústicas con Cheddar', salePrice: 4.0, cost: 1.2, estimatedCost: 1.2, stock: 30, stockQuantity: 30, physicalStock: 30, category: 'Acompañantes', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1576107232684-1279f3908594?w=600&auto=format&fit=crop&q=80'] });
+    let pAlitas = await getOrCreateProduct(tenantBurger.id, { name: 'Alitas BBQ Crispy (8 und)', salePrice: 6.5, cost: 2.2, estimatedCost: 2.2, stock: 18, stockQuantity: 18, physicalStock: 18, category: 'Entradas', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1567620832903-9fc6debc209f?w=600&auto=format&fit=crop&q=80'] });
+    let pCocaCola = await getOrCreateProduct(tenantBurger.id, { name: 'Coca-Cola Sabor Original Lata 355ml', salePrice: 1.5, cost: 0.7, estimatedCost: 0.7, stock: 48, stockQuantity: 48, physicalStock: 48, category: 'Bebidas', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=600&auto=format&fit=crop&q=80'] });
+    let pCerveza = await getOrCreateProduct(tenantBurger.id, { name: 'Cerveza Zulia Polar Fría 330ml', salePrice: 2.0, cost: 0.9, estimatedCost: 0.9, stock: 36, stockQuantity: 36, physicalStock: 36, category: 'Bebidas', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1608270586620-248524c67de9?w=600&auto=format&fit=crop&q=80'] });
 
-    // Comandas demo en Gastronomía (1 Salón para Cocina, 1 Delivery en Tránsito para Carlos, 1 Entregada pagada)
-    const existingOrders = await orderRepo.count({ where: { tenantId: tenantBurger.id } });
-    if (existingOrders === 0) {
-      // 1. Pedido en Preparación - Mesa 4 (Para vista de Chef/Cocina)
-      const orderMesa = orderRepo.create({
-        tenantId: tenantBurger.id,
-        customerName: 'Mesa 4 (Salón)',
-        customerPhone: '0414-0000000',
-        tableNumber: '4',
-        status: OrderStatus.PREPARING,
-        paymentStatus: PaymentStatus.PENDING,
-        deliveryMethod: DeliveryMethod.IN_STORE,
-        totalAmount: 15.00,
-        totalCost: 5.00,
-        netProfit: 10.00,
-        exchangeRate: tasaActual,
-        notes: 'Una sin cebolla. Marchando a cocina.',
-      });
-      const savedOrderMesa = await orderRepo.save(orderMesa);
-      await orderItemRepo.save(orderItemRepo.create({
-        orderId: savedOrderMesa.id,
-        productId: burger.id,
-        productName: burger.name,
-        quantity: 2,
-        unitPrice: 7.50,
-        unitCost: 2.50,
-        subtotal: 15.00,
-      }));
+    // Gastos y Fondo Burger
+    await getOrCreateExpense(tenantBurger.id, { description: 'Fondo Inicial de Caja / Gaveta', amount: 50.00, category: 'FONDO_CAJA', paymentMethod: 'CASH_USD' });
+    await getOrCreateExpense(tenantBurger.id, { description: 'Carbón Vegetal y Gas para Parrilla', amount: 28.00, category: 'UTILITIES', paymentMethod: 'CASH_USD' });
+    await getOrCreateExpense(tenantBurger.id, { description: 'Cajas Térmicas y Papel Antigrasa Delivery', amount: 22.00, category: 'SUPPLIES', paymentMethod: 'PAGO_MOVIL' });
+    await getOrCreateExpense(tenantBurger.id, { description: 'Nómina Semanal Reparto y Cocina', amount: 80.00, category: 'PAYROLL', paymentMethod: 'PAGO_MOVIL' });
 
-      // 2. Pedido Delivery con Repartidor Asignado (Para vista de Panel Repartidor Carlos)
-      const orderDelivery = orderRepo.create({
-        tenantId: tenantBurger.id,
-        customerName: 'Andrés Silva',
-        customerPhone: '0416-5551234',
-        customerAddress: 'Av. Bolívar, Edf. Rosal, Apto 4B',
-        status: OrderStatus.IN_TRANSIT,
-        paymentStatus: PaymentStatus.PAID,
-        paymentMethod: 'PAGO_MOVIL',
-        deliveryMethod: DeliveryMethod.DELIVERY,
-        deliveryZoneId: zoneCentro?.id,
-        deliveryFee: 1.50,
-        deliveryUserId: deliveryUser.id,
-        driverId: deliveryUser.id,
-        totalAmount: 9.00,
-        totalCost: 2.50,
-        netProfit: 6.50,
-        exchangeRate: tasaActual,
-        pagoMovilRef: 'REF-89472',
-        notes: 'Llamar al llegar a la reja principal.',
-      });
-      const savedOrderDelivery = await orderRepo.save(orderDelivery);
-      await orderItemRepo.save(orderItemRepo.create({
-        orderId: savedOrderDelivery.id,
-        productId: burger.id,
-        productName: burger.name,
-        quantity: 1,
-        unitPrice: 7.50,
-        unitCost: 2.50,
-        subtotal: 7.50,
-      }));
+    // Comandas Gastronomía (Cocina + Reparto + Entregados)
+    // 1. Comanda Cocina (PREPARING) en Mesa 4
+    await getOrCreateOrder(tenantBurger.id, {
+      customerName: 'Mesa 4 (Salón)',
+      customerPhone: '0414-0000000',
+      tableNumber: '4',
+      employeeId: meseroUser.id,
+      status: OrderStatus.PREPARING,
+      paymentStatus: PaymentStatus.PENDING,
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 15.00,
+      totalCost: 5.00,
+      netProfit: 10.00,
+      exchangeRate: tasaActual,
+      notes: 'Mesa 4: 2 dobles queso marchando a cocina. Una sin cebolla.',
+    }, [{ productId: pBurgerDoble.id, productName: pBurgerDoble.name, quantity: 2, unitPrice: 7.50, unitCost: 2.50 }]);
 
-      // 3. Venta anterior ya entregada y cobrada (Aporta ingresos a tesorería)
-      const orderPaid = orderRepo.create({
-        tenantId: tenantBurger.id,
-        customerName: 'Karla Rivas',
-        customerPhone: '0412-8877665',
-        status: OrderStatus.DELIVERED,
-        paymentStatus: PaymentStatus.PAID,
-        paymentMethod: 'USD',
-        deliveryMethod: DeliveryMethod.IN_STORE,
-        totalAmount: 22.50,
-        totalCost: 7.50,
-        netProfit: 15.00,
-        usdReceived: 25.00,
-        changeAmount: 2.50,
-        changeMethod: 'CASH_USD',
-        exchangeRate: tasaActual,
-        notes: '3 combos entregados.',
-      });
-      const savedOrderPaid = await orderRepo.save(orderPaid);
-      await orderItemRepo.save(orderItemRepo.create({
-        orderId: savedOrderPaid.id,
-        productId: burger.id,
-        productName: burger.name,
-        quantity: 3,
-        unitPrice: 7.50,
-        unitCost: 2.50,
-        subtotal: 22.50,
-      }));
+    // 2. Comanda Salón Lista (READY) en Mesa 2
+    await getOrCreateOrder(tenantBurger.id, {
+      customerName: bFamilia.name,
+      customerPhone: bFamilia.phone,
+      customerId: bFamilia.id,
+      tableNumber: '2',
+      employeeId: mesera2User.id,
+      status: OrderStatus.READY,
+      paymentStatus: PaymentStatus.PENDING,
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 21.50,
+      totalCost: 7.30,
+      netProfit: 14.20,
+      exchangeRate: tasaActual,
+      notes: 'Mesa 2: Pedido listo para servir en mesa con refrescos.',
+    }, [
+      { productId: pBurgerEspecial.id, productName: pBurgerEspecial.name, quantity: 1, unitPrice: 9.50, unitCost: 3.20 },
+      { productId: pBurgerDoble.id, productName: pBurgerDoble.name, quantity: 1, unitPrice: 7.50, unitCost: 2.50 },
+      { productId: pCocaCola.id, productName: pCocaCola.name, quantity: 3, unitPrice: 1.50, unitCost: 0.70 },
+    ]);
 
-      console.log('   ✅ [NUEVO] 3 comandas demo creadas (Salón para cocina, Reparto en tránsito y Venta cobrada)');
-    }
+    // 3. Comanda Delivery en Tránsito (IN_TRANSIT) para Repartidor Carlos
+    await getOrCreateOrder(tenantBurger.id, {
+      customerName: bSilva.name,
+      customerPhone: bSilva.phone,
+      customerId: bSilva.id,
+      customerAddress: 'Av. Bolívar, Edf. Rosal, Apto 4B',
+      status: OrderStatus.IN_TRANSIT,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      deliveryMethod: DeliveryMethod.DELIVERY,
+      deliveryZoneId: zoneCentro?.id,
+      deliveryFee: 1.50,
+      deliveryUserId: deliveryUser.id,
+      driverId: deliveryUser.id,
+      totalAmount: 9.00,
+      totalCost: 2.50,
+      netProfit: 6.50,
+      exchangeRate: tasaActual,
+      pagoMovilRef: 'REF-89472',
+      notes: 'Delivery asignado a Carlos. Entregar en reja de vigilancia.',
+    }, [{ productId: pBurgerDoble.id, productName: pBurgerDoble.name, quantity: 1, unitPrice: 7.50, unitCost: 2.50 }]);
+
+    // 4. Comanda Delivery Entregada y Cobrada
+    await getOrCreateOrder(tenantBurger.id, {
+      customerName: bRivas.name,
+      customerPhone: bRivas.phone,
+      customerId: bRivas.id,
+      customerAddress: 'Urb. Los Criollitos, Casa 14',
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      deliveryMethod: DeliveryMethod.DELIVERY,
+      deliveryZoneId: zoneVaryna?.id,
+      deliveryFee: 2.00,
+      deliveryUserId: delivery2User.id,
+      driverId: delivery2User.id,
+      totalAmount: 20.00,
+      totalCost: 6.80,
+      netProfit: 13.20,
+      exchangeRate: tasaActual,
+      pagoMovilRef: 'PM-112233',
+      notes: 'Delivery completado por Javier. Pago Móvil verificado.',
+    }, [
+      { productId: pBurgerEspecial.id, productName: pBurgerEspecial.name, quantity: 1, unitPrice: 9.50, unitCost: 3.20 },
+      { productId: pAlitas.id, productName: pAlitas.name, quantity: 1, unitPrice: 6.50, unitCost: 2.20 },
+      { productId: pCerveza.id, productName: pCerveza.name, quantity: 1, unitPrice: 2.00, unitCost: 0.90 },
+    ]);
+
+    // 5. Venta Salón pagada en Efectivo USD
+    await getOrCreateOrder(tenantBurger.id, {
+      customerName: bMendoza.name,
+      customerPhone: bMendoza.phone,
+      customerId: bMendoza.id,
+      employeeId: meseroUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 25.00,
+      changeAmount: 2.50,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 22.50,
+      totalCost: 7.50,
+      netProfit: 15.00,
+      exchangeRate: tasaActual,
+      notes: '3 combos de hamburguesa doble entregados en salón.',
+    }, [{ productId: pBurgerDoble.id, productName: pBurgerDoble.name, quantity: 3, unitPrice: 7.50, unitCost: 2.50 }]);
 
     // =========================================================================
-    // 6. ESPACIO 6: CENTRO ESTÉTICO GLOW (Híbrido: Citas de Spa + Venta Retail)
+    // 6. ESPACIO 6: CENTRO ESTÉTICO GLOW (demo-estetica) -> Citas Médicas + Retail
     // =========================================================================
-    console.log('\n✨ Verificando Espacio 6: Centro Estético Glow (demo-estetica)...');
+    console.log('\n✨ Espacio 6: Centro Estético Glow (demo-estetica)...');
     let tenantGlow = await tenantRepo.findOne({ where: [{ referral_code: 'demo-estetica' }, { name: 'Centro Estético Glow' }] });
     if (!tenantGlow) {
       tenantGlow = await tenantRepo.save(tenantRepo.create({
@@ -939,11 +1196,13 @@ async function runSeed() {
         isActive: true,
         promoterId: promoterProfile.id,
       }));
-      console.log(' ✅ [NUEVO] Espacio creado: Centro Estético Glow');
     }
+    // Accesos Centro Glow
     await linkAccess(promoter.id, tenantGlow.id, UserRole.ADMIN, 'Directora Estética');
     await linkAccess(demoAdmin.id, tenantGlow.id, UserRole.ADMIN, 'Administrador');
-    await linkAccess(specialistUser.id, tenantGlow.id, UserRole.OPERATIVO, 'Dra. Estética & Cosmiatra');
+    await linkAccess(specialistUser.id, tenantGlow.id, UserRole.OPERATIVO, 'Dra. Ana Cosmiatra & Médico Estético');
+    await linkAccess(terapeutaUser.id, tenantGlow.id, UserRole.OPERATIVO, 'Claudia Fisioterapeuta & Drenaje');
+    await linkAccess(recepcionGlowUser.id, tenantGlow.id, UserRole.POS, 'Camila Recepcionista & Atención');
 
     let settingsGlow = await settingsRepo.findOne({ where: { tenantId: tenantGlow.id } });
     if (!settingsGlow) {
@@ -958,180 +1217,198 @@ async function runSeed() {
         exchangeRateBs: tasaActual,
         themePrimaryColor: '#059669',
         themeHeaderColor: '#ecfdf5',
+        bookingRequireService: true,
+        bookingAllowStaffSelection: true,
         acceptCashUsd: true,
         acceptPagoMovil: true,
       });
       await settingsRepo.save(settingsGlow);
-      console.log('   ✅ Configuración de Centro Glow creada');
     }
 
-    // Base de Apertura en Gaveta para Centro Glow
-    const existingGlowFund = await expenseRepo.findOne({ where: { tenantId: tenantGlow.id, category: 'FONDO_CAJA' } });
-    if (!existingGlowFund) {
-      await expenseRepo.save(expenseRepo.create({
-        tenantId: tenantGlow.id,
-        description: 'Base de Apertura en Gaveta',
-        amount: 60.00,
-        category: 'FONDO_CAJA',
-        paymentMethod: 'CASH_USD',
-      }));
-      console.log('   ✅ [NUEVO] Fondo base de gaveta en Centro Glow: $60.00 USD');
-    }
+    // Clientes Centro Glow
+    const gMendoza = await getOrCreateCustomer(tenantGlow.id, { name: 'Valeria Mendoza', phone: '0424-5544332', identification: 'V-23998877', totalVisits: 5, notes: 'Tratamiento facial y sérums antimanchas.' });
+    const gSalas = await getOrCreateCustomer(tenantGlow.id, { name: 'Mariana Salas', phone: '0414-7766554', identification: 'V-19334455', totalVisits: 4, notes: 'Sesiones de masaje descontracturante quincenal.' });
+    const gColmenares = await getOrCreateCustomer(tenantGlow.id, { name: 'Patricia Colmenares', phone: '0412-9900112', identification: 'V-25112233', totalVisits: 3, notes: 'Paciente de drenaje linfático con Claudia.' });
+    const gZambrano = await getOrCreateCustomer(tenantGlow.id, { name: 'Daniela Zambrano', phone: '0416-4433221', identification: 'V-18665544', totalVisits: 6, notes: 'Limpieza profunda hidrafacial cada mes.' });
 
-    const glowCatalog = [
-      { name: 'Masaje Descontracturante 50min', salePrice: 25.0, cost: 4.0, estimatedCost: 4.0, durationMinutes: 50, category: 'Masajes', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=600&auto=format&fit=crop&q=80'] },
-      { name: 'Sérum Facial Vitamina C (30ml)', salePrice: 18.0, cost: 8.0, estimatedCost: 8.0, stock: 12, stockQuantity: 12, physicalStock: 12, category: 'Cosméticos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&auto=format&fit=crop&q=80'] },
-      { name: 'Protector Solar Toque Seco FPS 50', salePrice: 22.0, cost: 10.0, estimatedCost: 10.0, stock: 10, stockQuantity: 10, physicalStock: 10, category: 'Cosméticos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&auto=format&fit=crop&q=80'] },
-    ];
-    for (const g of glowCatalog) {
-      let prod = await productRepo.findOne({ where: { tenantId: tenantGlow.id, name: g.name } });
-      if (!prod) {
-        prod = productRepo.create({ ...g, tenantId: tenantGlow.id });
-        await productRepo.save(prod);
-        console.log(`   ✅ [NUEVO] Producto creado: ${g.name}`);
-      }
-    }
+    // Servicios & Cosméticos Centro Glow
+    const gMasaje = await getOrCreateProduct(tenantGlow.id, { name: 'Masaje Descontracturante 50min', salePrice: 25.0, cost: 4.0, estimatedCost: 4.0, durationMinutes: 50, category: 'Masajes', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=600&auto=format&fit=crop&q=80'] });
+    const gHidrafacial = await getOrCreateProduct(tenantGlow.id, { name: 'Limpieza Facial Profunda Hidrafacial', salePrice: 30.0, cost: 5.5, estimatedCost: 5.5, durationMinutes: 60, category: 'Faciales', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=600&auto=format&fit=crop&q=80'] });
+    const gDrenaje = await getOrCreateProduct(tenantGlow.id, { name: 'Drenaje Linfático Post-Quirúrgico', salePrice: 28.0, cost: 4.0, estimatedCost: 4.0, durationMinutes: 45, category: 'Terapéutico', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1519823551278-64ac92734fb1?w=600&auto=format&fit=crop&q=80'] });
+    const gSerum = await getOrCreateProduct(tenantGlow.id, { name: 'Sérum Facial Vitamina C 30ml', salePrice: 18.0, cost: 8.0, estimatedCost: 8.0, stock: 15, stockQuantity: 15, physicalStock: 15, category: 'Cosméticos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&auto=format&fit=crop&q=80'] });
+    const gSolar = await getOrCreateProduct(tenantGlow.id, { name: 'Protector Solar Toque Seco FPS 50', salePrice: 22.0, cost: 10.0, estimatedCost: 10.0, stock: 12, stockQuantity: 12, physicalStock: 12, category: 'Cosméticos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&auto=format&fit=crop&q=80'] });
+    const gAcido = await getOrCreateProduct(tenantGlow.id, { name: 'Ácido Hialurónico Sérum Antiedad 30ml', salePrice: 25.0, cost: 11.0, estimatedCost: 11.0, stock: 10, stockQuantity: 10, physicalStock: 10, category: 'Cosméticos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1608248597359-561352136932?w=600&auto=format&fit=crop&q=80'] });
 
-    // Ventas e Ingresos reales en Centro Glow (para equilibrar y tener flujo positivo en bancos)
-    const existingGlowOrders = await orderRepo.count({ where: { tenantId: tenantGlow.id } });
-    if (existingGlowOrders === 0) {
-      const serumProd = await productRepo.findOne({ where: { tenantId: tenantGlow.id, name: 'Sérum Facial Vitamina C (30ml)' } });
-      const solarProd = await productRepo.findOne({ where: { tenantId: tenantGlow.id, name: 'Protector Solar Toque Seco FPS 50' } });
+    // Gastos y Fondo Glow
+    await getOrCreateExpense(tenantGlow.id, { description: 'Base de Apertura en Gaveta', amount: 60.00, category: 'FONDO_CAJA', paymentMethod: 'CASH_USD' });
+    await getOrCreateExpense(tenantGlow.id, { description: 'Aceites Esenciales, Mascarillas e Insumos Spa', amount: 35.00, category: 'SUPPLIES', paymentMethod: 'CASH_USD' });
+    await getOrCreateExpense(tenantGlow.id, { description: 'Servicio de Internet Fibra Óptica', amount: 35.00, category: 'UTILITIES', paymentMethod: 'PAGO_MOVIL' });
+    await getOrCreateExpense(tenantGlow.id, { description: 'Honorarios Médicos Quincenales Dra. Ana', amount: 90.00, category: 'PAYROLL', paymentMethod: 'PAGO_MOVIL' });
 
-      // 1. Venta cobrada por Pago Móvil ($40 USD = Bs. a la tasa actual)
-      const orderPagoMovil = orderRepo.create({
-        tenantId: tenantGlow.id,
-        customerName: 'Valeria Mendoza',
-        customerPhone: '0424-5544332',
-        status: OrderStatus.DELIVERED,
-        paymentStatus: PaymentStatus.PAID,
-        paymentMethod: 'PAGO_MOVIL',
-        amountBs: 40.00 * tasaActual,
-        pagoMovilRef: 'PM-482019',
-        pagoMovilBank: '0102 - Banco de Venezuela',
-        deliveryMethod: DeliveryMethod.IN_STORE,
-        totalAmount: 40.00,
-        totalCost: 18.00,
-        netProfit: 22.00,
-        exchangeRate: tasaActual,
-        notes: 'Venta de cosméticos con Pago Móvil confirmado en cuenta bancaria.',
-      });
-      const savedGlowOrder1 = await orderRepo.save(orderPagoMovil);
-      if (serumProd && solarProd) {
-        await orderItemRepo.save([
-          orderItemRepo.create({
-            orderId: savedGlowOrder1.id,
-            productId: serumProd.id,
-            productName: serumProd.name,
-            quantity: 1,
-            unitPrice: 18.00,
-            unitCost: 8.00,
-            subtotal: 18.00,
-          }),
-          orderItemRepo.create({
-            orderId: savedGlowOrder1.id,
-            productId: solarProd.id,
-            productName: solarProd.name,
-            quantity: 1,
-            unitPrice: 22.00,
-            unitCost: 10.00,
-            subtotal: 22.00,
-          })
-        ]);
-      }
+    // Citas Agendadas Glow
+    await getOrCreateReservation(tenantGlow.id, {
+      customerName: gZambrano.name,
+      customerPhone: gZambrano.phone,
+      customerId: gZambrano.id,
+      date: todayIso,
+      time: '11:00',
+      durationMinutes: 60,
+      serviceId: gHidrafacial.id,
+      serviceName: gHidrafacial.name,
+      employeeId: specialistUser.id,
+      employeeName: 'Dra. Ana Especialista',
+      status: ReservationStatus.COMPLETED,
+      paymentStatus: PaymentStatus.PAID,
+      totalAmount: 30.00,
+      notes: 'Sesión de hidrafacial realizada con éxito.',
+    });
 
-      // 2. Venta cobrada en Efectivo USD ($25 USD)
-      const orderCashUSD = orderRepo.create({
-        tenantId: tenantGlow.id,
-        customerName: 'Mariana Salas',
-        customerPhone: '0414-7766554',
-        status: OrderStatus.DELIVERED,
-        paymentStatus: PaymentStatus.PAID,
-        paymentMethod: 'USD',
-        usdReceived: 30.00,
-        changeAmount: 5.00,
-        changeMethod: 'CASH_USD',
-        deliveryMethod: DeliveryMethod.IN_STORE,
-        totalAmount: 25.00,
-        totalCost: 4.00,
-        netProfit: 21.00,
-        exchangeRate: tasaActual,
-        notes: 'Pago en efectivo de sesión de masaje.',
-      });
-      await orderRepo.save(orderCashUSD);
+    await getOrCreateReservation(tenantGlow.id, {
+      customerName: gSalas.name,
+      customerPhone: gSalas.phone,
+      customerId: gSalas.id,
+      date: todayIso,
+      time: '16:00',
+      durationMinutes: 50,
+      serviceId: gMasaje.id,
+      serviceName: gMasaje.name,
+      employeeId: specialistUser.id,
+      employeeName: 'Dra. Ana Especialista',
+      status: ReservationStatus.CONFIRMED,
+      paymentStatus: PaymentStatus.PAID,
+      totalAmount: 25.00,
+      notes: 'Paciente reservada con Dra. Ana para masaje.',
+    });
 
-      console.log('   ✅ [NUEVO] 2 ventas cobradas registradas en Centro Glow (Pago Móvil y Efectivo)');
-    }
+    await getOrCreateReservation(tenantGlow.id, {
+      customerName: gColmenares.name,
+      customerPhone: gColmenares.phone,
+      customerId: gColmenares.id,
+      date: tomorrowIso,
+      time: '10:00',
+      durationMinutes: 45,
+      serviceId: gDrenaje.id,
+      serviceName: gDrenaje.name,
+      employeeId: terapeutaUser.id,
+      employeeName: 'Claudia Fisioterapeuta',
+      status: ReservationStatus.CONFIRMED,
+      paymentStatus: PaymentStatus.PENDING,
+      totalAmount: 28.00,
+      notes: 'Drenaje linfático post-operatorio agendado.',
+    });
 
-    // Cita Agendada con la Dra. Ana Especialista
-    const existingGlowCitas = await reservationRepo.count({ where: { tenantId: tenantGlow.id } });
-    if (existingGlowCitas === 0) {
-      const masajeServ = await productRepo.findOne({ where: { tenantId: tenantGlow.id, name: 'Masaje Descontracturante 50min' } });
-      const todayIso = new Date().toISOString().split('T')[0];
-      await reservationRepo.save(reservationRepo.create({
-        tenantId: tenantGlow.id,
-        customerName: 'Patricia Colmenares',
-        customerPhone: '0412-9900112',
-        date: todayIso,
-        time: '16:00',
-        durationMinutes: 50,
-        serviceId: masajeServ?.id,
-        serviceName: masajeServ?.name || 'Masaje Descontracturante 50min',
-        employeeId: specialistUser.id,
-        employeeName: specialistUser.name || 'Dra. Ana Especialista',
-        status: ReservationStatus.CONFIRMED,
-        paymentStatus: PaymentStatus.PAID,
-        totalAmount: 25.00,
-        notes: 'Paciente reservada con Dra. Ana.',
-      }));
-      console.log('   ✅ [NUEVO] Cita asignada a Dra. Ana Especialista en Centro Glow');
-    }
+    // Ventas Retail & Servicios Glow
+    await getOrCreateOrder(tenantGlow.id, {
+      customerName: gMendoza.name,
+      customerPhone: gMendoza.phone,
+      customerId: gMendoza.id,
+      employeeId: recepcionGlowUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 40.00 * tasaActual,
+      pagoMovilRef: 'PM-482019',
+      pagoMovilBank: '0102 - Banco de Venezuela',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 40.00,
+      totalCost: 18.00,
+      netProfit: 22.00,
+      exchangeRate: tasaActual,
+      notes: 'Venta de cosméticos con Pago Móvil confirmado en cuenta bancaria.',
+    }, [
+      { productId: gSerum.id, productName: gSerum.name, quantity: 1, unitPrice: 18.00, unitCost: 8.00 },
+      { productId: gSolar.id, productName: gSolar.name, quantity: 1, unitPrice: 22.00, unitCost: 10.00 },
+    ]);
 
-    // Gasto operativo demo
-    const existingExpenses = await expenseRepo.count({ where: { tenantId: tenantGlow.id, category: 'UTILITIES' } });
-    if (existingExpenses === 0) {
-      await expenseRepo.save(expenseRepo.create({
-        tenantId: tenantGlow.id,
-        description: 'Servicio de Internet Fibra Óptica',
-        amount: 35.00,
-        category: 'UTILITIES',
-        paymentMethod: 'PAGO_MOVIL',
-      }));
-      console.log('   ✅ [NUEVO] Gasto operativo demo registrado en Centro Glow');
-    }
+    await getOrCreateOrder(tenantGlow.id, {
+      customerName: gSalas.name,
+      customerPhone: gSalas.phone,
+      customerId: gSalas.id,
+      employeeId: recepcionGlowUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 30.00,
+      changeAmount: 5.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 25.00,
+      totalCost: 4.00,
+      netProfit: 21.00,
+      exchangeRate: tasaActual,
+      notes: 'Pago en efectivo de sesión de masaje descontracturante.',
+    }, [{ productId: gMasaje.id, productName: gMasaje.name, quantity: 1, unitPrice: 25.00, unitCost: 4.00 }]);
+
+    await getOrCreateOrder(tenantGlow.id, {
+      customerName: gZambrano.name,
+      customerPhone: gZambrano.phone,
+      customerId: gZambrano.id,
+      employeeId: recepcionGlowUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 50.00,
+      changeAmount: 3.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 47.00,
+      totalCost: 21.00,
+      netProfit: 26.00,
+      exchangeRate: tasaActual,
+      notes: 'Compra de Ácido Hialurónico y Protector Solar en efectivo.',
+    }, [
+      { productId: gAcido.id, productName: gAcido.name, quantity: 1, unitPrice: 25.00, unitCost: 11.00 },
+      { productId: gSolar.id, productName: gSolar.name, quantity: 1, unitPrice: 22.00, unitCost: 10.00 },
+    ]);
 
     console.log('\n==================================================');
-    console.log('🎉 SEED COMPLETADO EXITOSAMENTE (SIN TOCAR NI BORRAR DATOS PREVIOS)');
+    console.log('🎉 SEED COMPLETADO EXITOSAMENTE');
     console.log('==================================================');
     console.log('🛡️ SuperAdmin de Plataforma:');
     console.log('👉 Correo:   superadmin@finowork.com');
     console.log('👉 Clave:    SuperAdmin2026!');
-    console.log('\n👤 Administrador General Demo:');
+    console.log('\n👤 Administrador General Demo (Acceso a todos los negocios):');
     console.log('👉 Correo:   admin@finowork.com');
     console.log('👉 Clave:    123456');
-    console.log('\n💼 Usuario Promotor (Vinculado a todos los demos):');
+    console.log('\n💼 Promotor Oficial:');
     console.log('👉 Correo:   promotor@finowork.com');
     console.log('👉 Clave:    123456');
     console.log('👉 Código:   PROMO-FINO');
-    console.log('\n🛵 Usuario Delivery (Para pruebas de reparto):');
-    console.log('👉 Correo:   delivery@finowork.com');
-    console.log('👉 Clave:    123456');
-    console.log('\n👨‍🍳 Usuario Cocina / Comandas (Para vista de chef):');
-    console.log('👉 Correo:   cocina@finowork.com');
-    console.log('👉 Clave:    123456');
-    console.log('\n💳 Usuario Cajero / POS (Para cobros y arqueos):');
-    console.log('👉 Correo:   cajero@finowork.com');
-    console.log('👉 Clave:    123456');
-    console.log('\n✂️ Usuario Especialista (Para citas y agenda de spa/barbería):');
-    console.log('👉 Correo:   especialista@finowork.com');
-    console.log('👉 Clave:    123456');
-    console.log('\n🏪 Tiendas / Negocios de prueba disponibles:');
-    console.log('1. Boutique Moda Urbana       (demo-retail)      -> Tri-Moneda COP + Variantes + Crédito');
-    console.log('2. Panadería La Espiga        (demo-panaderia)   -> Producción pura + Fórmulas');
-    console.log('3. Barbería & Spa Élite       (demo-servicios)   -> Citas con agenda');
-    console.log('4. Auto Lavado Express        (demo-autolavado)  -> Servicios sin cita');
-    console.log('5. Burger House Gourmet       (demo-gastronomia) -> Híbrido: Cocina (comandas) + Delivery');
-    console.log('6. Centro Estético Glow       (demo-estetica)    -> Híbrido: Citas con Dra. Ana + Retail');
+    console.log('\n🛵 Repartidores / Delivery:');
+    console.log('👉 Carlos:   delivery@finowork.com (123456)');
+    console.log('👉 Javier:   delivery2.burger@finowork.com (123456)');
+    console.log('\n👨‍🍳 Cocina & Parrilla:');
+    console.log('👉 Ramón:    cocina@finowork.com (123456) [Chef de Cocina]');
+    console.log('👉 Álvaro:   parrillero.burger@finowork.com (123456) [Parrillero]');
+    console.log('\n🍽️ Mesoneros & Salón:');
+    console.log('👉 Pedro:    mesero@finowork.com (123456) [Capitán]');
+    console.log('👉 Lucía:    mesera2.burger@finowork.com (123456) [Mesonera]');
+    console.log('\n💳 Cajas & Mostrador:');
+    console.log('👉 María:    cajero@finowork.com (123456) [Cajera Boutique]');
+    console.log('👉 Valentina: asesor1.boutique@finowork.com (123456) [Asesora]');
+    console.log('👉 Rosa:     despacho.pan@finowork.com (123456) [Despacho Pan]');
+    console.log('👉 Camila:   recepcion.glow@finowork.com (123456) [Recepción Glow]');
+    console.log('\n🥖 Panadería & Pastelería:');
+    console.log('👉 Luis:     panadero@finowork.com (123456) [Panadero]');
+    console.log('👉 Gabriel:  pastelero.pan@finowork.com (123456) [Pastelero]');
+    console.log('\n✂️ Barberos & Estética:');
+    console.log('👉 Víctor:   barbero@finowork.com (123456) [Master Barber]');
+    console.log('👉 Daniel:   barbero2.spa@finowork.com (123456) [Fades & Barbas]');
+    console.log('👉 Sofía:    manicurista.spa@finowork.com (123456) [Nails]');
+    console.log('\n👩‍⚕️ Salud & Spa:');
+    console.log('👉 Dra. Ana: especialista@finowork.com (123456) [Cosmiatra & Médico]');
+    console.log('👉 Claudia:  terapeuta.glow@finowork.com (123456) [Fisioterapeuta]');
+    console.log('\n🚗 Auto Lavado:');
+    console.log('👉 José:     lavador@finowork.com (123456) [Lavador Pro]');
+    console.log('👉 Miguel:   lavador2.autolavado@finowork.com (123456) [Detailing]');
+    console.log('👉 Fernando: supervisor.autolavado@finowork.com (123456) [Supervisor]');
+    console.log('\n🏪 Negocios Demo:');
+    console.log('1. Boutique Moda Urbana       (demo-retail)');
+    console.log('2. Panadería La Espiga        (demo-panaderia)');
+    console.log('3. Barbería & Spa Élite       (demo-servicios)');
+    console.log('4. Auto Lavado Express        (demo-autolavado)');
+    console.log('5. Burger House Gourmet       (demo-gastronomia)');
+    console.log('6. Centro Estético Glow       (demo-estetica)');
     console.log('==================================================\n');
 
   } catch (error) {

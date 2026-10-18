@@ -152,11 +152,16 @@ export class DashboardService {
       .getRawOne();
     const historicalInvestment = Number(invRes?.total || 0);
 
-    // Ingreso histórico de pedidos no cancelados
+    // Ingreso histórico de pedidos activos/entregados (excluye cancelados)
+    const invalidOrderStatuses = [
+      OrderStatus.CANCELED,
+      OrderStatus.CANCELADO_PROVEEDOR,
+    ];
+
     const revRes = await this.orderRepo.createQueryBuilder('o')
       .select('COALESCE(SUM(o.totalAmount), 0)', 'total')
       .where('o.tenantId = :tenantId', { tenantId })
-      .andWhere('o.status IN (:...statuses)', { statuses: [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.DELIVERED] })
+      .andWhere('o.status NOT IN (:...invalidStatuses)', { invalidStatuses: invalidOrderStatuses })
       .getRawOne();
     const orderRevenue = Number(revRes?.total || 0);
 
@@ -178,14 +183,14 @@ export class DashboardService {
       .leftJoin('item.product', 'prod')
       .select('COALESCE(SUM(item.quantity * CASE WHEN item.unitCost > 0 THEN item.unitCost WHEN prod.estimatedCost > 0 THEN prod.estimatedCost WHEN prod.cost > 0 THEN prod.cost ELSE 0 END), 0)', 'total')
       .where('o.tenantId = :tenantId', { tenantId })
-      .andWhere('o.status IN (:...statuses)', { statuses: [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.DELIVERED] })
+      .andWhere('o.status NOT IN (:...invalidStatuses)', { invalidStatuses: invalidOrderStatuses })
       .getRawOne();
     const orderItemCost = Number(orderItemCostRes?.total || 0);
 
     const ordersCostRes = await this.orderRepo.createQueryBuilder('o')
       .select('COALESCE(SUM(o.totalCost), 0)', 'total')
       .where('o.tenantId = :tenantId', { tenantId })
-      .andWhere('o.status IN (:...statuses)', { statuses: [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.DELIVERED] })
+      .andWhere('o.status NOT IN (:...invalidStatuses)', { invalidStatuses: invalidOrderStatuses })
       .getRawOne();
     const ordersCost = Number(ordersCostRes?.total || 0);
 
@@ -215,10 +220,11 @@ export class DashboardService {
 
     const totalCostOfSales = finalOrderCost + standaloneReservationCost;
 
-    // Gastos operativos generales y de nómina
+    // Gastos operativos generales y de nómina (FONDO_CAJA NO es un gasto, es base de apertura de efectivo)
     const expRes = await this.expenseRepo.createQueryBuilder('e')
       .select('COALESCE(SUM(e.amount), 0)', 'total')
       .where('e.tenantId = :tenantId', { tenantId })
+      .andWhere('(e.category IS NULL OR e.category != :fondo)', { fondo: 'FONDO_CAJA' })
       .getRawOne();
     const totalOperatingExpenses = Number(expRes?.total || 0);
 
@@ -248,9 +254,9 @@ export class DashboardService {
     const totalConsolidatedReinvestment = reinvestmentExpense + totalRegisteredReinvestment;
     const totalConsolidatedInvestment = totalExternalInvestment + totalConsolidatedReinvestment;
 
-    // Descontar costo efectivo de ventas/servicios para calcular margen neto real
-    const effectiveProductionCost = Math.max(totalCostOfSales, reinvestmentExpense);
-    const historicalProfit = Number((historicalRevenue - effectiveProductionCost - totalRegisteredReinvestment - totalOperatingExpenses).toFixed(2));
+    // Descontar costo efectivo de ventas/servicios y gastos operativos para calcular margen neto real
+    const effectiveProductionCost = totalCostOfSales;
+    const historicalProfit = Number((historicalRevenue - effectiveProductionCost - totalOperatingExpenses).toFixed(2));
 
     // Calcular ventas de los últimos 7 días únicamente
     const sevenDaysAgo = new Date();
@@ -263,14 +269,12 @@ export class DashboardService {
       return d.toISOString().split('T')[0];
     }).reverse();
 
-    const recentOrders = await this.orderRepo.find({
-      where: [
-        { status: OrderStatus.PENDING, tenantId, createdAt: MoreThanOrEqual(sevenDaysAgo) },
-        { status: OrderStatus.PREPARING, tenantId, createdAt: MoreThanOrEqual(sevenDaysAgo) },
-        { status: OrderStatus.DELIVERED, tenantId, createdAt: MoreThanOrEqual(sevenDaysAgo) }
-      ],
-      select: { createdAt: true, totalAmount: true }
-    });
+    const recentOrders = await this.orderRepo.createQueryBuilder('o')
+      .select(['o.createdAt', 'o.totalAmount'])
+      .where('o.tenantId = :tenantId', { tenantId })
+      .andWhere('o.status NOT IN (:...invalidStatuses)', { invalidStatuses: invalidOrderStatuses })
+      .andWhere('o.createdAt >= :sevenDaysAgo', { sevenDaysAgo })
+      .getMany();
 
     const salesByDay: Record<string, number> = {};
     last7Days.forEach(d => salesByDay[d] = 0);
@@ -316,7 +320,7 @@ export class DashboardService {
       .addSelect('SUM(item.quantity)', 'totalQuantity')
       .addSelect('SUM(item.subtotal)', 'totalRevenue')
       .where('order.tenantId = :tenantId', { tenantId })
-      .andWhere('order.status IN (:...statuses)', { statuses: [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.DELIVERED] })
+      .andWhere('order.status NOT IN (:...invalidStatuses)', { invalidStatuses: invalidOrderStatuses })
       .groupBy('item.productId')
       .addGroupBy('item.productName')
       .orderBy('"totalQuantity"', 'DESC')
@@ -458,15 +462,34 @@ export class DashboardService {
 
     const allExpenses = (await this.expenseRepo.find({ where: { tenantId } })) || [];
     let operatingExpenses = 0;
+    let payrollExpenses = 0;
+    let generalExpenses = 0;
     for (const exp of allExpenses) {
       if ((exp as any).category === 'FONDO_CAJA') continue;
       const d = new Date((exp as any).date || (exp as any).createdAt || Date.now());
       if (d >= startDate && d <= endDate) {
-        operatingExpenses += Number(exp.amount || 0);
+        const amt = Number(exp.amount || 0);
+        operatingExpenses += amt;
+        if ((exp as any).category === 'PAYROLL') {
+          payrollExpenses += amt;
+        } else {
+          generalExpenses += amt;
+        }
       }
     }
 
-    const netProfit = Number((invoicedRevenue - costOfGoodsSold - operatingExpenses).toFixed(2));
+    const monthLossOrders = allOrders.filter(o => {
+      if (o.status !== OrderStatus.CERRADO_CON_PERDIDA) return false;
+      const d = new Date(o.createdAt);
+      return d >= startDate && d <= endDate;
+    });
+    const monthLosses = monthLossOrders.reduce((acc, o) => acc + (Number(o.totalCost) > 0 ? Number(o.totalCost) : Number(o.totalAmount || 0)), 0);
+
+    const netProfit = Number((invoicedRevenue - costOfGoodsSold - operatingExpenses - monthLosses).toFixed(2));
+
+    const pagoMovilUsdVal = rate > 0 ? Number((pagoMovilBs / rate).toFixed(2)) : 0;
+    const puntoUsdVal = rate > 0 ? Number((puntoBs / rate).toFixed(2)) : 0;
+    const transferUsdVal = rate > 0 ? Number((transferBs / rate).toFixed(2)) : 0;
 
     return {
       month: formattedMonth,
@@ -478,19 +501,30 @@ export class DashboardService {
       pendingReceivable: Number(pendingReceivable.toFixed(2)),
       costOfGoodsSold: Number(costOfGoodsSold.toFixed(2)),
       operatingExpenses: Number(operatingExpenses.toFixed(2)),
+      cogs: Number(costOfGoodsSold.toFixed(2)),
+      expenses: Number(generalExpenses.toFixed(2)),
+      payroll: Number(payrollExpenses.toFixed(2)),
+      losses: Number(monthLosses.toFixed(2)),
       netProfit,
       ordersCount: monthOrders.length,
       paidOrdersCount,
       pendingOrdersCount,
+      byMethod: {
+        USD: Number(cashUSD.toFixed(2)),
+        PAGO_MOVIL: pagoMovilUsdVal,
+        PUNTO: puntoUsdVal,
+        TRANSFER: transferUsdVal,
+        BINANCE: Number(digitalUSD.toFixed(2)),
+      },
       breakdown: {
         cashUSD: Number(cashUSD.toFixed(2)),
         digitalUSD: Number(digitalUSD.toFixed(2)),
         pagoMovilBs: Number(pagoMovilBs.toFixed(2)),
-        pagoMovilUSD: rate > 0 ? Number((pagoMovilBs / rate).toFixed(2)) : 0,
+        pagoMovilUSD: pagoMovilUsdVal,
         puntoBs: Number(puntoBs.toFixed(2)),
-        puntoUSD: rate > 0 ? Number((puntoBs / rate).toFixed(2)) : 0,
+        puntoUSD: puntoUsdVal,
         transferBs: Number(transferBs.toFixed(2)),
-        transferUSD: rate > 0 ? Number((transferBs / rate).toFixed(2)) : 0,
+        transferUSD: transferUsdVal,
       },
     };
   }

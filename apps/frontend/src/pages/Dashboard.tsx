@@ -646,10 +646,10 @@ const Dashboard: React.FC = () => {
                           📉 Gastos + Costos (Haber)
                         </div>
                         <div style={{ fontSize: '20px', fontWeight: '900', color: '#DC2626', marginTop: '4px' }}>
-                          ${(Number(monthlyData.cogs || 0) + Number(monthlyData.expenses || 0) + Number(monthlyData.payroll || 0) + Number(monthlyData.losses || 0)).toFixed(2)}
+                          ${(Number(monthlyData.cogs ?? monthlyData.costOfGoodsSold ?? 0) + Number(monthlyData.expenses ?? monthlyData.operatingExpenses ?? 0) + Number(monthlyData.payroll || 0) + Number(monthlyData.losses || 0)).toFixed(2)}
                         </div>
                         <div style={{ fontSize: '10px', color: '#7F1D1D', marginTop: '2px' }}>
-                          Costo: ${Number(monthlyData.cogs || 0).toFixed(2)} | Oper: ${(Number(monthlyData.expenses || 0) + Number(monthlyData.payroll || 0)).toFixed(2)}
+                          Costo: ${Number(monthlyData.cogs ?? monthlyData.costOfGoodsSold ?? 0).toFixed(2)} | Oper: ${(Number(monthlyData.expenses ?? monthlyData.operatingExpenses ?? 0) + Number(monthlyData.payroll || 0)).toFixed(2)}
                         </div>
                       </div>
 
