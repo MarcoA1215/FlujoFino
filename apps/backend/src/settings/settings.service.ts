@@ -43,6 +43,15 @@ export class SettingsService implements OnModuleInit {
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "logoFit" character varying DEFAULT 'contain';`,
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "bookingAllowStaffSelection" boolean DEFAULT true;`,
       `UPDATE "settings" SET "bookingAllowStaffSelection" = true WHERE "bookingAllowStaffSelection" IS NULL;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "enableCopCurrency" boolean DEFAULT false;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "exchangeRateCop" numeric(12,4) DEFAULT 4000;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "exchangeRateCopMode" character varying DEFAULT 'MANUAL';`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "manualExchangeRateCop" numeric(12,4);`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "companyCopBank" character varying;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "companyCopAccountNumber" character varying;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "companyCopAccountHolder" character varying;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "acceptCashCop" boolean DEFAULT true;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "acceptTransferCop" boolean DEFAULT false;`,
     ];
 
     for (const sql of settingsColumns) {
@@ -87,6 +96,12 @@ export class SettingsService implements OnModuleInit {
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "binanceRef" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferRef" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferBank" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "amountCop" numeric(14,2);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "exchangeRateCop" numeric(12,4);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "copReceived" numeric(14,2);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changeAmountCop" numeric(14,2);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "copRef" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "copBank" character varying;
         CREATE INDEX IF NOT EXISTS "IDX_8bde46c5c57a69f2cb02d02b17" ON "order" ("linkedReservationId");
       `,
       `
@@ -170,11 +185,15 @@ export class SettingsService implements OnModuleInit {
           exchangeRateBs: 40.0,
           exchangeRateMode: 'BCV',
           currencySymbol: 'Bs.',
+          enableCopCurrency: false,
+          exchangeRateCop: 4000.0,
+          exchangeRateCopMode: 'MANUAL',
           ratesCache: {
             bcv: 40.0,
             parallel: 40.0,
             usdt: 40.0,
             eur: 43.0,
+            cop: 4000.0,
             updatedAt: new Date(0).toISOString(),
           },
         });
@@ -283,6 +302,37 @@ export class SettingsService implements OnModuleInit {
     return effectiveRate;
   }
 
+  async getEffectiveCopRate(tenantId?: string): Promise<number> {
+    const globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+    const globalCache = globalSettings?.ratesCache;
+    const globalCop = globalCache?.cop ? Number(globalCache.cop) : (globalSettings?.exchangeRateCop ? Number(globalSettings.exchangeRateCop) : 4000.0);
+
+    const { isValidUUID } = require('../utils/tenant-crypto');
+    if (!tenantId || !isValidUUID(tenantId)) {
+      return globalCop;
+    }
+
+    const tenantSettings = await this.settingsRepo.findOne({ where: { tenantId } });
+    if (!tenantSettings) {
+      return globalCop;
+    }
+
+    const mode = tenantSettings.exchangeRateCopMode || 'MANUAL';
+    let effectiveCop = globalCop;
+
+    if (mode === 'AUTO') {
+      effectiveCop = Number(globalCache?.cop || tenantSettings.exchangeRateCop || 4000.0);
+      if (Number(tenantSettings.exchangeRateCop) !== effectiveCop) {
+        tenantSettings.exchangeRateCop = effectiveCop;
+        await this.settingsRepo.save(tenantSettings);
+      }
+    } else {
+      effectiveCop = Number(tenantSettings.manualExchangeRateCop || tenantSettings.exchangeRateCop || globalCop || 4000.0);
+    }
+
+    return effectiveCop;
+  }
+
   async getSettings(tenantId?: string) {
     let globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
     
@@ -298,6 +348,7 @@ export class SettingsService implements OnModuleInit {
     }
 
     const globalRate = globalSettings?.exchangeRateBs ? Number(globalSettings.exchangeRateBs) : 40.0;
+    const globalCopRate = globalSettings?.ratesCache?.cop ? Number(globalSettings.ratesCache.cop) : 4000.0;
     const availableRates = globalSettings?.ratesCache || null;
 
     const { isValidUUID } = require('../utils/tenant-crypto');
@@ -317,7 +368,9 @@ export class SettingsService implements OnModuleInit {
       if (tenantSettings) {
         const { encodeTenantId } = require('../utils/tenant-crypto');
         const effectiveRate = await this.getEffectiveRate(tenantId);
+        const effectiveCopRate = await this.getEffectiveCopRate(tenantId);
         const mode = tenantSettings.exchangeRateMode || 'BCV';
+        const copMode = tenantSettings.exchangeRateCopMode || 'MANUAL';
         const defaultSymbol = mode === 'EUR' ? '€' : 'Bs.';
         const currencySymbol = tenantSettings.currencySymbol || defaultSymbol;
 
@@ -327,6 +380,10 @@ export class SettingsService implements OnModuleInit {
           exchangeRateBs: effectiveRate,
           exchangeRateMode: mode,
           manualExchangeRate: tenantSettings.manualExchangeRate,
+          enableCopCurrency: Boolean(tenantSettings.enableCopCurrency),
+          exchangeRateCop: effectiveCopRate,
+          exchangeRateCopMode: copMode,
+          manualExchangeRateCop: tenantSettings.manualExchangeRateCop,
           currencySymbol,
           availableRates,
           publicToken: encodeTenantId(tenantId) 
@@ -339,6 +396,10 @@ export class SettingsService implements OnModuleInit {
       exchangeRateBs: globalRate,
       exchangeRateMode: 'BCV',
       manualExchangeRate: null,
+      enableCopCurrency: false,
+      exchangeRateCop: globalCopRate,
+      exchangeRateCopMode: 'MANUAL',
+      manualExchangeRateCop: null,
       currencySymbol: 'Bs.',
       availableRates,
     };
@@ -408,6 +469,37 @@ export class SettingsService implements OnModuleInit {
     if (payload.exchangeRateBs !== undefined && (!payload.exchangeRateMode || payload.exchangeRateMode === 'MANUAL')) {
       settings.exchangeRateBs = payload.exchangeRateBs;
     }
+
+    if (payload.enableCopCurrency !== undefined) {
+      settings.enableCopCurrency = Boolean(payload.enableCopCurrency);
+    }
+    if (payload.exchangeRateCopMode !== undefined) {
+      settings.exchangeRateCopMode = payload.exchangeRateCopMode;
+      if (payload.exchangeRateCopMode === 'AUTO') {
+        settings.exchangeRateCop = Number(globalCache?.cop || payload.exchangeRateCop || settings.exchangeRateCop || 4000.0);
+      } else if (payload.exchangeRateCopMode === 'MANUAL') {
+        if (payload.manualExchangeRateCop !== undefined && payload.manualExchangeRateCop !== null) {
+          settings.manualExchangeRateCop = Number(payload.manualExchangeRateCop);
+          settings.exchangeRateCop = Number(payload.manualExchangeRateCop);
+        } else if (payload.exchangeRateCop !== undefined) {
+          settings.exchangeRateCop = Number(payload.exchangeRateCop);
+          settings.manualExchangeRateCop = Number(payload.exchangeRateCop);
+        }
+      }
+    }
+    if (payload.manualExchangeRateCop !== undefined) {
+      settings.manualExchangeRateCop = payload.manualExchangeRateCop;
+    }
+    if (payload.exchangeRateCop !== undefined && (!payload.exchangeRateCopMode || payload.exchangeRateCopMode === 'MANUAL')) {
+      settings.exchangeRateCop = Number(payload.exchangeRateCop);
+      settings.manualExchangeRateCop = Number(payload.exchangeRateCop);
+    }
+    if (payload.companyCopBank !== undefined) settings.companyCopBank = payload.companyCopBank;
+    if (payload.companyCopAccountNumber !== undefined) settings.companyCopAccountNumber = payload.companyCopAccountNumber;
+    if (payload.companyCopAccountHolder !== undefined) settings.companyCopAccountHolder = payload.companyCopAccountHolder;
+    if (payload.acceptCashCop !== undefined) settings.acceptCashCop = payload.acceptCashCop;
+    if (payload.acceptTransferCop !== undefined) settings.acceptTransferCop = payload.acceptTransferCop;
+
     if (payload.companyBank !== undefined) settings.companyBank = payload.companyBank;
     if (payload.companyCedula !== undefined) settings.companyCedula = payload.companyCedula;
     if (payload.companyPhone !== undefined) settings.companyPhone = payload.companyPhone;
@@ -540,12 +632,22 @@ export class SettingsService implements OnModuleInit {
       exchangeRateBs: Number(s.exchangeRateBs || 40.0),
       exchangeRateMode: s.exchangeRateMode || 'BCV',
       manualExchangeRate: s.manualExchangeRate,
+      enableCopCurrency: Boolean((s as any).enableCopCurrency),
+      exchangeRateCop: Number((s as any).exchangeRateCop || 4000.0),
+      exchangeRateCopMode: (s as any).exchangeRateCopMode || 'MANUAL',
+      manualExchangeRateCop: (s as any).manualExchangeRateCop ?? null,
       currencySymbol: s.currencySymbol || 'Bs.',
       availableRates: s.availableRates || null,
     };
   }
 
-  async updateExchangeRate(rate?: number, tenantId?: string, mode?: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'MANUAL', manualRate?: number) {
+  async updateExchangeRate(
+    rate?: number,
+    tenantId?: string,
+    mode?: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'MANUAL',
+    manualRate?: number,
+    copOptions?: { exchangeRateCop?: number; exchangeRateCopMode?: 'AUTO' | 'MANUAL'; manualExchangeRateCop?: number }
+  ) {
     const { isValidUUID } = require('../utils/tenant-crypto');
     if (tenantId && isValidUUID(tenantId)) {
       let tenantSettings = await this.settingsRepo.findOne({ where: { tenantId } });
@@ -565,8 +667,21 @@ export class SettingsService implements OnModuleInit {
         tenantSettings.manualExchangeRate = rate;
         tenantSettings.exchangeRateBs = rate;
       }
+      if (copOptions) {
+        if (copOptions.exchangeRateCopMode !== undefined) {
+          tenantSettings.exchangeRateCopMode = copOptions.exchangeRateCopMode;
+        }
+        if (copOptions.manualExchangeRateCop !== undefined) {
+          tenantSettings.manualExchangeRateCop = copOptions.manualExchangeRateCop;
+        }
+        if (copOptions.exchangeRateCop !== undefined && (!copOptions.exchangeRateCopMode || copOptions.exchangeRateCopMode === 'MANUAL')) {
+          tenantSettings.exchangeRateCop = copOptions.exchangeRateCop;
+          tenantSettings.manualExchangeRateCop = copOptions.exchangeRateCop;
+        }
+      }
       await this.settingsRepo.save(tenantSettings);
       await this.getEffectiveRate(tenantId);
+      await this.getEffectiveCopRate(tenantId);
     } else {
       if (rate !== undefined) {
         await this.settingsRepo.update({ id: 'GLOBAL' }, { exchangeRateBs: rate });
@@ -584,11 +699,12 @@ export class SettingsService implements OnModuleInit {
     return this.syncRates();
   }
 
-  async syncRates(): Promise<{ bcv: number; parallel: number; usdt: number; eur: number; updatedAt: string }> {
+  async syncRates(): Promise<{ bcv: number; parallel: number; usdt: number; eur: number; cop: number; updatedAt: string }> {
     let bcvVal: number | null = null;
     let parallelVal: number | null = null;
     let usdtVal: number | null = null;
     let eurVal: number | null = null;
+    let copVal: number | null = null;
 
     const apiKey = this.configService.get<string>('COTIZAVE_API_KEY');
     const now = Date.now();
@@ -691,6 +807,43 @@ export class SettingsService implements OnModuleInit {
       }
     }
 
+    // 3. Sincronizar TRM Oficial Colombia (COP/USD) desde DolarApi Colombia con fallback a Datos Abiertos Superfinanciera
+    try {
+      const controllerCop = new AbortController();
+      const timeoutCop = setTimeout(() => controllerCop.abort(), 6000);
+      const copRes = await fetch('https://co.dolarapi.com/v1/trm', { signal: controllerCop.signal });
+      clearTimeout(timeoutCop);
+      if (copRes.ok) {
+        const copData: any = await copRes.json();
+        const parsedCop = parseFloat(copData?.valor ?? copData?.promedio);
+        if (!isNaN(parsedCop) && parsedCop > 500) {
+          copVal = parsedCop;
+        }
+      }
+    } catch (copErr: any) {
+      this.logger.warn(`DolarApi Colombia falló (${copErr.message}). Intentando Datos Abiertos Superfinanciera...`);
+    }
+
+    if (!copVal) {
+      try {
+        const controllerSfc = new AbortController();
+        const timeoutSfc = setTimeout(() => controllerSfc.abort(), 6000);
+        const sfcRes = await fetch('https://www.datos.gov.co/resource/32sa-8pi3.json?$limit=1&$order=vigenciadesde%20DESC', {
+          signal: controllerSfc.signal,
+        });
+        clearTimeout(timeoutSfc);
+        if (sfcRes.ok) {
+          const sfcData: any[] = await sfcRes.json();
+          const parsedSfc = parseFloat(sfcData?.[0]?.valor);
+          if (!isNaN(parsedSfc) && parsedSfc > 500) {
+            copVal = parsedSfc;
+          }
+        }
+      } catch (sfcErr: any) {
+        this.logger.warn(`Respaldo TRM Superfinanciera falló: ${sfcErr.message}`);
+      }
+    }
+
     // Completar valores derivados si alguno faltó
     if (!usdtVal && parallelVal) usdtVal = parallelVal;
     if (!eurVal && bcvVal) eurVal = Number((bcvVal * 1.085).toFixed(2));
@@ -707,6 +860,7 @@ export class SettingsService implements OnModuleInit {
     const finalParallel = parallelVal || (currentCache.parallel && Number(currentCache.parallel) > 40 ? Number(currentCache.parallel) : finalBcv);
     const finalUsdt = usdtVal || (currentCache.usdt && Number(currentCache.usdt) > 40 ? Number(currentCache.usdt) : finalParallel);
     const finalEur = eurVal || (currentCache.eur && Number(currentCache.eur) > 40 ? Number(currentCache.eur) : Number((finalBcv * 1.12).toFixed(2)));
+    const finalCop = copVal || (currentCache.cop && Number(currentCache.cop) > 500 ? Number(currentCache.cop) : 4000.0);
 
     const hasRealRates = (bcvVal && bcvVal > 40) || finalBcv > 40;
     const newRatesCache = {
@@ -714,11 +868,13 @@ export class SettingsService implements OnModuleInit {
       parallel: finalParallel,
       usdt: finalUsdt,
       eur: finalEur,
+      cop: finalCop,
       updatedAt: hasRealRates ? new Date().toISOString() : (currentCache.updatedAt || new Date().toISOString()),
     };
 
     globalSettings.ratesCache = newRatesCache;
     globalSettings.exchangeRateBs = finalBcv;
+    globalSettings.exchangeRateCop = finalCop;
     await this.settingsRepo.save(globalSettings);
 
     // Propagar automáticamente las nuevas tasas a todas las organizaciones en modo automático
@@ -746,11 +902,17 @@ export class SettingsService implements OnModuleInit {
         .set({ exchangeRateBs: finalEur })
         .where('exchangeRateMode = :m', { m: 'EUR' })
         .execute();
+
+      await this.settingsRepo.createQueryBuilder()
+        .update(Settings)
+        .set({ exchangeRateCop: finalCop })
+        .where('exchangeRateCopMode = :cm', { cm: 'AUTO' })
+        .execute();
     } catch (errCascade: any) {
       this.logger.warn(`No se propagaron tasas a los inquilinos: ${errCascade.message}`);
     }
 
-    this.logger.log(`Tasas sincronizadas con éxito: BCV=${finalBcv}, Paralelo=${finalParallel}, USDT=${finalUsdt}, EUR=${finalEur}`);
+    this.logger.log(`Tasas sincronizadas con éxito: BCV=${finalBcv}, Paralelo=${finalParallel}, USDT=${finalUsdt}, EUR=${finalEur}, COP=${finalCop}`);
     return newRatesCache;
   }
 

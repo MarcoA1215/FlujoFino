@@ -11,6 +11,7 @@ export interface SplitPaymentItem {
   method: string;
   amountUSD: number;
   amountBS: number;
+  amountCOP?: number;
   reference?: string;
 }
 
@@ -133,6 +134,24 @@ export class Order {
   @Column('decimal', { nullable: true , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   exchangeRate: number;
 
+  @Column('decimal', { nullable: true, precision: 14, scale: 2, transformer: new ColumnNumericTransformer() })
+  amountCop: number;
+
+  @Column('decimal', { nullable: true, precision: 12, scale: 4, transformer: new ColumnNumericTransformer() })
+  exchangeRateCop: number;
+
+  @Column('decimal', { nullable: true, precision: 14, scale: 2, transformer: new ColumnNumericTransformer() })
+  copReceived: number;
+
+  @Column('decimal', { nullable: true, precision: 14, scale: 2, transformer: new ColumnNumericTransformer() })
+  changeAmountCop: number;
+
+  @Column({ nullable: true })
+  copRef: string;
+
+  @Column({ nullable: true })
+  copBank: string;
+
   @Column('decimal', { nullable: true, precision: 12, scale: 4, transformer: new ColumnNumericTransformer() })
   usdReceived: number;
 
@@ -143,7 +162,7 @@ export class Order {
   changeAmountBs: number;
 
   @Column({ nullable: true })
-  changeMethod: string; // 'CASH_USD' | 'PAGO_MOVIL' | 'CASH_BS'
+  changeMethod: string; // 'CASH_USD' | 'PAGO_MOVIL' | 'CASH_BS' | 'CASH_COP'
 
   @Column({ nullable: true })
   changeRef: string;

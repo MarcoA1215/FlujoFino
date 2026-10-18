@@ -94,6 +94,28 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const [availableRates, setAvailableRates] = useState<any>(null);
   const [manualInputRate, setManualInputRate] = useState<string>('');
+  const [enableCopCurrency, setEnableCopCurrency] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('flujofino_enable_cop') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [exchangeRateCop, setExchangeRateCop] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('flujofino_exchange_rate_cop');
+      if (saved && !isNaN(Number(saved)) && Number(saved) > 0) return Number(saved);
+    } catch {}
+    return 4000;
+  });
+  const [exchangeRateCopMode, setExchangeRateCopMode] = useState<'AUTO' | 'MANUAL'>(() => {
+    try {
+      return (localStorage.getItem('flujofino_rate_cop_mode') as 'AUTO' | 'MANUAL') || 'AUTO';
+    } catch {
+      return 'AUTO';
+    }
+  });
+  const [manualCopInput, setManualCopInput] = useState<string>('4000');
 
   const refreshPendingCount = async () => {
     try {
@@ -121,9 +143,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         if (res.data.manualExchangeRate) setManualInputRate(res.data.manualExchangeRate.toString());
         else setManualInputRate(rate.toString());
 
+        const copEnabled = Boolean(res.data.enableCopCurrency);
+        const copRate = Number(res.data.exchangeRateCop || 4000);
+        const copMode = (res.data.exchangeRateCopMode === 'MANUAL' ? 'MANUAL' : 'AUTO') as 'AUTO' | 'MANUAL';
+        setEnableCopCurrency(copEnabled);
+        setExchangeRateCop(copRate);
+        setExchangeRateCopMode(copMode);
+        setManualCopInput(String(res.data.manualExchangeRateCop || copRate || 4000));
+
         localStorage.setItem('flujofino_exchange_rate', rate.toString());
         localStorage.setItem('flujofino_rate_mode', mode);
         localStorage.setItem('flujofino_currency_symbol', symbol);
+        localStorage.setItem('flujofino_enable_cop', String(copEnabled));
+        localStorage.setItem('flujofino_exchange_rate_cop', String(copRate));
+        localStorage.setItem('flujofino_rate_cop_mode', copMode);
       }
     } catch (e) {
       const saved = localStorage.getItem('flujofino_exchange_rate');
@@ -150,6 +183,21 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         if (s.currencySymbol) setCurrencySymbol(s.currencySymbol);
         if (s.availableRates) setAvailableRates(s.availableRates);
         if (s.manualExchangeRate) setManualInputRate(s.manualExchangeRate.toString());
+        if (s.enableCopCurrency !== undefined) {
+          setEnableCopCurrency(Boolean(s.enableCopCurrency));
+          localStorage.setItem('flujofino_enable_cop', String(Boolean(s.enableCopCurrency)));
+        }
+        if (s.exchangeRateCop) {
+          setExchangeRateCop(Number(s.exchangeRateCop));
+          localStorage.setItem('flujofino_exchange_rate_cop', String(Number(s.exchangeRateCop)));
+        }
+        if (s.exchangeRateCopMode) {
+          setExchangeRateCopMode(s.exchangeRateCopMode);
+          localStorage.setItem('flujofino_rate_cop_mode', s.exchangeRateCopMode);
+        }
+        if (s.manualExchangeRateCop) {
+          setManualCopInput(String(s.manualExchangeRateCop));
+        }
       }
     };
 
@@ -420,6 +468,56 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     }
   };
 
+  const handleApplyCopRate = async (copMode: 'AUTO' | 'MANUAL') => {
+    if (!isAdmin) return;
+    try {
+      let targetCopRate = Number(availableRates?.cop || exchangeRateCop || 4000);
+      if (copMode === 'MANUAL') {
+        const parsed = parseFloat(manualCopInput);
+        if (!parsed || parsed <= 0) {
+          presentToast({ message: 'Ingresa una tasa COP válida mayor a cero', duration: 2500, color: 'warning' });
+          return;
+        }
+        targetCopRate = parsed;
+      }
+
+      await apiClient.put('/settings/exchange-rate', {
+        rate: exchangeRate,
+        mode: exchangeRateMode,
+        currencySymbol,
+        enableCopCurrency: true,
+        exchangeRateCopMode: copMode,
+        exchangeRateCop: targetCopRate,
+        manualExchangeRateCop: copMode === 'MANUAL' ? targetCopRate : undefined,
+      });
+
+      setExchangeRateCopMode(copMode);
+      setExchangeRateCop(targetCopRate);
+      localStorage.setItem('flujofino_exchange_rate_cop', String(targetCopRate));
+      localStorage.setItem('flujofino_rate_cop_mode', copMode);
+
+      window.dispatchEvent(
+        new CustomEvent('settings_updated', {
+          detail: {
+            enableCopCurrency: true,
+            exchangeRateCop: targetCopRate,
+            exchangeRateCopMode: copMode,
+            manualExchangeRateCop: copMode === 'MANUAL' ? targetCopRate : undefined,
+          },
+        })
+      );
+
+      presentToast({
+        message: `🇨🇴 Tasa COP actualizada (${copMode === 'AUTO' ? 'TRM Oficial' : 'Manual'}): $${Number(targetCopRate).toLocaleString('es-CO')} COP`,
+        duration: 2500,
+        color: 'success',
+      });
+      setShowRateModal(false);
+    } catch (e) {
+      presentToast({ message: 'Error al actualizar la tasa COP', duration: 2500, color: 'danger' });
+    }
+  };
+
   const getRatePillText = () => {
     const symbol = currencySymbol || (exchangeRateMode === 'COP' ? 'COP' : 'Bs.');
     const formattedVal =
@@ -545,6 +643,35 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 style={{ cursor: isAdmin ? 'pointer' : 'default', userSelect: 'none' }}
               >
                 <span>{getRatePillText()}</span>
+              </div>
+            )}
+
+            {/* COP Tri-Currency Pill (Shown when business enables Pesos Colombianos) */}
+            {showRate && enableCopCurrency && (
+              <div
+                className={`ff-pill ${isAdmin ? 'ff-pill-interactive' : ''}`}
+                onClick={() => {
+                  if (isAdmin) {
+                    setShowRateModal(true);
+                  } else {
+                    presentToast({
+                      message: '🔒 Solo un administrador puede modificar la tasa COP del negocio',
+                      duration: 2500,
+                      color: 'warning',
+                    });
+                  }
+                }}
+                title={`Tasa Pesos Colombianos (${exchangeRateCopMode === 'AUTO' ? 'TRM Oficial' : 'Tasa Frontera Manual'})`}
+                style={{
+                  cursor: isAdmin ? 'pointer' : 'default',
+                  userSelect: 'none',
+                  background: '#FEF9C3',
+                  color: '#854D0E',
+                  border: '1px solid #FDE047',
+                  fontWeight: 800,
+                }}
+              >
+                <span>🇨🇴 COP: ${Number(exchangeRateCop || 4000).toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
               </div>
             )}
 
@@ -892,6 +1019,83 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Sección Triángulo Multi-Moneda: Pesos Colombianos (COP) */}
+              {enableCopCurrency && (
+                <div
+                  style={{
+                    marginTop: '10px',
+                    padding: '14px',
+                    borderRadius: '14px',
+                    border: '2px solid #FDE047',
+                    background: '#FEFCE8',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 900, color: '#854D0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🇨🇴 Tasa Pesos Colombianos (COP)
+                      <span style={{ fontSize: '10px', background: '#CA8A04', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
+                        {exchangeRateCopMode === 'AUTO' ? 'TRM AUTO' : 'MANUAL'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyCopRate('AUTO')}
+                      style={{
+                        background: exchangeRateCopMode === 'AUTO' ? '#10B981' : '#ffffff',
+                        color: exchangeRateCopMode === 'AUTO' ? '#ffffff' : '#0F172A',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '8px',
+                        padding: '5px 10px',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      🌐 Usar TRM ({Number(availableRates?.cop || exchangeRateCop || 4000).toLocaleString('es-CO', { maximumFractionDigits: 0 })})
+                    </button>
+                  </div>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '11px', color: '#713F12' }}>
+                    O personaliza la tasa en pesos por cada $1 USD para tu zona:
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="number"
+                      step="1"
+                      min="1"
+                      value={manualCopInput}
+                      onChange={e => setManualCopInput(e.target.value)}
+                      placeholder="Ej. 4000"
+                      style={{
+                        flex: 1,
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #FDE047',
+                        fontSize: '14px',
+                        fontWeight: 800,
+                        background: '#ffffff',
+                        color: '#0F172A'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleApplyCopRate('MANUAL')}
+                      style={{
+                        padding: '9px 14px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: '#CA8A04',
+                        color: '#ffffff',
+                        fontWeight: 800,
+                        fontSize: '12px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Fijar COP
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

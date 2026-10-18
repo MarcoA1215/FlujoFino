@@ -164,6 +164,30 @@ export class CreateOrderDto {
   exchangeRateBs?: number;
 
   @IsOptional()
+  @IsNumber()
+  amountCop?: number;
+
+  @IsOptional()
+  @IsNumber()
+  exchangeRateCop?: number;
+
+  @IsOptional()
+  @IsNumber()
+  copReceived?: number;
+
+  @IsOptional()
+  @IsNumber()
+  changeAmountCop?: number;
+
+  @IsOptional()
+  @IsString()
+  copRef?: string;
+
+  @IsOptional()
+  @IsString()
+  copBank?: string;
+
+  @IsOptional()
   @IsArray()
   items: {
     id?: string;
@@ -326,6 +350,30 @@ export class UpdatePaymentDto {
   exchangeRateBs?: number;
 
   @IsOptional()
+  @IsNumber()
+  amountCop?: number;
+
+  @IsOptional()
+  @IsNumber()
+  exchangeRateCop?: number;
+
+  @IsOptional()
+  @IsNumber()
+  copReceived?: number;
+
+  @IsOptional()
+  @IsNumber()
+  changeAmountCop?: number;
+
+  @IsOptional()
+  @IsString()
+  copRef?: string;
+
+  @IsOptional()
+  @IsString()
+  copBank?: string;
+
+  @IsOptional()
   @IsArray()
   splitPayments?: SplitPaymentItem[];
 }
@@ -356,6 +404,12 @@ export class OrdersService implements OnModuleInit {
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "binanceRef" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferRef" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferBank" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "amountCop" numeric(14,2);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "exchangeRateCop" numeric(12,4);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "copReceived" numeric(14,2);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changeAmountCop" numeric(14,2);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "copRef" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "copBank" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "nextAbonoDueDate" timestamp;
         ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "employeeId" character varying;
         ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "variantId" character varying;
@@ -571,6 +625,11 @@ export class OrdersService implements OnModuleInit {
       ? Number(dto.exchangeRate)
       : (tenantSettings?.exchangeRateBs ? Number(tenantSettings.exchangeRateBs) : await this.settingsService.getEffectiveRate(tenantId));
 
+    const isCopEnabled = Boolean((tenantSettings as any)?.enableCopCurrency);
+    const orderExchangeRateCop = (dto.exchangeRateCop && Number(dto.exchangeRateCop) > 0)
+      ? Number(dto.exchangeRateCop)
+      : ((tenantSettings as any)?.exchangeRateCop ? Number((tenantSettings as any).exchangeRateCop) : 4000.0);
+
     return this.dataSource.transaction(async (manager) => {
       if (dto.paymentMethod === 'PAGO_MOVIL' && dto.pagoMovilRef && dto.pagoMovilRef.trim().length > 0) {
         const cleanRef = dto.pagoMovilRef.trim();
@@ -739,6 +798,8 @@ export class OrdersService implements OnModuleInit {
           vueltoNote = `[Vuelto: $${Number(dto.changeAmount).toFixed(2)} (Bs. ${Number(dto.changeAmountBs || 0).toFixed(2)}) vía Pago Móvil Ref: ${dto.changeRef || 'S/R'}${bankStr}${phoneStr}]`;
         } else if (dto.changeMethod === 'CASH_BS') {
           vueltoNote = `[Vuelto: $${Number(dto.changeAmount).toFixed(2)} en Efectivo Bs. ${Number(dto.changeAmountBs || 0).toFixed(2)}]`;
+        } else if (dto.changeMethod === 'CASH_COP') {
+          vueltoNote = `[Vuelto: $${Number(dto.changeAmount).toFixed(2)} en Efectivo COP $${Math.round(Number(dto.changeAmountCop || (Number(dto.changeAmount) * orderExchangeRateCop))).toLocaleString('es-CO')}]`;
         } else {
           vueltoNote = `[Vuelto: $${Number(dto.changeAmount).toFixed(2)} USD en Efectivo]`;
         }
@@ -750,6 +811,12 @@ export class OrdersService implements OnModuleInit {
         const recNote = `[Efectivo Recibido: $${Number(dto.usdReceived).toFixed(2)}]`;
         if (!finalNotes.includes('Efectivo Recibido:')) {
           finalNotes = finalNotes ? `${recNote} | ${finalNotes}` : recNote;
+        }
+      }
+      if ((dto.paymentMethod === 'CASH_COP' || dto.paymentMethod === 'COP') && dto.copReceived) {
+        const recCopNote = `[Efectivo COP Recibido: $${Math.round(Number(dto.copReceived)).toLocaleString('es-CO')} COP]`;
+        if (!finalNotes.includes('Efectivo COP Recibido:')) {
+          finalNotes = finalNotes ? `${recCopNote} | ${finalNotes}` : recCopNote;
         }
       }
 
@@ -785,7 +852,7 @@ export class OrdersService implements OnModuleInit {
         notes: finalNotes,
         tableNumber: dto.tableNumber || '',
         paymentStatus: dto.paymentStatus || PaymentStatus.PENDING,
-        paymentReported: Boolean(dto.paymentReported || (dto.pagoMovilRef || dto.transferRef || dto.binanceRef)) && dto.paymentStatus !== PaymentStatus.PAID,
+        paymentReported: Boolean(dto.paymentReported || (dto.pagoMovilRef || dto.transferRef || dto.binanceRef || dto.copRef)) && dto.paymentStatus !== PaymentStatus.PAID,
         paymentProofUrl: dto.paymentProofUrl || undefined,
         paymentRejectedReason: dto.paymentRejectedReason || undefined,
         status: initialStatus,
@@ -811,6 +878,10 @@ export class OrdersService implements OnModuleInit {
         binanceRef: dto.binanceRef,
         transferRef: dto.transferRef,
         transferBank: dto.transferBank,
+        copRef: dto.copRef,
+        copBank: dto.copBank,
+        copReceived: dto.copReceived,
+        changeAmountCop: dto.changeAmountCop,
         usdReceived: dto.usdReceived,
         changeAmount: dto.changeAmount,
         changeAmountBs: dto.changeAmountBs,
@@ -820,6 +891,8 @@ export class OrdersService implements OnModuleInit {
         changeBank: dto.changeBank,
         amountBs: dto.amountBs,
         exchangeRate: orderExchangeRate,
+        amountCop: dto.amountCop,
+        exchangeRateCop: (isCopEnabled || dto.exchangeRateCop || dto.amountCop || dto.copReceived) ? orderExchangeRateCop : undefined,
         offlineId: dto.offlineId || (dto as any)?.payload?.offlineId || undefined,
         createdAt: orderCreatedAt,
         abonosTotal: dto.initialAbono || 0,
@@ -1087,8 +1160,17 @@ export class OrdersService implements OnModuleInit {
         savedOrder.amountBs = (dto.amountBs !== undefined && Number(dto.amountBs) > 0)
           ? Number(dto.amountBs)
           : Number((savedOrder.totalAmount * orderExchangeRate).toFixed(2));
+        if (isCopEnabled || dto.exchangeRateCop || dto.amountCop || dto.copReceived) {
+          savedOrder.exchangeRateCop = orderExchangeRateCop;
+          savedOrder.amountCop = (dto.amountCop !== undefined && Number(dto.amountCop) > 0)
+            ? Math.round(Number(dto.amountCop))
+            : Math.round(savedOrder.totalAmount * orderExchangeRateCop);
+        }
         if (savedOrder.changeAmount && (!savedOrder.changeAmountBs || Number(savedOrder.changeAmountBs) === 0)) {
           savedOrder.changeAmountBs = Number((Number(savedOrder.changeAmount) * orderExchangeRate).toFixed(2));
+        }
+        if (savedOrder.changeAmount && savedOrder.changeMethod === 'CASH_COP' && (!savedOrder.changeAmountCop || Number(savedOrder.changeAmountCop) === 0)) {
+          savedOrder.changeAmountCop = Math.round(Number(savedOrder.changeAmount) * orderExchangeRateCop);
         }
         if (savedOrder.totalAmount === 0) {
           savedOrder.paymentStatus = PaymentStatus.PAID;
@@ -1100,6 +1182,9 @@ export class OrdersService implements OnModuleInit {
             totalReceivedUSD = Math.max(totalReceivedUSD, splitSum);
           } else if (dto.usdReceived && Number(dto.usdReceived) > 0) {
             totalReceivedUSD = Math.max(totalReceivedUSD, Number(dto.usdReceived) - Number(savedOrder.changeAmount || 0));
+          } else if (dto.copReceived && Number(dto.copReceived) > 0 && orderExchangeRateCop > 0) {
+            const copUsdEquiv = Number(dto.copReceived) / orderExchangeRateCop;
+            totalReceivedUSD = Math.max(totalReceivedUSD, copUsdEquiv - Number(savedOrder.changeAmount || 0));
           }
 
           const roundedReceived = roundCurrency(totalReceivedUSD);
@@ -1262,6 +1347,12 @@ export class OrdersService implements OnModuleInit {
     if (dto.binanceRef !== undefined) order.binanceRef = dto.binanceRef;
     if (dto.transferRef !== undefined) order.transferRef = dto.transferRef;
     if (dto.transferBank !== undefined) order.transferBank = dto.transferBank;
+    if (dto.copRef !== undefined) order.copRef = dto.copRef;
+    if (dto.copBank !== undefined) order.copBank = dto.copBank;
+    if (dto.copReceived !== undefined) order.copReceived = dto.copReceived;
+    if (dto.changeAmountCop !== undefined) order.changeAmountCop = dto.changeAmountCop;
+    if (dto.amountCop !== undefined) order.amountCop = dto.amountCop;
+    if (dto.exchangeRateCop !== undefined) order.exchangeRateCop = dto.exchangeRateCop;
     if (dto.usdReceived !== undefined) order.usdReceived = dto.usdReceived;
     if (dto.changeAmount !== undefined) order.changeAmount = dto.changeAmount;
     if (dto.changeAmountBs !== undefined) order.changeAmountBs = dto.changeAmountBs;

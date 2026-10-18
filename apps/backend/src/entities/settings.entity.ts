@@ -22,12 +22,28 @@ export class Settings {
   @Column({ type: 'varchar', default: 'Bs.' })
   currencySymbol: string; // 'Bs.' | '€'
 
+  @Column('boolean', { default: false })
+  enableCopCurrency: boolean;
+
+  @Column('decimal', { default: 4000.0, precision: 12, scale: 4, transformer: new ColumnNumericTransformer() })
+  exchangeRateCop: number;
+
+  @Column({
+    type: 'varchar',
+    default: 'MANUAL',
+  })
+  exchangeRateCopMode: 'AUTO' | 'MANUAL';
+
+  @Column('decimal', { precision: 12, scale: 4, nullable: true, transformer: new ColumnNumericTransformer() })
+  manualExchangeRateCop: number | null;
+
   @Column('jsonb', { nullable: true })
   ratesCache: {
     bcv?: number;
     parallel?: number;
     usdt?: number;
     eur?: number;
+    cop?: number;
     updatedAt?: string;
   } | null;
 
@@ -45,6 +61,16 @@ export class Settings {
 
   @Column({ nullable: true })
   companyAccountHolder: string;
+
+  // --- Datos bancarios / Nequi en Pesos Colombianos (COP) ---
+  @Column({ nullable: true })
+  companyCopBank: string;
+
+  @Column({ nullable: true })
+  companyCopAccountNumber: string;
+
+  @Column({ nullable: true })
+  companyCopAccountHolder: string;
 
   // --- Binance Pay Config ---
   @Column({ nullable: true })
@@ -71,6 +97,12 @@ export class Settings {
 
   @Column('boolean', { default: false })
   acceptTransfer: boolean;
+
+  @Column('boolean', { default: true })
+  acceptCashCop: boolean;
+
+  @Column('boolean', { default: false })
+  acceptTransferCop: boolean;
 
   // --- Políticas de abonos y crédito ---
   @Column('boolean', { default: true })

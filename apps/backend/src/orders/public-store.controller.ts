@@ -163,6 +163,13 @@ export class PublicStoreController {
       rate = Number(globalSettings?.exchangeRateBs || 40.0);
     }
 
+    const enableCopCurrency = Boolean(settings?.enableCopCurrency);
+    let rateCop = Number(settings?.exchangeRateCop || 0);
+    if (!rateCop) {
+      const globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+      rateCop = Number(globalSettings?.ratesCache?.cop || globalSettings?.exchangeRateCop || 4000.0);
+    }
+
     return {
       tenant: {
         id: token,
@@ -170,11 +177,16 @@ export class PublicStoreController {
       },
       settings: {
         exchangeRateBs: rate,
+        enableCopCurrency,
+        exchangeRateCop: rateCop,
         companyBank: settings?.companyBank || '',
         companyCedula: settings?.companyCedula || '',
         companyPhone: settings?.companyPhone || '',
         companyAccountNumber: settings?.companyAccountNumber || '',
         companyAccountHolder: settings?.companyAccountHolder || '',
+        companyCopBank: settings?.companyCopBank || '',
+        companyCopAccountNumber: settings?.companyCopAccountNumber || '',
+        companyCopAccountHolder: settings?.companyCopAccountHolder || '',
         binancePayId: settings?.binancePayId || '',
         binanceEmail: settings?.binanceEmail || '',
         acceptCashUsd: settings?.acceptCashUsd !== false,
@@ -182,6 +194,8 @@ export class PublicStoreController {
         acceptCardPos: settings?.acceptCardPos === true,
         acceptBinance: settings?.acceptBinance === true,
         acceptTransfer: settings?.acceptTransfer === true,
+        acceptCashCop: settings?.acceptCashCop !== false,
+        acceptTransferCop: settings?.acceptTransferCop === true,
         themePrimaryColor: settings?.themePrimaryColor || '#10b981',
         themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
         companyLogoUrl: settings?.companyLogoUrl || null,
@@ -320,7 +334,7 @@ export class PublicStoreController {
     }
 
     // 2. Crear orden mediante OrdersService con sanitización estricta de seguridad
-    const hasElectronicPayment = Boolean(dto.pagoMovilRef || dto.transferRef || dto.binanceRef || dto.paymentReported);
+    const hasElectronicPayment = Boolean(dto.pagoMovilRef || dto.transferRef || dto.binanceRef || dto.copRef || dto.paymentReported);
     const normalizedCedula = this.normalizeDocumentId((dto as any).customerCedula || (dto as any).identification || dto.pagoMovilCedula);
     const orderPayload: CreateOrderDto = {
       items: dto.items,
@@ -343,8 +357,12 @@ export class PublicStoreController {
       binanceRef: dto.binanceRef?.trim(),
       transferRef: dto.transferRef?.trim(),
       transferBank: dto.transferBank?.trim(),
+      copRef: dto.copRef?.trim(),
+      copBank: dto.copBank?.trim(),
       amountBs: dto.amountBs ? Number(dto.amountBs) : undefined,
       exchangeRate: dto.exchangeRate ? Number(dto.exchangeRate) : undefined,
+      amountCop: dto.amountCop ? Number(dto.amountCop) : undefined,
+      exchangeRateCop: dto.exchangeRateCop ? Number(dto.exchangeRateCop) : undefined,
       splitPayments: undefined,
       usdReceived: undefined,
       changeAmount: undefined,
@@ -388,6 +406,8 @@ export class PublicStoreController {
       abonosHistory: createdOrder.abonosHistory || [],
       totalAmount: createdOrder.totalAmount,
       totalAmountBs: createdOrder.amountBs,
+      totalAmountCop: createdOrder.amountCop,
+      exchangeRateCop: createdOrder.exchangeRateCop,
       deliveryMethod: createdOrder.deliveryMethod,
       customerName: createdOrder.customerName,
       customerPhone: createdOrder.customerPhone,
@@ -460,6 +480,7 @@ export class PublicStoreController {
     @Body() dto: {
       amount: number;
       amountBs?: number;
+      amountCop?: number;
       method: string;
       reference: string;
       bank?: string;
@@ -491,6 +512,7 @@ export class PublicStoreController {
       id: Date.now().toString(),
       amount: Number(dto.amount),
       amountBs: dto.amountBs ? Number(dto.amountBs) : undefined,
+      amountCop: dto.amountCop ? Number(dto.amountCop) : undefined,
       method: cleanMethod,
       ref: cleanRef,
       reference: cleanRef,
@@ -516,6 +538,9 @@ export class PublicStoreController {
     } else if (cleanMethod === 'TRANSFER') {
       order.transferRef = cleanRef;
       if (cleanBank) order.transferBank = cleanBank;
+    } else if (cleanMethod === 'TRANSFER_COP' || cleanMethod === 'COP') {
+      order.copRef = cleanRef;
+      if (cleanBank) order.copBank = cleanBank;
     } else if (cleanMethod === 'BINANCE') {
       order.binanceRef = cleanRef;
     } else {
@@ -527,7 +552,7 @@ export class PublicStoreController {
       order.paymentProofUrl = dto.paymentProofUrl;
     }
 
-    const methodLabel = cleanMethod === 'PAGO_MOVIL' ? 'Pago Móvil' : cleanMethod === 'BINANCE' ? 'Binance' : cleanMethod === 'TRANSFER' ? 'Transferencia' : 'Pago';
+    const methodLabel = cleanMethod === 'PAGO_MOVIL' ? 'Pago Móvil' : cleanMethod === 'BINANCE' ? 'Binance' : cleanMethod === 'TRANSFER_COP' ? 'Transferencia COP / Nequi' : cleanMethod === 'TRANSFER' ? 'Transferencia' : 'Pago';
     const noteTag = `[Abono/Pago Reportado: $${Number(dto.amount).toFixed(2)} vía ${methodLabel} Ref: ${cleanRef}${cleanBank ? ` (${cleanBank})` : ''}]`;
     order.notes = order.notes ? `${order.notes} | ${noteTag}` : noteTag;
 
@@ -632,6 +657,8 @@ export class PublicStoreController {
       pagoMovilBank: order.pagoMovilBank,
       transferRef: order.transferRef,
       transferBank: order.transferBank,
+      copRef: order.copRef,
+      copBank: order.copBank,
       binanceRef: order.binanceRef,
       customerName: order.customerName,
       customerPhone: order.customerPhone,
@@ -642,6 +669,8 @@ export class PublicStoreController {
       amountBs: order.amountBs,
       grandTotalBs: Number(order.amountBs),
       exchangeRate: Number(order.exchangeRate || 40),
+      amountCop: order.amountCop ? Number(order.amountCop) : undefined,
+      exchangeRateCop: order.exchangeRateCop ? Number(order.exchangeRateCop) : undefined,
       deliveryMethod: order.deliveryMethod,
       customerAddress: order.customerAddress,
       createdAt: order.createdAt,
