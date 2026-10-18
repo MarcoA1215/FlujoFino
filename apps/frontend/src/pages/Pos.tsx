@@ -89,7 +89,7 @@ type CartItem = {
   hasModifications?: boolean;
 };
 
-type PaymentMethod = 'PENDING' | 'PAGO_MOVIL' | 'USD' | 'PUNTO' | 'BINANCE' | 'TRANSFER';
+type PaymentMethod = 'PENDING' | 'PAGO_MOVIL' | 'USD' | 'PUNTO' | 'BINANCE' | 'TRANSFER' | 'CASH_COP' | 'TRANSFER_COP';
 
 export function getProductStockBadgeLabel(pStock: number, isService: boolean = false, durationMinutes?: number): string {
   if (isService) {
@@ -181,6 +181,20 @@ const Pos: React.FC = () => {
     } catch (e) {}
     return 'Bs.';
   });
+  const [enableCopCurrency, setEnableCopCurrency] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('flujofino_enable_cop') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [exchangeRateCop, setExchangeRateCop] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('flujofino_exchange_rate_cop');
+      if (saved && !isNaN(Number(saved)) && Number(saved) > 0) return Number(saved);
+    } catch {}
+    return 4000;
+  });
   const [, setAllowPartialPayments] = useState<boolean>(false);
   const [settings, setSettings] = useState<any>(() => {
     try {
@@ -214,8 +228,12 @@ const Pos: React.FC = () => {
   const [transferRef, setTransferRef] = useState('');
   const [transferBank, setTransferBank] = useState('');
 
+  const [copReceived, setCopReceived] = useState<number | ''>('');
+  const [copRef, setCopRef] = useState('');
+  const [copBank, setCopBank] = useState('Nequi');
+
   const [usdReceived, setUsdReceived] = useState<number | ''>('');
-  const [changeMethod, setChangeMethod] = useState<'CASH_USD' | 'PAGO_MOVIL' | 'CASH_BS'>('CASH_USD');
+  const [changeMethod, setChangeMethod] = useState<'CASH_USD' | 'PAGO_MOVIL' | 'CASH_BS' | 'CASH_COP'>('CASH_USD');
   const [changeRef, setChangeRef] = useState('');
   const [changePhone, setChangePhone] = useState('');
   const [changeBank, setChangeBank] = useState('');
@@ -284,6 +302,14 @@ const Pos: React.FC = () => {
         setCurrencySymbol(s.currencySymbol);
         localStorage.setItem('flujofino_currency_symbol', s.currencySymbol);
       }
+      const copEnabled = Boolean(s.enableCopCurrency);
+      const copRate = Number(s.exchangeRateCop || 4000);
+      setEnableCopCurrency(copEnabled);
+      setExchangeRateCop(copRate);
+      localStorage.setItem('flujofino_enable_cop', String(copEnabled));
+      localStorage.setItem('flujofino_exchange_rate_cop', String(copRate));
+      if (s.companyCopBank) setCopBank(s.companyCopBank);
+
       localStorage.setItem('flujofino_cached_settings', JSON.stringify(s));
       setAllowPartialPayments(s.allowPartialPayments !== false);
 
@@ -294,6 +320,8 @@ const Pos: React.FC = () => {
 
       if (s.acceptPagoMovil !== false) setPaymentMethod('PAGO_MOVIL');
       else if (s.acceptCashUsd !== false) setPaymentMethod('USD');
+      else if (copEnabled && s.acceptCashCop !== false) setPaymentMethod('CASH_COP');
+      else if (copEnabled && s.acceptTransferCop === true) setPaymentMethod('TRANSFER_COP');
       else if (s.acceptCardPos === true) setPaymentMethod('PUNTO');
       else if (s.acceptBinance === true) setPaymentMethod('BINANCE');
       else if (s.acceptTransfer === true) setPaymentMethod('TRANSFER');
@@ -482,6 +510,12 @@ const Pos: React.FC = () => {
         }
         if (s.currencySymbol) {
           setCurrencySymbol(s.currencySymbol);
+        }
+        if (s.enableCopCurrency !== undefined) {
+          setEnableCopCurrency(Boolean(s.enableCopCurrency));
+        }
+        if (s.exchangeRateCop) {
+          setExchangeRateCop(Number(s.exchangeRateCop));
         }
         setSettings((prev: any) => ({ ...prev, ...s }));
       }
@@ -904,23 +938,37 @@ const Pos: React.FC = () => {
     return totalCart * exchangeRate;
   }, [totalCart, exchangeRate]);
 
+  const totalCartCop = useMemo(() => {
+    return Math.round(totalCart * exchangeRateCop);
+  }, [totalCart, exchangeRateCop]);
+
   const formatLocalAmount = (val: number) => {
     return currencySymbol === 'COP'
       ? Number(val).toLocaleString('es-CO')
       : Number(val).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  // Vuelto calculation for Cash USD
+  // Vuelto calculation for Cash USD or Cash COP
   const vueltoUsd = useMemo(() => {
-    if (typeof usdReceived === 'number' && usdReceived >= totalCart) {
+    if (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived >= totalCart) {
       return usdReceived - totalCart;
     }
+    if (paymentMethod === 'CASH_COP' && typeof copReceived === 'number' && copReceived >= totalCartCop && exchangeRateCop > 0) {
+      return (copReceived - totalCartCop) / exchangeRateCop;
+    }
     return 0;
-  }, [usdReceived, totalCart]);
+  }, [paymentMethod, usdReceived, copReceived, totalCart, totalCartCop, exchangeRateCop]);
 
   const vueltoBs = useMemo(() => {
     return vueltoUsd * exchangeRate;
   }, [vueltoUsd, exchangeRate]);
+
+  const vueltoCop = useMemo(() => {
+    if (paymentMethod === 'CASH_COP' && typeof copReceived === 'number' && copReceived >= totalCartCop) {
+      return Math.round(copReceived - totalCartCop);
+    }
+    return Math.round(vueltoUsd * exchangeRateCop);
+  }, [paymentMethod, copReceived, totalCartCop, vueltoUsd, exchangeRateCop]);
 
   // Place / Confirm Order (handles Online & Offline with Dexie)
   const placeOrder = async () => {
@@ -950,6 +998,34 @@ const Pos: React.FC = () => {
           });
           return;
         }
+      }
+
+      if (paymentMethod === 'CASH_COP') {
+        if (copReceived === '' || copReceived === undefined || isNaN(Number(copReceived))) {
+          presentToast({
+            message: 'Por favor ingresa el monto de efectivo recibido en Pesos Colombianos ($ COP)',
+            duration: 3000,
+            color: 'warning'
+          });
+          return;
+        }
+        if (Number(copReceived) < totalCartCop) {
+          presentToast({
+            message: `El monto recibido ($${Number(copReceived).toLocaleString('es-CO')} COP) es menor al total a pagar ($${totalCartCop.toLocaleString('es-CO')} COP)`,
+            duration: 3000,
+            color: 'warning'
+          });
+          return;
+        }
+      }
+
+      if (paymentMethod === 'TRANSFER_COP' && !copRef.trim()) {
+        presentToast({
+          message: 'Por favor ingresa el número de referencia o comprobante Nequi / Bancolombia',
+          duration: 3000,
+          color: 'warning'
+        });
+        return;
       }
 
       if (paymentMethod === 'PAGO_MOVIL') {
@@ -1002,7 +1078,10 @@ const Pos: React.FC = () => {
       }
     }
 
-    if (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) {
+    const hasChange = (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ||
+      (paymentMethod === 'CASH_COP' && typeof copReceived === 'number' && copReceived > totalCartCop);
+
+    if (hasChange) {
       if (changeMethod === 'PAGO_MOVIL' && !changeRef.trim()) {
         presentToast({
           message: 'Por favor indica la Referencia del Pago Móvil del vuelto para el arqueo de caja',
@@ -1056,19 +1135,25 @@ const Pos: React.FC = () => {
       binanceRef: paymentMethod === 'BINANCE' ? binanceRef : undefined,
       transferRef: paymentMethod === 'TRANSFER' ? transferRef : undefined,
       transferBank: paymentMethod === 'TRANSFER' ? transferBank : undefined,
+      copReceived: paymentMethod === 'CASH_COP' && typeof copReceived === 'number' ? copReceived : undefined,
+      copRef: paymentMethod === 'TRANSFER_COP' ? copRef : undefined,
+      copBank: paymentMethod === 'TRANSFER_COP' ? copBank : undefined,
       usdReceived: paymentMethod === 'USD' && typeof usdReceived === 'number' ? usdReceived : undefined,
-      changeAmount: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? vueltoUsd : undefined,
-      changeAmountBs: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? vueltoBs : undefined,
-      changeMethod: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? changeMethod : undefined,
-      changeRef: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? (changeRef.trim() || undefined) : undefined,
-      changePhone: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart && changeMethod === 'PAGO_MOVIL') ? (changePhone.trim() || customerPhone.trim() || customerCedula.trim() || undefined) : undefined,
-      changeBank: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart && changeMethod === 'PAGO_MOVIL') ? (changeBank || undefined) : undefined,
+      changeAmount: hasChange ? vueltoUsd : undefined,
+      changeAmountBs: hasChange ? vueltoBs : undefined,
+      changeAmountCop: hasChange ? vueltoCop : undefined,
+      changeMethod: hasChange ? changeMethod : undefined,
+      changeRef: hasChange ? (changeRef.trim() || undefined) : undefined,
+      changePhone: (hasChange && changeMethod === 'PAGO_MOVIL') ? (changePhone.trim() || customerPhone.trim() || customerCedula.trim() || undefined) : undefined,
+      changeBank: (hasChange && changeMethod === 'PAGO_MOVIL') ? (changeBank || undefined) : undefined,
       initialAbono: paymentMethod === 'PENDING' ? abonoAmount : undefined,
       nextAbonoDueDate: paymentMethod === 'PENDING' && abonoAmount < totalCart && nextAbonoDueDate ? nextAbonoDueDate : undefined,
       bypassMinDeposit: paymentMethod === 'PENDING' ? bypassMinDeposit : undefined,
       amountBs: Number(totalCartBs.toFixed(2)),
       exchangeRate: exchangeRate,
       exchangeRateBs: exchangeRate,
+      amountCop: enableCopCurrency ? totalCartCop : undefined,
+      exchangeRateCop: enableCopCurrency ? exchangeRateCop : undefined,
       linkedReservationId: linkedReservationId || undefined
     };
 
@@ -1080,7 +1165,8 @@ const Pos: React.FC = () => {
       const statusText = paymentMethod === 'PENDING'
         ? (abonoAmount > 0 ? `Abonado ($${abonoAmount.toFixed(2)} USD) - Pendiente: $${Math.max(0, totalCart - abonoAmount).toFixed(2)} USD` : 'Cuenta Abierta / Por Pagar')
         : 'Pagado ✓';
-      return `🧾 *Comprobante de Venta ${code}*\n👤 Cliente: ${customerName.trim() || 'Cliente Mostrador'}\n\n*Detalle:*\n${itemsLines}\n\n💵 *Total:* $${totalCart.toFixed(2)} USD (${currencySymbol} ${formatLocalAmount(totalCartBs)})\n📌 *Estado:* ${statusText}`;
+      const copPart = enableCopCurrency ? ` | 🇨🇴 $${totalCartCop.toLocaleString('es-CO')} COP` : '';
+      return `🧾 *Comprobante de Venta ${code}*\n👤 Cliente: ${customerName.trim() || 'Cliente Mostrador'}\n\n*Detalle:*\n${itemsLines}\n\n💵 *Total:* $${totalCart.toFixed(2)} USD (${currencySymbol} ${formatLocalAmount(totalCartBs)}${copPart})\n📌 *Estado:* ${statusText}`;
     };
 
     const executeOrderSubmit = async (orderPayload: any) => {
@@ -1147,6 +1233,8 @@ const Pos: React.FC = () => {
             setBinanceRef('');
             setTransferRef('');
             setTransferBank('');
+            setCopReceived('');
+            setCopRef('');
             setUsdReceived('');
             setChangeMethod('CASH_USD');
             setChangeRef('');
@@ -1208,6 +1296,8 @@ const Pos: React.FC = () => {
           setBinanceRef('');
           setTransferRef('');
           setTransferBank('');
+          setCopReceived('');
+          setCopRef('');
           setUsdReceived('');
           setChangeMethod('CASH_USD');
           setChangeRef('');
@@ -1554,6 +1644,11 @@ const Pos: React.FC = () => {
                           <div style={{ fontSize: '11px', fontWeight: '500', color: '#64748B', marginTop: '1px' }}>
                             ({currencySymbol} {currencySymbol === 'COP' ? Number(p.salePrice * exchangeRate).toLocaleString('es-CO') : (p.salePrice * exchangeRate).toFixed(2)})
                           </div>
+                          {enableCopCurrency && (
+                            <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#854D0E', marginTop: '1px' }}>
+                              🇨🇴 ${Math.round(p.salePrice * exchangeRateCop).toLocaleString('es-CO')} COP
+                            </div>
+                          )}
                         </div>
 
                         {/* Meta badge & Add button */}
@@ -1623,6 +1718,7 @@ const Pos: React.FC = () => {
                 </div>
                 <div style={{ fontSize: '11px', color: '#94A3B8' }}>
                   {currencySymbol} {currencySymbol === 'COP' ? Number(totalCartBs).toLocaleString('es-CO') : totalCartBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {enableCopCurrency ? ` • 🇨🇴 $${totalCartCop.toLocaleString('es-CO')} COP` : ''}
                 </div>
               </div>
             </div>
@@ -1788,6 +1884,7 @@ const Pos: React.FC = () => {
                       <span style={{ fontSize: '13px', fontWeight: '600', color: '#64748B' }}>Total a Pagar:</span>
                       <div style={{ fontSize: '11px', color: '#64748B' }}>
                         Tasa: {currencySymbol} {currencySymbol === 'COP' ? Number(exchangeRate).toLocaleString('es-CO') : exchangeRate.toFixed(2)}
+                        {enableCopCurrency ? ` • 🇨🇴 $${exchangeRateCop.toLocaleString('es-CO')} COP` : ''}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -1797,6 +1894,11 @@ const Pos: React.FC = () => {
                       <div style={{ fontSize: '12px', fontWeight: '700', color: '#0F172A' }}>
                         {currencySymbol} {currencySymbol === 'COP' ? Number(totalCartBs).toLocaleString('es-CO') : totalCartBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
+                      {enableCopCurrency && (
+                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#854D0E', marginTop: '2px' }}>
+                          🇨🇴 ${totalCartCop.toLocaleString('es-CO')} COP
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2283,6 +2385,54 @@ const Pos: React.FC = () => {
                       </button>
                     )}
 
+                    {/* Efectivo COP (Pesos Colombianos) */}
+                    {enableCopCurrency && settings?.acceptCashCop !== false && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('CASH_COP')}
+                        style={{
+                          padding: '12px 10px',
+                          borderRadius: '12px',
+                          border: paymentMethod === 'CASH_COP' ? '2px solid #CA8A04' : '1px solid #E2E8F0',
+                          background: paymentMethod === 'CASH_COP' ? '#FEF9C3' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <span style={{ fontSize: '16px' }}>🇨🇴</span>
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'CASH_COP' ? '#854D0E' : '#0F172A' }}>
+                          Efectivo COP
+                        </span>
+                      </button>
+                    )}
+
+                    {/* Nequi / Bancolombia / Daviplata (COP) */}
+                    {enableCopCurrency && settings?.acceptTransferCop === true && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('TRANSFER_COP')}
+                        style={{
+                          padding: '12px 10px',
+                          borderRadius: '12px',
+                          border: paymentMethod === 'TRANSFER_COP' ? '2px solid #CA8A04' : '1px solid #E2E8F0',
+                          background: paymentMethod === 'TRANSFER_COP' ? '#FEF9C3' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <span style={{ fontSize: '16px' }}>📲</span>
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'TRANSFER_COP' ? '#854D0E' : '#0F172A' }}>
+                          {settings?.companyCopBank || 'Nequi / COP'}
+                        </span>
+                      </button>
+                    )}
+
                     {/* Punto de Venta */}
                     {settings?.acceptCardPos === true && (
                       <button
@@ -2409,6 +2559,111 @@ const Pos: React.FC = () => {
                           value={pagoMovilBank}
                           onChange={val => setPagoMovilBank(val)}
                           placeholder="Selecciona banco..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Dynamic Fields: Efectivo COP + Vuelto Card */}
+                {paymentMethod === 'CASH_COP' && (
+                  <div style={{ background: '#FEFCE8', borderRadius: '16px', border: '1px solid #FDE047', padding: '14px', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: '800', color: '#854D0E' }}>
+                        🇨🇴 Efectivo Recibido ($ COP)
+                      </label>
+                      <span style={{ fontSize: '12px', fontWeight: '900', color: '#0F172A' }}>
+                        Total: ${totalCartCop.toLocaleString('es-CO')} COP
+                      </span>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      value={copReceived}
+                      onChange={e => setCopReceived(e.target.value ? parseFloat(e.target.value) : '')}
+                      placeholder={`Ej. ${Math.ceil(totalCartCop / 1000) * 1000}`}
+                      style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #FDE047', fontSize: '15px', fontWeight: '800', background: '#ffffff', marginBottom: '8px' }}
+                    />
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                      {[totalCartCop, 20000, 50000, 100000].map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setCopReceived(preset)}
+                          style={{
+                            padding: '5px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #FDE047',
+                            background: '#ffffff',
+                            color: '#854D0E',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {idx === 0 ? `Exacto ($${preset.toLocaleString('es-CO')})` : `$${preset.toLocaleString('es-CO')}`}
+                        </button>
+                      ))}
+                    </div>
+
+                    {typeof copReceived === 'number' && copReceived >= totalCartCop && (
+                      <div style={{ background: '#ffffff', border: '1px solid #FDE047', borderRadius: '12px', padding: '12px', marginTop: '6px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '800', color: '#854D0E', marginBottom: '4px' }}>
+                          💵 Vuelto a Entregar (Triángulo COP / USD / Bs):
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                          <span style={{ fontSize: '17px', fontWeight: '900', color: '#854D0E' }}>
+                            🇨🇴 ${vueltoCop.toLocaleString('es-CO')} COP
+                          </span>
+                          <span style={{ fontSize: '13px', fontWeight: '800', color: '#047857' }}>
+                            💵 ${vueltoUsd.toFixed(2)} USD
+                          </span>
+                          <span style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A' }}>
+                            🇻🇪 {currencySymbol} {formatLocalAmount(vueltoBs)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Dynamic Fields: Nequi / Bancolombia / Daviplata (TRANSFER_COP) */}
+                {paymentMethod === 'TRANSFER_COP' && (
+                  <div style={{ background: '#FEFCE8', borderRadius: '16px', border: '1px solid #FDE047', padding: '14px', marginBottom: '16px' }}>
+                    {settings?.companyCopAccountNumber && (
+                      <div style={{ background: '#ffffff', borderRadius: '10px', padding: '10px 12px', border: '1px solid #FEF08A', marginBottom: '10px', fontSize: '12px', color: '#0F172A' }}>
+                        <div style={{ fontWeight: '800', color: '#854D0E' }}>
+                          📲 Enviar ${totalCartCop.toLocaleString('es-CO')} COP a {settings.companyCopBank || 'Nequi / Bancolombia'}:
+                        </div>
+                        <div style={{ fontWeight: '700', marginTop: '2px' }}>
+                          Cuenta/Celular: {settings.companyCopAccountNumber} {settings.companyCopAccountHolder ? `• ${settings.companyCopAccountHolder}` : ''}
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#854D0E', marginBottom: '4px' }}>
+                          Referencia / Comprobante *
+                        </label>
+                        <input
+                          type="text"
+                          value={copRef}
+                          onChange={e => setCopRef(e.target.value)}
+                          placeholder="Ej. M1234567"
+                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#ffffff' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#854D0E', marginBottom: '4px' }}>
+                          Plataforma / Banco COP
+                        </label>
+                        <input
+                          type="text"
+                          value={copBank}
+                          onChange={e => setCopBank(e.target.value)}
+                          placeholder="Nequi / Bancolombia"
+                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#ffffff' }}
                         />
                       </div>
                     </div>

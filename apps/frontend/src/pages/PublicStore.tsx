@@ -139,7 +139,7 @@ const PublicStore: React.FC = () => {
   const [customerAddress, setCustomerAddress] = useState('');
   const [requestedDeliveryDate, setRequestedDeliveryDate] = useState('');
   const [notes, setNotes] = useState('');
-  const [paymentOption, setPaymentOption] = useState<'PAGO_MOVIL' | 'USD' | 'TRANSFER' | 'BINANCE' | 'WHATSAPP' | 'PENDING'>('PAGO_MOVIL');
+  const [paymentOption, setPaymentOption] = useState<'PAGO_MOVIL' | 'USD' | 'CASH_COP' | 'TRANSFER_COP' | 'TRANSFER' | 'BINANCE' | 'WHATSAPP' | 'PENDING'>('PAGO_MOVIL');
   const [pagoMovilRef, setPagoMovilRef] = useState('');
   const [transferRef, setTransferRef] = useState('');
   const [originBank, setOriginBank] = useState('');
@@ -580,6 +580,8 @@ const PublicStore: React.FC = () => {
 
   // Calculations
   const exchangeRate = Number(storeData?.settings?.exchangeRateBs || 40.0);
+  const enableCopCurrency = Boolean(storeData?.settings?.enableCopCurrency);
+  const exchangeRateCop = Number(storeData?.settings?.exchangeRateCop || 4000);
 
   const filteredProducts = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -621,6 +623,7 @@ const PublicStore: React.FC = () => {
 
   const grandTotalUSD = cartSubtotalUSD + deliveryFeeUSD;
   const grandTotalBs = grandTotalUSD * exchangeRate;
+  const grandTotalCop = Math.round(grandTotalUSD * exchangeRateCop);
 
   const hasBajoEncargo = useMemo(() => cart.some((i) => i.product.availabilityType === 'BAJO_ENCARGO'), [cart]);
   const hasSupplierPreorder = useMemo(() => cart.some((i) => i.product.isSupplierPreorder), [cart]);
@@ -745,8 +748,8 @@ const PublicStore: React.FC = () => {
     }
 
     if (!hasSupplierPreorder) {
-      if (paymentOption === 'TRANSFER' && !transferRef.trim()) {
-        presentToast({ message: 'Por favor ingresa la referencia de transferencia bancaria', duration: 2500, color: 'warning' });
+      if ((paymentOption === 'TRANSFER' || paymentOption === 'TRANSFER_COP') && !transferRef.trim()) {
+        presentToast({ message: 'Por favor ingresa la referencia o comprobante de transferencia', duration: 2500, color: 'warning' });
         return;
       }
       if (paymentOption === 'BINANCE' && !binanceRef.trim()) {
@@ -767,8 +770,19 @@ const PublicStore: React.FC = () => {
         }
       }
 
+      let copCashNote = `MÉTODO: Efectivo Pesos (COP: $${grandTotalCop.toLocaleString('es-CO')})`;
+      if (paymentOption === 'CASH_COP' && cashReceivedAmount) {
+        const cashNumCop = parseFloat(cashReceivedAmount);
+        if (!isNaN(cashNumCop) && cashNumCop >= grandTotalCop) {
+          const changeCop = Math.round(cashNumCop - grandTotalCop);
+          copCashNote = `MÉTODO: Efectivo Pesos (COP) | Paga con: $${Math.round(cashNumCop).toLocaleString('es-CO')} COP | Vuelto: $${changeCop.toLocaleString('es-CO')} COP`;
+        }
+      }
+
       const paymentNote = hasSupplierPreorder ? 'MÉTODO: Solicitud de Encargo (Pago tras confirmación de proveedor)' :
                           paymentOption === 'TRANSFER' ? `MÉTODO: Transferencia Bancaria | Ref: ${transferRef.trim()}` :
+                          paymentOption === 'TRANSFER_COP' ? `MÉTODO: ${storeData?.settings?.companyCopBank || 'Nequi / Bancolombia'} (COP: $${grandTotalCop.toLocaleString('es-CO')}) | Ref: ${transferRef.trim()}` :
+                          paymentOption === 'CASH_COP' ? copCashNote :
                           paymentOption === 'BINANCE' ? `MÉTODO: Binance Pay | ID: ${binanceRef.trim()}` :
                           paymentOption === 'USD' ? usdNote :
                           paymentOption === 'PENDING' ? 'MÉTODO: Cuenta Abierta / Pagar Después' :
@@ -797,13 +811,15 @@ const PublicStore: React.FC = () => {
         notes: finalNotes,
         pagoMovilRef: hasSupplierPreorder ? undefined : (
                       paymentOption === 'PAGO_MOVIL' ? pagoMovilRef.trim() : 
-                      paymentOption === 'TRANSFER' ? transferRef.trim() : 
+                      (paymentOption === 'TRANSFER' || paymentOption === 'TRANSFER_COP') ? transferRef.trim() : 
                       paymentOption === 'BINANCE' ? binanceRef.trim() : undefined),
         pagoMovilBank: originBank || undefined,
         transferBank: (paymentOption === 'TRANSFER' && originBank) ? originBank : undefined,
         paymentMethod: paymentOption,
         exchangeRate,
         amountBs: grandTotalBs,
+        exchangeRateCop: enableCopCurrency ? exchangeRateCop : undefined,
+        amountCop: enableCopCurrency ? grandTotalCop : undefined,
         items: cart.map((i) => ({
           productId: i.product.id,
           variantId: i.variant?.id || undefined,
@@ -920,7 +936,13 @@ const PublicStore: React.FC = () => {
 
     const totalUSD = Number(orderResult.grandTotalUSD || 0).toFixed(2);
     const totalBs = Number(orderResult.grandTotalBs || 0).toFixed(2);
-    lines.push('', `💵 *TOTAL:* $${totalUSD} / Bs. ${totalBs}`);
+    const totalCop = Math.round(Number(orderResult.grandTotalUSD || 0) * exchangeRateCop).toLocaleString('es-CO');
+    lines.push(
+      '',
+      enableCopCurrency
+        ? `💵 *TOTAL:* $${totalUSD} / Bs. ${totalBs} / 🇨🇴 $${totalCop} COP`
+        : `💵 *TOTAL:* $${totalUSD} / Bs. ${totalBs}`
+    );
 
     const refPM = orderResult.pagoMovilRef || pagoMovilRef;
     const refTrans = orderResult.transferRef || transferRef;
@@ -928,12 +950,16 @@ const PublicStore: React.FC = () => {
 
     if (refPM) {
       lines.push(`📱 *Ref. Pago Móvil:* ${refPM}${originBank ? ` (${originBank})` : ''}`);
+    } else if (paymentOption === 'TRANSFER_COP' && refTrans) {
+      lines.push(`🇨🇴 *Ref. ${storeData?.settings?.companyCopBank || 'Nequi / Bancolombia'}:* ${refTrans}`);
     } else if (refTrans) {
       lines.push(`🏦 *Ref. Transferencia:* ${refTrans}${originBank ? ` (${originBank})` : ''}`);
     } else if (refBin) {
       lines.push(`🟡 *ID Binance Pay:* ${refBin}`);
     } else if (paymentOption === 'USD') {
       lines.push(`💵 *Método:* Efectivo Divisas (USD)`);
+    } else if (paymentOption === 'CASH_COP') {
+      lines.push(`🇨🇴 *Método:* Efectivo Pesos (COP)`);
     } else if (paymentOption === 'PENDING') {
       lines.push(`⏳ *Método:* Cuenta Abierta / Pagar Después`);
     } else if (paymentOption === 'WHATSAPP') {
@@ -2420,6 +2446,11 @@ const PublicStore: React.FC = () => {
                         <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
                           Bs. {priceBs.toFixed(2)}
                         </div>
+                        {enableCopCurrency && (
+                          <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#92400e', marginTop: '2px' }}>
+                            🇨🇴 ${Math.round(effectivePrice * exchangeRateCop).toLocaleString('es-CO')} COP
+                          </div>
+                        )}
                       </div>
 
                       {inCart ? (
@@ -2883,6 +2914,12 @@ const PublicStore: React.FC = () => {
                       {storeData?.settings?.acceptCashUsd !== false && (
                         <IonSelectOption value="USD">💵 Divisas / Efectivo (USD)</IonSelectOption>
                       )}
+                      {enableCopCurrency && storeData?.settings?.acceptCashCop !== false && (
+                        <IonSelectOption value="CASH_COP">🇨🇴 Efectivo Pesos (COP)</IonSelectOption>
+                      )}
+                      {enableCopCurrency && storeData?.settings?.acceptTransferCop === true && (
+                        <IonSelectOption value="TRANSFER_COP">📲 {storeData?.settings?.companyCopBank || 'Nequi / Bancolombia'} (COP)</IonSelectOption>
+                      )}
                       {storeData?.settings?.acceptTransfer === true && (
                         <IonSelectOption value="TRANSFER">🏦 Transferencia Bancaria (Bs.)</IonSelectOption>
                       )}
@@ -3049,6 +3086,106 @@ const PublicStore: React.FC = () => {
                     </div>
                   )}
 
+                  {paymentOption === 'CASH_COP' && (
+                    <div style={{ background: '#fffbeb', padding: '14px', borderRadius: '10px', marginTop: '10px', border: '1px solid #fde68a' }}>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 'bold', color: '#92400e' }}>
+                        🇨🇴 Pago en Efectivo Pesos (Total: ${grandTotalCop.toLocaleString('es-CO')} COP)
+                      </p>
+                      <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#b45309' }}>
+                        Indica con qué billete pagarás para preparar tu vuelto en pesos:
+                      </p>
+
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setCashReceivedAmount(grandTotalCop.toString())}
+                          style={{
+                            background: cashReceivedAmount === grandTotalCop.toString() ? '#d97706' : '#ffffff',
+                            color: cashReceivedAmount === grandTotalCop.toString() ? '#ffffff' : '#92400e',
+                            border: '1px solid #fcd34d',
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Monto Exacto
+                        </button>
+                        {[10000, 20000, 50000, 100000, 200000].filter(d => d >= grandTotalCop).map(denom => (
+                          <button
+                            key={denom}
+                            type="button"
+                            onClick={() => setCashReceivedAmount(denom.toString())}
+                            style={{
+                              background: cashReceivedAmount === denom.toString() ? '#d97706' : '#ffffff',
+                              color: cashReceivedAmount === denom.toString() ? '#ffffff' : '#92400e',
+                              border: '1px solid #fcd34d',
+                              borderRadius: '6px',
+                              padding: '4px 8px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            ${(denom / 1000).toFixed(0)}k
+                          </button>
+                        ))}
+                      </div>
+
+                      <IonItem lines="none" style={{ '--background': '#fff', borderRadius: '6px' }}>
+                        <IonLabel position="stacked">¿Con cuánto pagarás? (COP)</IonLabel>
+                        <IonInput
+                          type="number"
+                          value={cashReceivedAmount}
+                          onIonInput={(e) => setCashReceivedAmount(e.detail.value!)}
+                          placeholder={`Ej. ${grandTotalCop}`}
+                        />
+                      </IonItem>
+
+                      {parseFloat(cashReceivedAmount) >= grandTotalCop && (
+                        <div style={{ marginTop: '8px', padding: '8px 10px', background: '#fef3c7', borderRadius: '6px', fontSize: '13px', color: '#92400e', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Vuelto requerido:</span>
+                          <span>${Math.round(parseFloat(cashReceivedAmount) - grandTotalCop).toLocaleString('es-CO')} COP</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {paymentOption === 'TRANSFER_COP' && storeData?.settings && (
+                    <div style={{ background: '#fffbeb', padding: '14px', borderRadius: '10px', marginTop: '10px', border: '1px solid #fde68a' }}>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 'bold', color: '#92400e' }}>
+                        📲 Datos para {storeData.settings.companyCopBank || 'Nequi / Bancolombia'} (Total: ${grandTotalCop.toLocaleString('es-CO')} COP):
+                      </p>
+                      {storeData.settings.companyCopBank && (
+                        <p style={{ margin: '3px 0', fontSize: '13px' }}>
+                          <b>Entidad:</b> {storeData.settings.companyCopBank}
+                        </p>
+                      )}
+                      {storeData.settings.companyCopAccountHolder && (
+                        <p style={{ margin: '3px 0', fontSize: '13px' }}>
+                          <b>Titular:</b> {storeData.settings.companyCopAccountHolder}
+                        </p>
+                      )}
+                      {storeData.settings.companyCopAccountNumber && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0', background: '#fff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #fde68a' }}>
+                          <span style={{ fontSize: '13px' }}><b>Cuenta / Celular:</b> {storeData.settings.companyCopAccountNumber}</span>
+                          <IonButton fill="clear" size="small" onClick={() => copyToClipboard(storeData.settings.companyCopAccountNumber, 'Cuenta COP')}>
+                            <IonIcon icon={copyOutline} slot="icon-only" />
+                          </IonButton>
+                        </div>
+                      )}
+                      <IonItem lines="none" style={{ '--background': '#fff', borderRadius: '6px', marginTop: '10px' }}>
+                        <IonLabel position="stacked">N° de Referencia / Comprobante *</IonLabel>
+                        <IonInput
+                          value={transferRef}
+                          onIonInput={(e) => setTransferRef(e.detail.value!)}
+                          placeholder="Ej. M1928374"
+                        />
+                      </IonItem>
+                    </div>
+                  )}
+
                   {paymentOption === 'TRANSFER' && storeData?.settings && (
                     <div style={{ background: '#eff6ff', padding: '14px', borderRadius: '10px', marginTop: '10px', border: '1px solid #bfdbfe' }}>
                       <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 'bold', color: '#1e40af' }}>
@@ -3162,6 +3299,11 @@ const PublicStore: React.FC = () => {
                     <div>
                       <b style={{ fontSize: '1.1rem' }}>Total General:</b>
                       <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Tasa: Bs. {exchangeRate.toFixed(2)}</div>
+                      {enableCopCurrency && (
+                        <div style={{ fontSize: '0.78rem', color: '#92400e', fontWeight: 700 }}>
+                          Tasa COP: ${exchangeRateCop.toLocaleString('es-CO')}
+                        </div>
+                      )}
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#16a34a' }}>
@@ -3170,6 +3312,11 @@ const PublicStore: React.FC = () => {
                       <div style={{ fontSize: '0.9rem', color: '#475569' }}>
                         Bs. {grandTotalBs.toFixed(2)}
                       </div>
+                      {enableCopCurrency && (
+                        <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#92400e', marginTop: '2px' }}>
+                          🇨🇴 ${grandTotalCop.toLocaleString('es-CO')} COP
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -433,13 +433,17 @@ const Orders: React.FC = () => {
     }).join('\n');
 
     const dueInfo = getAbonoDueInfo(order);
+    const copEnabled = Boolean(systemSettings?.enableCopCurrency);
+    const copRate = Number((order as any).exchangeRateCop || systemSettings?.exchangeRateCop || 4000);
+    const copTotalStr = copEnabled ? ` | 🇨🇴 $${Math.round(totalUsd * copRate).toLocaleString('es-CO')} COP` : '';
+    const copRemStr = copEnabled ? ` | 🇨🇴 $${Math.round(remaining * copRate).toLocaleString('es-CO')} COP` : '';
     const summaryLines = [
       `🧾 *Comprobante de Venta ${shortCode}*`,
       `👤 Cliente: ${order.customerName || 'Cliente General'}`,
       itemsLines ? `\n📦 *Detalle:*\n${itemsLines}` : '',
-      `\n💵 *Total:* $${totalUsd.toFixed(2)} (${formatLocalAmount(totalUsd * orderRate)})`,
+      `\n💵 *Total:* $${totalUsd.toFixed(2)} (${formatLocalAmount(totalUsd * orderRate)}${copTotalStr})`,
       abonosTotal > 0 ? `✅ *Abonado:* $${abonosTotal.toFixed(2)}` : '',
-      order.paymentStatus !== PaymentStatus.PAID ? `⏳ *Saldo Pendiente:* $${remaining.toFixed(2)} (${formatLocalAmount(remaining * orderRate)})` : '✅ *Estado:* PAGADO',
+      order.paymentStatus !== PaymentStatus.PAID ? `⏳ *Saldo Pendiente:* $${remaining.toFixed(2)} (${formatLocalAmount(remaining * orderRate)}${copRemStr})` : '✅ *Estado:* PAGADO',
       dueInfo && order.paymentStatus !== PaymentStatus.PAID ? `📅 *Próximo abono:* ${dueInfo.formattedDue}` : '',
     ].filter(Boolean).join('\n');
 
@@ -952,6 +956,11 @@ const Orders: React.FC = () => {
                             <div style={{ fontSize: '11px', color: '#64748B' }}>
                               {totalLocalFormatted}
                             </div>
+                            {Boolean(systemSettings?.enableCopCurrency) && (
+                              <div style={{ fontSize: '11px', fontWeight: '800', color: '#854D0E' }}>
+                                🇨🇴 ${Math.round(totalUsd * Number((order as any).exchangeRateCop || systemSettings?.exchangeRateCop || 4000)).toLocaleString('es-CO')} COP
+                              </div>
+                            )}
                           </div>
 
                           <div
