@@ -98,18 +98,23 @@ export type Movement = {
 export type MonthlySummary = {
   month: string;
   monthLabel: string;
-  currencySymbol: string;
-  exchangeRate: number;
+  currencySymbol?: string;
+  exchangeRate?: number;
   invoicedRevenue: number;
   collectedRevenue: number;
   pendingReceivable: number;
-  costOfGoodsSold: number;
-  operatingExpenses: number;
+  costOfGoodsSold?: number;
+  operatingExpenses?: number;
+  cogs: number;
+  expenses: number;
+  payroll: number;
+  losses: number;
   netProfit: number;
   ordersCount: number;
   paidOrdersCount: number;
-  pendingOrdersCount: number;
-  breakdown: {
+  pendingOrdersCount?: number;
+  byMethod?: Record<string, number>;
+  breakdown?: {
     cashUSD: number;
     digitalUSD: number;
     pagoMovilBs: number;

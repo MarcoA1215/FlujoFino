@@ -30,7 +30,8 @@ import {
   timeOutline,
   imageOutline,
   arrowForwardOutline,
-  flashOutline
+  flashOutline,
+  calendarOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
@@ -42,15 +43,27 @@ import AppHeader from '../components/AppHeader';
 import { SalaryAdvanceModal } from '../components/SalaryAdvanceModal';
 import { BankSelect } from '../components/BankSelect';
 
+type ProductVariant = {
+  id: string;
+  name: string;
+  sku?: string;
+  stockQuantity: number;
+  priceOverride?: number | null;
+  images?: string[];
+};
+
 type Product = {
   id: string;
   name: string;
+  code?: string;
   category?: string;
   stockQuantity: number;
   salePrice: number;
   baseCost: number;
   durationMinutes?: number;
   images?: string[] | string;
+  hasVariants?: boolean;
+  variants?: ProductVariant[];
   recipe?: any[];
   isCombo?: boolean;
   isPreAssembled?: boolean;
@@ -66,6 +79,8 @@ type Product = {
 type CartItem = {
   cartItemId: string;
   product: Product;
+  variantId?: string;
+  variantName?: string;
   quantity: number;
   unitPrice: number;
   employeeId?: string;
@@ -118,6 +133,7 @@ const Pos: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
+  const [selectingVariantProduct, setSelectingVariantProduct] = useState<Product | null>(null);
 
   // Raw Materials & Customization (Extras / Retiro de Insumos)
   const [availableRawMaterials, setAvailableRawMaterials] = useState<any[]>([]);
@@ -175,6 +191,11 @@ const Pos: React.FC = () => {
   });
   const [initialAbono, setInitialAbono] = useState<string>('');
   const [bypassMinDeposit, setBypassMinDeposit] = useState<boolean>(false);
+  const [nextAbonoDueDate, setNextAbonoDueDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split('T')[0];
+  });
 
   // Discounts
   const [discountType, setDiscountType] = useState<'FIXED' | 'PERCENTAGE'>('FIXED');
@@ -265,6 +286,11 @@ const Pos: React.FC = () => {
       }
       localStorage.setItem('flujofino_cached_settings', JSON.stringify(s));
       setAllowPartialPayments(s.allowPartialPayments !== false);
+
+      const defaultDays = Number(s.abonoDefaultDueDays) > 0 ? Number(s.abonoDefaultDueDays) : 7;
+      const d = new Date();
+      d.setDate(d.getDate() + defaultDays);
+      setNextAbonoDueDate(d.toISOString().split('T')[0]);
 
       if (s.acceptPagoMovil !== false) setPaymentMethod('PAGO_MOVIL');
       else if (s.acceptCashUsd !== false) setPaymentMethod('USD');
@@ -671,7 +697,15 @@ const Pos: React.FC = () => {
         } as Product));
     }
     return products.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const q = searchTerm.toLowerCase();
+      const matchesName = p.name.toLowerCase().includes(q);
+      const matchesCode = Boolean(p.code && p.code.toLowerCase().includes(q));
+      const matchesVariant = Boolean(
+        p.hasVariants &&
+        Array.isArray(p.variants) &&
+        p.variants.some(v => v.name?.toLowerCase().includes(q) || v.sku?.toLowerCase().includes(q))
+      );
+      const matchesSearch = matchesName || matchesCode || matchesVariant;
       const matchesCategory =
         selectedCategory === 'Todos' ||
         (selectedCategory === 'Servicios' ? (p.category === 'Servicios' || p.durationMinutes) : p.category === selectedCategory);
@@ -680,9 +714,23 @@ const Pos: React.FC = () => {
   }, [products, searchTerm, selectedCategory, availableRawMaterials]);
 
   // Cart operations
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, chosenVariant?: ProductVariant) => {
+    if (product.hasVariants && Array.isArray(product.variants) && product.variants.length > 0 && !chosenVariant) {
+      setSelectingVariantProduct(product);
+      return;
+    }
+
+    const effectivePrice = chosenVariant && chosenVariant.priceOverride !== undefined && chosenVariant.priceOverride !== null
+      ? Number(chosenVariant.priceOverride)
+      : product.salePrice;
+
     setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id && !item.hasModifications);
+      const existing = prev.find(
+        item =>
+          item.product.id === product.id &&
+          (item.variantId || '') === (chosenVariant?.id || '') &&
+          !item.hasModifications
+      );
       if (existing) {
         return prev.map(item =>
           item.cartItemId === existing.cartItemId
@@ -695,15 +743,21 @@ const Pos: React.FC = () => {
         {
           cartItemId: Date.now() + '_' + Math.random().toString(36).substring(2, 7),
           product,
+          variantId: chosenVariant?.id,
+          variantName: chosenVariant?.name,
           quantity: 1,
-          unitPrice: product.salePrice,
+          unitPrice: effectivePrice,
           hasModifications: false,
           removedIngredients: [],
           addedExtras: []
         }
       ];
     });
-    presentToast({ message: `+1 ${product.name}`, duration: 1000, color: 'success', position: 'top' });
+    const label = chosenVariant ? `${product.name} (${chosenVariant.name})` : product.name;
+    presentToast({ message: `+1 ${label}`, duration: 1000, color: 'success', position: 'top' });
+    if (chosenVariant) {
+      setSelectingVariantProduct(null);
+    }
   };
 
   const updateQuantity = (cartItemId: string, quantity: number) => {
@@ -981,6 +1035,8 @@ const Pos: React.FC = () => {
       items: cart.map(item => ({
         id: item.cartItemId && !item.cartItemId.includes('_') ? item.cartItemId : (item as any).id,
         productId: item.product?.id || (item as any).productId,
+        variantId: item.variantId || undefined,
+        variantName: item.variantName || undefined,
         quantity: Number(item.quantity) || 1,
         unitPrice: Number(item.unitPrice || item.product?.salePrice || 0),
         employeeId: item.employeeId || undefined,
@@ -1008,11 +1064,23 @@ const Pos: React.FC = () => {
       changePhone: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart && changeMethod === 'PAGO_MOVIL') ? (changePhone.trim() || customerPhone.trim() || customerCedula.trim() || undefined) : undefined,
       changeBank: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart && changeMethod === 'PAGO_MOVIL') ? (changeBank || undefined) : undefined,
       initialAbono: paymentMethod === 'PENDING' ? abonoAmount : undefined,
+      nextAbonoDueDate: paymentMethod === 'PENDING' && abonoAmount < totalCart && nextAbonoDueDate ? nextAbonoDueDate : undefined,
       bypassMinDeposit: paymentMethod === 'PENDING' ? bypassMinDeposit : undefined,
       amountBs: Number(totalCartBs.toFixed(2)),
       exchangeRate: exchangeRate,
       exchangeRateBs: exchangeRate,
       linkedReservationId: linkedReservationId || undefined
+    };
+
+    const buildSaleCopySummary = (orderIdStr: string) => {
+      const code = `#ORD-${orderIdStr.slice(-6).toUpperCase()}`;
+      const itemsLines = cart
+        .map(it => `• ${it.quantity}x ${it.product.name}${it.variantName ? ` (${it.variantName})` : ''} - $${((it.unitPrice || it.product.salePrice) * it.quantity).toFixed(2)}`)
+        .join('\n');
+      const statusText = paymentMethod === 'PENDING'
+        ? (abonoAmount > 0 ? `Abonado ($${abonoAmount.toFixed(2)} USD) - Pendiente: $${Math.max(0, totalCart - abonoAmount).toFixed(2)} USD` : 'Cuenta Abierta / Por Pagar')
+        : 'Pagado ✓';
+      return `🧾 *Comprobante de Venta ${code}*\n👤 Cliente: ${customerName.trim() || 'Cliente Mostrador'}\n\n*Detalle:*\n${itemsLines}\n\n💵 *Total:* $${totalCart.toFixed(2)} USD (${currencySymbol} ${formatLocalAmount(totalCartBs)})\n📌 *Estado:* ${statusText}`;
     };
 
     const executeOrderSubmit = async (orderPayload: any) => {
@@ -1050,10 +1118,19 @@ const Pos: React.FC = () => {
               return updated;
             });
 
+            const summaryToCopy = buildSaleCopySummary(offlineId);
             presentToast({
               message: '✓ Venta guardada localmente (Modo Offline)',
-              duration: 3000,
-              color: 'success'
+              duration: 4500,
+              color: 'success',
+              buttons: [
+                {
+                  text: '📋 Copiar Código',
+                  handler: () => {
+                    navigator.clipboard?.writeText(summaryToCopy);
+                  }
+                }
+              ]
             });
 
             // Reset cart and modal
@@ -1091,13 +1168,32 @@ const Pos: React.FC = () => {
 
         // ONLINE MODE: Send to server
         try {
+          let createdOrUpdatedOrder: any = null;
           if (editingOrderId) {
-            await apiClient.put(`/orders/${editingOrderId}`, orderPayload);
-            presentToast({ message: 'Pedido actualizado con éxito', duration: 2500, color: 'success' });
+            const res = await apiClient.put(`/orders/${editingOrderId}`, orderPayload);
+            createdOrUpdatedOrder = res.data;
           } else {
-            await apiClient.post('/orders', orderPayload);
-            presentToast({ message: '✓ ¡Pedido registrado con éxito!', duration: 2500, color: 'success' });
+            const res = await apiClient.post('/orders', orderPayload);
+            createdOrUpdatedOrder = res.data;
           }
+
+          const orderIdForCopy = createdOrUpdatedOrder?.id || editingOrderId || String(Date.now());
+          const summaryToCopy = buildSaleCopySummary(orderIdForCopy);
+          const shortCode = `#ORD-${orderIdForCopy.slice(-6).toUpperCase()}`;
+
+          presentToast({
+            message: editingOrderId ? `Pedido ${shortCode} actualizado` : `✓ ¡Venta ${shortCode} registrada!`,
+            duration: 5000,
+            color: 'success',
+            buttons: [
+              {
+                text: '📋 Copiar Código',
+                handler: () => {
+                  navigator.clipboard?.writeText(summaryToCopy);
+                }
+              }
+            ]
+          });
 
           setCart([]);
           setCustomerName('');
@@ -1417,6 +1513,20 @@ const Pos: React.FC = () => {
 
                       {/* Card Content */}
                       <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                        {(p.code || (p.hasVariants && Array.isArray(p.variants) && p.variants.length > 0)) && (
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                            {p.code && (
+                              <span style={{ fontSize: '9px', fontWeight: '800', color: '#475569', background: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>
+                                #{p.code}
+                              </span>
+                            )}
+                            {p.hasVariants && Array.isArray(p.variants) && p.variants.length > 0 && (
+                              <span style={{ fontSize: '9px', fontWeight: '800', color: '#6D28D9', background: '#F3E8FF', padding: '1px 6px', borderRadius: '4px' }}>
+                                🎨 {p.variants.length} var.
+                              </span>
+                            )}
+                          </div>
+                        )}
                         <div
                           style={{
                             fontSize: '13px',
@@ -1579,6 +1689,11 @@ const Pos: React.FC = () => {
                       <div style={{ flex: 1, paddingRight: '8px' }}>
                         <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           <span>{item.quantity}x {item.product.name}</span>
+                          {item.variantName && (
+                            <span style={{ fontSize: '10px', fontWeight: '800', background: '#F3E8FF', color: '#6D28D9', padding: '1px 6px', borderRadius: '4px' }}>
+                              🎨 {item.variantName}
+                            </span>
+                          )}
                           {item.employeeId && (
                             <span style={{ fontSize: '10px', fontWeight: '700', background: '#ECFDF5', color: '#065F46', padding: '1px 6px', borderRadius: '4px' }}>
                               👤 {employees.find(e => e.id === item.employeeId)?.name || employees.find(e => e.id === item.employeeId)?.username || 'Especialista'}
@@ -2631,6 +2746,24 @@ const Pos: React.FC = () => {
                         />
                       </div>
 
+                      {saldoPendiente > 0.01 && (
+                        <div style={{ marginBottom: '12px' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: '#78350F', marginBottom: '4px' }}>
+                            <IonIcon icon={calendarOutline} style={{ fontSize: '15px' }} />
+                            Fecha de Vencimiento del Próximo Abono
+                          </label>
+                          <input
+                            type="date"
+                            value={nextAbonoDueDate}
+                            onChange={e => setNextAbonoDueDate(e.target.value)}
+                            style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #FCD34D', fontSize: '13px', fontWeight: '700', background: '#ffffff', color: '#0F172A' }}
+                          />
+                          <div style={{ fontSize: '10.5px', color: '#92400E', marginTop: '3px' }}>
+                            Se mostrará alerta de vencimiento en Caja/Pedidos al cumplirse esta fecha.
+                          </div>
+                        </div>
+                      )}
+
                       {/* Saldo Breakdown Card */}
                       <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #FCD34D', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
@@ -2892,6 +3025,132 @@ const Pos: React.FC = () => {
               >
                 {editingCartItemId ? 'Guardar Cambios ✓' : 'Agregar al Carrito ✓'}
               </button>
+            </div>
+          </div>
+        </IonModal>
+
+        {/* Modal Selector de Sub-producto / Variante */}
+        <IonModal isOpen={Boolean(selectingVariantProduct)} onDidDismiss={() => setSelectingVariantProduct(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#F8FAFC' }}>
+            <div style={{ background: '#ffffff', padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: '800', color: '#6D28D9', textTransform: 'uppercase' }}>
+                  🎨 Seleccionar Sub-producto / Variante
+                </div>
+                <h3 style={{ margin: '2px 0 0 0', fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
+                  {selectingVariantProduct?.name}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectingVariantProduct(null)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748B' }}
+              >
+                <IonIcon icon={closeOutline} style={{ fontSize: '20px' }} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                {(selectingVariantProduct?.variants || []).map(v => {
+                  const vPrice = v.priceOverride !== undefined && v.priceOverride !== null
+                    ? Number(v.priceOverride)
+                    : Number(selectingVariantProduct?.salePrice || 0);
+                  const vStock = Number(v.stockQuantity || 0);
+                  const vImg = Array.isArray(v.images) && v.images.length > 0 ? v.images[0] : null;
+                  const inCartCount = cart
+                    .filter(it => it.product.id === selectingVariantProduct?.id && it.variantId === v.id)
+                    .reduce((acc, it) => acc + it.quantity, 0);
+
+                  return (
+                    <div
+                      key={v.id}
+                      onClick={() => {
+                        if (selectingVariantProduct) {
+                          addToCart(selectingVariantProduct, v);
+                        }
+                      }}
+                      className="ff-card ff-card-interactive"
+                      style={{
+                        background: '#ffffff',
+                        borderRadius: '14px',
+                        border: inCartCount > 0 ? '2px solid #10B981' : '1px solid #E2E8F0',
+                        padding: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {vImg ? (
+                        <img
+                          src={vImg}
+                          alt={v.name}
+                          onClick={e => {
+                            e.stopPropagation();
+                            openImage(vImg, `${selectingVariantProduct?.name} - ${v.name}`);
+                          }}
+                          style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0, border: '1px solid #E2E8F0' }}
+                        />
+                      ) : (
+                        <div style={{ width: '56px', height: '56px', borderRadius: '10px', background: '#F3E8FF', color: '#6D28D9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '18px', flexShrink: 0 }}>
+                          🎨
+                        </div>
+                      )}
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '14px', fontWeight: '800', color: '#0F172A' }}>
+                            {v.name}
+                          </span>
+                          {v.sku && (
+                            <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748B', background: '#F1F5F9', padding: '1px 5px', borderRadius: '4px' }}>
+                              #{v.sku}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '14px', fontWeight: '800', color: '#10B981', marginTop: '2px' }}>
+                          ${vPrice.toFixed(2)} USD
+                          <span style={{ fontSize: '11px', fontWeight: '600', color: '#64748B', marginLeft: '6px' }}>
+                            ({currencySymbol} {formatLocalAmount(vPrice * exchangeRate)})
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                          <span style={{
+                            fontSize: '10.5px',
+                            fontWeight: '700',
+                            padding: '2px 7px',
+                            borderRadius: '6px',
+                            background: vStock <= 0 ? '#FEF2F2' : '#ECFDF5',
+                            color: vStock <= 0 ? '#DC2626' : '#065F46'
+                          }}>
+                            {vStock <= 0 ? (vStock < 0 ? `Por producir: ${Math.abs(vStock)}` : 'Agotado (0)') : `Stock: ${vStock}`}
+                          </span>
+                          {inCartCount > 0 && (
+                            <span style={{ fontSize: '10.5px', fontWeight: '800', color: '#065F46', background: '#D1FAE5', padding: '2px 7px', borderRadius: '6px' }}>
+                              {inCartCount} en carrito
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: '50%',
+                        background: '#10B981',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <IonIcon icon={addOutline} style={{ fontSize: '18px' }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </IonModal>

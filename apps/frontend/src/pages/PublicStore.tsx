@@ -48,13 +48,26 @@ import { normalizeCedula, analyzeCedulaInput, type CedulaPrefix } from '../utils
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+interface StoreProductVariant {
+  id: string;
+  name: string;
+  sku?: string;
+  stockQuantity: number;
+  priceOverride?: number | null;
+  images?: string[];
+  isOutOfStock?: boolean;
+}
+
 interface StoreProduct {
   id: string;
   name: string;
+  code?: string;
   description: string;
   category: string;
   salePrice: number;
   images: string[];
+  hasVariants?: boolean;
+  variants?: StoreProductVariant[];
   stockQuantity: number;
   stock?: number;
   isService: boolean;
@@ -75,8 +88,11 @@ const isProductMadeToOrder = (p: StoreProduct) => {
   return false;
 };
 
-const getAvailableStock = (p: StoreProduct) => {
+const getAvailableStock = (p: StoreProduct, variant?: StoreProductVariant) => {
   if (isProductMadeToOrder(p)) return 999;
+  if (variant) {
+    return Math.max(0, Number(variant.stockQuantity || 0));
+  }
   return Math.max(0, Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.stockQuantity || 0)));
 };
 
@@ -87,7 +103,10 @@ interface DeliveryZone {
 }
 
 interface CartItem {
+  cartKey: string;
   product: StoreProduct;
+  variant?: StoreProductVariant;
+  unitPrice: number;
   quantity: number;
 }
 
@@ -104,6 +123,8 @@ const PublicStore: React.FC = () => {
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('TODOS');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedVariantByProduct, setSelectedVariantByProduct] = useState<Record<string, string>>({});
+  const [activeImageByProduct, setActiveImageByProduct] = useState<Record<string, string>>({});
 
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -561,16 +582,24 @@ const PublicStore: React.FC = () => {
   const exchangeRate = Number(storeData?.settings?.exchangeRateBs || 40.0);
 
   const filteredProducts = useMemo(() => {
+    const q = searchQuery.toLowerCase();
     return products.filter((p) => {
       if (p.isService) return false;
       if (p.category?.toLowerCase() === 'servicios') return false;
       const matchCat =
         selectedCategory === 'TODOS' ||
         p.category?.toLowerCase() === selectedCategory.toLowerCase();
+      const matchVariant = Boolean(
+        p.hasVariants &&
+        Array.isArray(p.variants) &&
+        p.variants.some((v) => v.name?.toLowerCase().includes(q) || v.sku?.toLowerCase().includes(q))
+      );
       const matchSearch =
         !searchQuery ||
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.description?.toLowerCase().includes(searchQuery.toLowerCase());
+        p.name.toLowerCase().includes(q) ||
+        Boolean(p.code && p.code.toLowerCase().includes(q)) ||
+        p.description?.toLowerCase().includes(q) ||
+        matchVariant;
       return matchCat && matchSearch;
     });
   }, [products, selectedCategory, searchQuery]);
@@ -581,7 +610,7 @@ const PublicStore: React.FC = () => {
   }, [cart]);
 
   const cartSubtotalUSD = useMemo(() => {
-    return cart.reduce((acc, item) => acc + item.product.salePrice * item.quantity, 0);
+    return cart.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
   }, [cart]);
 
   const deliveryFeeUSD = useMemo(() => {
@@ -596,66 +625,72 @@ const PublicStore: React.FC = () => {
   const hasBajoEncargo = useMemo(() => cart.some((i) => i.product.availabilityType === 'BAJO_ENCARGO'), [cart]);
   const hasSupplierPreorder = useMemo(() => cart.some((i) => i.product.isSupplierPreorder), [cart]);
 
-  const handleAddToCart = (product: StoreProduct) => {
+  const handleAddToCart = (product: StoreProduct, variant?: StoreProductVariant) => {
     const isExempt = product.availabilityType === 'BAJO_ENCARGO' || product.isSupplierPreorder || isProductMadeToOrder(product);
-    if (product.isOutOfStock && !isExempt) {
+    const availableStock = getAvailableStock(product, variant);
+    const isOut = variant ? (availableStock <= 0) : product.isOutOfStock;
+
+    if (isOut && !isExempt) {
       presentToast({
-        message: 'Este producto está agotado por el momento.',
+        message: 'Esta opción está agotada por el momento.',
         duration: 2500,
         color: 'warning',
       });
       return;
     }
 
-    const existingIndex = cart.findIndex((i) => i.product.id === product.id);
+    const cartKey = variant ? `${product.id}__${variant.id}` : product.id;
+    const existingIndex = cart.findIndex((i) => i.cartKey === cartKey);
     const currentQtyInCart = existingIndex > -1 ? cart[existingIndex].quantity : 0;
-    const availableStock = getAvailableStock(product);
 
     // Check inventory availability
     if (!isExempt && !product.isService && currentQtyInCart + 1 > availableStock) {
       presentToast({
-        message: `Solo quedan ${availableStock} unidades disponibles de "${product.name}".`,
+        message: `Solo quedan ${availableStock} unidades disponibles de "${product.name}${variant ? ` (${variant.name})` : ''}".`,
         duration: 3000,
         color: 'warning',
       });
       return;
     }
 
+    const effectivePrice =
+      variant && variant.priceOverride !== undefined && variant.priceOverride !== null
+        ? Number(variant.priceOverride)
+        : Number(product.salePrice || 0);
+
     if (existingIndex > -1) {
       const nextCart = [...cart];
       nextCart[existingIndex].quantity += 1;
       setCart(nextCart);
     } else {
-      setCart([...cart, { product, quantity: 1 }]);
+      setCart([...cart, { cartKey, product, variant, unitPrice: effectivePrice, quantity: 1 }]);
     }
 
     presentToast({
-      message: `"${product.name}" agregado al carrito`,
+      message: `"${product.name}${variant ? ` (${variant.name})` : ''}" agregado al carrito`,
       duration: 1500,
       color: 'success',
     });
   };
 
-  const handleUpdateQuantity = (productId: string, delta: number) => {
-    const existingIndex = cart.findIndex((i) => i.product.id === productId);
+  const handleUpdateQuantity = (cartKey: string, delta: number) => {
+    const existingIndex = cart.findIndex((i) => i.cartKey === cartKey);
     if (existingIndex === -1) return;
 
     const item = cart[existingIndex];
     const newQty = item.quantity + delta;
 
     if (newQty <= 0) {
-      // Remove item
-      setCart(cart.filter((i) => i.product.id !== productId));
+      setCart(cart.filter((i) => i.cartKey !== cartKey));
       return;
     }
 
     const isExempt = item.product.availabilityType === 'BAJO_ENCARGO' || item.product.isSupplierPreorder || isProductMadeToOrder(item.product);
-    const availableStock = getAvailableStock(item.product);
+    const availableStock = getAvailableStock(item.product, item.variant);
 
-    // Check inventory cap on increase
     if (delta > 0 && !isExempt && !item.product.isService && newQty > availableStock) {
       presentToast({
-        message: `Límite alcanzado: solo hay ${availableStock} unidades disponibles de "${item.product.name}".`,
+        message: `Límite alcanzado: solo hay ${availableStock} unidades disponibles de "${item.product.name}${item.variant ? ` (${item.variant.name})` : ''}".`,
         duration: 2500,
         color: 'warning',
       });
@@ -667,8 +702,8 @@ const PublicStore: React.FC = () => {
     setCart(nextCart);
   };
 
-  const handleRemoveItem = (productId: string) => {
-    setCart(cart.filter((i) => i.product.id !== productId));
+  const handleRemoveItem = (cartKey: string) => {
+    setCart(cart.filter((i) => i.cartKey !== cartKey));
   };
 
   // Submit Order
@@ -698,10 +733,10 @@ const PublicStore: React.FC = () => {
 
     for (const item of cart) {
       const isExempt = item.product.availabilityType === 'BAJO_ENCARGO' || item.product.isSupplierPreorder || isProductMadeToOrder(item.product);
-      const avail = getAvailableStock(item.product);
+      const avail = getAvailableStock(item.product, item.variant);
       if (!isExempt && !item.product.isService && item.quantity > avail) {
         presentToast({
-          message: `El producto "${item.product.name}" solo tiene ${avail} unidades disponibles. Por favor ajusta la cantidad.`,
+          message: `El producto "${item.product.name}${item.variant ? ` (${item.variant.name})` : ''}" solo tiene ${avail} unidades disponibles. Por favor ajusta la cantidad.`,
           duration: 3500,
           color: 'warning',
         });
@@ -771,8 +806,10 @@ const PublicStore: React.FC = () => {
         amountBs: grandTotalBs,
         items: cart.map((i) => ({
           productId: i.product.id,
+          variantId: i.variant?.id || undefined,
+          variantName: i.variant?.name || undefined,
           quantity: i.quantity,
-          unitPrice: i.product.salePrice,
+          unitPrice: i.unitPrice,
         })),
       };
 
@@ -783,10 +820,11 @@ const PublicStore: React.FC = () => {
         orderNumber: res.data.orderNumber,
         items: cart.map((i) => ({
           quantity: i.quantity,
+          variantName: i.variant?.name,
           product: {
             id: i.product.id,
-            name: i.product.name,
-            salePrice: i.product.salePrice,
+            name: i.variant ? `${i.product.name} (${i.variant.name})` : i.product.name,
+            salePrice: i.unitPrice,
           },
         })),
         deliveryMethod,
@@ -2067,9 +2105,32 @@ const PublicStore: React.FC = () => {
             }}
           >
             {filteredProducts.map((product) => {
-              const imageUrl = product.images?.[0] || null;
-              const priceBs = product.salePrice * exchangeRate;
-              const inCart = cart.find((i) => i.product.id === product.id);
+              const hasVariants = Boolean(product.hasVariants && Array.isArray(product.variants) && product.variants.length > 0);
+              const selectedVarId = hasVariants
+                ? (selectedVariantByProduct[product.id] || product.variants![0]?.id)
+                : undefined;
+              const activeVariant = hasVariants
+                ? product.variants!.find((v) => v.id === selectedVarId) || product.variants![0]
+                : undefined;
+
+              const galleryImages = Array.from(
+                new Set([
+                  ...(activeVariant && Array.isArray(activeVariant.images) ? activeVariant.images : []),
+                  ...(Array.isArray(product.images) ? product.images : []),
+                ].filter(Boolean))
+              );
+              const imageUrl = activeImageByProduct[product.id] && galleryImages.includes(activeImageByProduct[product.id])
+                ? activeImageByProduct[product.id]
+                : (galleryImages[0] || null);
+
+              const effectivePrice = activeVariant && activeVariant.priceOverride !== undefined && activeVariant.priceOverride !== null
+                ? Number(activeVariant.priceOverride)
+                : Number(product.salePrice || 0);
+              const priceBs = effectivePrice * exchangeRate;
+              const activeCartKey = activeVariant ? `${product.id}__${activeVariant.id}` : product.id;
+              const inCart = cart.find((i) => i.cartKey === activeCartKey);
+              const availStock = getAvailableStock(product, activeVariant);
+              const isOptionOutOfStock = activeVariant ? availStock <= 0 : product.isOutOfStock;
 
               return (
                 <div
@@ -2092,7 +2153,7 @@ const PublicStore: React.FC = () => {
                         src={imageUrl}
                         alt={product.name}
                         loading="lazy"
-                        onClick={() => openImage(imageUrl, product.name)}
+                        onClick={() => openImage(imageUrl, activeVariant ? `${product.name} - ${activeVariant.name}` : product.name)}
                         title="Toca para ampliar imagen"
                         style={{
                           width: '100%',
@@ -2102,6 +2163,23 @@ const PublicStore: React.FC = () => {
                           display: 'block',
                         }}
                       />
+                      {product.code && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            left: '8px',
+                            backgroundColor: 'rgba(15, 23, 42, 0.78)',
+                            color: '#fff',
+                            padding: '2px 7px',
+                            borderRadius: '6px',
+                            fontSize: '10px',
+                            fontWeight: 800,
+                          }}
+                        >
+                          #{product.code}
+                        </div>
+                      )}
                       {product.isSupplierPreorder ? (
                         <div
                           style={{
@@ -2134,7 +2212,7 @@ const PublicStore: React.FC = () => {
                         >
                           🎂 Bajo Encargo (Preparación)
                         </div>
-                      ) : product.isOutOfStock ? (
+                      ) : isOptionOutOfStock ? (
                         <div
                           style={{
                             position: 'absolute',
@@ -2164,9 +2242,49 @@ const PublicStore: React.FC = () => {
                             fontWeight: '500',
                           }}
                         >
-                          Disp: {getAvailableStock(product)}
+                          Disp: {availStock}
                         </div>
                       ) : null}
+
+                      {/* Multi-image Thumbnail Strip */}
+                      {galleryImages.length > 1 && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '6px',
+                            left: '8px',
+                            right: '8px',
+                            display: 'flex',
+                            gap: '5px',
+                            overflowX: 'auto',
+                            padding: '3px 4px',
+                            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+                            backdropFilter: 'blur(4px)',
+                            borderRadius: '8px',
+                          }}
+                        >
+                          {galleryImages.slice(0, 6).map((thumbUrl, tIdx) => (
+                            <img
+                              key={tIdx}
+                              src={thumbUrl}
+                              alt="thumb"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveImageByProduct((prev) => ({ ...prev, [product.id]: thumbUrl }));
+                              }}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '5px',
+                                objectFit: 'cover',
+                                cursor: 'pointer',
+                                border: imageUrl === thumbUrl ? '2px solid #10B981' : '1px solid rgba(255,255,255,0.6)',
+                                flexShrink: 0,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div
@@ -2178,8 +2296,26 @@ const PublicStore: React.FC = () => {
                         justifyContent: 'center',
                         color: '#94a3b8',
                         fontSize: '12px',
+                        position: 'relative',
                       }}
                     >
+                      {product.code && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            left: '8px',
+                            backgroundColor: '#E2E8F0',
+                            color: '#475569',
+                            padding: '2px 7px',
+                            borderRadius: '6px',
+                            fontSize: '10px',
+                            fontWeight: 800,
+                          }}
+                        >
+                          #{product.code}
+                        </span>
+                      )}
                       Sin imagen
                     </div>
                   )}
@@ -2224,6 +2360,46 @@ const PublicStore: React.FC = () => {
                           {product.description}
                         </p>
                       )}
+
+                      {/* Selector de Subproductos / Variantes */}
+                      {hasVariants && (
+                        <div style={{ marginTop: '6px', marginBottom: '8px' }}>
+                          <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                            Elige opción / variante:
+                          </div>
+                          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                            {product.variants!.map((v) => {
+                              const isSelected = activeVariant?.id === v.id;
+                              const vStock = Number(v.stockQuantity || 0);
+                              return (
+                                <button
+                                  key={v.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedVariantByProduct((prev) => ({ ...prev, [product.id]: v.id }));
+                                    if (Array.isArray(v.images) && v.images.length > 0) {
+                                      setActiveImageByProduct((prev) => ({ ...prev, [product.id]: v.images![0] }));
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '8px',
+                                    border: isSelected ? `1.5px solid ${primaryColor}` : '1px solid #cbd5e1',
+                                    backgroundColor: isSelected ? primarySoftBg : '#f8fafc',
+                                    color: isSelected ? primaryReadable : (vStock <= 0 ? '#94a3b8' : '#334155'),
+                                    fontSize: '11px',
+                                    fontWeight: isSelected ? 800 : 600,
+                                    cursor: 'pointer',
+                                    opacity: vStock <= 0 && !isProductMadeToOrder(product) ? 0.65 : 1,
+                                  }}
+                                >
+                                  {v.name} {vStock <= 0 && !isProductMadeToOrder(product) ? '(Agotado)' : `(${vStock})`}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Price and Action Button */}
@@ -2239,7 +2415,7 @@ const PublicStore: React.FC = () => {
                     >
                       <div>
                         <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: primaryReadable }}>
-                          ${product.salePrice.toFixed(2)}
+                          ${effectivePrice.toFixed(2)}
                         </div>
                         <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
                           Bs. {priceBs.toFixed(2)}
@@ -2252,7 +2428,7 @@ const PublicStore: React.FC = () => {
                             size="small"
                             fill="outline"
                             color="primary"
-                            onClick={() => handleUpdateQuantity(product.id, -1)}
+                            onClick={() => handleUpdateQuantity(activeCartKey, -1)}
                             style={{ margin: 0, height: '32px', width: '32px' }}
                           >
                             <IonIcon slot="icon-only" icon={removeOutline} />
@@ -2263,8 +2439,8 @@ const PublicStore: React.FC = () => {
                           <IonButton
                             size="small"
                             color="primary"
-                            onClick={() => handleUpdateQuantity(product.id, 1)}
-                            disabled={!product.isService && !isProductMadeToOrder(product) && product.availabilityType !== 'BAJO_ENCARGO' && !product.isSupplierPreorder && inCart.quantity >= getAvailableStock(product)}
+                            onClick={() => handleUpdateQuantity(activeCartKey, 1)}
+                            disabled={!product.isService && !isProductMadeToOrder(product) && product.availabilityType !== 'BAJO_ENCARGO' && !product.isSupplierPreorder && inCart.quantity >= availStock}
                             style={{ margin: 0, height: '32px', width: '32px' }}
                           >
                             <IonIcon slot="icon-only" icon={addOutline} />
@@ -2274,15 +2450,15 @@ const PublicStore: React.FC = () => {
                         <IonButton
                           size="small"
                           color={product.isSupplierPreorder ? 'tertiary' : product.availabilityType === 'BAJO_ENCARGO' ? 'warning' : 'primary'}
-                          disabled={product.isOutOfStock && !product.isSupplierPreorder && product.availabilityType !== 'BAJO_ENCARGO' && !isProductMadeToOrder(product)}
-                          onClick={() => handleAddToCart(product)}
+                          disabled={isOptionOutOfStock && !product.isSupplierPreorder && product.availabilityType !== 'BAJO_ENCARGO' && !isProductMadeToOrder(product)}
+                          onClick={() => handleAddToCart(product, activeVariant)}
                           style={{ margin: 0, borderRadius: '8px', fontWeight: 'bold' }}
                         >
                           {product.isSupplierPreorder
                             ? 'Solicitar Encargo'
                             : product.availabilityType === 'BAJO_ENCARGO'
                             ? 'Encargar'
-                            : product.isOutOfStock
+                            : isOptionOutOfStock
                             ? 'Agotado'
                             : 'Agregar'}
                         </IonButton>
@@ -2364,10 +2540,12 @@ const PublicStore: React.FC = () => {
                 <h4 style={{ fontWeight: 'bold', margin: '0 0 10px 0' }}>Productos Seleccionados</h4>
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', marginBottom: '20px' }}>
                   {cart.map((item) => {
-                    const lineTotal = item.product.salePrice * item.quantity;
+                    const lineTotal = item.unitPrice * item.quantity;
+                    const itemImg = (item.variant?.images && item.variant.images[0]) || item.product.images?.[0];
+                    const itemAvail = getAvailableStock(item.product, item.variant);
                     return (
                       <div
-                        key={item.product.id}
+                        key={item.cartKey}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -2377,9 +2555,9 @@ const PublicStore: React.FC = () => {
                           gap: '12px',
                         }}
                       >
-                        {item.product.images?.[0] ? (
+                        {itemImg ? (
                           <img
-                            src={item.product.images[0]}
+                            src={itemImg}
                             alt={item.product.name}
                             loading="lazy"
                             style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px' }}
@@ -2405,23 +2583,28 @@ const PublicStore: React.FC = () => {
                         <div style={{ flex: 1 }}>
                           <h4 style={{ margin: '0 0 3px 0', fontSize: '0.95rem', fontWeight: '600' }}>
                             {item.product.name}
+                            {item.variant && (
+                              <span style={{ marginLeft: '6px', fontSize: '0.78rem', fontWeight: 800, backgroundColor: '#F3E8FF', color: '#6D28D9', padding: '1px 6px', borderRadius: '5px' }}>
+                                🎨 {item.variant.name}
+                              </span>
+                            )}
                           </h4>
                           <span style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 'bold' }}>
-                            ${item.product.salePrice.toFixed(2)} c/u (${lineTotal.toFixed(2)})
+                            ${item.unitPrice.toFixed(2)} c/u (${lineTotal.toFixed(2)})
                           </span>
                           {!item.product.isService && !isProductMadeToOrder(item.product) && (
                             <span
                               style={{
                                 fontSize: '0.75rem',
-                                color: item.quantity > getAvailableStock(item.product) ? '#ef4444' : '#64748b',
+                                color: item.quantity > itemAvail ? '#ef4444' : '#64748b',
                                 display: 'block',
                                 marginTop: '2px',
-                                fontWeight: item.quantity > getAvailableStock(item.product) ? 'bold' : 'normal',
+                                fontWeight: item.quantity > itemAvail ? 'bold' : 'normal',
                               }}
                             >
-                              {item.quantity > getAvailableStock(item.product)
-                                ? `⚠️ Excede stock disponible (${getAvailableStock(item.product)})`
-                                : `Disponible: ${getAvailableStock(item.product)}`}
+                              {item.quantity > itemAvail
+                                ? `⚠️ Excede stock disponible (${itemAvail})`
+                                : `Disponible: ${itemAvail}`}
                             </span>
                           )}
                           {isProductMadeToOrder(item.product) && (
@@ -2445,7 +2628,7 @@ const PublicStore: React.FC = () => {
                             size="small"
                             fill="outline"
                             color="medium"
-                            onClick={() => handleUpdateQuantity(item.product.id, -1)}
+                            onClick={() => handleUpdateQuantity(item.cartKey, -1)}
                             style={{ height: '30px', width: '30px', margin: 0 }}
                           >
                             <IonIcon slot="icon-only" icon={removeOutline} />
@@ -2457,8 +2640,8 @@ const PublicStore: React.FC = () => {
                             size="small"
                             fill="outline"
                             color="primary"
-                            disabled={!item.product.isService && !isProductMadeToOrder(item.product) && item.quantity >= getAvailableStock(item.product)}
-                            onClick={() => handleUpdateQuantity(item.product.id, 1)}
+                            disabled={!item.product.isService && !isProductMadeToOrder(item.product) && item.quantity >= itemAvail}
+                            onClick={() => handleUpdateQuantity(item.cartKey, 1)}
                             style={{ height: '30px', width: '30px', margin: 0 }}
                           >
                             <IonIcon slot="icon-only" icon={addOutline} />
@@ -2467,7 +2650,7 @@ const PublicStore: React.FC = () => {
                             size="small"
                             fill="clear"
                             color="danger"
-                            onClick={() => handleRemoveItem(item.product.id)}
+                            onClick={() => handleRemoveItem(item.cartKey)}
                             style={{ height: '30px', width: '30px', margin: 0 }}
                           >
                             <IonIcon slot="icon-only" icon={trashOutline} />

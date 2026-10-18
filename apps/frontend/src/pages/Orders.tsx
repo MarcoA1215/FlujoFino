@@ -20,9 +20,7 @@ import {
   storefrontOutline,
   cartOutline,
   trashOutline,
-  copyOutline,
-  calendarOutline,
-  alertCircleOutline
+  copyOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { OrderStatus, PaymentStatus, DeliveryMethod, UserRole } from '@finowork/shared-types';

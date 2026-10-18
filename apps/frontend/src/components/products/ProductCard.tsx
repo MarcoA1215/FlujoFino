@@ -209,7 +209,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '10px', cursor: 'zoom-in' }} 
               />
             )}
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 5px 0', lineHeight: '1.3' }}>{p.name}</h2>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 5px 0', lineHeight: '1.3', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <span>{p.name}</span>
+              {p.code && (
+                <span style={{ fontSize: '0.72rem', fontWeight: '800', backgroundColor: '#F1F5F9', color: '#475569', padding: '2px 6px', borderRadius: '6px', border: '1px solid #CBD5E1' }}>
+                  #{p.code}
+                </span>
+              )}
+            </h2>
             
             {!isClientMode && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0 0 8px 0', flexWrap: 'wrap' }}>
@@ -224,6 +231,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 }}>
                   {isResale ? '📦 Reventa' : isFormula ? '🧪 Armable / Fórmula' : '💆 Servicio'}
                 </span>
+                {Array.isArray(p.variants) && p.variants.length > 0 && (
+                  <span style={{
+                    fontSize: '0.72rem',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    fontWeight: '800',
+                    backgroundColor: '#ECFDF5',
+                    color: '#065F46',
+                    border: '1px solid #A7F3D0'
+                  }}>
+                    🎨 {p.variants.length} variante{p.variants.length === 1 ? '' : 's'}
+                  </span>
+                )}
               </div>
             )}
             

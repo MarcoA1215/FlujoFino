@@ -9,12 +9,13 @@ import {
   IonContent,
   IonFooter,
   IonIcon,
+  IonToggle,
   useIonToast
 } from '@ionic/react';
-import { closeOutline, checkmarkCircle, personOutline, timeOutline, pricetagOutline, buildOutline } from 'ionicons/icons';
+import { closeOutline, checkmarkCircle, personOutline, timeOutline, pricetagOutline, buildOutline, imageOutline, trashOutline, addOutline, layersOutline } from 'ionicons/icons';
 import { apiClient } from '../../api/client';
 import { useSettings } from '../../context/SettingsContext';
-import type { Product } from '../../types';
+import type { Product, ProductVariant } from '../../types';
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 }) => {
   const [presentToast] = useIonToast();
   const [name, setName] = useState('');
+  const [code, setCode] = useState('');
   const [category, setCategory] = useState('');
   const [salePrice, setSalePrice] = useState('');
   const [estimatedCost, setEstimatedCost] = useState('');
@@ -53,6 +55,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [selectedType, setSelectedType] = useState<'REVENTA' | 'FORMULA' | 'SERVICIO'>(archetype || 'REVENTA');
   const [availabilityType, setAvailabilityType] = useState<'INMEDIATO' | 'BAJO_ENCARGO'>('INMEDIATO');
   const [isSupplierPreorder, setIsSupplierPreorder] = useState(false);
+  const [baseImages, setBaseImages] = useState<string[]>([]);
+  const [uploadingMedia, setUploadingMedia] = useState<boolean>(false);
+  const [hasVariants, setHasVariants] = useState<boolean>(false);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
 
   const { settings: contextSettings } = useSettings();
   const [localSettings, setLocalSettings] = useState<any>(() => {
@@ -122,6 +128,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         ((product.recipe && product.recipe.length > 0) || product.isCombo ? 'FORMULA' : 'REVENTA'));
       setSelectedType(pType);
       setName(product.name || '');
+      setCode(product.code || '');
       setCategory(product.category || '');
       setSalePrice(product.salePrice !== undefined ? String(product.salePrice) : '');
       const existingCost = product.cost !== undefined && product.cost !== null ? product.cost : product.estimatedCost;
@@ -131,6 +138,24 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setAvailabilityType(product.availabilityType || 'INMEDIATO');
       setIsSupplierPreorder(!!product.isSupplierPreorder);
       
+      const parsedImages = Array.isArray(product.images)
+        ? product.images.filter(Boolean)
+        : (typeof product.images === 'string' && (product.images as string).trim()
+            ? (product.images as string).split(',').map(s => s.trim()).filter(Boolean)
+            : []);
+      setBaseImages(parsedImages);
+
+      const existingVariants = Array.isArray(product.variants) ? product.variants : [];
+      setHasVariants(Boolean(product.hasVariants) || existingVariants.length > 0);
+      setVariants(existingVariants.map(v => ({
+        ...v,
+        name: v.name || '',
+        sku: v.sku || '',
+        stockQuantity: Number(v.stockQuantity || 0),
+        salePrice: v.salePrice !== null && v.salePrice !== undefined ? Number(v.salePrice) : null,
+        images: Array.isArray(v.images) ? v.images.slice(0, 3) : []
+      })));
+
       let staffIds: string[] = [];
       if (Array.isArray(product.assignedStaffIds)) {
         staffIds = product.assignedStaffIds;
@@ -145,6 +170,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       }
       setSelectedType(defaultType);
       setName('');
+      setCode('');
       setCategory(isCombo ? 'Combos' : defaultType === 'SERVICIO' ? 'Servicios' : 'General');
       setSalePrice('');
       setEstimatedCost('');
@@ -153,6 +179,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setAvailabilityType('INMEDIATO');
       setIsSupplierPreorder(false);
       setSelectedStaffIds([]);
+      setBaseImages([]);
+      setHasVariants(false);
+      setVariants([]);
     }
   }, [product, isCombo, archetype, isResaleOnly, isOpen, isProductionEnabled, isRetailEnabled, isReservationsEnabled, availableTypes]);
 
@@ -193,6 +222,79 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
   };
 
+  const handleUploadBaseImages = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploadingMedia(true);
+    try {
+      const uploadedUrls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const formData = new FormData();
+        formData.append('file', files[i]);
+        const res = await apiClient.post('/products/upload-media', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        if (res.data?.url) uploadedUrls.push(res.data.url);
+      }
+      if (uploadedUrls.length > 0) {
+        setBaseImages(prev => [...prev, ...uploadedUrls]);
+        presentToast({ message: `✨ ${uploadedUrls.length} imagen(es) cargada(s)`, duration: 2000, color: 'success' });
+      }
+    } catch (err: any) {
+      presentToast({ message: 'Error subiendo imagen: ' + (err.response?.data?.message || err.message), duration: 3000, color: 'danger' });
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  const handleUploadVariantImages = async (variantIdx: number, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const currentImages = Array.isArray(variants[variantIdx]?.images) ? variants[variantIdx].images! : [];
+    const remainingSlots = 3 - currentImages.length;
+    if (remainingSlots <= 0) {
+      presentToast({ message: 'Máximo 3 imágenes permitidas por subproducto/variante', duration: 2500, color: 'warning' });
+      return;
+    }
+    setUploadingMedia(true);
+    try {
+      const uploadedUrls: string[] = [];
+      const countToUpload = Math.min(files.length, remainingSlots);
+      for (let i = 0; i < countToUpload; i++) {
+        const formData = new FormData();
+        formData.append('file', files[i]);
+        const res = await apiClient.post('/products/upload-media', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        if (res.data?.url) uploadedUrls.push(res.data.url);
+      }
+      if (uploadedUrls.length > 0) {
+        setVariants(prev => prev.map((v, idx) => idx === variantIdx ? {
+          ...v,
+          images: [...(v.images || []), ...uploadedUrls].slice(0, 3)
+        } : v));
+        presentToast({ message: `✨ ${uploadedUrls.length} imagen(es) añadida(s) a la variante`, duration: 2000, color: 'success' });
+      }
+    } catch (err: any) {
+      presentToast({ message: 'Error subiendo imagen: ' + (err.response?.data?.message || err.message), duration: 3000, color: 'danger' });
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  const addEmptyVariant = () => {
+    setVariants(prev => [
+      ...prev,
+      {
+        name: '',
+        sku: '',
+        stockQuantity: 0,
+        salePrice: null,
+        images: []
+      }
+    ]);
+  };
+
+  const totalVariantsStock = variants.reduce((acc, v) => acc + Math.max(0, Number(v.stockQuantity || 0)), 0);
+
   const handleSave = async () => {
     if (!name.trim()) {
       presentToast({ message: 'El nombre es obligatorio', duration: 2500, color: 'warning' });
@@ -204,25 +306,48 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       return;
     }
 
+    const cleanedVariants = hasVariants && !isService
+      ? variants.filter(v => v.name && v.name.trim().length > 0).map(v => ({
+          id: v.id,
+          name: v.name.trim(),
+          sku: v.sku?.trim() || undefined,
+          stockQuantity: Number(v.stockQuantity || 0),
+          salePrice: v.salePrice !== null && v.salePrice !== undefined && String(v.salePrice) !== '' ? Number(v.salePrice) : null,
+          images: Array.isArray(v.images) ? v.images.slice(0, 3) : []
+        }))
+      : [];
+
+    if (hasVariants && !isService && cleanedVariants.length === 0) {
+      presentToast({ message: 'Agrega al menos una variante con nombre (ej. Talla M - Rojo) o desactiva las subdivisiones', duration: 3000, color: 'warning' });
+      return;
+    }
+
     setSaving(true);
     try {
       const costNum = estimatedCost ? parseFloat(estimatedCost) : 0;
-      const stockNum = isResale ? (stock ? parseFloat(stock) : 0) : 0;
+      const effectiveStockNum = (hasVariants && !isService)
+        ? cleanedVariants.reduce((acc, v) => acc + Number(v.stockQuantity || 0), 0)
+        : (isResale ? (stock ? parseFloat(stock) : 0) : 0);
+
       const payload: any = {
         name: name.trim(),
+        code: code.trim() || undefined,
         category: category.trim() || (isService ? 'Servicios' : 'General'),
         salePrice: priceNum,
         cost: costNum,
         estimatedCost: costNum,
-        stock: isResale ? stockNum : 0,
-        stockQuantity: isResale ? stockNum : 0,
-        physicalStock: isResale ? stockNum : 0,
+        stock: isService ? 0 : effectiveStockNum,
+        stockQuantity: isService ? 0 : effectiveStockNum,
+        physicalStock: isService ? 0 : effectiveStockNum,
         durationMinutes: isService ? (durationMinutes ? parseInt(durationMinutes, 10) : 30) : undefined,
         assignedStaffIds: isService ? selectedStaffIds : [],
         is_service: isService,
         product_type: selectedType,
         availabilityType: isService ? 'INMEDIATO' : availabilityType,
-        isSupplierPreorder: isService ? false : isSupplierPreorder
+        isSupplierPreorder: isService ? false : isSupplierPreorder,
+        images: baseImages,
+        hasVariants: !isService && hasVariants && cleanedVariants.length > 0,
+        variants: !isService && hasVariants ? cleanedVariants : []
       };
 
       if (product) {
@@ -371,17 +496,32 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               />
             </div>
 
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                Categoría
-              </label>
-              <input 
-                type="text"
-                value={category} 
-                onChange={e => setCategory(e.target.value)} 
-                placeholder={isResale ? 'Ej. Ropa, Snacks, Bodegón, Bebidas...' : isFormula ? 'Ej. Comida, Bebidas, Preparados...' : 'Ej. Servicios, Peluquería, Estética...'} 
-                style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
+                  Categoría
+                </label>
+                <input 
+                  type="text"
+                  value={category} 
+                  onChange={e => setCategory(e.target.value)} 
+                  placeholder={isResale ? 'Ej. Ropa, Snacks, Bodegón, Bebidas...' : isFormula ? 'Ej. Comida, Bebidas, Preparados...' : 'Ej. Servicios, Peluquería, Estética...'} 
+                  style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
+                  Código / Slug / SKU (Opcional)
+                </label>
+                <input 
+                  type="text"
+                  value={code} 
+                  onChange={e => setCode(e.target.value.toUpperCase())} 
+                  placeholder="Auto-generado si se deja vacío (Ej. CAM-001)" 
+                  style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#0f172a', fontSize: '13px', fontWeight: '700', boxSizing: 'border-box', outline: 'none' }}
+                />
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '12px' }}>
@@ -423,16 +563,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             {isResale && (
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                  {product ? 'Stock Actual' : 'Stock Inicial'}
+                  {hasVariants ? 'Stock Total (Basado exclusivamente en las Variantes)' : (product ? 'Stock Actual' : 'Stock Inicial')}
                 </label>
-                <input 
-                  type="number" 
-                  value={stock} 
-                  onChange={e => setStock(e.target.value)} 
-                  placeholder="Ej. 15" 
-                  min="0"
-                  style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
-                />
+                {hasVariants ? (
+                  <div style={{ padding: '11px 12px', borderRadius: '8px', border: '1px solid #A7F3D0', background: '#ECFDF5', color: '#065F46', fontSize: '14px', fontWeight: '800' }}>
+                    📦 {totalVariantsStock} unidades totales (suma de {variants.length} variante{variants.length === 1 ? '' : 's'})
+                  </div>
+                ) : (
+                  <input 
+                    type="number" 
+                    value={stock} 
+                    onChange={e => setStock(e.target.value)} 
+                    placeholder="Ej. 15" 
+                    min="0"
+                    style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+                  />
+                )}
               </div>
             )}
 
@@ -506,6 +652,303 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </>
             )}
           </div>
+
+          {/* Galería de Imágenes del Producto Base / Servicio */}
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <IonIcon icon={imageOutline} color="primary" /> Imágenes del {isService ? 'Servicio' : 'Producto Base'} ({baseImages.length})
+                </h4>
+                <span style={{ fontSize: '11px', color: '#64748b' }}>
+                  Puedes subir múltiples fotos para el catálogo y tienda online.
+                </span>
+              </div>
+              <label
+                style={{
+                  backgroundColor: '#ECFDF5',
+                  color: '#065F46',
+                  border: '1px solid #A7F3D0',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  fontSize: '12px',
+                  fontWeight: '800',
+                  cursor: uploadingMedia ? 'wait' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <IonIcon icon={addOutline} style={{ fontSize: '16px' }} />
+                <span>{uploadingMedia ? 'Subiendo...' : 'Subir Imágenes'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  disabled={uploadingMedia}
+                  onChange={e => handleUploadBaseImages(e.target.files)}
+                  style={{ display: 'none' }}
+                />
+              </label>
+            </div>
+
+            {baseImages.length === 0 ? (
+              <div style={{ padding: '14px', borderRadius: '10px', border: '1px dashed #CBD5E1', backgroundColor: '#F8FAFC', textAlign: 'center', fontSize: '12px', color: '#64748B' }}>
+                Sin imágenes cargadas aún. Toca "Subir Imágenes" para añadir fotos.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                {baseImages.map((imgUrl, idx) => (
+                  <div key={idx} style={{ position: 'relative', width: '76px', height: '76px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #CBD5E1' }}>
+                    <img src={imgUrl} alt={`Foto ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <button
+                      type="button"
+                      onClick={() => setBaseImages(prev => prev.filter((_, i) => i !== idx))}
+                      style={{
+                        position: 'absolute',
+                        top: '3px',
+                        right: '3px',
+                        width: '22px',
+                        height: '22px',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(239, 68, 68, 0.92)',
+                        color: '#ffffff',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        fontSize: '12px'
+                      }}
+                      title="Quitar imagen"
+                    >
+                      <IonIcon icon={closeOutline} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sub-divisiones / Variantes de Producto (Colores, Diseños, Tallas con Stock Propio y hasta 3 imágenes c/u) */}
+          {!isService && !isCombo && (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: hasVariants ? '12px' : '0' }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <IonIcon icon={layersOutline} color="primary" /> Subdivisiones / Variantes del Producto
+                  </h4>
+                  <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginTop: '2px' }}>
+                    Ej. Camisas de distintos colores/tallas o tazas con distintos dibujos y stock propio.
+                  </span>
+                </div>
+                <IonToggle
+                  checked={hasVariants}
+                  onIonChange={e => {
+                    const checked = e.detail.checked;
+                    setHasVariants(checked);
+                    if (checked && variants.length === 0) {
+                      addEmptyVariant();
+                    }
+                  }}
+                  color="success"
+                />
+              </div>
+
+              {hasVariants && (
+                <div>
+                  <div style={{ padding: '10px 12px', backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '10px', fontSize: '12px', color: '#065F46', marginBottom: '12px' }}>
+                    💡 Al activar variantes, el stock del producto se calcula <b>exclusivamente</b> sumando el stock de cada variante ({totalVariantsStock} unds). Cada variante permite hasta <b>3 fotos extras opcionales</b>.
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '12px' }}>
+                    {variants.map((v, vIdx) => {
+                      const vImages = Array.isArray(v.images) ? v.images : [];
+                      return (
+                        <div
+                          key={v.id || vIdx}
+                          style={{
+                            backgroundColor: '#F8FAFC',
+                            border: '1px solid #CBD5E1',
+                            borderRadius: '12px',
+                            padding: '12px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: '800', color: '#0F172A' }}>
+                              Variante #{vIdx + 1}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setVariants(prev => prev.filter((_, i) => i !== vIdx))}
+                              style={{
+                                background: '#FEF2F2',
+                                color: '#DC2626',
+                                border: '1px solid #FECACA',
+                                borderRadius: '6px',
+                                padding: '4px 8px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <IonIcon icon={trashOutline} />
+                              Quitar
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', marginBottom: '10px' }}>
+                            <div style={{ gridColumn: 'span 2' }}>
+                              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '3px' }}>
+                                Color / Diseño / Talla *
+                              </label>
+                              <input
+                                type="text"
+                                value={v.name}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setVariants(prev => prev.map((item, i) => i === vIdx ? { ...item, name: val } : item));
+                                }}
+                                placeholder="Ej. Rojo - Talla M, Diseño Goku, Azul XL..."
+                                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', fontSize: '13px', fontWeight: '700', color: '#0F172A' }}
+                              />
+                            </div>
+
+                            <div>
+                              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '3px' }}>
+                                Stock Propio *
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={v.stockQuantity}
+                                onChange={e => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setVariants(prev => prev.map((item, i) => i === vIdx ? { ...item, stockQuantity: val } : item));
+                                }}
+                                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', fontSize: '13px', fontWeight: '800', color: '#047857' }}
+                              />
+                            </div>
+
+                            <div>
+                              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '3px' }}>
+                                Precio Esp. $ (Opc.)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={v.salePrice !== null && v.salePrice !== undefined ? v.salePrice : ''}
+                                onChange={e => {
+                                  const raw = e.target.value;
+                                  setVariants(prev => prev.map((item, i) => i === vIdx ? { ...item, salePrice: raw === '' ? null : parseFloat(raw) } : item));
+                                }}
+                                placeholder={salePrice || 'Base'}
+                                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', fontSize: '13px', color: '#0F172A' }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Hasta 3 imágenes extras opcionales por variante */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', paddingTop: '8px', borderTop: '1px dashed #E2E8F0' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              {vImages.map((vImg, imgIdx) => (
+                                <div key={imgIdx} style={{ position: 'relative', width: '54px', height: '54px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #CBD5E1' }}>
+                                  <img src={vImg} alt="Variante" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setVariants(prev => prev.map((item, i) => i === vIdx ? {
+                                        ...item,
+                                        images: (item.images || []).filter((_, j) => j !== imgIdx)
+                                      } : item));
+                                    }}
+                                    style={{
+                                      position: 'absolute',
+                                      top: '2px',
+                                      right: '2px',
+                                      width: '18px',
+                                      height: '18px',
+                                      borderRadius: '50%',
+                                      backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                                      color: '#fff',
+                                      border: 'none',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '10px',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                              {vImages.length < 3 && (
+                                <label
+                                  style={{
+                                    padding: '6px 10px',
+                                    borderRadius: '8px',
+                                    border: '1px dashed #10B981',
+                                    backgroundColor: '#ECFDF5',
+                                    color: '#065F46',
+                                    fontSize: '11px',
+                                    fontWeight: '700',
+                                    cursor: uploadingMedia ? 'wait' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  📷 +Foto ({vImages.length}/3 máx)
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    disabled={uploadingMedia}
+                                    onChange={e => handleUploadVariantImages(vIdx, e.target.files)}
+                                    style={{ display: 'none' }}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                            <span style={{ fontSize: '10px', color: '#64748B' }}>
+                              Máx. 3 fotos opcionales para esta variante
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={addEmptyVariant}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '10px',
+                      border: '1.5px dashed #10B981',
+                      backgroundColor: '#F0FDF4',
+                      color: '#047857',
+                      fontSize: '13px',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <IonIcon icon={addOutline} style={{ fontSize: '16px' }} />
+                    <span>Agregar otra variante (Color / Talla / Diseño)</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Modalidad y Disponibilidad (Productos y Fórmulas) */}
           {!isService && (

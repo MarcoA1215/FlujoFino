@@ -386,8 +386,14 @@ const Products: React.FC = () => {
   const filteredData = products.filter(item => {
     if (isClientMode && !isProductService(item) && getProductStock(item) <= 0) return false;
     if (searchText.trim() === '') return true;
-    return item.name.toLowerCase().includes(searchText.toLowerCase()) || 
-      (item.category && item.category.toLowerCase().includes(searchText.toLowerCase()));
+    const q = searchText.toLowerCase();
+    const matchName = item.name.toLowerCase().includes(q);
+    const matchCat = Boolean(item.category && item.category.toLowerCase().includes(q));
+    const matchCode = Boolean(item.code && item.code.toLowerCase().includes(q));
+    const matchVariant = Array.isArray(item.variants) && item.variants.some(v =>
+      (v.name && v.name.toLowerCase().includes(q)) || (v.sku && v.sku.toLowerCase().includes(q))
+    );
+    return matchName || matchCat || matchCode || matchVariant;
   });
   
   return (
@@ -405,7 +411,7 @@ const Products: React.FC = () => {
                 type="text"
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                placeholder="Buscar por nombre o categoría..."
+                placeholder="Buscar por nombre, código (#SKU), variante o categoría..."
               />
               {searchText && (
                 <IonIcon
