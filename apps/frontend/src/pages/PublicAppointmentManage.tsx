@@ -154,9 +154,14 @@ const PublicAppointmentManage: React.FC = () => {
   };
 
   const openPaymentModal = () => {
-    const remaining = appointment?.remainingAmount ?? (appointment?.totalAmount || appointment?.servicePrice || 0);
-    setPaymentType('FULL');
-    setPaymentAmount(remaining.toString());
+    const remaining = Number(appointment?.remainingAmount ?? (appointment?.totalAmount || appointment?.servicePrice || 0));
+    if (remaining > 0) {
+      setPaymentType('FULL');
+      setPaymentAmount(remaining.toFixed(2));
+    } else {
+      setPaymentType('PARTIAL');
+      setPaymentAmount('');
+    }
     setPaymentRef('');
     setPaymentNotes('');
     if (appointment?.acceptPagoMovil !== false) {
@@ -173,13 +178,13 @@ const PublicAppointmentManage: React.FC = () => {
 
   const handlePaymentTypeChange = (type: 'FULL' | 'PARTIAL') => {
     setPaymentType(type);
-    const remaining = appointment?.remainingAmount ?? (appointment?.totalAmount || appointment?.servicePrice || 0);
-    if (type === 'FULL') {
-      setPaymentAmount(remaining.toString());
+    const remaining = Number(appointment?.remainingAmount ?? (appointment?.totalAmount || appointment?.servicePrice || 0));
+    if (type === 'FULL' && remaining > 0) {
+      setPaymentAmount(remaining.toFixed(2));
     } else {
       const minPercentage = appointment?.minDepositPercentage || 30;
       const minDeposit = Math.round((remaining * (minPercentage / 100)) * 100) / 100;
-      setPaymentAmount(minDeposit > 0 ? minDeposit.toString() : '');
+      setPaymentAmount(minDeposit > 0 ? minDeposit.toFixed(2) : '');
     }
   };
 
@@ -312,8 +317,8 @@ const PublicAppointmentManage: React.FC = () => {
   const rateBs = Number(appointment.exchangeRateBs || 40.0);
   const totalBs = Math.round(totalAmount * rateBs * 100) / 100;
   const remainingBs = Math.round(remainingAmount * rateBs * 100) / 100;
-  const isPaidComplete = appointment.paymentStatus === 'PAID' || remainingAmount <= 0;
-  const isPartialPaid = appointment.paymentStatus === 'PARTIAL' || (abonosTotal > 0 && remainingAmount > 0);
+  const isPaidComplete = appointment.paymentStatus === 'PAID';
+  const isPartialPaid = appointment.paymentStatus === 'PARTIAL' || (abonosTotal > 0 && !isPaidComplete);
 
 
   // Convert current input to Bs for live feedback
@@ -598,7 +603,7 @@ const PublicAppointmentManage: React.FC = () => {
                 </div>
 
                 {/* Financial and Payment Section */}
-                {totalAmount > 0 && (
+                {(totalAmount > 0 || !isPaidComplete || abonosTotal > 0) && (
                   <div style={{ 
                     backgroundColor: isPaidComplete ? '#f0fdf4' : '#eff6ff', 
                     border: `1px solid ${isPaidComplete ? '#bbf7d0' : '#bfdbfe'}`,
@@ -973,7 +978,7 @@ const PublicAppointmentManage: React.FC = () => {
                       type="number" 
                       value={paymentAmount} 
                       placeholder="0.00"
-                      disabled={paymentType === 'FULL'}
+                      disabled={paymentType === 'FULL' && remainingAmount > 0}
                       onIonInput={e => setPaymentAmount(e.detail.value!)}
                     />
                   </IonItem>

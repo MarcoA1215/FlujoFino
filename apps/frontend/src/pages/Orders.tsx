@@ -913,30 +913,32 @@ const Orders: React.FC = () => {
                       </>
                     )}
 
-                    {!isPaid && !isCanceled && !isProveedorCancel && !isPreorderSolicitud && (
+                    {!isPaid && !isCanceled && !isProveedorCancel && (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/pos?editOrderId=${order.id}`)}
-                          style={{
-                            padding: '8px 10px',
-                            borderRadius: '10px',
-                            border: '1px solid #CBD5E1',
-                            background: '#F8FAFC',
-                            color: '#334155',
-                            fontSize: '12px',
-                            fontWeight: '700',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px',
-                            cursor: 'pointer'
-                          }}
-                          title="Agregar más productos o modificar la cuenta abierta"
-                        >
-                          <IonIcon icon={cartOutline} />
-                          Agregar
-                        </button>
+                        {!isPreorderSolicitud && (
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/pos?editOrderId=${order.id}`)}
+                            style={{
+                              padding: '8px 10px',
+                              borderRadius: '10px',
+                              border: '1px solid #CBD5E1',
+                              background: '#F8FAFC',
+                              color: '#334155',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px',
+                              cursor: 'pointer'
+                            }}
+                            title="Agregar más productos o modificar la cuenta abierta"
+                          >
+                            <IonIcon icon={cartOutline} />
+                            Agregar
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => {
@@ -964,15 +966,17 @@ const Orders: React.FC = () => {
                         >
                           ➕ Abonar
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => openPaymentAlert(order)}
-                          className="ff-btn-primary"
-                          style={{ flex: 1, padding: '8px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
-                        >
-                          <IonIcon icon={cashOutline} />
-                          Cobrar
-                        </button>
+                        {!isPreorderSolicitud && (
+                          <button
+                            type="button"
+                            onClick={() => openPaymentAlert(order)}
+                            className="ff-btn-primary"
+                            style={{ flex: 1, padding: '8px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                          >
+                            <IonIcon icon={cashOutline} />
+                            Cobrar
+                          </button>
+                        )}
                       </>
                     )}
 
@@ -1254,10 +1258,12 @@ const Orders: React.FC = () => {
                       </div>
 
                       {/* Si pagó con USD (Monto Recibido y Vuelto) */}
-                      {(selectedOrderForDetails.paymentMethod === 'USD' || selectedOrderForDetails.usdReceived) && (
+                      {(Boolean(selectedOrderForDetails.usdReceived) || (selectedOrderForDetails.paymentMethod === 'USD' && selectedOrderForDetails.paymentStatus === PaymentStatus.PAID)) && (
                         <div style={{ marginTop: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '14px', padding: '14px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '13px', color: '#166534', fontWeight: '700' }}>💵 Efectivo Recibido:</span>
+                            <span style={{ fontSize: '13px', color: '#166534', fontWeight: '700' }}>
+                              {selectedOrderForDetails.paymentStatus === PaymentStatus.PAID ? '💵 Efectivo Recibido:' : '💵 Paga al recibir con:'}
+                            </span>
                             <span style={{ fontSize: '16px', fontWeight: '900', color: '#15803D' }}>
                               ${Number(selectedOrderForDetails.usdReceived || detailsTotal).toFixed(2)} USD
                             </span>
@@ -1364,8 +1370,8 @@ const Orders: React.FC = () => {
                         </div>
                       )}
 
-                      {/* Si fue Cuenta Abierta */}
-                      {selectedOrderForDetails.paymentMethod === 'PENDING' && (
+                      {/* Si es Cuenta Abierta / Pago Pendiente o tiene Abonos */}
+                      {(selectedOrderForDetails.paymentMethod === 'PENDING' || selectedOrderForDetails.paymentStatus !== PaymentStatus.PAID || Number(selectedOrderForDetails.abonosTotal || 0) > 0) && (
                         <div style={{ marginTop: '12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '14px', padding: '12px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
                             <span style={{ color: '#92400E', fontWeight: '600' }}>Total Abonado:</span>
@@ -1387,7 +1393,11 @@ const Orders: React.FC = () => {
                               <div style={{ fontWeight: '700', marginBottom: '4px' }}>Historial de Abonos:</div>
                               {selectedOrderForDetails.abonosHistory.map((ab: any, i: number) => (
                                 <div key={ab.id || i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                                  <span>Abono #{i + 1} ({new Date(ab.date).toLocaleDateString()})</span>
+                                  <span>
+                                    Abono #{i + 1} ({new Date(ab.date).toLocaleDateString()})
+                                    {ab.method ? ` • ${ab.method}` : ''}
+                                    {ab.reference || ab.ref ? ` (Ref: ${ab.reference || ab.ref})` : ''}
+                                  </span>
                                   <b>${Number(ab.amount).toFixed(2)}</b>
                                 </div>
                               ))}

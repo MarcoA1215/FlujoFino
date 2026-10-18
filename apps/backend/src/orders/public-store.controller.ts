@@ -292,10 +292,13 @@ export class PublicStoreController {
 
     // 2. Crear orden mediante OrdersService con sanitización estricta de seguridad
     const hasElectronicPayment = Boolean(dto.pagoMovilRef || dto.transferRef || dto.binanceRef || dto.paymentReported);
+    const normalizedCedula = this.normalizeDocumentId((dto as any).customerCedula || (dto as any).identification || dto.pagoMovilCedula);
     const orderPayload: CreateOrderDto = {
       items: dto.items,
       customerName: dto.customerName?.trim(),
       customerPhone: dto.customerPhone?.trim(),
+      customerCedula: normalizedCedula || undefined,
+      identification: normalizedCedula || undefined,
       customerAddress: dto.customerAddress?.trim(),
       deliveryMethod: dto.deliveryMethod,
       deliveryZoneId: dto.deliveryZoneId,
@@ -304,7 +307,7 @@ export class PublicStoreController {
       paymentMethod: dto.paymentMethod,
       pagoMovilRef: dto.pagoMovilRef?.trim(),
       pagoMovilPhone: dto.pagoMovilPhone?.trim(),
-      pagoMovilCedula: dto.pagoMovilCedula?.trim(),
+      pagoMovilCedula: normalizedCedula || dto.pagoMovilCedula?.trim(),
       pagoMovilBank: dto.pagoMovilBank?.trim(),
       puntoRef: dto.puntoRef?.trim(),
       puntoBank: dto.puntoBank?.trim(),
@@ -350,6 +353,10 @@ export class PublicStoreController {
       status: createdOrder.status,
       paymentStatus: createdOrder.paymentStatus,
       paymentReported: createdOrder.paymentReported,
+      paymentMethod: createdOrder.paymentMethod,
+      abonosTotal: Number(createdOrder.abonosTotal || 0),
+      remainingAmount: Math.max(0, Number(createdOrder.totalAmount || 0) - Number(createdOrder.abonosTotal || 0)),
+      abonosHistory: createdOrder.abonosHistory || [],
       totalAmount: createdOrder.totalAmount,
       totalAmountBs: createdOrder.amountBs,
       deliveryMethod: createdOrder.deliveryMethod,
@@ -359,25 +366,56 @@ export class PublicStoreController {
     };
   }
 
+  private isUuid(val: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+  }
+
+  private normalizeDocumentId(input?: string | null): string {
+    if (!input) return '';
+    const trimmed = input.trim().toUpperCase();
+    if (!trimmed) return '';
+    const prefixMatch = trimmed.match(/^([VEJGP])/);
+    const digits = trimmed.replace(/\D/g, '');
+    if (!digits) return '';
+    const prefix = prefixMatch ? prefixMatch[1] : 'V';
+    return `${prefix}-${digits}`;
+  }
+
+  private async findOrderByIdOrPrefix(orderIdOrPrefix: string, tenantId?: string): Promise<Order | null> {
+    const clean = (orderIdOrPrefix || '').trim().replace(/^#/, '');
+    if (!clean) return null;
+
+    if (this.isUuid(clean)) {
+      const whereClause: any = { id: clean };
+      if (tenantId) whereClause.tenantId = tenantId;
+      const exact = await this.orderRepo.findOne({
+        where: whereClause,
+        relations: { items: { product: true } },
+      });
+      if (exact) return exact;
+    }
+
+    const cleanLower = clean.toLowerCase();
+    if (cleanLower.length >= 6) {
+      const qb = this.orderRepo
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.items', 'items')
+        .leftJoinAndSelect('items.product', 'product')
+        .where('LOWER(CAST(order.id AS TEXT)) LIKE :prefix', { prefix: `${cleanLower}%` });
+
+      if (tenantId) {
+        qb.andWhere('order.tenantId = :tenantId', { tenantId });
+      }
+
+      return await qb.orderBy('order.createdAt', 'DESC').getOne();
+    }
+
+    return null;
+  }
+
   @Get('order/:orderId')
   async getPublicOrderStatus(@Param('orderId') orderId: string) {
-    let order = await this.orderRepo.findOne({
-      where: { id: orderId },
-      relations: { items: { product: true } },
-    });
-
-    if (!order) {
-      const clean = orderId.trim().replace(/^#/, '').toLowerCase();
-      if (clean.length >= 6) {
-        order = await this.orderRepo
-          .createQueryBuilder('order')
-          .leftJoinAndSelect('order.items', 'items')
-          .leftJoinAndSelect('items.product', 'product')
-          .where('LOWER(order.id) LIKE :prefix', { prefix: `${clean}%` })
-          .orderBy('order.createdAt', 'DESC')
-          .getOne();
-      }
-    }
+    const order = await this.findOrderByIdOrPrefix(orderId);
 
     if (!order) {
       throw new NotFoundException('Pedido no encontrado');
@@ -387,10 +425,114 @@ export class PublicStoreController {
   }
 
   @Throttle({ default: { limit: 6, ttl: 60000 } })
+  @Post('order/:orderId/payment')
+  async reportOrderPayment(
+    @Param('orderId') orderId: string,
+    @Body() dto: {
+      amount: number;
+      amountBs?: number;
+      method: string;
+      reference: string;
+      bank?: string;
+      notes?: string;
+      paymentProofUrl?: string;
+    }
+  ) {
+    if (!dto.amount || Number(dto.amount) <= 0) {
+      throw new BadRequestException('El monto reportado debe ser mayor a 0');
+    }
+    if (!dto.reference || !dto.reference.trim()) {
+      throw new BadRequestException('Por favor, ingresa el número de referencia del comprobante');
+    }
+
+    const order = await this.findOrderByIdOrPrefix(orderId);
+
+    if (!order) {
+      throw new NotFoundException('Pedido no encontrado');
+    }
+    if (order.status === OrderStatus.CANCELED || order.status === OrderStatus.CANCELADO_PROVEEDOR) {
+      throw new BadRequestException('No se pueden reportar pagos para un pedido cancelado');
+    }
+
+    const cleanRef = dto.reference.trim();
+    const cleanMethod = (dto.method || 'PAGO_MOVIL').toUpperCase();
+    const cleanBank = dto.bank ? dto.bank.trim() : undefined;
+
+    const paymentEntry = {
+      id: Date.now().toString(),
+      amount: Number(dto.amount),
+      amountBs: dto.amountBs ? Number(dto.amountBs) : undefined,
+      method: cleanMethod,
+      ref: cleanRef,
+      reference: cleanRef,
+      bank: cleanBank,
+      date: new Date().toISOString(),
+      notes: dto.notes ? dto.notes.trim() : undefined,
+      status: 'REPORTED_PENDING_APPROVAL',
+    };
+
+    order.abonosHistory = Array.isArray(order.abonosHistory) ? order.abonosHistory : [];
+    order.abonosHistory.push(paymentEntry);
+    order.abonosTotal = Math.round(((Number(order.abonosTotal || 0) + Number(dto.amount)) * 100)) / 100;
+
+    // Si aún no está completamente pagado, mantener en estado actual (PENDING o PARTIAL) pero marcar paymentReported = true
+    if (order.paymentStatus !== PaymentStatus.PAID) {
+      order.paymentReported = true;
+    }
+    order.paymentRejectedReason = null as any;
+
+    if (cleanMethod === 'PAGO_MOVIL') {
+      order.pagoMovilRef = cleanRef;
+      if (cleanBank) order.pagoMovilBank = cleanBank;
+    } else if (cleanMethod === 'TRANSFER') {
+      order.transferRef = cleanRef;
+      if (cleanBank) order.transferBank = cleanBank;
+    } else if (cleanMethod === 'BINANCE') {
+      order.binanceRef = cleanRef;
+    } else {
+      order.pagoMovilRef = cleanRef;
+      if (cleanBank) order.pagoMovilBank = cleanBank;
+    }
+
+    if (dto.paymentProofUrl) {
+      order.paymentProofUrl = dto.paymentProofUrl;
+    }
+
+    const methodLabel = cleanMethod === 'PAGO_MOVIL' ? 'Pago Móvil' : cleanMethod === 'BINANCE' ? 'Binance' : cleanMethod === 'TRANSFER' ? 'Transferencia' : 'Pago';
+    const noteTag = `[Abono/Pago Reportado: $${Number(dto.amount).toFixed(2)} vía ${methodLabel} Ref: ${cleanRef}${cleanBank ? ` (${cleanBank})` : ''}]`;
+    order.notes = order.notes ? `${order.notes} | ${noteTag}` : noteTag;
+
+    const savedOrder = await this.orderRepo.save(order);
+
+    try {
+      const anyNotif = this.notificationsService as any;
+      if (typeof anyNotif.sendNotificationToNegocio === 'function') {
+        await anyNotif.sendNotificationToNegocio(order.tenantId, {
+          title: '📱 Comprobante de Pago / Abono en Pedido',
+          body: `${order.customerName || 'Cliente'} reportó un abono de $${Number(dto.amount).toFixed(2)} (${methodLabel}) en el pedido #${order.id.slice(0, 8).toUpperCase()}.`,
+          data: {
+            url: '/orders',
+            orderId: order.id,
+            type: 'ORDER_PAYMENT_REPORTED',
+          },
+        }, ['ADMIN', 'CAJERO', 'POS']);
+      } else if (typeof this.notificationsService.notifyNewOrder === 'function') {
+        await this.notificationsService.notifyNewOrder(order.tenantId, savedOrder);
+      }
+    } catch (err) {}
+
+    return {
+      success: true,
+      message: 'Abono reportado con éxito. El negocio verificará tu comprobante.',
+      ...this.formatOrderResponse(savedOrder),
+    };
+  }
+
+  @Throttle({ default: { limit: 6, ttl: 60000 } })
   @Post('tenant/:id/track')
   async trackOrder(
     @Param('id') token: string,
-    @Body() body: { orderCode?: string; phone?: string }
+    @Body() body: { orderCode?: string; phone?: string; cedula?: string }
   ) {
     let tenantId: string;
     try {
@@ -400,43 +542,50 @@ export class PublicStoreController {
     }
 
     const cleanCode = (body.orderCode || '').trim().replace(/^#/, '').toLowerCase();
-    const cleanPhone = (body.phone || '').trim().replace(/\D/g, '');
+    const rawIdentifier = (body.phone || body.cedula || '').trim();
+    const cleanDigits = rawIdentifier.replace(/\D/g, '');
 
     if (!cleanCode || cleanCode.length < 6) {
       throw new BadRequestException('Ingresa un código de pedido válido de al menos 6 u 8 caracteres (ej: #A1B2C3D4)');
     }
 
-    if (!cleanPhone || cleanPhone.length < 4) {
-      throw new BadRequestException('Ingresa el número de teléfono (o los últimos 4 dígitos) registrado en la orden para verificar tu identidad');
+    if (!cleanDigits || cleanDigits.length < 4) {
+      throw new BadRequestException('Ingresa el número de teléfono o cédula (o al menos los últimos 4 dígitos) registrado en el pedido para verificar tu identidad');
     }
 
-    const order = await this.orderRepo
-      .createQueryBuilder('order')
-      .leftJoinAndSelect('order.items', 'items')
-      .leftJoinAndSelect('items.product', 'product')
-      .where('order.tenantId = :tenantId', { tenantId })
-      .andWhere('LOWER(order.id) LIKE :prefix', { prefix: `${cleanCode}%` })
-      .orderBy('order.createdAt', 'DESC')
-      .getOne();
+    const order = await this.findOrderByIdOrPrefix(cleanCode, tenantId);
 
     if (!order) {
       throw new NotFoundException('No encontramos ningún pedido con ese código en esta tienda.');
     }
 
     const orderPhoneDigits = (order.customerPhone || '').replace(/\D/g, '');
-    const matchesPhone =
-      orderPhoneDigits.endsWith(cleanPhone) ||
-      orderPhoneDigits.includes(cleanPhone) ||
-      cleanPhone.endsWith(orderPhoneDigits);
+    const orderCedulaDigits = (order.identification || order.pagoMovilCedula || '').replace(/\D/g, '');
 
-    if (!matchesPhone) {
-      throw new NotFoundException('El número de teléfono no coincide con el registrado en este pedido.');
+    const matchesPhone =
+      Boolean(orderPhoneDigits) &&
+      (orderPhoneDigits.endsWith(cleanDigits) ||
+        orderPhoneDigits.includes(cleanDigits) ||
+        cleanDigits.endsWith(orderPhoneDigits));
+
+    const matchesCedula =
+      Boolean(orderCedulaDigits) &&
+      (orderCedulaDigits.endsWith(cleanDigits) ||
+        orderCedulaDigits.includes(cleanDigits) ||
+        cleanDigits.endsWith(orderCedulaDigits));
+
+    if (!matchesPhone && !matchesCedula) {
+      throw new NotFoundException('El número de teléfono o cédula no coincide con el registrado en este pedido.');
     }
 
     return this.formatOrderResponse(order);
   }
 
   private formatOrderResponse(order: Order) {
+    const totalAmt = Number(order.totalAmount || 0);
+    const abonosAmt = Number(order.abonosTotal || 0);
+    const remainingAmt = Math.max(0, Math.round((totalAmt - abonosAmt) * 100) / 100);
+
     return {
       id: order.id,
       orderId: order.id,
@@ -444,19 +593,26 @@ export class PublicStoreController {
       status: order.status,
       paymentStatus: order.paymentStatus,
       paymentReported: order.paymentReported,
+      paymentMethod: order.paymentMethod,
       paymentProofUrl: order.paymentProofUrl,
       paymentRejectedReason: order.paymentRejectedReason,
+      abonosTotal: abonosAmt,
+      remainingAmount: remainingAmt,
+      abonosHistory: order.abonosHistory || [],
       pagoMovilRef: order.pagoMovilRef,
+      pagoMovilBank: order.pagoMovilBank,
       transferRef: order.transferRef,
+      transferBank: order.transferBank,
       binanceRef: order.binanceRef,
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       identification: order.identification || order.pagoMovilCedula || '',
       customerCedula: order.identification || order.pagoMovilCedula || '',
       totalAmount: order.totalAmount,
-      grandTotalUSD: Number(order.totalAmount),
+      grandTotalUSD: totalAmt,
       amountBs: order.amountBs,
       grandTotalBs: Number(order.amountBs),
+      exchangeRate: Number(order.exchangeRate || 40),
       deliveryMethod: order.deliveryMethod,
       customerAddress: order.customerAddress,
       createdAt: order.createdAt,

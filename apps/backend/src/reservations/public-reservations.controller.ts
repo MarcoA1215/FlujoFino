@@ -346,7 +346,9 @@ export class PublicReservationsController {
     const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
     const recentWindow = new Date(Date.now() - 120 * 1000); // 2 minutos
     const cleanPhone = dto.customerPhone?.trim();
-    const cleanCedula = dto.identification?.trim();
+    const cleanCedula = typeof this.customersService?.normalizeId === 'function'
+      ? this.customersService.normalizeId(dto.identification)
+      : dto.identification?.trim();
 
     const duplicateConditions: any[] = [];
     if (cleanPhone) {
@@ -417,13 +419,13 @@ export class PublicReservationsController {
 
     // Synchronize customer profile
     let resolvedCustomerId: string | undefined = undefined;
-    let resolvedIdentification: string | undefined = dto.identification;
+    let resolvedIdentification: string | undefined = cleanCedula || dto.identification;
     if (dto.customerName && dto.customerPhone) {
       try {
         const customer = await this.customersService.findOrCreateOrUpdate(id, {
           name: dto.customerName,
           phone: dto.customerPhone,
-          identification: dto.identification
+          identification: cleanCedula || dto.identification
         });
         resolvedCustomerId = customer.id;
         if (!resolvedIdentification && customer.identification) {

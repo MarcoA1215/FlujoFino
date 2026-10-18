@@ -15,9 +15,42 @@ export class CustomersService {
     return phone.replace(/[^\d+]/g, '').trim();
   }
 
-  normalizeId(id?: string): string {
+  normalizeId(id?: string | null): string {
     if (!id) return '';
-    return id.trim().toUpperCase();
+    const trimmed = id.trim().toUpperCase();
+    if (!trimmed) return '';
+    const prefixMatch = trimmed.match(/^([VEJGP])/);
+    const digits = trimmed.replace(/\D/g, '');
+    if (!digits) return '';
+    const prefix = prefixMatch ? prefixMatch[1] : 'V';
+    return `${prefix}-${digits}`;
+  }
+
+  private async findCustomerByNormalizedId(tenantId: string, rawId?: string): Promise<Customer | null> {
+    const cleanId = this.normalizeId(rawId);
+    if (!cleanId) return null;
+
+    // 1. Búsqueda exacta por formato canónico (ej. V-31075846)
+    const exact = await this.customerRepo.findOne({
+      where: { tenantId, identification: cleanId },
+    });
+    if (exact) return exact;
+
+    // 2. Fallback para registros antiguos con puntos, sin guion o sin prefijo (ej. 31075846, v31.075.846)
+    const digits = cleanId.replace(/\D/g, '');
+    if (digits.length >= 5) {
+      const qb = this.customerRepo.createQueryBuilder?.('c');
+      if (qb) {
+        const candidate = await qb
+          .where('c.tenantId = :tenantId', { tenantId })
+          .andWhere("REGEXP_REPLACE(COALESCE(c.identification, ''), '[^0-9]', '', 'g') = :digits", { digits })
+          .getOne();
+        if (candidate) {
+          return candidate;
+        }
+      }
+    }
+    return null;
   }
 
   async findOrCreateOrUpdate(
@@ -30,9 +63,7 @@ export class CustomersService {
     let customer: Customer | null = null;
 
     if (cleanId) {
-      customer = await this.customerRepo.findOne({
-        where: { tenantId, identification: cleanId }
-      });
+      customer = await this.findCustomerByNormalizedId(tenantId, cleanId);
     }
 
     if (!customer && cleanPhone) {
@@ -54,7 +85,7 @@ export class CustomersService {
       if (data.name && data.name.trim().length > customer.name.length) {
         customer.name = data.name.trim();
       }
-      if (cleanId && !customer.identification) {
+      if (cleanId && customer.identification !== cleanId) {
         customer.identification = cleanId;
       }
       if (data.notes && !customer.notes) {
@@ -93,11 +124,9 @@ export class CustomersService {
 
     let customer: Customer | null = null;
 
-    // Search by identification
+    // Search by identification (canonical + digit-normalized fallback)
     if (cleanId) {
-      customer = await this.customerRepo.findOne({
-        where: { tenantId, identification: cleanId }
-      });
+      customer = await this.findCustomerByNormalizedId(tenantId, cleanId);
     }
 
     // Search by phone
@@ -120,7 +149,7 @@ export class CustomersService {
         id: customer.id,
         name: customer.name,
         phone: customer.phone,
-        identification: customer.identification || '',
+        identification: this.normalizeId(customer.identification) || customer.identification || '',
         notes: customer.notes || '',
         totalVisits: customer.totalVisits || 0,
       };
@@ -134,8 +163,18 @@ export class CustomersService {
       .where('c.tenantId = :tenantId', { tenantId });
 
     if (search && search.trim()) {
-      const s = `%${search.trim().toLowerCase()}%`;
-      qb.andWhere('(LOWER(c.name) LIKE :s OR c.phone LIKE :s OR LOWER(c.identification) LIKE :s)', { s });
+      const rawSearch = search.trim();
+      const s = `%${rawSearch.toLowerCase()}%`;
+      const digitsOnly = rawSearch.replace(/\D/g, '');
+      if (digitsOnly.length >= 4) {
+        const d = `%${digitsOnly}%`;
+        qb.andWhere(
+          "(LOWER(c.name) LIKE :s OR c.phone LIKE :s OR LOWER(c.identification) LIKE :s OR REGEXP_REPLACE(COALESCE(c.identification, ''), '[^0-9]', '', 'g') LIKE :d)",
+          { s, d },
+        );
+      } else {
+        qb.andWhere('(LOWER(c.name) LIKE :s OR c.phone LIKE :s OR LOWER(c.identification) LIKE :s)', { s });
+      }
     }
 
     qb.orderBy('c.updatedAt', 'DESC');

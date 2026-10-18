@@ -1202,14 +1202,21 @@ export class ReservationsService implements OnModuleInit {
     return { success: true };
   }
 
-  async addAbono(tenantId: string, id: string, amount: number) {
+  async addAbono(tenantId: string, id: string, amount: number, method?: string, ref?: string, bank?: string) {
     if (amount <= 0) throw new BadRequestException('El abono debe ser mayor a 0');
     const res = await this.repo.findOne({ where: { id, tenantId } });
     if (!res) throw new BadRequestException('No encontrado');
     
     res.abonosHistory = res.abonosHistory || [];
     const abonoId = randomUUID();
-    res.abonosHistory.push({ id: abonoId, amount, date: new Date().toISOString() });
+    const entry: any = { id: abonoId, amount: Number(amount), date: new Date().toISOString() };
+    if (method) entry.method = method;
+    if (ref) {
+      entry.ref = ref;
+      entry.reference = ref;
+    }
+    if (bank) entry.bank = bank;
+    res.abonosHistory.push(entry);
     res.abonosTotal = Math.round(((res.abonosTotal || 0) + Number(amount)) * 100) / 100;
     
     this.recalculatePaymentStatus(res);
@@ -1306,9 +1313,9 @@ export class ReservationsService implements OnModuleInit {
       });
     }
 
-    // Calcular abonos reales aprobados
+    // Calcular abonos reales aprobados (incluyendo abonos manuales sin status)
     const historySum = Array.isArray(res.abonosHistory)
-      ? res.abonosHistory.filter((e: any) => e.status === 'APPROVED').reduce((acc: number, e: any) => acc + (Number(e.amount) || 0), 0)
+      ? res.abonosHistory.filter((e: any) => !e.status || e.status === 'APPROVED').reduce((acc: number, e: any) => acc + (Number(e.amount) || 0), 0)
       : 0;
 
     if (historySum > 0) {
@@ -1354,7 +1361,7 @@ export class ReservationsService implements OnModuleInit {
         return entry;
       });
       const remainingApproved = res.abonosHistory
-        .filter((e: any) => e.status === 'APPROVED')
+        .filter((e: any) => !e.status || e.status === 'APPROVED')
         .reduce((sum: number, e: any) => sum + (Number(e.amount) || 0), 0);
       res.abonosTotal = remainingApproved;
     } else {

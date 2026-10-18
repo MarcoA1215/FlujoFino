@@ -87,9 +87,26 @@ const Reservations: React.FC = () => {
   const [shiftTimeFrom, setShiftTimeFrom] = useState('');
   const [shiftMinutes, setShiftMinutes] = useState(30);
   const [, setShiftAffected] = useState<any[]>([]);
-  const [, setSettings] = useState<any>({});
+  const [settings, setSettings] = useState<any>({});
   const [, setIsOfflineMode] = useState<boolean>(!navigator.onLine);
   const [notifyingDelayId, setNotifyingDelayId] = useState<string | null>(null);
+
+  // States for Abono Modal
+  const [selectedReservationForAbono, setSelectedReservationForAbono] = useState<any>(null);
+  const [abonoAmount, setAbonoAmount] = useState<string>('');
+  const [abonoMethod, setAbonoMethod] = useState<string>('USD');
+  const [abonoRef, setAbonoRef] = useState<string>('');
+  const [abonoBank, setAbonoBank] = useState<string>('');
+  const [isSubmittingAbono, setIsSubmittingAbono] = useState<boolean>(false);
+
+  const openAbonoModal = (res: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedReservationForAbono(res);
+    setAbonoAmount('');
+    setAbonoMethod('USD');
+    setAbonoRef('');
+    setAbonoBank('');
+  };
 
   // States for Reschedule Modal
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
@@ -239,6 +256,50 @@ const Reservations: React.FC = () => {
     } catch (e: any) {
       console.error(e);
       presentToast({ message: 'Error aprobando pago: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
+    }
+  };
+
+  const handleRegisterAbono = async () => {
+    if (!selectedReservationForAbono) return;
+    const rawAmount = parseFloat(abonoAmount);
+    if (isNaN(rawAmount) || rawAmount <= 0) {
+      presentToast({ message: 'Ingresa un monto de abono válido mayor a 0', duration: 2500, color: 'warning' });
+      return;
+    }
+
+    const rate = Number(settings?.exchangeRateBs || 40);
+    const isBsMethod = ['PAGO_MOVIL', 'TRANSFER', 'PUNTO', 'CASH_BS'].includes(abonoMethod);
+    const amountUsd = isBsMethod && rate > 0
+      ? Math.round((rawAmount / rate) * 100) / 100
+      : Math.round(rawAmount * 100) / 100;
+
+    setIsSubmittingAbono(true);
+    try {
+      const res = await apiClient.post(`/reservations/${selectedReservationForAbono.id}/abono`, {
+        amount: amountUsd,
+        method: abonoMethod,
+        ref: abonoRef.trim() || undefined,
+        bank: abonoBank.trim() || undefined,
+      });
+      presentToast({
+        message: `✅ Abono de $${amountUsd.toFixed(2)} USD registrado con éxito`,
+        duration: 3000,
+        color: 'success',
+      });
+      if (selectedEvent && selectedEvent.id === selectedReservationForAbono.id && res.data) {
+        setSelectedEvent(res.data);
+      }
+      setSelectedReservationForAbono(null);
+      fetchReservations();
+    } catch (e: any) {
+      console.error(e);
+      presentToast({
+        message: e.response?.data?.message || 'Error al registrar abono en la reserva',
+        duration: 3000,
+        color: 'danger',
+      });
+    } finally {
+      setIsSubmittingAbono(false);
     }
   };
 
@@ -1173,7 +1234,7 @@ const Reservations: React.FC = () => {
                         )}
 
                         {/* TAREA 1: Pago Reportado Por Verificar en Cita */}
-                        {!isConfirmed && res.paymentStatus !== 'PAID' && (Boolean(res.paymentReported) || (Array.isArray(res.abonosHistory) && res.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) && (
+                        {res.paymentStatus !== 'PAID' && (Boolean(res.paymentReported) || (Array.isArray(res.abonosHistory) && res.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) && (
                           <div
                             onClick={(e) => e.stopPropagation()}
                             style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', padding: '10px', marginBottom: '10px' }}
@@ -1343,6 +1404,31 @@ const Reservations: React.FC = () => {
                             <IonIcon icon={res.imageUrl ? imageOutline : cameraOutline} style={{ fontSize: '13px' }} />
                             {uploadingPhotoId === res.id ? 'Subiendo...' : (res.imageUrl ? 'Cambiar foto' : '+ Foto')}
                           </button>
+
+                          {/* Registrar Abono Directo */}
+                          {res.paymentStatus !== 'PAID' && res.status !== ReservationStatus.CANCELED && (
+                            <button
+                              type="button"
+                              onClick={(e) => openAbonoModal(res, e)}
+                              style={{
+                                background: '#FEF3C7',
+                                border: '1px solid #FCD34D',
+                                color: '#92400E',
+                                borderRadius: '8px',
+                                padding: '5px 10px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap'
+                              }}
+                              title="Registrar un abono parcial o pago en esta cita"
+                            >
+                              ➕ Abonar
+                            </button>
+                          )}
 
                           {/* Enviar a Caja */}
                           <button
@@ -1892,6 +1978,39 @@ const Reservations: React.FC = () => {
                         ${Number(selectedEvent.totalAmount || 0).toFixed(2)}
                       </span>
                     </div>
+
+                    {/* Desglose de Cuenta Abierta / Abonos en Reserva */}
+                    {(Number(selectedEvent.abonosTotal || 0) > 0 || selectedEvent.paymentStatus !== 'PAID') && (
+                      <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #CBD5E1' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                          <span style={{ color: '#64748B', fontWeight: '600' }}>Total Abonado:</span>
+                          <span style={{ fontWeight: '800', color: '#059669' }}>
+                            ${Number(selectedEvent.abonosTotal || 0).toFixed(2)} USD
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                          <span style={{ color: '#64748B', fontWeight: '700' }}>Saldo Pendiente:</span>
+                          <span style={{ fontWeight: '900', color: '#D97706' }}>
+                            ${Math.max(0, Number(selectedEvent.totalAmount || 0) - Number(selectedEvent.abonosTotal || 0)).toFixed(2)} USD
+                          </span>
+                        </div>
+                        {Array.isArray(selectedEvent.abonosHistory) && selectedEvent.abonosHistory.length > 0 && (
+                          <div style={{ marginTop: '8px', background: '#FFFFFF', borderRadius: '8px', padding: '8px 10px', border: '1px solid #E2E8F0', fontSize: '11px' }}>
+                            <div style={{ fontWeight: '700', color: '#475569', marginBottom: '4px' }}>Historial de Abonos:</div>
+                            {selectedEvent.abonosHistory.map((ab: any, idx: number) => (
+                              <div key={ab.id || idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: '#334155' }}>
+                                <span>
+                                  #{idx + 1} ({ab.date ? new Date(ab.date).toLocaleDateString() : 'Hoy'})
+                                  {ab.method ? ` • ${ab.method}` : ''}
+                                  {ab.reference || ab.ref ? ` (Ref: ${ab.reference || ab.ref})` : ''}
+                                </span>
+                                <b style={{ color: '#059669' }}>${Number(ab.amount || 0).toFixed(2)}</b>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* TAREA 1: Pago Reportado Por Verificar en Modal */}
@@ -2128,8 +2247,32 @@ const Reservations: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Actions: Cobrar, Reprogramar, Avisar Retraso & Editar */}
+                  {/* Actions: Abonar, Cobrar, Reprogramar, Avisar Retraso & Editar */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: selectedEvent.paymentStatus !== 'PAID' ? '1fr 1fr' : '1fr', gap: '8px' }}>
+                      {selectedEvent.paymentStatus !== 'PAID' && (
+                        <button
+                          type="button"
+                          onClick={() => openAbonoModal(selectedEvent)}
+                          style={{
+                            width: '100%',
+                            padding: '12px 10px',
+                            borderRadius: '10px',
+                            border: '1px solid #FCD34D',
+                            background: '#FEF3C7',
+                            color: '#92400E',
+                            fontSize: '13px',
+                            fontWeight: '800',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ➕ Registrar Abono
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
@@ -2137,11 +2280,12 @@ const Reservations: React.FC = () => {
                           window.location.href = `/pos?reservationId=${selectedEvent.id}`;
                         }}
                         className="ff-btn-primary"
-                        style={{ width: '100%', padding: '12px', fontSize: '14px' }}
+                        style={{ width: '100%', padding: '12px 10px', fontSize: '13px' }}
                       >
                         <IonIcon icon={cashOutline} />
-                        Enviar a Caja para Cobrar
+                        Enviar a Caja
                       </button>
+                    </div>
 
                       {/* Tarjeta Enlace de Control de Cita para el Cliente */}
                       <div style={{
@@ -2424,6 +2568,164 @@ const Reservations: React.FC = () => {
                 {isRescheduling ? 'Reprogramando...' : 'Confirmar Nueva Hora ✓'}
               </button>
             </div>
+          </div>
+        </IonModal>
+
+        {/* Modal de Registrar Abono en Reserva */}
+        <IonModal isOpen={Boolean(selectedReservationForAbono)} onDidDismiss={() => setSelectedReservationForAbono(null)} style={{ '--border-radius': '20px' } as any}>
+          <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
+                ➕ Registrar Abono de Cita
+              </h2>
+              <button
+                type="button"
+                onClick={() => setSelectedReservationForAbono(null)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <IonIcon icon={closeOutline} style={{ color: '#64748B' }} />
+              </button>
+            </div>
+
+            {selectedReservationForAbono && (() => {
+              const rate = Number(settings?.exchangeRateBs || 40);
+              const totalResUsd = Number(selectedReservationForAbono.totalAmount || 0);
+              const abonosResUsd = Number(selectedReservationForAbono.abonosTotal || 0);
+              const remainingResUsd = Math.max(0, totalResUsd - abonosResUsd);
+              const isBsMethod = ['PAGO_MOVIL', 'TRANSFER', 'PUNTO', 'CASH_BS'].includes(abonoMethod);
+              const parsedInput = parseFloat(abonoAmount) || 0;
+              const equivalentUsd = isBsMethod && rate > 0 ? parsedInput / rate : parsedInput;
+
+              return (
+                <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
+                  <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '14px', padding: '14px', marginBottom: '16px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '800', color: '#0F172A', marginBottom: '6px' }}>
+                      {selectedReservationForAbono.customerName}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
+                      <span style={{ color: '#92400E', fontWeight: '600' }}>Total Servicio:</span>
+                      <span style={{ fontWeight: '800', color: '#0F172A' }}>${totalResUsd.toFixed(2)} USD</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
+                      <span style={{ color: '#92400E', fontWeight: '600' }}>Abonado Previamente:</span>
+                      <span style={{ fontWeight: '800', color: '#10B981' }}>${abonosResUsd.toFixed(2)} USD</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', paddingTop: '6px', borderTop: '1px dashed #FCD34D' }}>
+                      <span style={{ color: '#92400E', fontWeight: '700' }}>Saldo Pendiente:</span>
+                      <span style={{ fontWeight: '900', color: '#D97706' }}>
+                        ${remainingResUsd.toFixed(2)} USD (~Bs. {(remainingResUsd * rate).toFixed(2)})
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#64748B', marginBottom: '6px', textTransform: 'uppercase' }}>
+                      Método del Abono
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                      {[
+                        { id: 'USD', label: '💵 USD' },
+                        { id: 'PAGO_MOVIL', label: '📱 Pago Móvil' },
+                        { id: 'PUNTO', label: '💳 Punto' },
+                        { id: 'TRANSFER', label: '🏦 Transf.' },
+                        { id: 'BINANCE', label: '🟡 Binance' },
+                        { id: 'CASH_BS', label: '🇻🇪 Efec. Bs' },
+                      ].map(m => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            setAbonoMethod(m.id);
+                            setAbonoAmount('');
+                          }}
+                          style={{
+                            padding: '10px 6px',
+                            borderRadius: '10px',
+                            border: abonoMethod === m.id ? '2px solid #10B981' : '1px solid #E2E8F0',
+                            background: abonoMethod === m.id ? '#ECFDF5' : '#F8FAFC',
+                            color: abonoMethod === m.id ? '#065F46' : '#334155',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>
+                        Monto a Abonar ({isBsMethod ? 'Bolívares Bs.' : 'Dólares USD'}) *
+                      </label>
+                      {remainingResUsd > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setAbonoAmount((isBsMethod ? remainingResUsd * rate : remainingResUsd).toFixed(2))}
+                          style={{ background: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0', borderRadius: '6px', padding: '2px 8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                          Saldo Total ({isBsMethod ? `Bs. ${(remainingResUsd * rate).toFixed(2)}` : `$${remainingResUsd.toFixed(2)}`})
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={abonoAmount}
+                      onChange={e => setAbonoAmount(e.target.value)}
+                      placeholder={isBsMethod ? `Ej. ${(remainingResUsd * rate || 100).toFixed(2)}` : `Ej. ${(remainingResUsd || 10).toFixed(2)}`}
+                      style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '16px', fontWeight: '800', color: '#0F172A', boxSizing: 'border-box' }}
+                    />
+                    {parsedInput > 0 && (
+                      <div style={{ fontSize: '12px', color: '#059669', fontWeight: '700', marginTop: '4px' }}>
+                        ✓ Se acreditarán ${equivalentUsd.toFixed(2)} USD a la reserva (Tasa: Bs. {rate.toFixed(2)})
+                      </div>
+                    )}
+                  </div>
+
+                  {abonoMethod !== 'USD' && abonoMethod !== 'CASH_BS' && (
+                    <>
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                          N° de Referencia / Comprobante
+                        </label>
+                        <input
+                          type="text"
+                          value={abonoRef}
+                          onChange={e => setAbonoRef(e.target.value)}
+                          placeholder="Últimos 4-6 dígitos"
+                          style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: '16px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                          Banco / Terminal (Opcional)
+                        </label>
+                        <input
+                          type="text"
+                          value={abonoBank}
+                          onChange={e => setAbonoBank(e.target.value)}
+                          placeholder="Ej. Banesco / Mercantil"
+                          style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={isSubmittingAbono}
+                    onClick={handleRegisterAbono}
+                    className="ff-btn-primary"
+                    style={{ width: '100%', padding: '13px', fontSize: '14px', borderRadius: '12px' }}
+                  >
+                    {isSubmittingAbono ? <IonSpinner name="crescent" /> : 'Confirmar Abono ✓'}
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </IonModal>
 

@@ -61,8 +61,15 @@ export class ReservationsController {
   }
 
   @Post(':id/abono')
-  addAbono(@Request() req, @Param('id') id: string, @Body('amount') amount: number) {
-    return this.service.addAbono(req.user.tenantId, id, amount);
+  addAbono(
+    @Request() req,
+    @Param('id') id: string,
+    @Body('amount') amount: number,
+    @Body('method') method?: string,
+    @Body('ref') ref?: string,
+    @Body('bank') bank?: string,
+  ) {
+    return this.service.addAbono(req.user.tenantId, id, amount, method, ref, bank);
   }
 
   @Post(':id/pay-full')

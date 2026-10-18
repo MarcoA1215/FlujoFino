@@ -99,4 +99,15 @@ describe('CustomersService', () => {
       expect(mockCustomerRepo.save).toHaveBeenCalledWith(customer);
     });
   });
+
+  describe('normalizeId', () => {
+    it('debe estandarizar todas las variantes de cédula y RIF al formato canónico PREFIX-DIGITS', () => {
+      expect(service.normalizeId('31075846')).toBe('V-31075846');
+      expect(service.normalizeId('v31.075.846')).toBe('V-31075846');
+      expect(service.normalizeId('v-31075846')).toBe('V-31075846');
+      expect(service.normalizeId('V-31.075.846')).toBe('V-31075846');
+      expect(service.normalizeId('j-40.123.456-7')).toBe('J-401234567');
+      expect(service.normalizeId('e 82.123.456')).toBe('E-82123456');
+    });
+  });
 });

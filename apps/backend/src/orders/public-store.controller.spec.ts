@@ -122,4 +122,51 @@ describe('PublicStoreController', () => {
       expect(passedPayload.initialAbono).toBeUndefined();
     });
   });
+
+  describe('trackOrder (Búsqueda de pedido por código de 8 caracteres y teléfono o cédula)', () => {
+    it('debe usar LOWER(CAST(order.id AS TEXT)) en vez de LOWER(order.id) y validar por teléfono o cédula sin lanzar error de PostgreSQL UUID', async () => {
+      const tenantId = '00000000-0000-0000-0000-000000000001';
+      jest.spyOn(tenantCrypto, 'decodeTenantId').mockReturnValue(tenantId);
+
+      const mockQb: any = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: '3a4b5c6d-1111-2222-3333-444455556666',
+          tenantId,
+          status: OrderStatus.PENDING,
+          paymentStatus: PaymentStatus.PENDING,
+          customerName: 'Juan Perez',
+          customerPhone: '0412-1234567',
+          identification: 'V-19876543',
+          totalAmount: 25,
+          amountBs: 1000,
+          items: [],
+        }),
+      };
+
+      mockOrderRepo.createQueryBuilder = jest.fn().mockReturnValue(mockQb);
+
+      // 1) Búsqueda usando Cédula
+      const resByCedula = await controller.trackOrder('token-valido', {
+        orderCode: '#3A4B5C6D',
+        phone: '19876543',
+      });
+
+      expect(mockOrderRepo.findOne).not.toHaveBeenCalled();
+      expect(mockQb.where).toHaveBeenCalledWith('LOWER(CAST(order.id AS TEXT)) LIKE :prefix', {
+        prefix: '3a4b5c6d%',
+      });
+      expect(resByCedula.orderNumber).toBe('3A4B5C6D');
+
+      // 2) Búsqueda usando Teléfono
+      const resByPhone = await controller.trackOrder('token-valido', {
+        orderCode: '3A4B5C6D',
+        phone: '04121234567',
+      });
+      expect(resByPhone.orderNumber).toBe('3A4B5C6D');
+    });
+  });
 });

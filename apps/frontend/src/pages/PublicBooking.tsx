@@ -25,6 +25,7 @@ import { CustomerNotificationPrompt } from '../components/CustomerNotificationPr
 import { BankSelect } from '../components/BankSelect';
 import { getPublicBaseUrl } from '../utils/public-url';
 import { getContrastColor, ensureReadableColor } from '../utils/colors';
+import { normalizeCedula, analyzeCedulaInput, type CedulaPrefix } from '../utils/cedula';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -327,6 +328,20 @@ const PublicBooking: React.FC = () => {
     if (tenantId) fetchTenant();
   }, [tenantId]);
 
+  const cedulaAnalysis = useMemo(() => analyzeCedulaInput(identification), [identification]);
+
+  const handleIdentificationBlur = () => {
+    if (identification.trim()) {
+      const norm = normalizeCedula(identification);
+      if (norm) setIdentification(norm);
+    }
+  };
+
+  const applyIdentificationPrefix = (prefix: CedulaPrefix) => {
+    const digits = identification.replace(/\D/g, '');
+    setIdentification(digits ? `${prefix}-${digits}` : `${prefix}-`);
+  };
+
   const handleLookup = async (q?: string) => {
     const queryToUse = q !== undefined ? q : lookupQuery;
     if (!queryToUse || !queryToUse.trim() || !tenantId) return;
@@ -337,7 +352,7 @@ const PublicBooking: React.FC = () => {
       if (res.data && res.data.exists) {
         setCustomerName(res.data.name || '');
         setCustomerPhone(res.data.phone || '');
-        if (res.data.identification) setIdentification(res.data.identification);
+        if (res.data.identification) setIdentification(normalizeCedula(res.data.identification));
         setRecognizedCustomer(res.data);
         presentToast({ message: `¡Hola de nuevo, ${res.data.name}! Hemos cargado tus datos.`, duration: 3000, color: 'success' });
       } else {
@@ -406,11 +421,16 @@ const PublicBooking: React.FC = () => {
     setIsSubmitting(true);
 
     try {
+      const normalizedIdentification = identification.trim() ? normalizeCedula(identification) : '';
+      if (normalizedIdentification && normalizedIdentification !== identification) {
+        setIdentification(normalizedIdentification);
+      }
+
       const payAmtNum = parseFloat(bookingPaymentAmount) || totalServicePrice;
       const res = await axios.post(`${apiBase}/public/reservations/${tenantId}`, {
         customerName, 
         customerPhone, 
-        identification: identification || undefined,
+        identification: normalizedIdentification || undefined,
         date: (selectedDate ? formatDateLocal(selectedDate) : undefined), 
         time: selectedTime, 
         numberOfPeople: (tenantInfo?.bookingRequireService || selectedServices.length > 0) ? 1 : numberOfPeople, 
@@ -443,7 +463,7 @@ const PublicBooking: React.FC = () => {
         localStorage.setItem('lastBookingCustomer', JSON.stringify({
           name: customerName,
           phone: customerPhone,
-          identification: identification || undefined
+          identification: normalizedIdentification || undefined
         }));
       } catch (e) {
         console.warn('Could not save to localStorage', e);
@@ -454,7 +474,7 @@ const PublicBooking: React.FC = () => {
       setSuccess(true);
 
       // Web Push notification subscription
-      const identifier = customerPhone || identification;
+      const identifier = customerPhone || normalizedIdentification;
       if (identifier) {
         requestAndSubscribePush(identifier.trim(), tenantId).catch((e) =>
           console.warn('Web push subscription failed:', e),
@@ -1914,12 +1934,12 @@ const PublicBooking: React.FC = () => {
                       ¿Ya te has atendido con nosotros?
                     </div>
                     <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>
-                      Ingresa tu Cédula o Teléfono para autocompletar tus datos al instante.
+                      Ingresa tu Cédula/RIF (ej. <b>V-31075846</b>) o Teléfono para autocompletar tus datos al instante.
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <IonInput 
                         value={lookupQuery}
-                        placeholder="Ej. 28123456 o 04141234567"
+                        placeholder="Ej. V-31075846 o 04141234567"
                         onIonInput={e => setLookupQuery(e.detail.value!)}
                         onKeyDown={e => { if (e.key === 'Enter') handleLookup(); }}
                         onBlur={() => { if (lookupQuery && !recognizedCustomer) handleLookup(); }}
@@ -1952,10 +1972,82 @@ const PublicBooking: React.FC = () => {
                     <IonInput value={customerPhone} onIonInput={e => setCustomerPhone(e.detail.value!)} placeholder="Ej. 04141234567" />
                   </IonItem>
 
-                  <IonItem lines="none" style={{ marginBottom: '10px', border: '1px solid #ddd', borderRadius: '8px' }}>
-                    <IonLabel position="stacked">Cédula / Documento de Identidad (Opcional)</IonLabel>
-                    <IonInput value={identification} onIonInput={e => setIdentification(e.detail.value!)} placeholder="Ej. V-28123456" />
-                  </IonItem>
+                  <div style={{ marginBottom: '12px', border: '1px solid #ddd', borderRadius: '8px', padding: '10px 12px', backgroundColor: '#ffffff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '4px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>
+                        Cédula / RIF (Opcional)
+                      </label>
+                      {cedulaAnalysis.normalized && cedulaAnalysis.digits.length >= 5 && (
+                        <span style={{ fontSize: '11px', fontWeight: 700, backgroundColor: '#ecfdf5', color: '#065f46', padding: '2px 8px', borderRadius: '10px', border: '1px solid #a7f3d0' }}>
+                          ✓ Se guardará: {cedulaAnalysis.normalized}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Indicador:</span>
+                      {(['V', 'E', 'J', 'G', 'P'] as CedulaPrefix[]).map((pref) => {
+                        const isSelected = (cedulaAnalysis.prefix || 'V') === pref && Boolean(identification.trim());
+                        return (
+                          <button
+                            key={pref}
+                            type="button"
+                            onClick={() => applyIdentificationPrefix(pref)}
+                            style={{
+                              padding: '3px 9px',
+                              borderRadius: '6px',
+                              border: isSelected ? '1.5px solid #10b981' : '1px solid #cbd5e1',
+                              backgroundColor: isSelected ? '#ecfdf5' : '#f8fafc',
+                              color: isSelected ? '#065f46' : '#475569',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {pref}-
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <IonInput
+                      value={identification}
+                      onIonInput={e => setIdentification(e.detail.value!)}
+                      onIonBlur={handleIdentificationBlur}
+                      placeholder="Ej. V-28123456 o J-401234567"
+                      style={{
+                        border: cedulaAnalysis.warningMessage && !cedulaAnalysis.isValidFormat ? '1.5px solid #f59e0b' : '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        padding: '0 10px',
+                        backgroundColor: '#f8fafc',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                      }}
+                    />
+
+                    {cedulaAnalysis.warningMessage ? (
+                      <div
+                        style={{
+                          marginTop: '6px',
+                          padding: '7px 10px',
+                          borderRadius: '8px',
+                          backgroundColor: cedulaAnalysis.isValidFormat ? '#f0fdf4' : '#fffbeb',
+                          border: `1px solid ${cedulaAnalysis.isValidFormat ? '#bbf7d0' : '#fde68a'}`,
+                          color: cedulaAnalysis.isValidFormat ? '#166534' : '#92400e',
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {cedulaAnalysis.isValidFormat ? '✨ ' : '⚠️ '}
+                        {cedulaAnalysis.warningMessage}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                        💡 Por favor incluye el indicador (<b>V-</b>, <b>E-</b>, <b>J-</b>, <b>G-</b> o <b>P-</b>) sin puntos. Si escribes solo números o con puntos, lo estandarizaremos automáticamente (ej. <b>V-28123456</b>).
+                      </div>
+                    )}
+                  </div>
 
                   {/* Only show "Cantidad de Personas" if it's NOT a required service mode and no service was picked */}
                   {!isServiceRequired && selectedServices.length === 0 && (

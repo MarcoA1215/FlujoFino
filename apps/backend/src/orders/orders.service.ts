@@ -30,6 +30,10 @@ export class CreateOrderDto {
 
   @IsOptional()
   @IsString()
+  identification?: string;
+
+  @IsOptional()
+  @IsString()
   customerAddress?: string;
 
   @IsOptional()
@@ -659,13 +663,16 @@ export class OrdersService implements OnModuleInit {
       const initialStatus = dto.status || (requiresPreparation ? OrderStatus.PREPARING : OrderStatus.PENDING);
 
       let customerId: string | undefined = undefined;
-      let identification: string | undefined = dto.customerCedula || dto.pagoMovilCedula;
+      const rawDocId = dto.identification || dto.customerCedula || dto.pagoMovilCedula;
+      let identification: string | undefined = rawDocId
+        ? (this.customersService?.normalizeId ? this.customersService.normalizeId(rawDocId) : rawDocId) || rawDocId
+        : undefined;
       if (dto.customerName && dto.customerPhone) {
         try {
           const customer = await this.customersService.findOrCreateOrUpdate(tenantId, {
             name: dto.customerName,
             phone: dto.customerPhone,
-            identification: dto.customerCedula || dto.pagoMovilCedula
+            identification
           });
           customerId = customer.id;
           if (!identification && customer.identification) {
@@ -1217,9 +1224,9 @@ export class OrdersService implements OnModuleInit {
       });
     }
 
-    // Calcular abonos aprobados reales
+    // Calcular abonos aprobados reales (incluyendo abonos manuales que no traen status)
     const historySum = Array.isArray(order.abonosHistory)
-      ? order.abonosHistory.filter((e: any) => e.status === 'APPROVED').reduce((acc: number, e: any) => acc + (Number(e.amount) || 0), 0)
+      ? order.abonosHistory.filter((e: any) => !e.status || e.status === 'APPROVED').reduce((acc: number, e: any) => acc + (Number(e.amount) || 0), 0)
       : 0;
 
     if (historySum > 0) {
@@ -1298,7 +1305,7 @@ export class OrdersService implements OnModuleInit {
         return e;
       });
       const remainingApproved = order.abonosHistory
-        .filter((e: any) => e.status === 'APPROVED')
+        .filter((e: any) => !e.status || e.status === 'APPROVED')
         .reduce((sum: number, e: any) => sum + (Number(e.amount) || 0), 0);
       order.abonosTotal = remainingApproved;
       const total = Number(order.totalAmount || 0);

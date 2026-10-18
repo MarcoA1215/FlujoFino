@@ -44,6 +44,7 @@ import { formatWhatsAppUrl } from '../utils/whatsapp';
 import { playNotificationSound } from '../utils/audio';
 import { BankSelect } from '../components/BankSelect';
 import { getContrastColor, ensureReadableColor } from '../utils/colors';
+import { normalizeCedula, analyzeCedulaInput, type CedulaPrefix } from '../utils/cedula';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -117,7 +118,7 @@ const PublicStore: React.FC = () => {
   const [customerAddress, setCustomerAddress] = useState('');
   const [requestedDeliveryDate, setRequestedDeliveryDate] = useState('');
   const [notes, setNotes] = useState('');
-  const [paymentOption, setPaymentOption] = useState<'PAGO_MOVIL' | 'USD' | 'TRANSFER' | 'BINANCE' | 'WHATSAPP'>('PAGO_MOVIL');
+  const [paymentOption, setPaymentOption] = useState<'PAGO_MOVIL' | 'USD' | 'TRANSFER' | 'BINANCE' | 'WHATSAPP' | 'PENDING'>('PAGO_MOVIL');
   const [pagoMovilRef, setPagoMovilRef] = useState('');
   const [transferRef, setTransferRef] = useState('');
   const [originBank, setOriginBank] = useState('');
@@ -132,6 +133,17 @@ const PublicStore: React.FC = () => {
   const [activeOrderMini, setActiveOrderMini] = useState<any | null>(null);
   const [liveOrderStatus, setLiveOrderStatus] = useState<string | null>(null);
   const [livePaymentStatus, setLivePaymentStatus] = useState<string>('PENDING');
+
+  // Order Abono / Payment Reporting Modal state
+  const [showOrderPaymentModal, setShowOrderPaymentModal] = useState(false);
+  const [orderPaymentType, setOrderPaymentType] = useState<'FULL' | 'PARTIAL'>('FULL');
+  const [orderPaymentAmount, setOrderPaymentAmount] = useState<string>('');
+  const [orderPaymentMethod, setOrderPaymentMethod] = useState<string>('PAGO_MOVIL');
+  const [orderPaymentOriginBank, setOrderPaymentOriginBank] = useState<string>('');
+  const [orderPaymentRef, setOrderPaymentRef] = useState<string>('');
+  const [orderPaymentNotes, setOrderPaymentNotes] = useState<string>('');
+  const [isSubmittingOrderPayment, setIsSubmittingOrderPayment] = useState(false);
+  const [showOrderPaymentHistory, setShowOrderPaymentHistory] = useState(false);
 
   // Track Order Modal state
   const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
@@ -152,7 +164,7 @@ const PublicStore: React.FC = () => {
       return;
     }
     if (!cleanPh) {
-      setTrackError('Por favor ingresa tu teléfono registrado (o los últimos 4 dígitos)');
+      setTrackError('Por favor ingresa tu teléfono o cédula registrada (o los últimos 4 dígitos)');
       return;
     }
 
@@ -207,7 +219,8 @@ const PublicStore: React.FC = () => {
         });
       }
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'No se encontró ningún pedido con esos datos o el teléfono no coincide.';
+      const rawMsg = err.response?.data?.message;
+      const msg = Array.isArray(rawMsg) ? rawMsg[0] : (rawMsg || 'No se encontró ningún pedido con esos datos o el teléfono/cédula no coincide.');
       setTrackError(msg);
     } finally {
       setIsTrackingLoading(false);
@@ -359,6 +372,12 @@ const PublicStore: React.FC = () => {
         }
 
         if (res.data) {
+          setOrderResult((prev: any) => prev ? {
+            ...prev,
+            ...res.data,
+            status: newStatus || prev?.status,
+            paymentStatus: newPayStatus || prev?.paymentStatus,
+          } : prev);
           setActiveOrderMini((prev: any) => {
             const updated = {
               ...prev,
@@ -393,6 +412,90 @@ const PublicStore: React.FC = () => {
     };
   }, [orderResult?.orderId]);
 
+  const openOrderPaymentModal = () => {
+    const totalAmt = Number(orderResult?.grandTotalUSD || orderResult?.totalAmount || 0);
+    const abonosAmt = Number(orderResult?.abonosTotal || 0);
+    const remaining = Math.max(0, Math.round((totalAmt - abonosAmt) * 100) / 100);
+    setOrderPaymentType('FULL');
+    setOrderPaymentAmount(remaining > 0 ? remaining.toString() : '');
+    setOrderPaymentRef('');
+    setOrderPaymentNotes('');
+    setOrderPaymentOriginBank('');
+    if (storeData?.settings?.acceptPagoMovil !== false) {
+      setOrderPaymentMethod('PAGO_MOVIL');
+    } else if (storeData?.settings?.acceptTransfer === true) {
+      setOrderPaymentMethod('TRANSFER');
+    } else if (storeData?.settings?.acceptBinance === true) {
+      setOrderPaymentMethod('BINANCE');
+    } else {
+      setOrderPaymentMethod('PAGO_MOVIL');
+    }
+    setShowOrderPaymentModal(true);
+  };
+
+  const handleOrderPaymentTypeChange = (type: 'FULL' | 'PARTIAL') => {
+    setOrderPaymentType(type);
+    const totalAmt = Number(orderResult?.grandTotalUSD || orderResult?.totalAmount || 0);
+    const abonosAmt = Number(orderResult?.abonosTotal || 0);
+    const remaining = Math.max(0, Math.round((totalAmt - abonosAmt) * 100) / 100);
+    if (type === 'FULL') {
+      setOrderPaymentAmount(remaining > 0 ? remaining.toString() : '');
+    } else {
+      const half = Math.round((remaining * 0.5) * 100) / 100;
+      setOrderPaymentAmount(half > 0 ? half.toString() : '');
+    }
+  };
+
+  const handleOrderPaymentSubmit = async () => {
+    if (!orderResult?.orderId) return;
+    const amt = parseFloat(orderPaymentAmount);
+    if (isNaN(amt) || amt <= 0) {
+      presentToast({ message: 'Ingresa un monto válido mayor a 0', duration: 3000, color: 'warning' });
+      return;
+    }
+    if (!orderPaymentRef.trim()) {
+      presentToast({ message: 'Por favor, ingresa el número de referencia del comprobante', duration: 3000, color: 'warning' });
+      return;
+    }
+
+    setIsSubmittingOrderPayment(true);
+    try {
+      const rate = Number(storeData?.settings?.exchangeRateBs || orderResult?.exchangeRate || 40);
+      const amtBs = Math.round(amt * rate * 100) / 100;
+      const res = await axios.post(`${apiBase}/public/store/order/${orderResult.orderId}/payment`, {
+        amount: amt,
+        amountBs: amtBs,
+        method: orderPaymentMethod,
+        reference: orderPaymentRef.trim(),
+        bank: orderPaymentOriginBank.trim() || undefined,
+        notes: orderPaymentNotes.trim() || undefined,
+      });
+
+      if (res.data) {
+        setOrderResult((prev: any) => prev ? { ...prev, ...res.data } : res.data);
+        setActiveOrderMini((prev: any) => prev ? { ...prev, ...res.data } : res.data);
+      }
+      presentToast({
+        message: '✓ ¡Abono / Pago reportado con éxito! El negocio verificará tu comprobante.',
+        duration: 4000,
+        color: 'success',
+      });
+      setShowOrderPaymentModal(false);
+      setOrderPaymentRef('');
+      setOrderPaymentNotes('');
+      setOrderPaymentOriginBank('');
+      await loadOrderDetails(orderResult.orderId, true);
+    } catch (e: any) {
+      presentToast({
+        message: e.response?.data?.message || 'Error al reportar el abono / pago',
+        duration: 3500,
+        color: 'danger',
+      });
+    } finally {
+      setIsSubmittingOrderPayment(false);
+    }
+  };
+
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'SOLICITUD_ENCARGO':
@@ -420,20 +523,38 @@ const PublicStore: React.FC = () => {
     }
   };
 
+  const cedulaAnalysis = useMemo(() => analyzeCedulaInput(customerCedula), [customerCedula]);
+
   const handleCedulaInput = (val: string) => {
     setCustomerCedula(val);
-    try {
-      const saved = localStorage.getItem('flujofino_customer_data');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.cedula && parsed.cedula.replace(/\D/g, '') === val.replace(/\D/g, '')) {
-          if (parsed.name && !customerName) setCustomerName(parsed.name);
-          if (parsed.phone && !customerPhone) setCustomerPhone(parsed.phone);
-          if (parsed.address && !customerAddress) setCustomerAddress(parsed.address);
-          if (parsed.zoneId && !selectedZoneId) setSelectedZoneId(parsed.zoneId);
+    const digits = val.replace(/\D/g, '');
+    if (digits.length >= 5) {
+      try {
+        const saved = localStorage.getItem('flujofino_customer_data') || localStorage.getItem('lastBookingCustomer');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const savedCedula = parsed.cedula || parsed.identification || '';
+          if (savedCedula && savedCedula.replace(/\D/g, '') === digits) {
+            if (parsed.name && !customerName) setCustomerName(parsed.name);
+            if (parsed.phone && !customerPhone) setCustomerPhone(parsed.phone);
+            if (parsed.address && !customerAddress) setCustomerAddress(parsed.address);
+            if (parsed.zoneId && !selectedZoneId) setSelectedZoneId(parsed.zoneId);
+          }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
+  };
+
+  const handleCedulaBlur = () => {
+    if (customerCedula.trim()) {
+      const norm = normalizeCedula(customerCedula);
+      if (norm) setCustomerCedula(norm);
+    }
+  };
+
+  const applyCedulaPrefix = (prefix: CedulaPrefix) => {
+    const digits = customerCedula.replace(/\D/g, '');
+    setCustomerCedula(digits ? `${prefix}-${digits}` : `${prefix}-`);
   };
 
   // Calculations
@@ -615,17 +736,24 @@ const PublicStore: React.FC = () => {
                           paymentOption === 'TRANSFER' ? `MÉTODO: Transferencia Bancaria | Ref: ${transferRef.trim()}` :
                           paymentOption === 'BINANCE' ? `MÉTODO: Binance Pay | ID: ${binanceRef.trim()}` :
                           paymentOption === 'USD' ? usdNote :
+                          paymentOption === 'PENDING' ? 'MÉTODO: Cuenta Abierta / Pagar Después' :
                           paymentOption === 'WHATSAPP' ? 'MÉTODO: A convenir por WhatsApp' : '';
 
+      const normalizedCustomerCedula = customerCedula.trim() ? normalizeCedula(customerCedula) : '';
+      if (normalizedCustomerCedula && normalizedCustomerCedula !== customerCedula) {
+        setCustomerCedula(normalizedCustomerCedula);
+      }
+
       const deliveryDateNote = requestedDeliveryDate.trim() ? `Fecha requerida: ${requestedDeliveryDate.replace('T', ' ')}` : '';
-      const cedulaNote = customerCedula.trim() ? `Cédula: ${customerCedula.trim()}` : '';
+      const cedulaNote = normalizedCustomerCedula ? `Cédula: ${normalizedCustomerCedula}` : '';
       const finalNotes = [notes.trim(), deliveryDateNote, cedulaNote, paymentNote].filter(Boolean).join(' | ');
 
       const payload = {
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
-        customerCedula: customerCedula.trim() || undefined,
-        pagoMovilCedula: customerCedula.trim() || undefined,
+        customerCedula: normalizedCustomerCedula || undefined,
+        identification: normalizedCustomerCedula || undefined,
+        pagoMovilCedula: normalizedCustomerCedula || undefined,
         deliveryMethod,
         deliveryZoneId: deliveryMethod === 'DELIVERY' ? selectedZoneId : undefined,
         customerAddress: deliveryMethod === 'DELIVERY' ? customerAddress.trim() : undefined,
@@ -667,7 +795,7 @@ const PublicStore: React.FC = () => {
         grandTotalBs,
         notes: finalNotes,
         customerAddress: deliveryMethod === 'DELIVERY' ? customerAddress.trim() : '',
-        customerCedula: customerCedula.trim() || '',
+        customerCedula: normalizedCustomerCedula || '',
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
       };
@@ -689,7 +817,7 @@ const PublicStore: React.FC = () => {
           JSON.stringify({
             name: customerName.trim(),
             phone: customerPhone.trim(),
-            cedula: customerCedula.trim(),
+            cedula: normalizedCustomerCedula,
             address: customerAddress.trim(),
             zoneId: selectedZoneId,
           }),
@@ -768,6 +896,8 @@ const PublicStore: React.FC = () => {
       lines.push(`🟡 *ID Binance Pay:* ${refBin}`);
     } else if (paymentOption === 'USD') {
       lines.push(`💵 *Método:* Efectivo Divisas (USD)`);
+    } else if (paymentOption === 'PENDING') {
+      lines.push(`⏳ *Método:* Cuenta Abierta / Pagar Después`);
     } else if (paymentOption === 'WHATSAPP') {
       lines.push(`💬 *Método:* A convenir por WhatsApp`);
     }
@@ -1045,42 +1175,379 @@ const PublicStore: React.FC = () => {
               </div>
             </div>
 
-            {/* Payment Verification Status Badge */}
-            <div style={{ margin: '14px 0' }}>
-              {livePaymentStatus === 'PAID' ? (
-                <div style={{
-                  background: '#ECFDF5',
-                  border: '1.5px solid #10B981',
-                  borderRadius: '12px',
-                  padding: '12px 14px',
-                  color: '#065F46',
-                  fontWeight: '700',
-                  fontSize: '13px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px'
-                }}>
-                  <span>✅ Pago Verificado y Aprobado (${orderResult.grandTotalUSD.toFixed(2)})</span>
-                </div>
-              ) : (pagoMovilRef || transferRef || binanceRef || orderResult.paymentReported || orderResult.paymentStatus === 'PENDING') ? (
-                <div style={{
-                  background: '#FEF3C7',
-                  border: '1.5px solid #FCD34D',
-                  borderRadius: '12px',
-                  padding: '12px 14px',
-                  color: '#92400E',
-                  fontWeight: '700',
-                  fontSize: '13px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px'
-                }}>
-                  <span>⏳ Pago Reportado: En proceso de verificación por el negocio</span>
-                </div>
-              ) : null}
-            </div>
+            {/* Payment & Abonos Control Panel */}
+            {(() => {
+              const totalOrderUsd = Number(orderResult.grandTotalUSD || orderResult.totalAmount || 0);
+              const abonosOrderUsd = Number(orderResult.abonosTotal || 0);
+              const remainingOrderUsd = Math.max(0, Math.round((totalOrderUsd - abonosOrderUsd) * 100) / 100);
+              const activeRate = Number(storeData?.settings?.exchangeRateBs || orderResult.exchangeRate || 40);
+              const remainingOrderBs = Math.round(remainingOrderUsd * activeRate * 100) / 100;
+              const hasReportedPending = Boolean(orderResult.paymentReported) || Boolean(orderResult.pagoMovilRef || orderResult.transferRef || orderResult.binanceRef || pagoMovilRef || transferRef || binanceRef) && livePaymentStatus !== 'PAID' && !orderResult.paymentRejectedReason || (Array.isArray(orderResult.abonosHistory) && orderResult.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'));
+              const isOrderCanceled = currentStatus === 'CANCELED' || currentStatus === 'CANCELADO_PROVEEDOR';
+              const isPaidFull = livePaymentStatus === 'PAID';
+              const isPartial = livePaymentStatus === 'PARTIAL' || (abonosOrderUsd > 0 && remainingOrderUsd > 0);
+              const inputPayAmt = parseFloat(orderPaymentAmount) || 0;
+              const inputPayBs = Math.round(inputPayAmt * activeRate * 100) / 100;
+              const s = storeData?.settings;
+
+              return (
+                <>
+                  <div style={{
+                    backgroundColor: isPaidFull ? '#ECFDF5' : '#EFF6FF',
+                    border: `1.5px solid ${isPaidFull ? '#10B981' : '#BFDBFE'}`,
+                    borderRadius: '14px',
+                    padding: '16px',
+                    margin: '16px 0',
+                    textAlign: 'left',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '6px' }}>
+                      <div style={{ fontWeight: 800, fontSize: '15px', color: isPaidFull ? '#065F46' : '#1E3A8A' }}>
+                        💳 Estado de Pago y Abonos
+                      </div>
+                      {isPaidFull ? (
+                        <span style={{ fontSize: '11px', fontWeight: 800, backgroundColor: '#DCFCE7', color: '#065F46', padding: '4px 10px', borderRadius: '999px' }}>
+                          ✅ Verificado y Pagado
+                        </span>
+                      ) : hasReportedPending ? (
+                        <span style={{ fontSize: '11px', fontWeight: 800, backgroundColor: '#FEF3C7', color: '#92400E', padding: '4px 10px', borderRadius: '999px' }}>
+                          ⏳ Comprobante en Verificación
+                        </span>
+                      ) : isPartial ? (
+                        <span style={{ fontSize: '11px', fontWeight: 800, backgroundColor: '#FEF3C7', color: '#92400E', padding: '4px 10px', borderRadius: '999px' }}>
+                          💵 Abono Parcial
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '11px', fontWeight: 800, backgroundColor: '#FEE2E2', color: '#B91C1C', padding: '4px 10px', borderRadius: '999px' }}>
+                          ⏳ Cuenta Abierta / Por Pagar
+                        </span>
+                      )}
+                    </div>
+
+                    {orderResult.paymentRejectedReason && !orderResult.paymentReported && (
+                      <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px', color: '#991B1B', fontSize: '12px', fontWeight: 700 }}>
+                        ⚠️ Comprobante anterior rechazado: {orderResult.paymentRejectedReason}. Por favor, verifica y reporta tu pago nuevamente.
+                      </div>
+                    )}
+
+                    {/* Desglose Financiero */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#FFFFFF', padding: '12px', borderRadius: '10px', border: '1px solid #E2E8F0', marginBottom: '12px' }}>
+                      <div>
+                        <span style={{ fontSize: '11px', color: '#64748B', display: 'block', textTransform: 'uppercase', fontWeight: 700 }}>Total Compra</span>
+                        <span style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>${totalOrderUsd.toFixed(2)}</span>
+                        <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px' }}>
+                          ≈ Bs. {(totalOrderUsd * activeRate).toFixed(2)}
+                        </div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '11px', color: '#64748B', display: 'block', textTransform: 'uppercase', fontWeight: 700 }}>Por Pagar</span>
+                        <span style={{ fontSize: '16px', fontWeight: 800, color: isPaidFull || remainingOrderUsd <= 0 ? '#059669' : '#DC2626' }}>
+                          ${isPaidFull ? '0.00' : remainingOrderUsd.toFixed(2)}
+                        </span>
+                        <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px' }}>
+                          ≈ Bs. {isPaidFull ? '0.00' : remainingOrderBs.toFixed(2)}
+                        </div>
+                      </div>
+                      {abonosOrderUsd > 0 && (
+                        <div style={{ gridColumn: 'span 2', borderTop: '1px dashed #E2E8F0', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                          <span style={{ color: '#065F46', fontWeight: 700 }}>Abonado / Reportado:</span>
+                          <span style={{ color: '#059669', fontWeight: 800 }}>${abonosOrderUsd.toFixed(2)} USD</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Cuentas Bancarias del Negocio para Pagar o Abonar */}
+                    {!isPaidFull && !isOrderCanceled && s && (s.companyPhone || s.companyAccountNumber || s.binancePayId) && (
+                      <div style={{ backgroundColor: '#FFFFFF', padding: '10px 12px', borderRadius: '10px', fontSize: '12px', color: '#334155', marginBottom: '12px', border: '1px solid #E2E8F0' }}>
+                        <div style={{ fontWeight: 800, color: '#0F172A', marginBottom: '6px' }}>
+                          🏦 Cuentas para Abonar o Pagar:
+                        </div>
+                        {s.companyPhone && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                            <span><b>Pago Móvil:</b> {s.companyBank ? `${s.companyBank} - ` : ''}{s.companyPhone} ({s.companyCedula})</span>
+                            <IonButton fill="clear" size="small" style={{ margin: 0, height: '24px' }} onClick={() => copyToClipboard(s.companyPhone, 'Teléfono Pago Móvil')}>
+                              <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '14px' }} />
+                            </IonButton>
+                          </div>
+                        )}
+                        {s.companyAccountNumber && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                            <span style={{ wordBreak: 'break-all' }}><b>Transferencia:</b> {s.companyAccountNumber}</span>
+                            <IonButton fill="clear" size="small" style={{ margin: 0, height: '24px' }} onClick={() => copyToClipboard(s.companyAccountNumber, 'Cuenta Bancaria')}>
+                              <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '14px' }} />
+                            </IonButton>
+                          </div>
+                        )}
+                        {s.binancePayId && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span><b>Binance Pay:</b> {s.binancePayId}</span>
+                            <IonButton fill="clear" size="small" style={{ margin: 0, height: '24px' }} onClick={() => copyToClipboard(s.binancePayId, 'Binance Pay ID')}>
+                              <IonIcon slot="icon-only" icon={copyOutline} style={{ fontSize: '14px' }} />
+                            </IonButton>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Historial de Abonos */}
+                    {Array.isArray(orderResult.abonosHistory) && orderResult.abonosHistory.length > 0 && (
+                      <div style={{ marginBottom: '10px' }}>
+                        <IonButton
+                          fill="clear"
+                          size="small"
+                          style={{ textTransform: 'none', padding: 0, fontSize: '12px' }}
+                          onClick={() => setShowOrderPaymentHistory(!showOrderPaymentHistory)}
+                        >
+                          {showOrderPaymentHistory ? 'Ocultar historial de abonos' : `Ver abonos registrados (${orderResult.abonosHistory.length})`}
+                        </IonButton>
+                        {showOrderPaymentHistory && (
+                          <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {orderResult.abonosHistory.map((ab: any, idx: number) => (
+                              <div key={ab.id || idx} style={{ backgroundColor: '#FFFFFF', padding: '8px 10px', borderRadius: '8px', fontSize: '12px', border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <b>${Number(ab.amount || 0).toFixed(2)}</b> {ab.amountBs ? `(~Bs. ${Number(ab.amountBs).toFixed(2)})` : ''}
+                                  <span style={{ color: '#64748B', marginLeft: '6px' }}>
+                                    {ab.method || 'Pago'} {ab.ref || ab.reference ? `(Ref: ${ab.ref || ab.reference})` : ''}
+                                  </span>
+                                </div>
+                                <span style={{ color: ab.status === 'REJECTED' ? '#DC2626' : ab.status === 'REPORTED_PENDING_APPROVAL' ? '#D97706' : '#059669', fontWeight: 800, fontSize: '11px' }}>
+                                  {ab.status === 'REJECTED' ? 'Rechazado' : ab.status === 'REPORTED_PENDING_APPROVAL' ? 'En revisión' : '✓ Aprobado'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Botón Principal para Abonar o Reportar Pago */}
+                    {!isOrderCanceled && !isPaidFull && (
+                      <button
+                        type="button"
+                        onClick={openOrderPaymentModal}
+                        className="ff-btn-primary"
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          borderRadius: '10px',
+                          background: '#10B981',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          fontWeight: 800,
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          marginTop: '6px',
+                        }}
+                      >
+                        ➕ Registrar Abono o Pago Completo
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Modal para Reportar Abono o Pago Completo de la Orden */}
+                  <IonModal isOpen={showOrderPaymentModal} onDidDismiss={() => setShowOrderPaymentModal(false)}>
+                    <IonHeader>
+                      <IonToolbar style={{ ['--background' as any]: headerColor, color: headerContrast }}>
+                        <IonTitle style={{ fontWeight: 800, fontSize: '16px' }}>Registrar Abono / Pago</IonTitle>
+                        <IonButtons slot="end">
+                          <IonButton onClick={() => setShowOrderPaymentModal(false)} style={{ color: headerContrast }}>
+                            <IonIcon icon={closeOutline} />
+                          </IonButton>
+                        </IonButtons>
+                      </IonToolbar>
+                    </IonHeader>
+                    <IonContent className="ion-padding" style={{ ['--background' as any]: '#F8FAFC' }}>
+                      <div style={{ maxWidth: '500px', margin: '0 auto', paddingBottom: '30px' }}>
+                        {/* Resumen de Saldo */}
+                        <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>Pedido #{orderResult.orderNumber}</div>
+                            <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{orderResult.customerName}</div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>Saldo Pendiente</div>
+                            <div style={{ fontSize: '18px', fontWeight: 900, color: '#10B981' }}>${remainingOrderUsd.toFixed(2)}</div>
+                            <div style={{ fontSize: '11px', color: '#475569' }}>≈ Bs. {remainingOrderBs.toFixed(2)}</div>
+                          </div>
+                        </div>
+
+                        {/* Tipo de Pago: Completo vs Abono Parcial */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleOrderPaymentTypeChange('FULL')}
+                            style={{
+                              padding: '10px',
+                              borderRadius: '10px',
+                              border: orderPaymentType === 'FULL' ? '2px solid #10B981' : '1px solid #CBD5E1',
+                              background: orderPaymentType === 'FULL' ? '#ECFDF5' : '#FFFFFF',
+                              color: orderPaymentType === 'FULL' ? '#065F46' : '#475569',
+                              fontWeight: 800,
+                              fontSize: '13px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Pago Completo (${remainingOrderUsd.toFixed(2)})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOrderPaymentTypeChange('PARTIAL')}
+                            style={{
+                              padding: '10px',
+                              borderRadius: '10px',
+                              border: orderPaymentType === 'PARTIAL' ? '2px solid #10B981' : '1px solid #CBD5E1',
+                              background: orderPaymentType === 'PARTIAL' ? '#ECFDF5' : '#FFFFFF',
+                              color: orderPaymentType === 'PARTIAL' ? '#065F46' : '#475569',
+                              fontWeight: 800,
+                              fontSize: '13px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Abono Parcial
+                          </button>
+                        </div>
+
+                        {/* Monto a Reportar */}
+                        <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px', marginBottom: '14px' }}>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                            Monto a Abonar ($ USD) *
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={orderPaymentAmount}
+                            onChange={(e) => setOrderPaymentAmount(e.target.value)}
+                            placeholder={`Ej. ${remainingOrderUsd.toFixed(2)}`}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              borderRadius: '10px',
+                              border: '1.5px solid #10B981',
+                              fontSize: '16px',
+                              fontWeight: 800,
+                              color: '#0F172A',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                          {inputPayAmt > 0 && (
+                            <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: 700, color: '#059669' }}>
+                              Equivalente a transferir: Bs. {inputPayBs.toFixed(2)} (Tasa BCV: Bs. {activeRate.toFixed(2)})
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Método de Pago */}
+                        <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px', marginBottom: '14px' }}>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+                            Método Utilizado *
+                          </label>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px', marginBottom: '12px' }}>
+                            {[
+                              { id: 'PAGO_MOVIL', label: '📱 Pago Móvil' },
+                              { id: 'TRANSFER', label: '🏦 Transferencia' },
+                              { id: 'BINANCE', label: '🟡 Binance Pay' },
+                            ].map((m) => (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => setOrderPaymentMethod(m.id)}
+                                style={{
+                                  padding: '10px 8px',
+                                  borderRadius: '10px',
+                                  border: orderPaymentMethod === m.id ? '2px solid #10B981' : '1px solid #CBD5E1',
+                                  background: orderPaymentMethod === m.id ? '#ECFDF5' : '#FFFFFF',
+                                  color: orderPaymentMethod === m.id ? '#065F46' : '#475569',
+                                  fontWeight: 700,
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {m.label}
+                              </button>
+                            ))}
+                          </div>
+
+                          {(orderPaymentMethod === 'PAGO_MOVIL' || orderPaymentMethod === 'TRANSFER') && (
+                            <div style={{ marginBottom: '10px' }}>
+                              <BankSelect
+                                label="Banco Emisor"
+                                value={orderPaymentOriginBank}
+                                onChange={(val) => setOrderPaymentOriginBank(val)}
+                                placeholder="Selecciona tu banco..."
+                              />
+                            </div>
+                          )}
+
+                          <div style={{ marginBottom: '10px' }}>
+                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                              N° de Referencia / Comprobante *
+                            </label>
+                            <input
+                              type="text"
+                              value={orderPaymentRef}
+                              onChange={(e) => setOrderPaymentRef(e.target.value)}
+                              placeholder="Últimos 4 a 8 dígitos de la operación"
+                              style={{
+                                width: '100%',
+                                padding: '10px 12px',
+                                borderRadius: '10px',
+                                border: '1px solid #CBD5E1',
+                                fontSize: '14px',
+                                boxSizing: 'border-box',
+                              }}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                              Nota adicional (Opcional)
+                            </label>
+                            <input
+                              type="text"
+                              value={orderPaymentNotes}
+                              onChange={(e) => setOrderPaymentNotes(e.target.value)}
+                              placeholder="Ej. Titular de la cuenta..."
+                              style={{
+                                width: '100%',
+                                padding: '10px 12px',
+                                borderRadius: '10px',
+                                border: '1px solid #CBD5E1',
+                                fontSize: '14px',
+                                boxSizing: 'border-box',
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={isSubmittingOrderPayment}
+                          onClick={handleOrderPaymentSubmit}
+                          className="ff-btn-primary"
+                          style={{
+                            width: '100%',
+                            padding: '14px',
+                            borderRadius: '12px',
+                            background: '#10B981',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            fontWeight: 800,
+                            fontSize: '15px',
+                            cursor: isSubmittingOrderPayment ? 'not-allowed' : 'pointer',
+                            opacity: isSubmittingOrderPayment ? 0.7 : 1,
+                          }}
+                        >
+                          {isSubmittingOrderPayment ? 'Enviando comprobante...' : `Confirmar Reporte de Abono ($${inputPayAmt.toFixed(2)})`}
+                        </button>
+                      </div>
+                    </IonContent>
+                  </IonModal>
+                </>
+              );
+            })()}
 
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', margin: '20px 0', textAlign: 'left' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -2077,15 +2544,84 @@ const PublicStore: React.FC = () => {
 
                 {/* Customer Details */}
                 <h4 style={{ fontWeight: 'bold', margin: '0 0 10px 0' }}>Tus Datos de Contacto</h4>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '8px 12px', marginBottom: '16px', background: '#fff' }}>
-                  <IonItem lines="none">
-                    <IonLabel position="stacked">Cédula / RIF (Opcional - Autocompleta tus datos)</IonLabel>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px', marginBottom: '16px', background: '#fff' }}>
+                  <div style={{ padding: '4px 8px 8px 8px', borderBottom: '1px solid #f1f5f9', marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '4px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>
+                        Cédula / RIF (Opcional - Autocompleta tus datos)
+                      </label>
+                      {cedulaAnalysis.normalized && cedulaAnalysis.digits.length >= 5 && (
+                        <span style={{ fontSize: '11px', fontWeight: 700, backgroundColor: '#ecfdf5', color: '#065f46', padding: '2px 8px', borderRadius: '10px', border: '1px solid #a7f3d0' }}>
+                          ✓ Se guardará: {cedulaAnalysis.normalized}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Selector rápido de indicador V-, E-, J-, G-, P- */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Indicador:</span>
+                      {(['V', 'E', 'J', 'G', 'P'] as CedulaPrefix[]).map((pref) => {
+                        const isSelected = (cedulaAnalysis.prefix || 'V') === pref && Boolean(customerCedula.trim());
+                        return (
+                          <button
+                            key={pref}
+                            type="button"
+                            onClick={() => applyCedulaPrefix(pref)}
+                            style={{
+                              padding: '3px 9px',
+                              borderRadius: '6px',
+                              border: isSelected ? '1.5px solid #10b981' : '1px solid #cbd5e1',
+                              backgroundColor: isSelected ? '#ecfdf5' : '#f8fafc',
+                              color: isSelected ? '#065f46' : '#475569',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {pref}-
+                          </button>
+                        );
+                      })}
+                    </div>
+
                     <IonInput
                       value={customerCedula}
                       onIonInput={(e) => handleCedulaInput(e.detail.value!)}
-                      placeholder="Ej. V-12345678"
+                      onIonBlur={handleCedulaBlur}
+                      placeholder="Ej. V-31075846 o J-401234567"
+                      style={{
+                        border: cedulaAnalysis.warningMessage && !cedulaAnalysis.isValidFormat ? '1.5px solid #f59e0b' : '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        padding: '0 10px',
+                        backgroundColor: '#f8fafc',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                      }}
                     />
-                  </IonItem>
+
+                    {cedulaAnalysis.warningMessage ? (
+                      <div
+                        style={{
+                          marginTop: '6px',
+                          padding: '7px 10px',
+                          borderRadius: '8px',
+                          backgroundColor: cedulaAnalysis.isValidFormat ? '#f0fdf4' : '#fffbeb',
+                          border: `1px solid ${cedulaAnalysis.isValidFormat ? '#bbf7d0' : '#fde68a'}`,
+                          color: cedulaAnalysis.isValidFormat ? '#166534' : '#92400e',
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {cedulaAnalysis.isValidFormat ? '✨ ' : '⚠️ '}
+                        {cedulaAnalysis.warningMessage}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                        💡 Incluye el indicador (<b>V-</b>, <b>E-</b>, <b>J-</b>, <b>G-</b> o <b>P-</b>) sin puntos. Si escribes solo números o con puntos, lo estandarizaremos automáticamente (ej. <b>V-31075846</b>).
+                      </div>
+                    )}
+                  </div>
                   <IonItem lines="none">
                     <IonLabel position="stacked">Nombre y Apellido *</IonLabel>
                     <IonInput
@@ -2170,9 +2706,21 @@ const PublicStore: React.FC = () => {
                       {storeData?.settings?.acceptBinance === true && (
                         <IonSelectOption value="BINANCE">🟡 Binance Pay (USDT)</IonSelectOption>
                       )}
+                      <IonSelectOption value="PENDING">⏳ Cuenta Abierta / Pagar Después</IonSelectOption>
                       <IonSelectOption value="WHATSAPP">💬 Acordar por WhatsApp</IonSelectOption>
                     </IonSelect>
                   </IonItem>
+
+                  {(paymentOption === 'PENDING' || paymentOption === 'WHATSAPP') && (
+                    <div style={{ background: '#f0fdf4', padding: '12px 14px', borderRadius: '10px', marginTop: '10px', border: '1px solid #bbf7d0' }}>
+                      <p style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#166534' }}>
+                        {paymentOption === 'PENDING' ? '⏳ Cuenta Abierta / Pago Posterior' : '💬 Coordinación por WhatsApp'}
+                      </p>
+                      <p style={{ margin: 0, fontSize: '12px', color: '#15803d', lineHeight: '1.4' }}>
+                        Tu pedido quedará registrado de inmediato. Podrás realizar abonos parciales o el pago completo en cualquier momento desde el panel de control de tu pedido.
+                      </p>
+                    </div>
+                  )}
 
                   {paymentOption === 'PAGO_MOVIL' && storeData?.settings && (
                     <div style={{ background: '#f1f5f9', padding: '12px', borderRadius: '8px', marginTop: '10px' }}>
@@ -2517,7 +3065,7 @@ const PublicStore: React.FC = () => {
                     Consulta el Estado de tu Pedido
                   </h2>
                   <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
-                    Ingresa el código que recibiste al comprar y tu número de teléfono para validar tu identidad.
+                    Ingresa el código que recibiste al comprar y tu número de teléfono o cédula para validar tu identidad.
                   </p>
                 </div>
 
@@ -2593,16 +3141,16 @@ const PublicStore: React.FC = () => {
                         marginBottom: '6px',
                       }}
                     >
-                      Teléfono Registrado:
+                      Teléfono o Cédula Registrada:
                     </label>
                     <input
-                      type="tel"
+                      type="text"
                       value={trackPhone}
                       onChange={(e) => {
                         setTrackPhone(e.target.value);
                         if (trackError) setTrackError(null);
                       }}
-                      placeholder="Ej: 04121234567 o últimos 4 dígitos"
+                      placeholder="Ej: 04121234567 o V-12345678"
                       style={{
                         width: '100%',
                         height: '42px',
