@@ -164,18 +164,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const qualifiedStaffList = React.useMemo(() => {
     return localStaffUsers.filter(emp => {
+      // Si ya está asignado o seleccionado para este producto, mantenerlo visible siempre
+      if (selectedStaffIds.includes(emp.id) || (emp.userId && selectedStaffIds.includes(emp.userId))) return true;
+
       const roles: string[] = emp.roles && emp.roles.length > 0 ? emp.roles : [emp.role];
       const isDeliveryOnly = roles.every(r => r === 'DELIVERY' || r === 'Repartidor');
       if (isDeliveryOnly) return false;
       if (emp.username?.toLowerCase() === 'delivery' || emp.name?.toLowerCase() === 'delivery') return false;
 
       const titleAndName = `${emp.jobTitle || ''} ${emp.name || ''} ${emp.username || ''}`.toLowerCase();
-      const isJanitorial = /limpieza|mantenimiento|vigilancia|seguridad|aseo/i.test(titleAndName);
+      const isCosmetic = /limpieza\s*(facial|cutis|profunda|cejas)|faciales|facial\b/i.test(titleAndName);
+      const isJanitorial = !isCosmetic && /(personal de limpieza|aseador|conserje|vigilancia|seguridad|\baseo\b|\blimpieza\b)/i.test(titleAndName);
       if (isJanitorial) return false;
 
       return true;
     });
-  }, [localStaffUsers]);
+  }, [localStaffUsers, selectedStaffIds]);
 
   const toggleStaff = (userId: string) => {
     setSelectedStaffIds(prev => 

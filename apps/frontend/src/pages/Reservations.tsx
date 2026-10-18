@@ -108,17 +108,66 @@ const Reservations: React.FC = () => {
     setAbonoBank('');
   };
 
+  const getOpeningTimeForDate = useCallback((dateStr: string) => {
+    try {
+      if (!settings?.businessHours || !dateStr) return '09:00';
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dateObj = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+      const dayOfWeek = dateObj.getUTCDay().toString();
+      const dayConfig = settings.businessHours[dayOfWeek];
+      if (dayConfig?.isOpen && dayConfig.startTime) {
+        return dayConfig.startTime;
+      }
+    } catch (e) {
+      // fallback
+    }
+    return '09:00';
+  }, [settings]);
+
   // States for Reschedule Modal
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleTime, setRescheduleTime] = useState('');
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [isRescheduling, setIsRescheduling] = useState(false);
+  const [rescheduleAvailableSlots, setRescheduleAvailableSlots] = useState<string[]>([]);
+  const [loadingRescheduleSlots, setLoadingRescheduleSlots] = useState(false);
+
+  useEffect(() => {
+    if (!showRescheduleModal || !rescheduleDate || !selectedEvent) return;
+    let isCancelled = false;
+    const fetchSlots = async () => {
+      setLoadingRescheduleSlots(true);
+      try {
+        const queryParams = new URLSearchParams();
+        queryParams.append('date', rescheduleDate);
+        if (selectedEvent.serviceId) queryParams.append('serviceId', selectedEvent.serviceId);
+        if (selectedEvent.employeeId) queryParams.append('employeeId', selectedEvent.employeeId);
+        if (selectedEvent.id) queryParams.append('exclude', selectedEvent.id);
+
+        const res = await apiClient.get(`/reservations/availability?${queryParams.toString()}`);
+        if (!isCancelled) {
+          const slots = Array.isArray(res.data) ? res.data : [];
+          setRescheduleAvailableSlots(slots);
+        }
+      } catch (err) {
+        if (!isCancelled) setRescheduleAvailableSlots([]);
+      } finally {
+        if (!isCancelled) setLoadingRescheduleSlots(false);
+      }
+    };
+    fetchSlots();
+    return () => {
+      isCancelled = true;
+    };
+  }, [showRescheduleModal, rescheduleDate, selectedEvent]);
 
   const openReschedule = (res: any) => {
-    setRescheduleDate(res.date || formatDateLocal(new Date()));
-    setRescheduleTime(res.time ? res.time.substring(0, 5) : '10:00');
+    const targetDate = res.date || formatDateLocal(new Date());
+    setRescheduleDate(targetDate);
+    setRescheduleTime(res.time ? res.time.substring(0, 5) : getOpeningTimeForDate(targetDate));
     setRescheduleReason('');
+    setRescheduleAvailableSlots([]);
     setShowRescheduleModal(true);
   };
 
@@ -465,7 +514,7 @@ const Reservations: React.FC = () => {
     setCustomerName('');
     setCustomerPhone('');
     setDate(selectedDate);
-    setTime('09:00');
+    setTime(getOpeningTimeForDate(selectedDate));
     setSelectedServiceIds([]);
     setServiceSpecialistMap({});
     setEmployeeId('');
@@ -716,7 +765,7 @@ const Reservations: React.FC = () => {
     setCustomerName(res.customerName);
     setCustomerPhone(res.customerPhone || '');
     setDate(res.date);
-    setTime(res.time ? res.time.substring(0, 5) : '09:00');
+    setTime(res.time ? res.time.substring(0, 5) : getOpeningTimeForDate(res.date || selectedDate));
     const rawSId = res.serviceId || '';
     const parsedIds = rawSId
       ? rawSId.split(',').map((s: string) => s.trim()).filter(Boolean)
@@ -908,7 +957,11 @@ const Reservations: React.FC = () => {
 
         const res = await apiClient.get(`/reservations/availability?${queryParams.toString()}`);
         if (!isCancelled) {
-          setAvailableSlots(Array.isArray(res.data) ? res.data : []);
+          const slots = Array.isArray(res.data) ? res.data : [];
+          setAvailableSlots(slots);
+          if (!editingId && slots.length > 0) {
+            setTime(prevTime => (!slots.includes(prevTime) ? slots[0] : prevTime));
+          }
         }
       } catch (err) {
         console.error('Error fetching availability slots:', err);
@@ -2528,6 +2581,50 @@ const Reservations: React.FC = () => {
                   onChange={e => setRescheduleDate(e.target.value)}
                   style={{ width: '100%', padding: '11px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '14px' }}
                 />
+              </div>
+
+              {/* Horarios Disponibles para Reprogramar */}
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '6px' }}>
+                  Horarios Disponibles para esta Fecha
+                </label>
+                {loadingRescheduleSlots ? (
+                  <div style={{ textAlign: 'center', padding: '12px' }}>
+                    <IonSpinner name="crescent" color="primary" />
+                    <div style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>Calculando cupos libres...</div>
+                  </div>
+                ) : rescheduleAvailableSlots.length === 0 ? (
+                  <div style={{ padding: '8px 10px', background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: '10px', fontSize: '11px', color: '#92400E', lineHeight: '1.4' }}>
+                    ⚠️ No hay cupos automáticos calculados para esta fecha o especialista. Puedes ingresar la hora deseada manualmente abajo.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(68px, 1fr))', gap: '6px', maxHeight: '130px', overflowY: 'auto', padding: '2px' }}>
+                    {rescheduleAvailableSlots.map((slot, idx) => {
+                      const isChosen = rescheduleTime === slot || rescheduleTime.substring(0, 5) === slot;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setRescheduleTime(slot)}
+                          style={{
+                            padding: '8px 4px',
+                            borderRadius: '8px',
+                            border: isChosen ? '2px solid #10B981' : '1px solid #A7F3D0',
+                            background: isChosen ? '#10B981' : '#F0FDF4',
+                            color: isChosen ? '#FFFFFF' : '#065F46',
+                            fontSize: '12px',
+                            fontWeight: isChosen ? '800' : '600',
+                            cursor: 'pointer',
+                            boxShadow: isChosen ? '0 2px 4px rgba(16,185,129,0.25)' : 'none',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {slot}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div style={{ marginBottom: '14px' }}>

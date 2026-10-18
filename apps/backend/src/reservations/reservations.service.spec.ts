@@ -9,8 +9,9 @@ import { Reservation } from '../entities/reservation.entity';
 import { Order } from '../entities/order.entity';
 import { Product } from '../entities/product.entity';
 import { OrderItem } from '../entities/order-item.entity';
-import { ReservationStatus, PaymentStatus } from '@finowork/shared-types';
+import { ReservationStatus, PaymentStatus, UserRole } from '@finowork/shared-types';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
+import { Settings } from '../entities/settings.entity';
 
 describe('ReservationsService Suite', () => {
   let service: ReservationsService;
@@ -603,6 +604,59 @@ describe('ReservationsService Suite', () => {
           force: false,
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('debe permitir especialistas estéticos con cargo como "limpieza facial" y no descartarlos como personal de limpieza/aseo', async () => {
+      const tenantId = 'tenant-123';
+      const prodFacial = { id: 'svc-facial', name: 'Limpieza Facial', salePrice: 35, durationMinutes: 60, assignedStaffIds: ['emp-doris'] };
+
+      mockProductRepo.find.mockResolvedValue([prodFacial]);
+
+      const accessDoris = {
+        id: 'acc-doris',
+        tenantId,
+        isActive: true,
+        status: 'ACCEPTED',
+        jobTitle: 'pedicurista, masajista, limpieza facial',
+        user: { id: 'emp-doris', name: 'Doris Especialista', role: UserRole.STAFF },
+      };
+
+      const accessRepoMock = {
+        find: jest.fn().mockResolvedValue([accessDoris]),
+      };
+
+      (mockManager.getRepository as jest.Mock).mockImplementation((entity: any) => {
+        if (entity === UserTenantAccess || entity?.name === 'UserTenantAccess') {
+          return accessRepoMock;
+        }
+        if (entity === Settings || entity === 'Settings' || entity?.name === 'Settings') {
+          return {
+            findOne: jest.fn().mockResolvedValue({
+              businessHours: {
+                '4': { isOpen: true, startTime: '09:00', endTime: '18:00' },
+              },
+              slotInterval: 60,
+            }),
+          };
+        }
+        if (entity === Product || entity?.name === 'Product') {
+          return mockProductRepo;
+        }
+        if (entity === Reservation || entity?.name === 'Reservation') {
+          return mockRepo;
+        }
+        return {
+          findOne: jest.fn().mockResolvedValue(null),
+          find: jest.fn().mockResolvedValue([]),
+          createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+        };
+      });
+
+      const slots = await service.calculateAvailableSlots(tenantId, '2026-10-15', 'svc-facial', undefined, 'emp-doris');
+      expect(slots).toBeDefined();
+      expect(Array.isArray(slots)).toBe(true);
+      expect(slots.length).toBeGreaterThan(0);
+      expect(slots).toContain('09:00');
     });
   });
 });

@@ -455,8 +455,23 @@ export class ReservationsService implements OnModuleInit {
       where: { tenantId, isActive: true, status: 'ACCEPTED' },
       relations: { user: true },
     });
+
+    const allAssignedStaffIds = new Set<string>();
+    for (const p of products) {
+      const raw = (p as any)?.assignedStaffIds;
+      if (Array.isArray(raw)) {
+        raw.forEach((sid: any) => allAssignedStaffIds.add(String(sid).trim()));
+      } else if (typeof raw === 'string' && raw.trim()) {
+        raw.split(',').forEach((sid: any) => allAssignedStaffIds.add(sid.trim()));
+      }
+    }
+
     const staffList = allStaff.filter(a => {
       if (!a.user) return false;
+      if (allAssignedStaffIds.has(a.user.id) || employeeId === a.user.id || serviceSpecialists?.some(s => s.employeeId === a.user.id)) {
+        return true;
+      }
+
       const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
         ? a.roles
         : [a.role || a.user.role].filter(Boolean);
@@ -464,7 +479,8 @@ export class ReservationsService implements OnModuleInit {
       if (isExclusivelyDelivery) return false;
 
       const titleAndName = `${a.jobTitle || ''} ${a.user?.name || ''} ${a.user?.username || ''}`.toLowerCase();
-      const isJanitorial = /limpieza|mantenimiento|vigilancia|seguridad|aseo/i.test(titleAndName);
+      const isCosmetic = /limpieza\s*(facial|cutis|profunda|cejas)|faciales|facial\b/i.test(titleAndName);
+      const isJanitorial = !isCosmetic && /(personal de limpieza|aseador|conserje|vigilancia|seguridad|\baseo\b|\blimpieza\b)/i.test(titleAndName);
       if (isJanitorial) return false;
 
       return true;
@@ -1677,6 +1693,22 @@ export class ReservationsService implements OnModuleInit {
       return { entry, exit, lStart, lEnd };
     };
 
+    // Query products for service durations (match by ID and name)
+    const productRepo = this.repo.manager.getRepository(Product);
+    const allProducts = await productRepo.find({ where: { tenantId } });
+    const productMap = new Map<string, Product>(allProducts.map(p => [p.id, p]));
+    const productNameMap = new Map<string, Product>(allProducts.map(p => [p.name.trim().toLowerCase(), p]));
+
+    const allAssignedStaffIds = new Set<string>();
+    for (const p of allProducts) {
+      const raw = (p as any)?.assignedStaffIds;
+      if (Array.isArray(raw)) {
+        raw.forEach(sid => allAssignedStaffIds.add(String(sid).trim()));
+      } else if (typeof raw === 'string' && raw.trim()) {
+        raw.split(',').forEach(sid => allAssignedStaffIds.add(sid.trim()));
+      }
+    }
+
     // Query active staff in tenant
     const accessRepo = this.repo.manager.getRepository(UserTenantAccess);
     const allAccesses = await accessRepo.find({
@@ -1685,6 +1717,9 @@ export class ReservationsService implements OnModuleInit {
     });
     const staffList = allAccesses.filter(a => {
       if (!a.user) return false;
+      if (employeeId && (a.user.id === employeeId || a.id === employeeId)) return true;
+      if (allAssignedStaffIds.has(a.user.id) || allAssignedStaffIds.has(a.id)) return true;
+
       const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
         ? a.roles
         : [a.role || a.user.role].filter(Boolean);
@@ -1692,17 +1727,12 @@ export class ReservationsService implements OnModuleInit {
       if (isExclusivelyDelivery) return false;
 
       const titleAndName = `${a.jobTitle || ''} ${a.user?.name || ''} ${a.user?.username || ''}`.toLowerCase();
-      const isJanitorial = /limpieza|mantenimiento|vigilancia|seguridad|aseo/i.test(titleAndName);
+      const isCosmetic = /limpieza\s*(facial|cutis|profunda|cejas)|faciales|facial\b/i.test(titleAndName);
+      const isJanitorial = !isCosmetic && /(personal de limpieza|aseador|conserje|vigilancia|seguridad|\baseo\b|\blimpieza\b)/i.test(titleAndName);
       if (isJanitorial) return false;
 
       return true;
     });
-
-    // Query products for service durations (match by ID and name)
-    const productRepo = this.repo.manager.getRepository(Product);
-    const allProducts = await productRepo.find({ where: { tenantId } });
-    const productMap = new Map<string, Product>(allProducts.map(p => [p.id, p]));
-    const productNameMap = new Map<string, Product>(allProducts.map(p => [p.name.trim().toLowerCase(), p]));
 
     let duration = 0;
     if (serviceId) {

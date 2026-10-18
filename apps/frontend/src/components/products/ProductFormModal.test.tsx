@@ -159,5 +159,26 @@ describe('ProductFormModal & Service Feature Flag Control Suite', () => {
     expect(screen.getByText(/Costo Promedio del Servicio \(\$\)/i)).toBeDefined();
     expect(screen.getByText(/Insumos y Materiales de Trabajo/i)).toBeDefined();
   });
+
+  it('Debe incluir especialistas estéticos con cargo como "limpieza facial" en la lista de personal asignable', async () => {
+    const serviceSettings = {
+      featureCustomerSchedules: true,
+      enableReservations: true,
+      featureBuySell: true,
+      featureProduction: false,
+    };
+
+    const mockStaff = [
+      { id: 'u-1', name: 'Doris Especialista', role: 'OPERATIVO', jobTitle: 'pedicurista, masajista, limpieza facial' },
+      { id: 'u-2', name: 'Juan Limpieza', role: 'OPERATIVO', jobTitle: 'Personal de limpieza y aseo' },
+    ];
+
+    renderModalWithSettings(serviceSettings, { archetype: 'SERVICIO', users: mockStaff });
+
+    // Doris debe aparecer como especialista asignable
+    expect(screen.getByText(/Doris Especialista/i)).toBeDefined();
+    // Juan (aseo/limpieza puro) debe ser excluido
+    expect(screen.queryByText(/Juan Limpieza/i)).toBeNull();
+  });
 });
 

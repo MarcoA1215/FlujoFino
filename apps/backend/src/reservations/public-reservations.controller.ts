@@ -229,7 +229,8 @@ export class PublicReservationsController {
 
             // Exclude employees whose role/title indicates purely janitorial/security duties
             const titleAndName = `${a.jobTitle || ''} ${a.user?.name || ''} ${a.user?.username || ''}`.toLowerCase();
-            const isJanitorial = /limpieza|mantenimiento|vigilancia|seguridad|aseo/i.test(titleAndName);
+            const isCosmetic = /limpieza\s*(facial|cutis|profunda|cejas)|faciales|facial\b/i.test(titleAndName);
+            const isJanitorial = !isCosmetic && /(personal de limpieza|aseador|conserje|vigilancia|seguridad|\baseo\b|\blimpieza\b)/i.test(titleAndName);
             if (isJanitorial) return false;
 
             return true;
@@ -1206,6 +1207,22 @@ export class PublicReservationsController {
       return { entry, exit, lStart, lEnd };
     };
 
+    // Query products for service durations (match by ID and name)
+    const productRepo = this.tenantRepo.manager.getRepository(Product);
+    const allProducts = await productRepo.find({ where: { tenantId } });
+    const productMap = new Map<string, Product>(allProducts.map(p => [p.id, p]));
+    const productNameMap = new Map<string, Product>(allProducts.map(p => [p.name.trim().toLowerCase(), p]));
+
+    const allAssignedStaffIds = new Set<string>();
+    for (const p of allProducts) {
+      const raw = (p as any)?.assignedStaffIds;
+      if (Array.isArray(raw)) {
+        raw.forEach(sid => allAssignedStaffIds.add(String(sid).trim()));
+      } else if (typeof raw === 'string' && raw.trim()) {
+        raw.split(',').forEach(sid => allAssignedStaffIds.add(sid.trim()));
+      }
+    }
+
     // Query active staff in tenant
     const accessRepo = this.tenantRepo.manager.getRepository(UserTenantAccess);
     let staffList: any[] = [];
@@ -1216,6 +1233,9 @@ export class PublicReservationsController {
       });
       staffList = allAccesses.filter(a => {
         if (!a.user) return false;
+        if (employeeId && (a.user.id === employeeId || a.id === employeeId)) return true;
+        if (allAssignedStaffIds.has(a.user.id) || allAssignedStaffIds.has(a.id)) return true;
+
         const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
           ? a.roles
           : [a.role || a.user.role].filter(Boolean);
@@ -1223,7 +1243,8 @@ export class PublicReservationsController {
         if (isExclusivelyDelivery) return false;
 
         const titleAndName = `${a.jobTitle || ''} ${a.user?.name || ''} ${a.user?.username || ''}`.toLowerCase();
-        const isJanitorial = /limpieza|mantenimiento|vigilancia|seguridad|aseo/i.test(titleAndName);
+        const isCosmetic = /limpieza\s*(facial|cutis|profunda|cejas)|faciales|facial\b/i.test(titleAndName);
+        const isJanitorial = !isCosmetic && /(personal de limpieza|aseador|conserje|vigilancia|seguridad|\baseo\b|\blimpieza\b)/i.test(titleAndName);
         if (isJanitorial) return false;
 
         return true;
@@ -1232,12 +1253,6 @@ export class PublicReservationsController {
       console.warn('[PublicReservations] Error consultando staff en slots:', staffErr);
       staffList = [];
     }
-
-    // Query products for service durations (match by ID and name)
-    const productRepo = this.tenantRepo.manager.getRepository(Product);
-    const allProducts = await productRepo.find({ where: { tenantId } });
-    const productMap = new Map<string, Product>(allProducts.map(p => [p.id, p]));
-    const productNameMap = new Map<string, Product>(allProducts.map(p => [p.name.trim().toLowerCase(), p]));
 
     let duration = 0;
     if (serviceId) {
