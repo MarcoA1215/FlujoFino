@@ -419,6 +419,9 @@ export class SettingsService implements OnModuleInit {
     if (payload.allowPartialPayments !== undefined) settings.allowPartialPayments = payload.allowPartialPayments;
     if (payload.minDepositPercentage !== undefined) settings.minDepositPercentage = payload.minDepositPercentage;
     if (payload.allowCashierBypassDeposit !== undefined) settings.allowCashierBypassDeposit = payload.allowCashierBypassDeposit;
+    if (payload.abonoDefaultDueDays !== undefined) {
+      settings.abonoDefaultDueDays = Math.max(1, Math.min(365, Number(payload.abonoDefaultDueDays) || 7));
+    }
     const nextCashUsd = payload.acceptCashUsd !== undefined ? payload.acceptCashUsd : settings.acceptCashUsd;
     const nextPagoMovil = payload.acceptPagoMovil !== undefined ? payload.acceptPagoMovil : settings.acceptPagoMovil;
     const nextCardPos = payload.acceptCardPos !== undefined ? payload.acceptCardPos : settings.acceptCardPos;

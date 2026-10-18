@@ -93,6 +93,7 @@ interface Settings {
   allowPartialPayments?: boolean;
   minDepositPercentage?: number;
   allowCashierBypassDeposit?: boolean;
+  abonoDefaultDueDays?: number;
   acceptCashUsd?: boolean;
   acceptPagoMovil?: boolean;
   acceptCardPos?: boolean;
@@ -345,6 +346,7 @@ const SettingsPage: React.FC = () => {
         allowPartialPayments: settings.allowPartialPayments,
         minDepositPercentage: Number(settings.minDepositPercentage) || 0,
         allowCashierBypassDeposit: settings.allowCashierBypassDeposit !== false,
+        abonoDefaultDueDays: Math.max(1, Number(settings.abonoDefaultDueDays) || 7),
         acceptCashUsd: settings.acceptCashUsd !== false,
         acceptPagoMovil: settings.acceptPagoMovil !== false,
         acceptCardPos: settings.acceptCardPos === true,
@@ -813,6 +815,23 @@ const SettingsPage: React.FC = () => {
                         <IonToggle 
                           checked={settings.allowCashierBypassDeposit !== false} 
                           onIonChange={e => setSettings({...settings, allowCashierBypassDeposit: e.detail.checked})} 
+                        />
+                      </IonItem>
+
+                      <IonItem style={{ marginTop: '8px', background: '#f8fafc', borderRadius: '8px' }}>
+                        <IonLabel position="stacked">
+                          Plazo entre Abonos / Alerta de Vencimiento (Días)
+                          <small style={{ display: 'block', color: '#64748b' }}>
+                            Días por defecto para el próximo pago en cuentas abiertas antes de activar la alerta de vencimiento (Ej. 7 días).
+                          </small>
+                        </IonLabel>
+                        <IonInput
+                          type="number"
+                          min="1"
+                          max="365"
+                          value={settings.abonoDefaultDueDays !== undefined ? settings.abonoDefaultDueDays : 7}
+                          onIonInput={e => setSettings({...settings, abonoDefaultDueDays: Math.max(1, parseInt(e.detail.value!, 10) || 7)})}
+                          placeholder="7"
                         />
                       </IonItem>
                     </>
