@@ -117,6 +117,7 @@ async function runSeed() {
   const promoterRepo = dataSource.getRepository(Promoter);
   const customerRepo = dataSource.getRepository(Customer);
   const expenseRepo = dataSource.getRepository(OperatingExpense);
+  const variantRepo = dataSource.getRepository(ProductVariant);
 
   try {
     const passwordHash = await bcrypt.hash('123456', 10);
@@ -173,8 +174,11 @@ async function runSeed() {
     console.log('\n👥 Verificando cuentas maestras del sistema...');
     const superAdmin = await getOrCreateUser('superadmin@finowork.com', 'superadmin', UserRole.SUPERADMIN, 'Super Administrador', superPasswordHash);
     const promoter = await getOrCreateUser('promotor@finowork.com', 'promotor', UserRole.ADMIN, 'Promotor Oficial FinoWork');
-    const deliveryUser = await getOrCreateUser('delivery@finowork.com', 'delivery_carlos', UserRole.DELIVERY, 'Carlos Delivery');
     const demoAdmin = await getOrCreateUser('admin@finowork.com', 'admin', UserRole.ADMIN, 'Administrador Demo');
+    const deliveryUser = await getOrCreateUser('delivery@finowork.com', 'delivery_carlos', UserRole.DELIVERY, 'Carlos Delivery');
+    const kitchenUser = await getOrCreateUser('cocina@finowork.com', 'cocina_chef', UserRole.KITCHEN, 'Chef Ramón Cocina');
+    const cashierUser = await getOrCreateUser('cajero@finowork.com', 'cajero_maria', UserRole.POS, 'María Cajera');
+    const specialistUser = await getOrCreateUser('especialista@finowork.com', 'especialista_ana', UserRole.OPERATIVO, 'Dra. Ana Especialista');
 
     // Registrar perfil de promotor si no existe
     let promoterProfile = await promoterRepo.findOne({ where: { userId: promoter.id } });
@@ -211,6 +215,7 @@ async function runSeed() {
     }
     await linkAccess(promoter.id, tenantRetail.id, UserRole.ADMIN, 'Gerente de Boutique');
     await linkAccess(demoAdmin.id, tenantRetail.id, UserRole.ADMIN, 'Administrador');
+    await linkAccess(cashierUser.id, tenantRetail.id, UserRole.POS, 'Cajera Principal');
 
     let settingsRetail = await settingsRepo.findOne({ where: { tenantId: tenantRetail.id } });
     if (!settingsRetail) {
@@ -223,18 +228,50 @@ async function runSeed() {
         featureProduction: false,
         featureShowCatalog: true,
         exchangeRateBs: tasaActual,
+        enableCopCurrency: true,
+        exchangeRateCop: 4000.0,
+        exchangeRateCopMode: 'MANUAL',
+        manualExchangeRateCop: 4000.0,
+        companyCopBank: 'Bancolombia / Nequi',
+        companyCopAccountNumber: '3129876543',
+        companyCopAccountHolder: 'Boutique Moda Urbana SAS',
+        acceptCashCop: true,
+        acceptTransferCop: true,
+        allowPartialPayments: true,
+        abonoDefaultDueDays: 7,
         themePrimaryColor: '#2563eb',
         themeHeaderColor: '#eff6ff',
         acceptCashUsd: true,
         acceptPagoMovil: true,
       });
       await settingsRepo.save(settingsRetail);
-      console.log('   ✅ Configuración de Boutique creada');
+      console.log('   ✅ Configuración de Boutique creada con Tri-Moneda COP');
+    } else {
+      settingsRetail.enableCopCurrency = true;
+      settingsRetail.exchangeRateCop = 4000.0;
+      settingsRetail.companyCopBank = 'Bancolombia / Nequi';
+      settingsRetail.companyCopAccountNumber = '3129876543';
+      settingsRetail.companyCopAccountHolder = 'Boutique Moda Urbana SAS';
+      settingsRetail.acceptCashCop = true;
+      settingsRetail.acceptTransferCop = true;
+      await settingsRepo.save(settingsRetail);
+    }
+
+    // Fondo Inicial de Apertura en Caja (Gaveta Física)
+    const existingRetailFund = await expenseRepo.findOne({ where: { tenantId: tenantRetail.id, category: 'FONDO_CAJA' } });
+    if (!existingRetailFund) {
+      await expenseRepo.save(expenseRepo.create({
+        tenantId: tenantRetail.id,
+        description: 'Base de Apertura en Gaveta (Efectivo)',
+        amount: 80.00,
+        category: 'FONDO_CAJA',
+        paymentMethod: 'CASH_USD',
+      }));
+      console.log('   ✅ [NUEVO] Fondo base de gaveta registrado: $80.00 USD');
     }
 
     const retailProducts = [
       { name: 'Pantalón Jean Clásico', salePrice: 22.0, cost: 10.0, estimatedCost: 10.0, stock: 15, stockQuantity: 15, physicalStock: 15, category: 'Ropa Dama', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=600&auto=format&fit=crop&q=80'] },
-      { name: 'Camisa Oversize Algodón', salePrice: 14.0, cost: 6.5, estimatedCost: 6.5, stock: 25, stockQuantity: 25, physicalStock: 25, category: 'Ropa Dama', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=600&auto=format&fit=crop&q=80'] },
       { name: 'Vestido Casual Floral', salePrice: 28.0, cost: 12.0, estimatedCost: 12.0, stock: 10, stockQuantity: 10, physicalStock: 10, category: 'Vestidos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=600&auto=format&fit=crop&q=80'] },
     ];
     for (const rp of retailProducts) {
@@ -246,6 +283,77 @@ async function runSeed() {
       }
     }
 
+    // Producto Estrella con Sub-divisiones / Variantes (Tallas y Colores con stock propio)
+    let camisaVariants = await productRepo.findOne({ where: { tenantId: tenantRetail.id, name: 'Camisa Oversize Algodón' } });
+    if (!camisaVariants) {
+      camisaVariants = await productRepo.save(productRepo.create({
+        name: 'Camisa Oversize Algodón',
+        salePrice: 15.0,
+        cost: 7.0,
+        estimatedCost: 7.0,
+        stock: 35,
+        stockQuantity: 35,
+        physicalStock: 35,
+        category: 'Ropa Dama',
+        is_service: false,
+        product_type: 'REVENTA',
+        hasVariants: true,
+        tenantId: tenantRetail.id,
+        images: [
+          'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=600&auto=format&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80'
+        ],
+      }));
+
+      await variantRepo.save([
+        variantRepo.create({
+          productId: camisaVariants.id,
+          tenantId: tenantRetail.id,
+          name: 'Blanco / Talla S',
+          sku: 'CAM-OVR-WHT-S',
+          stockQuantity: 8,
+          salePrice: 15.0,
+          cost: 7.0,
+          images: ['https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80'],
+          attributes: { color: 'Blanco', talla: 'S' },
+        }),
+        variantRepo.create({
+          productId: camisaVariants.id,
+          tenantId: tenantRetail.id,
+          name: 'Blanco / Talla M',
+          sku: 'CAM-OVR-WHT-M',
+          stockQuantity: 12,
+          salePrice: 15.0,
+          cost: 7.0,
+          images: ['https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80'],
+          attributes: { color: 'Blanco', talla: 'M' },
+        }),
+        variantRepo.create({
+          productId: camisaVariants.id,
+          tenantId: tenantRetail.id,
+          name: 'Negro / Talla M',
+          sku: 'CAM-OVR-BLK-M',
+          stockQuantity: 10,
+          salePrice: 16.0,
+          cost: 7.5,
+          images: ['https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=600&auto=format&fit=crop&q=80'],
+          attributes: { color: 'Negro', talla: 'M' },
+        }),
+        variantRepo.create({
+          productId: camisaVariants.id,
+          tenantId: tenantRetail.id,
+          name: 'Negro / Talla L',
+          sku: 'CAM-OVR-BLK-L',
+          stockQuantity: 5,
+          salePrice: 16.0,
+          cost: 7.5,
+          images: ['https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=600&auto=format&fit=crop&q=80'],
+          attributes: { color: 'Negro', talla: 'L' },
+        }),
+      ]);
+      console.log('   ✅ [NUEVO] Camisa Oversize creada con 4 variantes de Talla/Color y stock independiente');
+    }
+
     // Cliente demo para Boutique
     let clientBoutique = await customerRepo.findOne({ where: { tenantId: tenantRetail.id, phone: '0414-1112233' } });
     if (!clientBoutique) {
@@ -254,45 +362,130 @@ async function runSeed() {
         name: 'Elena Fuentes',
         phone: '0414-1112233',
         identification: 'V-18456123',
-        totalVisits: 2,
-        notes: 'Clienta frecuente de vestidos y blusas.',
+        totalVisits: 3,
+        notes: 'Clienta frecuente con línea de crédito abierta.',
       }));
       console.log('   ✅ [NUEVO] Cliente demo creado: Elena Fuentes');
     }
 
-    // Comanda demo para Boutique (solo si no existen ventas)
+    // Comandas demo en Boutique
     const existingRetailOrders = await orderRepo.count({ where: { tenantId: tenantRetail.id } });
     if (existingRetailOrders === 0) {
-      const sampleProd = await productRepo.findOne({ where: { tenantId: tenantRetail.id, name: 'Vestido Casual Floral' } });
-      if (sampleProd) {
-        const order = orderRepo.create({
+      const sampleVestido = await productRepo.findOne({ where: { tenantId: tenantRetail.id, name: 'Vestido Casual Floral' } });
+      const samplePantalon = await productRepo.findOne({ where: { tenantId: tenantRetail.id, name: 'Pantalón Jean Clásico' } });
+
+      // 1. Venta pagada en Efectivo USD ($28 USD) atendida por María Cajera
+      if (sampleVestido) {
+        const order1 = orderRepo.create({
           tenantId: tenantRetail.id,
           customerName: clientBoutique.name,
           customerPhone: clientBoutique.phone,
           customerId: clientBoutique.id,
+          employeeId: cashierUser.id,
           status: OrderStatus.DELIVERED,
           paymentStatus: PaymentStatus.PAID,
-          paymentMethod: 'PAGO_MOVIL',
+          paymentMethod: 'USD',
+          usdReceived: 30.00,
+          changeAmount: 2.00,
+          changeMethod: 'CASH_USD',
           deliveryMethod: DeliveryMethod.IN_STORE,
           totalAmount: 28.00,
           totalCost: 12.00,
           netProfit: 16.00,
           exchangeRate: tasaActual,
-          pagoMovilRef: 'REF-789012',
-          notes: 'Venta presencial mostrador.',
+          notes: 'Venta de mostrador. Pagó con billete de $30, vuelto $2 en gaveta.',
         });
-        const savedOrder = await orderRepo.save(order);
+        const savedOrder1 = await orderRepo.save(order1);
         await orderItemRepo.save(orderItemRepo.create({
-          orderId: savedOrder.id,
-          productId: sampleProd.id,
-          productName: sampleProd.name,
+          orderId: savedOrder1.id,
+          productId: sampleVestido.id,
+          productName: sampleVestido.name,
           quantity: 1,
           unitPrice: 28.00,
           unitCost: 12.00,
           subtotal: 28.00,
         }));
-        console.log('   ✅ [NUEVO] Venta demo registrada en Boutique');
       }
+
+      // 2. Venta pagada en Pesos Colombianos (COP) ($15 USD = $60.000 COP)
+      if (camisaVariants) {
+        const orderCop = orderRepo.create({
+          tenantId: tenantRetail.id,
+          customerName: 'Santiago Gómez',
+          customerPhone: '0414-9988776',
+          employeeId: cashierUser.id,
+          status: OrderStatus.DELIVERED,
+          paymentStatus: PaymentStatus.PAID,
+          paymentMethod: 'CASH_COP',
+          amountCop: 60000,
+          exchangeRateCop: 4000,
+          copReceived: 100000,
+          changeAmountCop: 40000,
+          changeMethod: 'CASH_COP',
+          deliveryMethod: DeliveryMethod.IN_STORE,
+          totalAmount: 15.00,
+          totalCost: 7.00,
+          netProfit: 8.00,
+          exchangeRate: tasaActual,
+          notes: 'Pago en Efectivo Pesos COP: $60.000. Billete de $100k, vuelto $40k COP.',
+        });
+        const savedOrderCop = await orderRepo.save(orderCop);
+        await orderItemRepo.save(orderItemRepo.create({
+          orderId: savedOrderCop.id,
+          productId: camisaVariants.id,
+          productName: 'Camisa Oversize Algodón (Blanco / Talla M)',
+          quantity: 1,
+          unitPrice: 15.00,
+          unitCost: 7.00,
+          subtotal: 15.00,
+        }));
+      }
+
+      // 3. Cuenta abierta con Abono Parcial y Fecha de Vencimiento ($44 USD total, abonó $20 USD, restan $24)
+      if (samplePantalon) {
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 5); // Vence en 5 días (activa alerta)
+
+        const creditOrder = orderRepo.create({
+          tenantId: tenantRetail.id,
+          customerName: clientBoutique.name,
+          customerPhone: clientBoutique.phone,
+          customerId: clientBoutique.id,
+          employeeId: cashierUser.id,
+          status: OrderStatus.DELIVERED,
+          paymentStatus: PaymentStatus.PARTIAL,
+          paymentMethod: 'PAGO_MOVIL',
+          deliveryMethod: DeliveryMethod.IN_STORE,
+          totalAmount: 44.00,
+          totalCost: 20.00,
+          netProfit: 24.00,
+          exchangeRate: tasaActual,
+          abonosTotal: 20.00,
+          nextAbonoDueDate: dueDate,
+          abonosHistory: [
+            {
+              amount: 20.00,
+              date: new Date().toISOString(),
+              method: 'PAGO_MOVIL',
+              ref: 'PM-99238',
+              notes: 'Abono inicial 45% al retirar',
+            }
+          ],
+          notes: 'Prendas entregadas bajo compromiso de abono. Próximo abono acordado a 5 días.',
+        });
+        const savedCreditOrder = await orderRepo.save(creditOrder);
+        await orderItemRepo.save(orderItemRepo.create({
+          orderId: savedCreditOrder.id,
+          productId: samplePantalon.id,
+          productName: samplePantalon.name,
+          quantity: 2,
+          unitPrice: 22.00,
+          unitCost: 10.00,
+          subtotal: 44.00,
+        }));
+      }
+
+      console.log('   ✅ [NUEVO] 3 ventas demo registradas: Efectivo USD, Efectivo COP y Cuenta abierta con Abono');
     }
 
     // =========================================================================
@@ -549,6 +742,7 @@ async function runSeed() {
     }
     await linkAccess(promoter.id, tenantBurger.id, UserRole.ADMIN, 'Gerente Gastronómico');
     await linkAccess(deliveryUser.id, tenantBurger.id, UserRole.DELIVERY, 'Repartidor Oficial');
+    await linkAccess(kitchenUser.id, tenantBurger.id, UserRole.KITCHEN, 'Jefe de Cocina');
     await linkAccess(demoAdmin.id, tenantBurger.id, UserRole.ADMIN, 'Administrador');
 
     let settingsBurger = await settingsRepo.findOne({ where: { tenantId: tenantBurger.id } });
@@ -569,6 +763,18 @@ async function runSeed() {
       });
       await settingsRepo.save(settingsBurger);
       console.log('   ✅ Configuración de Burger House creada');
+    }
+
+    // Fondo Base de Gaveta en Burger House
+    const existingBurgerFund = await expenseRepo.findOne({ where: { tenantId: tenantBurger.id, category: 'FONDO_CAJA' } });
+    if (!existingBurgerFund) {
+      await expenseRepo.save(expenseRepo.create({
+        tenantId: tenantBurger.id,
+        description: 'Fondo Inicial de Caja / Gaveta',
+        amount: 50.00,
+        category: 'FONDO_CAJA',
+        paymentMethod: 'CASH_USD',
+      }));
     }
 
     // Zonas Delivery
@@ -625,10 +831,10 @@ async function runSeed() {
       console.log('   ✅ [NUEVO] Receta creada: Hamburguesa Doble Queso');
     }
 
-    // Comandas demo en Gastronomía (1 Salón y 1 Delivery asignado a Carlos)
+    // Comandas demo en Gastronomía (1 Salón para Cocina, 1 Delivery en Tránsito para Carlos, 1 Entregada pagada)
     const existingOrders = await orderRepo.count({ where: { tenantId: tenantBurger.id } });
     if (existingOrders === 0) {
-      // 1. Pedido en Preparación - Mesa 4
+      // 1. Pedido en Preparación - Mesa 4 (Para vista de Chef/Cocina)
       const orderMesa = orderRepo.create({
         tenantId: tenantBurger.id,
         customerName: 'Mesa 4 (Salón)',
@@ -654,7 +860,7 @@ async function runSeed() {
         subtotal: 15.00,
       }));
 
-      // 2. Pedido Delivery con Repartidor Asignado
+      // 2. Pedido Delivery con Repartidor Asignado (Para vista de Panel Repartidor Carlos)
       const orderDelivery = orderRepo.create({
         tenantId: tenantBurger.id,
         customerName: 'Andrés Silva',
@@ -686,7 +892,36 @@ async function runSeed() {
         subtotal: 7.50,
       }));
 
-      console.log('   ✅ [NUEVO] 2 comandas demo creadas (Salón y Reparto en tránsito)');
+      // 3. Venta anterior ya entregada y cobrada (Aporta ingresos a tesorería)
+      const orderPaid = orderRepo.create({
+        tenantId: tenantBurger.id,
+        customerName: 'Karla Rivas',
+        customerPhone: '0412-8877665',
+        status: OrderStatus.DELIVERED,
+        paymentStatus: PaymentStatus.PAID,
+        paymentMethod: 'USD',
+        deliveryMethod: DeliveryMethod.IN_STORE,
+        totalAmount: 22.50,
+        totalCost: 7.50,
+        netProfit: 15.00,
+        usdReceived: 25.00,
+        changeAmount: 2.50,
+        changeMethod: 'CASH_USD',
+        exchangeRate: tasaActual,
+        notes: '3 combos entregados.',
+      });
+      const savedOrderPaid = await orderRepo.save(orderPaid);
+      await orderItemRepo.save(orderItemRepo.create({
+        orderId: savedOrderPaid.id,
+        productId: burger.id,
+        productName: burger.name,
+        quantity: 3,
+        unitPrice: 7.50,
+        unitCost: 2.50,
+        subtotal: 22.50,
+      }));
+
+      console.log('   ✅ [NUEVO] 3 comandas demo creadas (Salón para cocina, Reparto en tránsito y Venta cobrada)');
     }
 
     // =========================================================================
@@ -708,6 +943,7 @@ async function runSeed() {
     }
     await linkAccess(promoter.id, tenantGlow.id, UserRole.ADMIN, 'Directora Estética');
     await linkAccess(demoAdmin.id, tenantGlow.id, UserRole.ADMIN, 'Administrador');
+    await linkAccess(specialistUser.id, tenantGlow.id, UserRole.OPERATIVO, 'Dra. Estética & Cosmiatra');
 
     let settingsGlow = await settingsRepo.findOne({ where: { tenantId: tenantGlow.id } });
     if (!settingsGlow) {
@@ -729,6 +965,19 @@ async function runSeed() {
       console.log('   ✅ Configuración de Centro Glow creada');
     }
 
+    // Base de Apertura en Gaveta para Centro Glow
+    const existingGlowFund = await expenseRepo.findOne({ where: { tenantId: tenantGlow.id, category: 'FONDO_CAJA' } });
+    if (!existingGlowFund) {
+      await expenseRepo.save(expenseRepo.create({
+        tenantId: tenantGlow.id,
+        description: 'Base de Apertura en Gaveta',
+        amount: 60.00,
+        category: 'FONDO_CAJA',
+        paymentMethod: 'CASH_USD',
+      }));
+      console.log('   ✅ [NUEVO] Fondo base de gaveta en Centro Glow: $60.00 USD');
+    }
+
     const glowCatalog = [
       { name: 'Masaje Descontracturante 50min', salePrice: 25.0, cost: 4.0, estimatedCost: 4.0, durationMinutes: 50, category: 'Masajes', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=600&auto=format&fit=crop&q=80'] },
       { name: 'Sérum Facial Vitamina C (30ml)', salePrice: 18.0, cost: 8.0, estimatedCost: 8.0, stock: 12, stockQuantity: 12, physicalStock: 12, category: 'Cosméticos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&auto=format&fit=crop&q=80'] },
@@ -743,8 +992,103 @@ async function runSeed() {
       }
     }
 
-    // Gasto operativo de prueba (para reportes de rentabilidad)
-    const existingExpenses = await expenseRepo.count({ where: { tenantId: tenantGlow.id } });
+    // Ventas e Ingresos reales en Centro Glow (para equilibrar y tener flujo positivo en bancos)
+    const existingGlowOrders = await orderRepo.count({ where: { tenantId: tenantGlow.id } });
+    if (existingGlowOrders === 0) {
+      const serumProd = await productRepo.findOne({ where: { tenantId: tenantGlow.id, name: 'Sérum Facial Vitamina C (30ml)' } });
+      const solarProd = await productRepo.findOne({ where: { tenantId: tenantGlow.id, name: 'Protector Solar Toque Seco FPS 50' } });
+
+      // 1. Venta cobrada por Pago Móvil ($40 USD = Bs. a la tasa actual)
+      const orderPagoMovil = orderRepo.create({
+        tenantId: tenantGlow.id,
+        customerName: 'Valeria Mendoza',
+        customerPhone: '0424-5544332',
+        status: OrderStatus.DELIVERED,
+        paymentStatus: PaymentStatus.PAID,
+        paymentMethod: 'PAGO_MOVIL',
+        amountBs: 40.00 * tasaActual,
+        pagoMovilRef: 'PM-482019',
+        pagoMovilBank: '0102 - Banco de Venezuela',
+        deliveryMethod: DeliveryMethod.IN_STORE,
+        totalAmount: 40.00,
+        totalCost: 18.00,
+        netProfit: 22.00,
+        exchangeRate: tasaActual,
+        notes: 'Venta de cosméticos con Pago Móvil confirmado en cuenta bancaria.',
+      });
+      const savedGlowOrder1 = await orderRepo.save(orderPagoMovil);
+      if (serumProd && solarProd) {
+        await orderItemRepo.save([
+          orderItemRepo.create({
+            orderId: savedGlowOrder1.id,
+            productId: serumProd.id,
+            productName: serumProd.name,
+            quantity: 1,
+            unitPrice: 18.00,
+            unitCost: 8.00,
+            subtotal: 18.00,
+          }),
+          orderItemRepo.create({
+            orderId: savedGlowOrder1.id,
+            productId: solarProd.id,
+            productName: solarProd.name,
+            quantity: 1,
+            unitPrice: 22.00,
+            unitCost: 10.00,
+            subtotal: 22.00,
+          })
+        ]);
+      }
+
+      // 2. Venta cobrada en Efectivo USD ($25 USD)
+      const orderCashUSD = orderRepo.create({
+        tenantId: tenantGlow.id,
+        customerName: 'Mariana Salas',
+        customerPhone: '0414-7766554',
+        status: OrderStatus.DELIVERED,
+        paymentStatus: PaymentStatus.PAID,
+        paymentMethod: 'USD',
+        usdReceived: 30.00,
+        changeAmount: 5.00,
+        changeMethod: 'CASH_USD',
+        deliveryMethod: DeliveryMethod.IN_STORE,
+        totalAmount: 25.00,
+        totalCost: 4.00,
+        netProfit: 21.00,
+        exchangeRate: tasaActual,
+        notes: 'Pago en efectivo de sesión de masaje.',
+      });
+      await orderRepo.save(orderCashUSD);
+
+      console.log('   ✅ [NUEVO] 2 ventas cobradas registradas en Centro Glow (Pago Móvil y Efectivo)');
+    }
+
+    // Cita Agendada con la Dra. Ana Especialista
+    const existingGlowCitas = await reservationRepo.count({ where: { tenantId: tenantGlow.id } });
+    if (existingGlowCitas === 0) {
+      const masajeServ = await productRepo.findOne({ where: { tenantId: tenantGlow.id, name: 'Masaje Descontracturante 50min' } });
+      const todayIso = new Date().toISOString().split('T')[0];
+      await reservationRepo.save(reservationRepo.create({
+        tenantId: tenantGlow.id,
+        customerName: 'Patricia Colmenares',
+        customerPhone: '0412-9900112',
+        date: todayIso,
+        time: '16:00',
+        durationMinutes: 50,
+        serviceId: masajeServ?.id,
+        serviceName: masajeServ?.name || 'Masaje Descontracturante 50min',
+        employeeId: specialistUser.id,
+        employeeName: specialistUser.name || 'Dra. Ana Especialista',
+        status: ReservationStatus.CONFIRMED,
+        paymentStatus: PaymentStatus.PAID,
+        totalAmount: 25.00,
+        notes: 'Paciente reservada con Dra. Ana.',
+      }));
+      console.log('   ✅ [NUEVO] Cita asignada a Dra. Ana Especialista en Centro Glow');
+    }
+
+    // Gasto operativo demo
+    const existingExpenses = await expenseRepo.count({ where: { tenantId: tenantGlow.id, category: 'UTILITIES' } });
     if (existingExpenses === 0) {
       await expenseRepo.save(expenseRepo.create({
         tenantId: tenantGlow.id,
@@ -772,13 +1116,22 @@ async function runSeed() {
     console.log('\n🛵 Usuario Delivery (Para pruebas de reparto):');
     console.log('👉 Correo:   delivery@finowork.com');
     console.log('👉 Clave:    123456');
+    console.log('\n👨‍🍳 Usuario Cocina / Comandas (Para vista de chef):');
+    console.log('👉 Correo:   cocina@finowork.com');
+    console.log('👉 Clave:    123456');
+    console.log('\n💳 Usuario Cajero / POS (Para cobros y arqueos):');
+    console.log('👉 Correo:   cajero@finowork.com');
+    console.log('👉 Clave:    123456');
+    console.log('\n✂️ Usuario Especialista (Para citas y agenda de spa/barbería):');
+    console.log('👉 Correo:   especialista@finowork.com');
+    console.log('👉 Clave:    123456');
     console.log('\n🏪 Tiendas / Negocios de prueba disponibles:');
-    console.log('1. Boutique Moda Urbana       (demo-retail)      -> Retail puro + Clientes');
+    console.log('1. Boutique Moda Urbana       (demo-retail)      -> Tri-Moneda COP + Variantes + Crédito');
     console.log('2. Panadería La Espiga        (demo-panaderia)   -> Producción pura + Fórmulas');
     console.log('3. Barbería & Spa Élite       (demo-servicios)   -> Citas con agenda');
     console.log('4. Auto Lavado Express        (demo-autolavado)  -> Servicios sin cita');
-    console.log('5. Burger House Gourmet       (demo-gastronomia) -> Híbrido: Cocina + Delivery');
-    console.log('6. Centro Estético Glow       (demo-estetica)    -> Híbrido: Citas + Retail + Gastos');
+    console.log('5. Burger House Gourmet       (demo-gastronomia) -> Híbrido: Cocina (comandas) + Delivery');
+    console.log('6. Centro Estético Glow       (demo-estetica)    -> Híbrido: Citas con Dra. Ana + Retail');
     console.log('==================================================\n');
 
   } catch (error) {
