@@ -37,6 +37,7 @@ import { SalaryAdvance } from '../../entities/salary-advance.entity';
 import { CashExchange } from '../../entities/cash-exchange.entity';
 import { Investment } from '../../entities/investment.entity';
 import { PushSubscription } from '../../entities/push-subscription.entity';
+import { ProductVariant } from '../../entities/product-variant.entity';
 
 // Enums
 import { 
@@ -65,7 +66,7 @@ async function runSeed() {
     url: databaseUrl,
     ssl: isLocal ? false : { rejectUnauthorized: false },
     entities: [
-      User, Tenant, UserTenantAccess, Settings, Product, RawMaterial, RecipeItem,
+      User, Tenant, UserTenantAccess, Settings, Product, ProductVariant, RawMaterial, RecipeItem,
       ComboItem, Order, OrderItem, Reservation, DeliveryZone, ProductionBatch,
       StockMovement, WorkSchedule, OperatingExpense, AccessRequest, Feedback,
       OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig,
@@ -75,8 +76,13 @@ async function runSeed() {
   });
 
   console.log('🔄 Conectando a la base de datos (synchronize: false)...');
-  await dataSource.initialize();
-  console.log('✅ Conexión establecida de forma segura (modo no destructivo).');
+  try {
+    await dataSource.initialize();
+    console.log('✅ Conexión establecida de forma segura (modo no destructivo).');
+  } catch (initErr) {
+    console.error('❌ Error fatal al inicializar TypeORM DataSource:', initErr);
+    process.exit(1);
+  }
 
   // Asegurar que columnas opcionales requeridas por las entidades existan sin tocar esquemas ni borrar datos
   const safeColumns = [
