@@ -16,9 +16,19 @@ export class OrdersController {
     @Body('amount') amount: number,
     @Body('method') method?: string,
     @Body('ref') ref?: string,
-    @Body('bank') bank?: string
+    @Body('bank') bank?: string,
+    @Body('nextAbonoDueDate') nextAbonoDueDate?: string
   ) {
-    return this.ordersService.addAbono(req.user.tenantId, id, amount, method, ref, bank);
+    return this.ordersService.addAbono(req.user.tenantId, id, amount, method, ref, bank, nextAbonoDueDate);
+  }
+
+  @Patch(':id/due-date')
+  updateAbonoDueDate(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body('nextAbonoDueDate') nextAbonoDueDate: string | null,
+  ) {
+    return this.ordersService.updateAbonoDueDate(req.user.tenantId, id, nextAbonoDueDate);
   }
 
   @Delete(':id/abono/:index')

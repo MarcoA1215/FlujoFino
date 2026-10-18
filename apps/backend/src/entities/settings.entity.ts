@@ -82,6 +82,9 @@ export class Settings {
   @Column('boolean', { default: true })
   allowCashierBypassDeposit: boolean;
 
+  @Column('int', { default: 7 })
+  abonoDefaultDueDays: number;
+
   // Feature Flags / Onboarding
   @Column('boolean', { default: true })
   featureDelivery: boolean;

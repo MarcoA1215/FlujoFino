@@ -1,6 +1,20 @@
+export type ProductVariant = {
+  id?: string;
+  productId?: string;
+  name: string;
+  sku?: string;
+  attributes?: Record<string, any>;
+  stockQuantity: number;
+  cost?: number | null;
+  salePrice?: number | null;
+  images?: string[];
+};
+
 export type Product = {
   id: string;
   name: string;
+  code?: string;
+  description?: string;
   category?: string;
   salePrice: number;
   stockQuantity: number;
@@ -21,6 +35,8 @@ export type Product = {
   product_type?: 'REVENTA' | 'FORMULA' | 'SERVICIO';
   availabilityType?: 'INMEDIATO' | 'BAJO_ENCARGO';
   isSupplierPreorder?: boolean;
+  hasVariants?: boolean;
+  variants?: ProductVariant[];
 };
 
 export type RawMaterial = {
@@ -47,6 +63,8 @@ export type OrderItem = {
   id?: string;
   productId: string;
   productName?: string;
+  variantId?: string;
+  variantName?: string;
   product?: Product;
   quantity: number;
   deliveredQuantity?: number;
@@ -75,6 +93,32 @@ export type Movement = {
   totalCost: number;
   createdAt: string;
   description: string;
+};
+
+export type MonthlySummary = {
+  month: string;
+  monthLabel: string;
+  currencySymbol: string;
+  exchangeRate: number;
+  invoicedRevenue: number;
+  collectedRevenue: number;
+  pendingReceivable: number;
+  costOfGoodsSold: number;
+  operatingExpenses: number;
+  netProfit: number;
+  ordersCount: number;
+  paidOrdersCount: number;
+  pendingOrdersCount: number;
+  breakdown: {
+    cashUSD: number;
+    digitalUSD: number;
+    pagoMovilBs: number;
+    pagoMovilUSD: number;
+    puntoBs: number;
+    puntoUSD: number;
+    transferBs: number;
+    transferUSD: number;
+  };
 };
 
 export type DashboardSummary = {
@@ -114,6 +158,7 @@ export type DashboardSummary = {
   totalConsolidatedReinvestment?: number;
   payrollExpenses?: number;
   treasury?: TreasurySummary;
+  monthlySummary?: MonthlySummary | null;
 };
 
 export type TreasurySummary = {

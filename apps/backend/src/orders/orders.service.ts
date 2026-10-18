@@ -5,6 +5,7 @@ import { IsOptional, IsArray, IsString, IsNumber, IsBoolean, IsEnum } from 'clas
 import { Order, SplitPaymentItem } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Product } from '../entities/product.entity';
+import { ProductVariant } from '../entities/product-variant.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
 import { PaymentStatus, OrderStatus, MovementType, DeliveryMethod, UserRole, ReservationStatus } from '@finowork/shared-types';
 import { RawMaterial } from '../entities/raw-material.entity';
@@ -167,6 +168,8 @@ export class CreateOrderDto {
   items: {
     id?: string;
     productId: string;
+    variantId?: string;
+    variantName?: string;
     quantity: number;
     unitPrice: number;
     employeeId?: string;
@@ -228,6 +231,9 @@ export class CreateOrderDto {
 
   @IsOptional()
   requestedDeliveryDate?: string | Date;
+
+  @IsOptional()
+  nextAbonoDueDate?: string | Date;
 }
 
 export class UpdatePaymentDto {
@@ -350,14 +356,35 @@ export class OrdersService implements OnModuleInit {
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "binanceRef" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferRef" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferBank" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "nextAbonoDueDate" timestamp;
         ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "employeeId" character varying;
+        ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "variantId" character varying;
+        ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "variantName" character varying;
+        ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "code" character varying;
+        ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "hasVariants" boolean DEFAULT false;
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "abonoDefaultDueDays" integer DEFAULT 7;
+        CREATE TABLE IF NOT EXISTS "product_variant" (
+          "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+          "productId" uuid NOT NULL,
+          "tenantId" character varying,
+          "name" character varying NOT NULL,
+          "sku" character varying,
+          "attributes" jsonb,
+          "stockQuantity" numeric(12,4) NOT NULL DEFAULT 0,
+          "cost" numeric(12,2),
+          "salePrice" numeric(12,2),
+          "images" text,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+          "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+          CONSTRAINT "PK_product_variant" PRIMARY KEY ("id")
+        );
       `);
     } catch (e: any) {
       // Ignorar si las columnas ya existen o si no hay permisos DDL
     }
   }
 
-  async addAbono(tenantId: string, orderId: string, amount: number, method?: string, ref?: string, bank?: string) {
+  async addAbono(tenantId: string, orderId: string, amount: number, method?: string, ref?: string, bank?: string, nextAbonoDueDate?: string) {
     if (amount <= 0) throw new BadRequestException('El monto debe ser mayor a 0');
     const order = await this.dataSource.getRepository(Order).findOne({ where: { tenantId, id: orderId } });
     if (!order) throw new NotFoundException('Orden no encontrada');
@@ -384,8 +411,16 @@ export class OrdersService implements OnModuleInit {
     const roundedTotal = roundCurrency(order.totalAmount);
     if (roundedAbonos >= roundedTotal && roundedTotal > 0) {
       order.paymentStatus = PaymentStatus.PAID;
+      order.nextAbonoDueDate = null;
     } else if (roundedAbonos > 0) {
       order.paymentStatus = PaymentStatus.PARTIAL;
+      if (nextAbonoDueDate && !isNaN(new Date(nextAbonoDueDate).getTime())) {
+        order.nextAbonoDueDate = new Date(nextAbonoDueDate);
+      } else {
+        const tenantSettings = typeof this.settingsService?.getSettings === 'function' ? await this.settingsService.getSettings(tenantId) : null;
+        const dueDays = Math.max(1, Number((tenantSettings as any)?.abonoDefaultDueDays || 7));
+        order.nextAbonoDueDate = new Date(Date.now() + dueDays * 24 * 60 * 60 * 1000);
+      }
     } else {
       order.paymentStatus = PaymentStatus.PENDING;
     }
@@ -411,6 +446,18 @@ export class OrdersService implements OnModuleInit {
     }
 
     return saved;
+  }
+
+  async updateAbonoDueDate(tenantId: string, orderId: string, nextAbonoDueDate: string | null) {
+    const repo = this.dataSource.getRepository(Order);
+    const order = await repo.findOne({ where: { tenantId, id: orderId } });
+    if (!order) throw new NotFoundException('Orden no encontrada');
+    if (nextAbonoDueDate && !isNaN(new Date(nextAbonoDueDate).getTime())) {
+      order.nextAbonoDueDate = new Date(nextAbonoDueDate);
+    } else {
+      order.nextAbonoDueDate = null;
+    }
+    return repo.save(order);
   }
 
   async registerFondoCaja(tenantId: string, amount: number, description?: string, currency: 'USD' | 'BS' = 'USD') {
@@ -594,7 +641,7 @@ export class OrdersService implements OnModuleInit {
         }
         products = await manager.find(Product, {
           where: { tenantId, id: In(productIds) },
-          relations: { comboItems: { component: { recipe: { rawMaterial: true } } }, recipe: { rawMaterial: true } }
+          relations: { comboItems: { component: { recipe: { rawMaterial: true } } }, recipe: { rawMaterial: true }, variants: true }
         });
       }
       const productMap = new Map(products.map(p => [p.id, p]));
@@ -867,17 +914,50 @@ export class OrdersService implements OnModuleInit {
               const isMadeToOrder = isFoodOrPrepared;
 
               if (!isService && !isMadeToOrder) {
-                const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
                 const isBajoEncargo = product.availabilityType === 'BAJO_ENCARGO';
-                if (!allowNegativeStock && currentStock < itemDto.quantity && !isBajoEncargo) {
-                  throw new BadRequestException(`Stock insuficiente para "${product.name}". Disponible: ${currentStock}, solicitado: ${itemDto.quantity}`);
+                if (product.hasVariants && Array.isArray(product.variants) && product.variants.length > 0) {
+                  const targetVariant = product.variants.find(
+                    v => (itemDto.variantId && v.id === itemDto.variantId) || (itemDto.variantName && v.name === itemDto.variantName)
+                  );
+                  if (targetVariant) {
+                    const currentVarStock = Number(targetVariant.stockQuantity) || 0;
+                    if (!allowNegativeStock && currentVarStock < itemDto.quantity && !isBajoEncargo) {
+                      throw new BadRequestException(`Stock insuficiente para "${product.name} (${targetVariant.name})". Disponible: ${currentVarStock}, solicitado: ${itemDto.quantity}`);
+                    }
+                    targetVariant.stockQuantity = allowNegativeStock
+                      ? currentVarStock - itemDto.quantity
+                      : (isBajoEncargo ? Math.max(0, currentVarStock - itemDto.quantity) : currentVarStock - itemDto.quantity);
+                    await manager.save(ProductVariant, targetVariant);
+
+                    const sumVarStock = product.variants.reduce((acc, v) => acc + Math.max(0, Number(v.stockQuantity || 0)), 0);
+                    product.stock = sumVarStock;
+                    product.stockQuantity = sumVarStock;
+                    product.physicalStock = sumVarStock;
+                    await manager.save(Product, product);
+                  } else {
+                    const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
+                    if (!allowNegativeStock && currentStock < itemDto.quantity && !isBajoEncargo) {
+                      throw new BadRequestException(`Stock insuficiente para "${product.name}". Disponible: ${currentStock}, solicitado: ${itemDto.quantity}`);
+                    }
+                    const newStock = allowNegativeStock
+                      ? currentStock - itemDto.quantity
+                      : (isBajoEncargo ? Math.max(0, currentStock - itemDto.quantity) : currentStock - itemDto.quantity);
+                    product.stock = newStock;
+                    product.stockQuantity = product.stock;
+                    await manager.save(Product, product);
+                  }
+                } else {
+                  const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
+                  if (!allowNegativeStock && currentStock < itemDto.quantity && !isBajoEncargo) {
+                    throw new BadRequestException(`Stock insuficiente para "${product.name}". Disponible: ${currentStock}, solicitado: ${itemDto.quantity}`);
+                  }
+                  const newStock = allowNegativeStock
+                    ? currentStock - itemDto.quantity
+                    : (isBajoEncargo ? Math.max(0, currentStock - itemDto.quantity) : currentStock - itemDto.quantity);
+                  product.stock = newStock;
+                  product.stockQuantity = product.stock;
+                  await manager.save(Product, product);
                 }
-                const newStock = allowNegativeStock
-                  ? currentStock - itemDto.quantity
-                  : (isBajoEncargo ? Math.max(0, currentStock - itemDto.quantity) : currentStock - itemDto.quantity);
-                product.stock = newStock;
-                product.stockQuantity = product.stock;
-                await manager.save(Product, product);
               }
             }
 
@@ -922,10 +1002,17 @@ export class OrdersService implements OnModuleInit {
                   );
                   if (!isRemoved && ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit;
               }
-          } else if (product.cost !== undefined && product.cost !== null && Number(product.cost) > 0) {
-              unitCost = Number(product.cost);
-          } else if (product.estimatedCost) {
-              unitCost = Number(product.estimatedCost);
+          } else {
+              const matchedVar = product.hasVariants && Array.isArray(product.variants)
+                ? product.variants.find(v => (itemDto.variantId && v.id === itemDto.variantId) || (itemDto.variantName && v.name === itemDto.variantName))
+                : null;
+              if (matchedVar && matchedVar.cost !== null && matchedVar.cost !== undefined && Number(matchedVar.cost) > 0) {
+                unitCost = Number(matchedVar.cost);
+              } else if (product.cost !== undefined && product.cost !== null && Number(product.cost) > 0) {
+                unitCost = Number(product.cost);
+              } else if (product.estimatedCost) {
+                unitCost = Number(product.estimatedCost);
+              }
           }
 
           // Sumar costo de insumos extra
@@ -948,10 +1035,21 @@ export class OrdersService implements OnModuleInit {
           itemDto.hasModifications
         );
 
+        const matchedVariantObj = (!extraMaterial && product?.hasVariants && Array.isArray(product?.variants))
+          ? product.variants.find(v => (itemDto.variantId && v.id === itemDto.variantId) || (itemDto.variantName && v.name === itemDto.variantName))
+          : null;
+        const resolvedVariantName = itemDto.variantName || matchedVariantObj?.name || undefined;
+        const baseProductName = extraMaterial ? `Extra: ${extraMaterial.name}` : product!.name;
+        const finalProductName = (resolvedVariantName && !baseProductName.includes(`(${resolvedVariantName})`))
+          ? `${baseProductName} (${resolvedVariantName})`
+          : baseProductName;
+
         const orderItem = manager.create(OrderItem, { tenantId,
           orderId: savedOrder.id,
           productId: extraMaterial ? extraMaterial.id : product!.id,
-          productName: extraMaterial ? `Extra: ${extraMaterial.name}` : product!.name,
+          productName: finalProductName,
+          variantId: itemDto.variantId || matchedVariantObj?.id || undefined,
+          variantName: resolvedVariantName,
           employeeId: itemDto.employeeId || undefined,
           quantity: itemDto.quantity,
           unitPrice: itemDto.unitPrice,
@@ -1010,6 +1108,17 @@ export class OrdersService implements OnModuleInit {
             savedOrder.paymentStatus = PaymentStatus.PAID;
           } else if (roundedReceived > 0 && roundedReceived < roundedTotal) {
             savedOrder.paymentStatus = PaymentStatus.PARTIAL;
+          }
+        }
+
+        if (savedOrder.paymentStatus === PaymentStatus.PAID) {
+          savedOrder.nextAbonoDueDate = null;
+        } else {
+          if (dto.nextAbonoDueDate && !isNaN(new Date(dto.nextAbonoDueDate).getTime())) {
+            savedOrder.nextAbonoDueDate = new Date(dto.nextAbonoDueDate);
+          } else {
+            const dueDays = Math.max(1, Number((tenantSettings as any)?.abonoDefaultDueDays || 7));
+            savedOrder.nextAbonoDueDate = new Date(orderCreatedAt.getTime() + dueDays * 24 * 60 * 60 * 1000);
           }
         }
 
@@ -1447,13 +1556,14 @@ export class OrdersService implements OnModuleInit {
       }
 
       if (status === OrderStatus.CANCELED) {
+        order.nextAbonoDueDate = null;
         const wasPreorder = order.status === OrderStatus.SOLICITUD_ENCARGO || order.status === OrderStatus.CANCELADO_PROVEEDOR;
         if (!wasPreorder) {
           // Reverse inventory
           const itemProductIds = Array.from(new Set((order.items || []).map(i => i.productId).filter(Boolean)));
           const products = itemProductIds.length > 0 ? await manager.find(Product, {
             where: { tenantId, id: In(itemProductIds) },
-            relations: { comboItems: { component: true }, recipe: { rawMaterial: true } }
+            relations: { comboItems: { component: true }, recipe: { rawMaterial: true }, variants: true }
           }) : [];
           const productMap = new Map(products.map(p => [p.id, p]));
 
@@ -1496,13 +1606,28 @@ export class OrdersService implements OnModuleInit {
               } else if (!product.isCombo || product.isPreAssembled) {
                   const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
                   if (!isService) {
-                    const restored = (Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0) + item.quantity;
-                    product.stock = restored;
-                    product.stockQuantity = restored;
-                    if (order.status === OrderStatus.DELIVERED) {
-                      product.physicalStock = (Number(product.physicalStock) || 0) + item.quantity;
+                    if (product.hasVariants && Array.isArray(product.variants) && product.variants.length > 0) {
+                      const targetVar = product.variants.find(
+                        v => (item.variantId && v.id === item.variantId) || (item.variantName && v.name === item.variantName)
+                      );
+                      if (targetVar) {
+                        targetVar.stockQuantity = (Number(targetVar.stockQuantity) || 0) + item.quantity;
+                        await manager.save(ProductVariant, targetVar);
+                      }
+                      const sumVarStock = product.variants.reduce((acc, v) => acc + Math.max(0, Number(v.stockQuantity || 0)), 0);
+                      product.stock = sumVarStock;
+                      product.stockQuantity = sumVarStock;
+                      product.physicalStock = sumVarStock;
+                      await manager.save(Product, product);
+                    } else {
+                      const restored = (Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0) + item.quantity;
+                      product.stock = restored;
+                      product.stockQuantity = restored;
+                      if (order.status === OrderStatus.DELIVERED) {
+                        product.physicalStock = (Number(product.physicalStock) || 0) + item.quantity;
+                      }
+                      await manager.save(Product, product);
                     }
-                    await manager.save(Product, product);
                   }
               }
 

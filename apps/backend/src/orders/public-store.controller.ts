@@ -76,7 +76,7 @@ export class PublicStoreController {
 
     const products = await this.productRepo.find({
       where: { tenantId },
-      relations: { comboItems: { component: true } },
+      relations: { comboItems: { component: true }, variants: true },
       order: { category: 'ASC', name: 'ASC' },
     });
 
@@ -95,8 +95,11 @@ export class PublicStoreController {
       const isFoodOrPrepared = (hasRecipe && !p.isPreAssembled) || isFormula || (isFoodCategory && !p.isPreAssembled);
       const isMadeToOrder = isFoodOrPrepared;
 
+      const hasActiveVariants = Boolean(p.hasVariants && Array.isArray(p.variants) && p.variants.length > 0);
       let availableStock = Math.max(0, Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.stockQuantity || 0)));
-      if (p.isCombo && !p.isPreAssembled && p.comboItems && p.comboItems.length > 0) {
+      if (hasActiveVariants) {
+        availableStock = p.variants.reduce((acc, v) => acc + Math.max(0, Number(v.stockQuantity || 0)), 0);
+      } else if (p.isCombo && !p.isPreAssembled && p.comboItems && p.comboItems.length > 0) {
         let minAvail = Infinity;
         for (const ci of p.comboItems) {
           const compStock = ci.component?.physicalStock ?? ci.component?.stockQuantity ?? 0;
@@ -118,6 +121,7 @@ export class PublicStoreController {
       return {
         id: p.id,
         name: p.name,
+        code: p.code || undefined,
         description: p.description || '',
         category: p.category || 'General',
         salePrice: Number(p.salePrice || 0),
@@ -126,6 +130,16 @@ export class PublicStoreController {
           : typeof p.images === 'string' && (p.images as string).trim().length > 0
           ? (p.images as string).split(',').map((s) => s.trim())
           : [],
+        hasVariants: hasActiveVariants,
+        variants: hasActiveVariants ? p.variants.map(v => ({
+          id: v.id,
+          name: v.name,
+          sku: v.sku || undefined,
+          attributes: v.attributes || {},
+          stockQuantity: Math.max(0, Number(v.stockQuantity || 0)),
+          salePrice: v.salePrice !== null && v.salePrice !== undefined ? Number(v.salePrice) : null,
+          images: Array.isArray(v.images) ? v.images.slice(0, 3) : [],
+        })) : [],
         stockQuantity: availableStock,
         stock: availableStock,
         availabilityType: p.availabilityType || 'INMEDIATO',
@@ -236,7 +250,7 @@ export class PublicStoreController {
 
       const product = await this.productRepo.findOne({
         where: { tenantId, id: item.productId },
-        relations: { comboItems: { component: true } },
+        relations: { comboItems: { component: true }, variants: true },
       });
 
       if (!product) {
@@ -265,6 +279,21 @@ export class PublicStoreController {
 
       const isExemptFromStock = product.isSupplierPreorder || product.availabilityType === 'BAJO_ENCARGO' || isMadeToOrder;
       if (!isExemptFromStock) {
+        if (product.hasVariants && Array.isArray(product.variants) && product.variants.length > 0) {
+          const matchedVar = product.variants.find(
+            v => (item.variantId && v.id === item.variantId) || (item.variantName && v.name === item.variantName)
+          );
+          if (matchedVar) {
+            const varStock = Math.max(0, Number(matchedVar.stockQuantity || 0));
+            if (varStock <= 0) {
+              throw new BadRequestException(`La variante "${matchedVar.name}" de "${product.name}" se encuentra agotada.`);
+            }
+            if (item.quantity > varStock) {
+              throw new BadRequestException(`No hay suficiente stock para "${product.name} (${matchedVar.name})". Disponible: ${varStock}, solicitado: ${item.quantity}.`);
+            }
+            continue;
+          }
+        }
         let availableStock = Math.max(0, Number(product.stock !== undefined && product.stock !== null ? product.stock : (product.stockQuantity || 0)));
         if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
           let minAvail = Infinity;

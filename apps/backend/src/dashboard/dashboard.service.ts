@@ -28,7 +28,7 @@ export class DashboardService {
     @InjectRepository(Settings) private settingsRepo: Repository<Settings>,
   ) {}
 
-  async getSummary(tenantId: string) {
+  async getSummary(tenantId: string, month?: string) {
     const { isValidUUID } = require('../utils/tenant-crypto');
     if (!isValidUUID(tenantId)) {
       return {
@@ -49,7 +49,8 @@ export class DashboardService {
         historicalProfit: 0,
         payrollExpenses: 0,
         salesChart: [],
-        topProducts: []
+        topProducts: [],
+        monthlySummary: null,
       };
     }
 
@@ -355,6 +356,337 @@ export class DashboardService {
       salesChart,
       topProducts,
       treasury: await this.getTreasurySummary(tenantId),
+      monthlySummary: await this.getMonthlySummary(tenantId, month),
+    };
+  }
+
+  async getMonthlySummary(tenantId: string, monthStr?: string) {
+    const now = new Date();
+    let targetYear = now.getFullYear();
+    let targetMonth = now.getMonth(); // 0-indexed
+
+    if (monthStr && /^\d{4}-\d{2}$/.test(monthStr)) {
+      const [y, m] = monthStr.split('-').map(Number);
+      targetYear = y;
+      targetMonth = m - 1;
+    }
+
+    const startDate = new Date(targetYear, targetMonth, 1, 0, 0, 0, 0);
+    const endDate = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
+    const formattedMonth = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
+
+    const monthNames = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    const monthLabel = `${monthNames[targetMonth]} ${targetYear}`;
+
+    const settings = await this.settingsRepo.findOne({ where: { tenantId } });
+    let rate = Number(settings?.exchangeRateBs || 40.0);
+    if (!rate || rate === 40.0) {
+      const global = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+      rate = Number(global?.exchangeRateBs || 40.0);
+    }
+    const currencySymbol = settings?.currencySymbol || 'Bs.';
+
+    const allOrders = (await this.orderRepo.find({ where: { tenantId } })) || [];
+    const monthOrders = allOrders.filter(o => {
+      if (o.status === OrderStatus.CANCELED || o.status === OrderStatus.CANCELADO_PROVEEDOR) return false;
+      const d = new Date(o.createdAt);
+      return d >= startDate && d <= endDate;
+    });
+
+    let invoicedRevenue = 0;
+    let collectedRevenue = 0;
+    let pendingReceivable = 0;
+    let costOfGoodsSold = 0;
+    let paidOrdersCount = 0;
+    let pendingOrdersCount = 0;
+
+    let cashUSD = 0;
+    let digitalUSD = 0;
+    let pagoMovilBs = 0;
+    let puntoBs = 0;
+    let transferBs = 0;
+
+    for (const o of monthOrders) {
+      const total = Number(o.totalAmount || 0);
+      const cost = Number(o.totalCost || 0);
+      const abonos = Number(o.abonosTotal || 0);
+      const orderRate = Number(o.exchangeRate) > 0 ? Number(o.exchangeRate) : rate;
+
+      invoicedRevenue += total;
+      costOfGoodsSold += cost;
+
+      if (o.paymentStatus === PaymentStatus.PAID) {
+        paidOrdersCount++;
+        collectedRevenue += total;
+      } else {
+        pendingOrdersCount++;
+        const paidPart = Math.min(total, Math.max(0, abonos));
+        collectedRevenue += paidPart;
+        pendingReceivable += Math.max(0, total - paidPart);
+      }
+
+      if (Array.isArray(o.splitPayments) && o.splitPayments.length > 0) {
+        for (const sp of o.splitPayments) {
+          const method = (sp.method || '').toUpperCase();
+          const amtUsd = Number(sp.amountUSD) || 0;
+          const amtBs = Number(sp.amountBS) > 0 ? Number(sp.amountBS) : Number((amtUsd * orderRate).toFixed(2));
+          const effUsd = amtUsd > 0 ? amtUsd : (orderRate > 0 ? amtBs / orderRate : 0);
+
+          if (['PUNTO', 'CARD_POS', 'POS', 'TARJETA'].includes(method)) puntoBs += amtBs;
+          else if (['PAGO_MOVIL', 'PAGOMOVIL'].includes(method)) pagoMovilBs += amtBs;
+          else if (['TRANSFER', 'TRANSFERENCIA'].includes(method)) transferBs += amtBs;
+          else if (['BINANCE', 'BINANCE_USDT', 'USDT', 'ZELLE'].includes(method)) digitalUSD += effUsd;
+          else cashUSD += effUsd;
+        }
+      } else if (o.paymentStatus === PaymentStatus.PAID || (o.paymentStatus === PaymentStatus.PARTIAL && abonos > 0)) {
+        const method = (o.paymentMethod || 'USD').toUpperCase();
+        const effectivePaidUsd = o.paymentStatus === PaymentStatus.PAID ? total : abonos;
+        const effectivePaidBs = Number(o.amountBs) > 0 && o.paymentStatus === PaymentStatus.PAID
+          ? Number(o.amountBs)
+          : Number((effectivePaidUsd * orderRate).toFixed(2));
+
+        if (['PUNTO', 'CARD_POS', 'POS', 'TARJETA'].includes(method)) puntoBs += effectivePaidBs;
+        else if (['PAGO_MOVIL', 'PAGOMOVIL'].includes(method)) pagoMovilBs += effectivePaidBs;
+        else if (['TRANSFER', 'TRANSFERENCIA'].includes(method)) transferBs += effectivePaidBs;
+        else if (['BINANCE', 'BINANCE_USDT', 'USDT', 'ZELLE'].includes(method)) digitalUSD += effectivePaidUsd;
+        else cashUSD += effectivePaidUsd;
+      }
+    }
+
+    const allExpenses = (await this.expenseRepo.find({ where: { tenantId } })) || [];
+    let operatingExpenses = 0;
+    for (const exp of allExpenses) {
+      if ((exp as any).category === 'FONDO_CAJA') continue;
+      const d = new Date((exp as any).date || (exp as any).createdAt || Date.now());
+      if (d >= startDate && d <= endDate) {
+        operatingExpenses += Number(exp.amount || 0);
+      }
+    }
+
+    const netProfit = Number((invoicedRevenue - costOfGoodsSold - operatingExpenses).toFixed(2));
+
+    return {
+      month: formattedMonth,
+      monthLabel,
+      currencySymbol,
+      exchangeRate: rate,
+      invoicedRevenue: Number(invoicedRevenue.toFixed(2)),
+      collectedRevenue: Number(collectedRevenue.toFixed(2)),
+      pendingReceivable: Number(pendingReceivable.toFixed(2)),
+      costOfGoodsSold: Number(costOfGoodsSold.toFixed(2)),
+      operatingExpenses: Number(operatingExpenses.toFixed(2)),
+      netProfit,
+      ordersCount: monthOrders.length,
+      paidOrdersCount,
+      pendingOrdersCount,
+      breakdown: {
+        cashUSD: Number(cashUSD.toFixed(2)),
+        digitalUSD: Number(digitalUSD.toFixed(2)),
+        pagoMovilBs: Number(pagoMovilBs.toFixed(2)),
+        pagoMovilUSD: rate > 0 ? Number((pagoMovilBs / rate).toFixed(2)) : 0,
+        puntoBs: Number(puntoBs.toFixed(2)),
+        puntoUSD: rate > 0 ? Number((puntoBs / rate).toFixed(2)) : 0,
+        transferBs: Number(transferBs.toFixed(2)),
+        transferUSD: rate > 0 ? Number((transferBs / rate).toFixed(2)) : 0,
+      },
+    };
+  }
+
+  async getLedgerReport(tenantId: string, fromDateStr?: string, toDateStr?: string) {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    const startDate = fromDateStr ? new Date(`${fromDateStr}T00:00:00`) : startOfMonth;
+    const endDate = toDateStr ? new Date(`${toDateStr}T23:59:59.999`) : endOfToday;
+
+    const orders = (await this.orderRepo.find({ where: { tenantId }, relations: { items: true } })) || [];
+    const expenses = (await this.expenseRepo.find({ where: { tenantId } })) || [];
+    const movements = (await this.movementRepo.find({ where: { tenantId }, relations: { rawMaterial: true } })) || [];
+    const investments = (await this.investmentRepo.find({ where: { negocioId: tenantId } })) || [];
+
+    interface RawLedgerRow {
+      timestamp: number;
+      date: string;
+      time: string;
+      reference: string;
+      type: string;
+      concept: string;
+      party: string;
+      method: string;
+      debe: number;
+      haber: number;
+    }
+
+    const rawRows: RawLedgerRow[] = [];
+
+    const formatDateTime = (d: Date) => {
+      const iso = d.toISOString();
+      return {
+        date: iso.split('T')[0],
+        time: d.toTimeString().slice(0, 5),
+      };
+    };
+
+    // 1. Orders & Abonos (DEBE)
+    for (const o of orders) {
+      if (o.status === OrderStatus.CANCELED || o.status === OrderStatus.CANCELADO_PROVEEDOR) continue;
+      const shortId = `ORD-${(o.id || '').slice(0, 8).toUpperCase()}`;
+      const itemsSummary = Array.isArray(o.items) && o.items.length > 0
+        ? o.items.map(i => `${i.quantity}x ${i.productName || 'Producto'}`).join(', ')
+        : 'Venta general';
+
+      if (Array.isArray(o.abonosHistory) && o.abonosHistory.length > 0) {
+        for (const ab of o.abonosHistory) {
+          const abDate = new Date(ab.date || o.createdAt);
+          if (abDate >= startDate && abDate <= endDate) {
+            const amt = Number(ab.amount || 0);
+            if (amt > 0) {
+              const dt = formatDateTime(abDate);
+              rawRows.push({
+                timestamp: abDate.getTime(),
+                date: dt.date,
+                time: dt.time,
+                reference: ab.ref ? `${shortId} (Ref: ${ab.ref})` : shortId,
+                type: 'ABONO / COBRO',
+                concept: `Abono orden #${shortId}: ${itemsSummary}`,
+                party: o.customerName || 'Cliente',
+                method: ab.method || o.paymentMethod || 'USD',
+                debe: Number(amt.toFixed(2)),
+                haber: 0,
+              });
+            }
+          }
+        }
+      } else if (o.paymentStatus === PaymentStatus.PAID) {
+        const oDate = new Date(o.createdAt);
+        if (oDate >= startDate && oDate <= endDate) {
+          const amt = Number(o.totalAmount || 0);
+          if (amt > 0) {
+            const dt = formatDateTime(oDate);
+            const ref = o.pagoMovilRef || o.puntoRef || o.transferRef || o.binanceRef;
+            rawRows.push({
+              timestamp: oDate.getTime(),
+              date: dt.date,
+              time: dt.time,
+              reference: ref ? `${shortId} (Ref: ${ref})` : shortId,
+              type: 'VENTA PAGADA',
+              concept: `Venta #${shortId}: ${itemsSummary}`,
+              party: o.customerName || 'Cliente',
+              method: o.paymentMethod || 'USD',
+              debe: Number(amt.toFixed(2)),
+              haber: 0,
+            });
+          }
+        }
+      }
+    }
+
+    // 2. Operating Expenses & Fondo de Caja
+    for (const exp of expenses) {
+      const eDate = new Date((exp as any).date || (exp as any).createdAt || Date.now());
+      if (eDate >= startDate && eDate <= endDate) {
+        const amt = Number(exp.amount || 0);
+        if (amt <= 0) continue;
+        const dt = formatDateTime(eDate);
+        const isFondo = (exp as any).category === 'FONDO_CAJA';
+        rawRows.push({
+          timestamp: eDate.getTime(),
+          date: dt.date,
+          time: dt.time,
+          reference: `EXP-${(exp.id || '').slice(0, 6).toUpperCase()}`,
+          type: isFondo ? 'FONDO DE CAJA' : ((exp as any).category === 'PAYROLL' ? 'NÓMINA' : 'GASTO OPERATIVO'),
+          concept: exp.description || 'Gasto operativo',
+          party: 'Operaciones Internas',
+          method: 'CAJA',
+          debe: isFondo ? Number(amt.toFixed(2)) : 0,
+          haber: isFondo ? 0 : Number(amt.toFixed(2)),
+        });
+      }
+    }
+
+    // 3. Stock Movements (Purchases -> HABER)
+    for (const mov of movements) {
+      if (mov.type !== MovementType.IN_PURCHASE) continue;
+      const mDate = new Date((mov as any).date || (mov as any).createdAt || Date.now());
+      if (mDate >= startDate && mDate <= endDate) {
+        const cost = Number(mov.totalCost || 0);
+        if (cost <= 0) continue;
+        const dt = formatDateTime(mDate);
+        rawRows.push({
+          timestamp: mDate.getTime(),
+          date: dt.date,
+          time: dt.time,
+          reference: `COMP-${(mov.id || '').slice(0, 6).toUpperCase()}`,
+          type: 'COMPRA INSUMOS',
+          concept: mov.description || `Compra de ${mov.rawMaterial?.name || 'Insumo'} (${mov.quantity})`,
+          party: 'Proveedor',
+          method: 'INVENTARIO',
+          debe: 0,
+          haber: Number(cost.toFixed(2)),
+        });
+      }
+    }
+
+    // 4. Investments
+    for (const inv of investments) {
+      const iDate = new Date(inv.date || (inv as any).createdAt || Date.now());
+      if (iDate >= startDate && iDate <= endDate) {
+        const usd = Number(inv.amountUSD || 0);
+        if (usd <= 0) continue;
+        const dt = formatDateTime(iDate);
+        const isExternal = inv.type === InvestmentType.INVERSION_EXTERNA;
+        rawRows.push({
+          timestamp: iDate.getTime(),
+          date: dt.date,
+          time: dt.time,
+          reference: `INV-${(inv.id || '').slice(0, 6).toUpperCase()}`,
+          type: isExternal ? 'APORTE CAPITAL' : 'REINVERSIÓN',
+          concept: inv.description || (isExternal ? 'Inversión externa' : 'Reinversión de ganancia'),
+          party: 'Socio / Capital',
+          method: 'CAPITAL',
+          debe: isExternal ? Number(usd.toFixed(2)) : 0,
+          haber: isExternal ? 0 : Number(usd.toFixed(2)),
+        });
+      }
+    }
+
+    rawRows.sort((a, b) => a.timestamp - b.timestamp);
+
+    let runningSaldo = 0;
+    let totalDebe = 0;
+    let totalHaber = 0;
+
+    const entries = rawRows.map((row, idx) => {
+      totalDebe += row.debe;
+      totalHaber += row.haber;
+      runningSaldo += row.debe - row.haber;
+      return {
+        index: idx + 1,
+        date: row.date,
+        time: row.time,
+        reference: row.reference,
+        type: row.type,
+        concept: row.concept,
+        party: row.party,
+        method: row.method,
+        debe: Number(row.debe.toFixed(2)),
+        haber: Number(row.haber.toFixed(2)),
+        saldo: Number(runningSaldo.toFixed(2)),
+      };
+    });
+
+    return {
+      from: startDate.toISOString().split('T')[0],
+      to: endDate.toISOString().split('T')[0],
+      totalDebe: Number(totalDebe.toFixed(2)),
+      totalHaber: Number(totalHaber.toFixed(2)),
+      finalSaldo: Number(runningSaldo.toFixed(2)),
+      count: entries.length,
+      entries,
     };
   }
 

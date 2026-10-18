@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Request, UseGuards, Query } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -11,8 +11,26 @@ export class DashboardController {
   @Get('summary')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  getSummary(@Request() req: any) {
-    return this.dashboardService.getSummary(req.user.tenantId);
+  getSummary(@Request() req: any, @Query('month') month?: string) {
+    return this.dashboardService.getSummary(req.user.tenantId, month);
+  }
+
+  @Get('monthly-summary')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  getMonthlySummary(@Request() req: any, @Query('month') month?: string) {
+    return this.dashboardService.getMonthlySummary(req.user.tenantId, month);
+  }
+
+  @Get('ledger')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  getLedger(
+    @Request() req: any,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.dashboardService.getLedgerReport(req.user.tenantId, from, to);
   }
 
   @Get('treasury')

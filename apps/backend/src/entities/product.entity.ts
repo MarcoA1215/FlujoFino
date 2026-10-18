@@ -5,6 +5,7 @@ import { RecipeItem } from './recipe-item.entity';
 import { OrderItem } from './order-item.entity';
 import { ProductionBatch } from './production-batch.entity';
 import { ComboItem } from './combo-item.entity';
+import { ProductVariant } from './product-variant.entity';
 
 @Entity()
 @Index(['tenantId', 'category'])
@@ -16,6 +17,10 @@ export class Product {
   @Column()
   name: string;
 
+  @Index()
+  @Column({ nullable: true })
+  code: string;
+
   @Column({ nullable: true })
   description: string;
   
@@ -25,6 +30,12 @@ export class Product {
 
   @Column('simple-array', { nullable: true })
   images: string[];
+
+  @Column({ default: false })
+  hasVariants: boolean;
+
+  @OneToMany(() => ProductVariant, variant => variant.product, { cascade: true })
+  variants: ProductVariant[];
 
   @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
   salePrice: number;

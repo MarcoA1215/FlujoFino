@@ -23,4 +23,7 @@ export class CreateProductDto {
   @IsOptional() @IsString() product_type?: string;
   @IsOptional() @IsString() productType?: string;
   @IsOptional() @IsString() id?: string;
+  @IsOptional() @IsString() code?: string;
+  @IsOptional() @IsBoolean() hasVariants?: boolean;
+  @IsOptional() @IsArray() variants?: any[];
 }

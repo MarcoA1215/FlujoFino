@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { DataSource, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from '../entities/product.entity';
+import { ProductVariant } from '../entities/product-variant.entity';
 import { RecipeItem } from '../entities/recipe-item.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
@@ -24,10 +25,26 @@ export class ProductsService {
     private dataSource: DataSource,
   ) {}
 
+  private generateProductCode(name: string): string {
+    const cleanName = (name || 'PROD')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9\s-]/g, '')
+      .trim();
+    const prefix = cleanName
+      .split(/\s+/)
+      .slice(0, 2)
+      .map(w => w.substring(0, 3).toUpperCase())
+      .join('-');
+    const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `${prefix || 'PRD'}-${suffix}`;
+  }
+
   async findAll(tenantId: string) {
     const products = await this.productRepo.find({ where: { tenantId }, relations: {
         comboItems: { component: { recipe: { rawMaterial: true } } },
-        recipe: { rawMaterial: true }
+        recipe: { rawMaterial: true },
+        variants: true
       }
     });
 
@@ -37,7 +54,13 @@ export class ProductsService {
       let finalStock = p.stockQuantity;
       let finalPhysical = p.physicalStock;
 
-      if (p.comboItems && p.comboItems.length > 0 && !p.isPreAssembled) {
+      const hasActiveVariants = Boolean(p.hasVariants && Array.isArray(p.variants) && p.variants.length > 0);
+
+      if (hasActiveVariants) {
+        const variantsStock = p.variants.reduce((acc, v) => acc + Math.max(0, Number(v.stockQuantity || 0)), 0);
+        finalStock = variantsStock;
+        finalPhysical = variantsStock;
+      } else if (p.comboItems && p.comboItems.length > 0 && !p.isPreAssembled) {
         let minAvail = Infinity;
         let minPhys = Infinity;
         for (const ci of p.comboItems) {
@@ -85,6 +108,15 @@ export class ProductsService {
 
       return {
         ...p,
+        code: p.code || undefined,
+        hasVariants: hasActiveVariants,
+        variants: Array.isArray(p.variants) ? p.variants.map(v => ({
+          ...v,
+          stockQuantity: Number(v.stockQuantity || 0),
+          salePrice: v.salePrice !== null && v.salePrice !== undefined ? Number(v.salePrice) : null,
+          cost: v.cost !== null && v.cost !== undefined ? Number(v.cost) : null,
+          images: Array.isArray(v.images) ? v.images.slice(0, 3) : []
+        })) : [],
         product_type: computedType,
         cost: p.cost !== undefined && p.cost !== null ? Number(p.cost) : (p.estimatedCost ? Number(p.estimatedCost) : 0),
         stock: finalStock,
@@ -98,21 +130,42 @@ export class ProductsService {
   }
 
   async findOne(tenantId: string, id: string) {
-    const product = await this.productRepo.findOne({ where: { tenantId, id } });
+    const product = await this.productRepo.findOne({ where: { tenantId, id }, relations: { variants: true } });
     if (!product) throw new NotFoundException('Producto no encontrado');
     return product;
   }
 
   async create(tenantId: string, dto: CreateProductDto) {
-    const stockVal = dto.stock !== undefined ? dto.stock : (dto.stockQuantity || 0);
+    const hasVariants = Boolean(dto.hasVariants && Array.isArray(dto.variants) && dto.variants.length > 0);
+    const variantsList = hasVariants
+      ? (dto.variants || []).map((v: any) => ({
+          tenantId,
+          name: String(v.name || 'Variante').trim(),
+          sku: v.sku ? String(v.sku).trim() : undefined,
+          attributes: v.attributes || {},
+          stockQuantity: Number(v.stockQuantity || 0),
+          cost: v.cost !== undefined && v.cost !== null && v.cost !== '' ? Number(v.cost) : null,
+          salePrice: v.salePrice !== undefined && v.salePrice !== null && v.salePrice !== '' ? Number(v.salePrice) : null,
+          images: Array.isArray(v.images) ? v.images.slice(0, 3) : [],
+        }))
+      : [];
+
+    const variantsStockSum = variantsList.reduce((acc, v) => acc + Math.max(0, v.stockQuantity), 0);
+    const rawStockVal = dto.stock !== undefined ? dto.stock : (dto.stockQuantity || 0);
+    const stockVal = hasVariants ? variantsStockSum : rawStockVal;
     const costVal = dto.cost !== undefined ? dto.cost : (dto.estimatedCost || 0);
     const isServiceVal = dto.product_type === 'SERVICIO' || dto.is_service === true;
     const finalType = dto.product_type || (isServiceVal ? 'SERVICIO' : (dto.category === 'Servicios' ? 'SERVICIO' : 'REVENTA'));
+    const codeVal = dto.code?.trim() || this.generateProductCode(dto.name);
+
     const product = this.productRepo.create({
       ...dto,
+      code: codeVal,
+      hasVariants,
+      variants: variantsList as any,
       stock: isServiceVal ? 0 : stockVal,
       stockQuantity: isServiceVal ? 0 : stockVal,
-      physicalStock: isServiceVal ? 0 : (dto.physicalStock !== undefined ? dto.physicalStock : stockVal),
+      physicalStock: isServiceVal ? 0 : (hasVariants ? variantsStockSum : (dto.physicalStock !== undefined ? dto.physicalStock : stockVal)),
       cost: costVal,
       estimatedCost: costVal,
       is_service: isServiceVal,
@@ -124,8 +177,8 @@ export class ProductsService {
 
   async update(tenantId: string, id: string, dto: any) {
     return this.dataSource.transaction(async (manager) => {
-      const oldProduct = await manager.findOne(Product, { where: { tenantId, id }, relations: { comboItems: { component: true } } });
-      const product = await manager.findOne(Product, { where: { tenantId, id } });
+      const oldProduct = await manager.findOne(Product, { where: { tenantId, id }, relations: { comboItems: { component: true }, variants: true } });
+      const product = await manager.findOne(Product, { where: { tenantId, id }, relations: { variants: true } });
       if (!product) throw new NotFoundException('Producto no encontrado');
 
       // Check if transitioning from PreAssembled to Virtual
@@ -169,7 +222,56 @@ export class ProductsService {
         product.product_type = dto.product_type;
       }
 
-      Object.assign(product, dto);
+      const incomingVariants = dto.variants;
+      const dtoCopy = { ...dto };
+      delete dtoCopy.variants;
+
+      Object.assign(product, dtoCopy);
+
+      if (dto.code !== undefined) {
+        product.code = dto.code?.trim() || product.code || this.generateProductCode(product.name);
+      } else if (!product.code) {
+        product.code = this.generateProductCode(product.name);
+      }
+
+      if (Array.isArray(incomingVariants)) {
+        if (typeof (manager as any).delete === 'function') {
+          await (manager as any).delete(ProductVariant, { productId: id });
+        }
+        const hasVars = Boolean(dto.hasVariants !== false && incomingVariants.length > 0);
+        product.hasVariants = hasVars;
+        if (hasVars) {
+          product.variants = incomingVariants.map((v: any) => {
+            const variantObj: any = {
+              productId: id,
+              tenantId,
+              name: String(v.name || 'Variante').trim(),
+              sku: v.sku ? String(v.sku).trim() : undefined,
+              attributes: v.attributes || {},
+              stockQuantity: Number(v.stockQuantity || 0),
+              cost: v.cost !== undefined && v.cost !== null && v.cost !== '' ? Number(v.cost) : null,
+              salePrice: v.salePrice !== undefined && v.salePrice !== null && v.salePrice !== '' ? Number(v.salePrice) : null,
+              images: Array.isArray(v.images) ? v.images.slice(0, 3) : [],
+            };
+            if (v.id && typeof v.id === 'string' && v.id.length > 10) {
+              variantObj.id = v.id;
+            }
+            return variantObj;
+          });
+          const sumStock = product.variants.reduce((acc, v) => acc + Math.max(0, Number(v.stockQuantity || 0)), 0);
+          product.stock = sumStock;
+          product.stockQuantity = sumStock;
+          product.physicalStock = sumStock;
+        } else {
+          product.variants = [];
+        }
+      } else if (dto.hasVariants === false) {
+        if (typeof (manager as any).delete === 'function') {
+          await (manager as any).delete(ProductVariant, { productId: id });
+        }
+        product.hasVariants = false;
+        product.variants = [];
+      }
 
       if (dto.cost !== undefined) {
         product.cost = Number(dto.cost);

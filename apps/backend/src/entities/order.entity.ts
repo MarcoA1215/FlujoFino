@@ -190,6 +190,9 @@ export class Order {
   @Column('json', { nullable: true })
   abonosHistory: any;
 
+  @Column({ type: 'timestamp', nullable: true })
+  nextAbonoDueDate: Date | null;
+
   @Column({ nullable: true })
   employeeId: string;
 
