@@ -26,7 +26,7 @@ import {
   IonSegment,
   IonSegmentButton
 } from '@ionic/react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { 
   calendarOutline, 
   closeCircleOutline, 
@@ -37,7 +37,12 @@ import {
   copyOutline,
   cashOutline,
   businessOutline,
-  closeOutline
+  closeOutline,
+  shareSocialOutline,
+  checkmarkOutline,
+  sparklesOutline,
+  linkOutline,
+  logoWhatsapp
 } from 'ionicons/icons';
 import axios from 'axios';
 import { BankSelect } from '../components/BankSelect';
@@ -80,6 +85,10 @@ const PublicAppointmentManage: React.FC = () => {
   
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
+
+  const location = useLocation();
+  const isNewBooking = new URLSearchParams(location.search).get('new') === '1';
+  const [isCopied, setIsCopied] = useState(false);
 
   const primaryColor = appointment?.themePrimaryColor || '#10b981';
   const headerColor = appointment?.themeHeaderColor || primaryColor;
@@ -125,6 +134,56 @@ const PublicAppointmentManage: React.FC = () => {
   useEffect(() => {
     fetchAppointment();
   }, [id]);
+
+  useEffect(() => {
+    if (isNewBooking) {
+      presentToast({
+        message: '🎉 ¡Cita agendada con éxito! Guarda o comparte tu enlace.',
+        duration: 4000,
+        color: 'success',
+      });
+    }
+  }, [isNewBooking]);
+
+  const appointmentUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/appointment/${id}`
+    : `https://www.finowork.com/appointment/${id}`;
+
+  const handleCopyLink = () => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(appointmentUrl);
+      setIsCopied(true);
+      presentToast({
+        message: '¡Enlace de tu cita copiado al portapapeles!',
+        duration: 2500,
+        color: 'success',
+      });
+      setTimeout(() => setIsCopied(false), 2500);
+    }
+  };
+
+  const handleShareLink = async () => {
+    if (typeof navigator !== 'undefined' && typeof (navigator as any).share === 'function') {
+      try {
+        await (navigator as any).share({
+          title: `Cita en ${appointment?.tenantName || 'FinoWork'}`,
+          text: `Consulta o gestiona los detalles de mi cita (${appointment?.date || ''} - ${appointment?.time || ''}):`,
+          url: appointmentUrl,
+        });
+      } catch (e: any) {
+        if (e.name !== 'AbortError') {
+          handleCopyLink();
+        }
+      }
+    } else {
+      handleCopyLink();
+    }
+  };
+
+  const handleShareWhatsApp = () => {
+    const text = `Hola! Aquí tengo el enlace para consultar y gestionar mi cita en ${appointment?.tenantName || 'el negocio'} (${appointment?.date || ''} - ${appointment?.time || ''}):\n${appointmentUrl}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  };
 
   useEffect(() => {
     if (showReschedule && selectedDate && appointment?.tenantId) {
@@ -493,6 +552,148 @@ const PublicAppointmentManage: React.FC = () => {
             >
               Nueva Cita →
             </IonButton>
+          </div>
+
+          {/* Widget / Card: Enlace de tu Cita */}
+          <div
+            style={{
+              backgroundColor: isNewBooking ? '#ECFDF5' : '#ffffff',
+              borderRadius: '16px',
+              padding: '16px 18px',
+              marginBottom: '18px',
+              border: isNewBooking ? '1.5px solid #10B981' : '1px solid #E2E8F0',
+              boxShadow: isNewBooking
+                ? '0 4px 16px rgba(16, 185, 129, 0.12)'
+                : '0 2px 8px rgba(15, 23, 42, 0.04)',
+            }}
+          >
+            {isNewBooking && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backgroundColor: '#D1FAE5',
+                  padding: '8px 12px',
+                  borderRadius: '10px',
+                  marginBottom: '12px',
+                  color: '#065F46',
+                }}
+              >
+                <IonIcon icon={sparklesOutline} style={{ fontSize: '20px', color: '#059669', flexShrink: 0 }} />
+                <span style={{ fontSize: '13px', fontWeight: 700 }}>
+                  ¡Cita confirmada! Te redirigimos a tu panel para tenerla siempre a mano.
+                </span>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <IonIcon icon={linkOutline} style={{ fontSize: '18px', color: primaryReadable }} />
+                <span style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.2px' }}>
+                  Enlace de tu Cita
+                </span>
+              </div>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  backgroundColor: '#F1F5F9',
+                  color: '#475569',
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                }}
+              >
+                Acceso Privado
+              </span>
+            </div>
+
+            <p style={{ fontSize: '12.5px', color: '#64748B', margin: '0 0 10px 0', lineHeight: 1.4 }}>
+              Guarda este enlace en tus favoritos o notas. Podrás consultar el estado, reportar pagos o reprogramar en cualquier momento:
+            </p>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: isNewBooking ? '#ffffff' : '#F8FAFC',
+                border: '1px solid #CBD5E1',
+                borderRadius: '10px',
+                padding: '8px 12px',
+                marginBottom: '12px',
+                overflow: 'hidden',
+              }}
+            >
+              <span
+                style={{
+                  flex: 1,
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  color: '#1E293B',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  fontFamily: 'monospace',
+                }}
+                title={appointmentUrl}
+              >
+                {appointmentUrl}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <IonButton
+                fill="solid"
+                style={{
+                  flex: 1,
+                  minWidth: '140px',
+                  '--background': isCopied ? '#059669' : primaryColor,
+                  '--color': primaryContrast,
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  '--border-radius': '10px',
+                  height: '40px',
+                }}
+                onClick={handleCopyLink}
+              >
+                <IonIcon slot="start" icon={isCopied ? checkmarkOutline : copyOutline} />
+                {isCopied ? '¡Enlace Copiado!' : 'Copiar Enlace'}
+              </IonButton>
+
+              <IonButton
+                fill="outline"
+                style={{
+                  flex: 1,
+                  minWidth: '110px',
+                  '--color': primaryReadable,
+                  '--border-color': primaryColor,
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  '--border-radius': '10px',
+                  height: '40px',
+                }}
+                onClick={handleShareLink}
+              >
+                <IonIcon slot="start" icon={shareSocialOutline} />
+                Compartir
+              </IonButton>
+
+              <IonButton
+                fill="outline"
+                style={{
+                  '--color': '#16A34A',
+                  '--border-color': '#86EFAC',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  '--border-radius': '10px',
+                  height: '40px',
+                }}
+                onClick={handleShareWhatsApp}
+                title="Compartir por WhatsApp"
+              >
+                <IonIcon slot="icon-only" icon={logoWhatsapp} />
+              </IonButton>
+            </div>
           </div>
 
           {!showReschedule ? (

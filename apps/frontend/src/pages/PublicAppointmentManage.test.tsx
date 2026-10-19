@@ -160,4 +160,76 @@ describe('PublicAppointmentManage - Suite de Reprogramación y Aceptación', () 
       expect(screen.getByText(/Original: 15:00/i)).toBeDefined();
     });
   });
+
+  it('debe mostrar el widget de Enlace de tu Cita y permitir copiar el enlace', async () => {
+    const mockAppointment = {
+      id: 'res-test-999',
+      tenantId: 'tenant-1',
+      tenantName: 'Barberia Central',
+      customerName: 'Carlos Ruiz',
+      date: '2026-10-28',
+      time: '11:00',
+      serviceName: 'Corte Clásico',
+      status: 'CONFIRMED',
+      totalAmount: 10,
+    };
+
+    (axios.get as any).mockResolvedValue({ data: mockAppointment });
+
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/appointment/res-test-999']}>
+        <Routes>
+          <Route path="/appointment/:id" element={<PublicAppointmentManage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Enlace de tu Cita')).toBeDefined();
+    });
+
+    expect(screen.getByText(/Acceso Privado/i)).toBeDefined();
+    expect(screen.getByText(/appointment\/res-test-999/i)).toBeDefined();
+
+    const copyBtn = screen.getByText(/Copiar Enlace/i);
+    fireEvent.click(copyBtn);
+
+    expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining('/appointment/res-test-999'));
+    expect(screen.getByText(/¡Enlace Copiado!/i)).toBeDefined();
+  });
+
+  it('debe mostrar el banner de celebración cuando el cliente llega redirigido con new=1', async () => {
+    const mockAppointment = {
+      id: 'res-test-new-1',
+      tenantId: 'tenant-1',
+      tenantName: 'Spa Relax',
+      customerName: 'Laura Sanchez',
+      date: '2026-10-29',
+      time: '17:00',
+      serviceName: 'Masaje Relajante',
+      status: 'CONFIRMED',
+      totalAmount: 30,
+    };
+
+    (axios.get as any).mockResolvedValue({ data: mockAppointment });
+
+    render(
+      <MemoryRouter initialEntries={['/appointment/res-test-new-1?new=1']}>
+        <Routes>
+          <Route path="/appointment/:id" element={<PublicAppointmentManage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/¡Cita confirmada! Te redirigimos a tu panel para tenerla siempre a mano/i)).toBeDefined();
+    });
+  });
 });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { IonPage, IonContent, IonCard, IonCardContent, IonInput, IonLabel, IonItem, IonButton, useIonToast, IonSpinner, IonIcon, IonSelect, IonSelectOption, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { 
   checkmarkCircleOutline, 
@@ -44,6 +44,7 @@ const formatStaffName = (name?: string): string => {
 const PublicBooking: React.FC = () => {
   const { openImage } = useImageViewer();
   const { tenantId } = useParams<{ tenantId: string }>();
+  const navigate = useNavigate();
   const [tenantInfo, setTenantInfo] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -473,6 +474,25 @@ const PublicBooking: React.FC = () => {
       setMagicLink(`${getPublicBaseUrl()}/appointment/${appointmentId}`);
       setSuccess(true);
 
+      // Persist to recent appointments in localStorage so user can easily track all appointments from this browser
+      try {
+        const stored = JSON.parse(localStorage.getItem('myRecentAppointments') || '[]');
+        const updated = [
+          {
+            id: appointmentId,
+            tenantId,
+            tenantName: tenantInfo?.name || '',
+            date: selectedDate ? formatDateLocal(selectedDate) : '',
+            time: selectedTime,
+            createdAt: new Date().toISOString()
+          },
+          ...stored.filter((x: any) => x.id !== appointmentId)
+        ].slice(0, 15);
+        localStorage.setItem('myRecentAppointments', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Could not save appointment to localStorage', e);
+      }
+
       // Web Push notification subscription
       const identifier = customerPhone || normalizedIdentification;
       if (identifier) {
@@ -480,6 +500,9 @@ const PublicBooking: React.FC = () => {
           console.warn('Web push subscription failed:', e),
         );
       }
+
+      // Instantly redirect to the customer appointment management panel
+      navigate(`/appointment/${appointmentId}?new=1`);
     } catch (e: any) {
       const msg = e.response?.data?.message || 'Error procesando tu reservación. Intenta de nuevo.';
       presentToast({ message: msg, duration: 3000, color: 'danger' });
