@@ -21,6 +21,7 @@ import {
   addOutline, 
   trashOutline 
 } from 'ionicons/icons';
+import { formatTime12h } from '../utils/time';
 
 const DAYS_OF_WEEK = [
   { id: '1', name: 'Lunes' },
@@ -267,7 +268,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
-                          Apertura
+                          Apertura {bulkStart ? <span style={{ color: '#0369a1', fontWeight: 700 }}>({formatTime12h(bulkStart)})</span> : ''}
                         </label>
                         <input 
                           type="time" 
@@ -289,7 +290,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                       </div>
                       <div>
                         <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
-                          Cierre
+                          Cierre {bulkEnd ? <span style={{ color: '#0369a1', fontWeight: 700 }}>({formatTime12h(bulkEnd)})</span> : ''}
                         </label>
                         <input 
                           type="time" 
@@ -346,7 +347,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                         <div>
                           <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
-                            Apertura
+                            Apertura {bulkSecondStart ? <span style={{ color: '#b45309', fontWeight: 700 }}>({formatTime12h(bulkSecondStart)})</span> : ''}
                           </label>
                           <input 
                             type="time" 
@@ -368,7 +369,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                         </div>
                         <div>
                           <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
-                            Cierre
+                            Cierre {bulkSecondEnd ? <span style={{ color: '#b45309', fontWeight: 700 }}>({formatTime12h(bulkSecondEnd)})</span> : ''}
                           </label>
                           <input 
                             type="time" 
@@ -507,7 +508,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                                 <div>
                                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '3px' }}>
-                                    Abre
+                                    Abre {dayData.startTime ? <span style={{ color: '#0369a1', fontWeight: 700 }}>({formatTime12h(dayData.startTime)})</span> : ''}
                                   </label>
                                   <input 
                                     type="time" 
@@ -529,7 +530,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                                 </div>
                                 <div>
                                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '3px' }}>
-                                    Cierra
+                                    Cierra {dayData.endTime ? <span style={{ color: '#0369a1', fontWeight: 700 }}>({formatTime12h(dayData.endTime)})</span> : ''}
                                   </label>
                                   <input 
                                     type="time" 
@@ -593,7 +594,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                                   <div>
                                     <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '3px' }}>
-                                      Abre
+                                      Abre {dayData.secondStartTime ? <span style={{ color: '#b45309', fontWeight: 700 }}>({formatTime12h(dayData.secondStartTime)})</span> : ''}
                                     </label>
                                     <input 
                                       type="time" 
@@ -615,7 +616,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                                   </div>
                                   <div>
                                     <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '3px' }}>
-                                      Cierra
+                                      Cierra {dayData.secondEndTime ? <span style={{ color: '#b45309', fontWeight: 700 }}>({formatTime12h(dayData.secondEndTime)})</span> : ''}
                                     </label>
                                     <input 
                                       type="time" 

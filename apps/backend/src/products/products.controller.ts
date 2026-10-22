@@ -1,5 +1,5 @@
-import { Controller, Request, Get, Post, Put, Patch, Delete, Body, Param, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Controller, Request, Get, Post, Put, Patch, Delete, Body, Param, UseInterceptors, UploadedFile, UploadedFiles, BadRequestException } from '@nestjs/common';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
@@ -16,6 +16,14 @@ export class ProductsController {
     private readonly productsService: ProductsService,
     private readonly storageService: StorageService
   ) {}
+
+  @Post('upload-media')
+  @UseInterceptors(FileInterceptor('file', safeImageUploadOptions))
+  async uploadMedia(@Request() req: any, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('File is required');
+    const url = await this.storageService.uploadFile(file, `tenant-${req.user.tenantId}/products`);
+    return { url };
+  }
 
   @Post(':id/image')
   @UseInterceptors(FileInterceptor('file', safeImageUploadOptions))
@@ -35,7 +43,36 @@ export class ProductsController {
     await this.productsService.update(req.user.tenantId, id, { images } as any);
     console.log(`[ProductsController.uploadImage] ✅ Imagen asignada correctamente al producto "${product.name}" (${id}): ${url}`);
 
-    return { url };
+    return { url, images };
+  }
+
+  @Post(':id/images')
+  @UseInterceptors(FilesInterceptor('files', 10, safeImageUploadOptions))
+  async uploadMultipleImages(@Request() req: any, @Param('id') id: string, @UploadedFiles() files: Express.Multer.File[]) {
+    if (!files || files.length === 0) throw new BadRequestException('Files are required');
+
+    const product = await this.productsService.findOne(req.user.tenantId, id);
+    if (!product) throw new BadRequestException('Product not found');
+
+    const uploadedUrls: string[] = [];
+    for (const file of files) {
+      const url = await this.storageService.uploadFile(file, `tenant-${req.user.tenantId}/products`);
+      uploadedUrls.push(url);
+    }
+
+    const images = [...(product.images || []), ...uploadedUrls];
+    await this.productsService.update(req.user.tenantId, id, { images } as any);
+    return { urls: uploadedUrls, images };
+  }
+
+  @Delete(':id/image')
+  async removeImage(@Request() req: any, @Param('id') id: string, @Body('url') url: string) {
+    const product = await this.productsService.findOne(req.user.tenantId, id);
+    if (!product) throw new BadRequestException('Product not found');
+
+    const images = (product.images || []).filter(img => img !== url);
+    await this.productsService.update(req.user.tenantId, id, { images } as any);
+    return { images };
   }
 
   @Post(':id/unpack')

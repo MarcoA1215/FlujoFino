@@ -11,7 +11,8 @@ export class AuthController {
   @Public()
   @Post('login')
   async login(@Body() body: any) {
-    const result = await this.authService.validateUser(body.username, body.password, body.tenantId);
+    const identifier = (body.username || body.email || '').trim();
+    const result = await this.authService.validateUser(identifier, body.password, body.tenantId);
     if (!result) {
       throw new UnauthorizedException('Credenciales inválidas');
     }

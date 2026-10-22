@@ -27,7 +27,15 @@ export default defineConfig({
     },
   },
   server: {
+    host: true,
+    port: 5173,
     headers: securityHeaders,
+    proxy: {
+      '^/(auth|users|products|orders|raw-materials|production|delivery-zones|deliveries|dashboard|settings|reservations|storage|feedback|customers|superadmin|notifications|salary-advances|investments|promoters|public)': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     headers: securityHeaders,

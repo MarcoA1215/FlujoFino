@@ -26,7 +26,8 @@ import {
   IonSegment,
   IonSegmentButton
 } from '@ionic/react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
+import { formatTime12h } from '../utils/time';
 import { 
   calendarOutline, 
   closeCircleOutline, 
@@ -37,12 +38,17 @@ import {
   copyOutline,
   cashOutline,
   businessOutline,
-  closeOutline
+  closeOutline,
+  shareSocialOutline,
+  checkmarkOutline,
+  sparklesOutline,
+  linkOutline,
+  logoWhatsapp
 } from 'ionicons/icons';
 import axios from 'axios';
 import { BankSelect } from '../components/BankSelect';
 import { CustomerNotificationPrompt } from '../components/CustomerNotificationPrompt';
-import { getContrastColor, ensureReadableColor } from '../utils/colors';
+import { getContrastColor, ensureReadableColor, applyThemeToDom, resetToDefaultTheme } from '../utils/colors';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -81,8 +87,12 @@ const PublicAppointmentManage: React.FC = () => {
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
 
-  const primaryColor = appointment?.themePrimaryColor || '#10b981';
-  const headerColor = appointment?.themeHeaderColor || primaryColor;
+  const location = useLocation();
+  const isNewBooking = new URLSearchParams(location.search).get('new') === '1';
+  const [isCopied, setIsCopied] = useState(false);
+
+  const primaryColor = appointment?.themePrimaryColor || appointment?.settings?.themePrimaryColor || '#10b981';
+  const headerColor = appointment?.themeHeaderColor || appointment?.settings?.themeHeaderColor || primaryColor;
   const headerContrast = getContrastColor(headerColor);
   const primaryContrast = getContrastColor(primaryColor);
   const primaryReadable = ensureReadableColor(primaryColor);
@@ -93,20 +103,13 @@ const PublicAppointmentManage: React.FC = () => {
 
   useEffect(() => {
     if (appointment) {
-      const pColor = appointment?.themePrimaryColor || '#10b981';
-      const hColor = appointment?.themeHeaderColor || pColor;
-      const pContrast = getContrastColor(pColor);
-      const hContrast = getContrastColor(hColor);
-      const pReadable = ensureReadableColor(pColor);
-
-      document.documentElement.style.setProperty('--theme-primary', pColor);
-      document.documentElement.style.setProperty('--theme-primary-contrast', pContrast);
-      document.documentElement.style.setProperty('--theme-primary-readable', pReadable);
-      document.documentElement.style.setProperty('--theme-header', hColor);
-      document.documentElement.style.setProperty('--theme-header-contrast', hContrast);
-      document.documentElement.style.setProperty('--ion-color-primary', pColor);
-      document.documentElement.style.setProperty('--ion-color-primary-contrast', pContrast);
+      const pColor = appointment?.themePrimaryColor || appointment?.settings?.themePrimaryColor || '#10b981';
+      const hColor = appointment?.themeHeaderColor || appointment?.settings?.themeHeaderColor || pColor;
+      applyThemeToDom(pColor, hColor);
     }
+    return () => {
+      resetToDefaultTheme();
+    };
   }, [appointment]);
 
   const fetchAppointment = async () => {
@@ -125,6 +128,56 @@ const PublicAppointmentManage: React.FC = () => {
   useEffect(() => {
     fetchAppointment();
   }, [id]);
+
+  useEffect(() => {
+    if (isNewBooking) {
+      presentToast({
+        message: '🎉 ¡Cita agendada con éxito! Guarda o comparte tu enlace.',
+        duration: 4000,
+        color: 'success',
+      });
+    }
+  }, [isNewBooking]);
+
+  const appointmentUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/appointment/${id}`
+    : `https://www.finowork.com/appointment/${id}`;
+
+  const handleCopyLink = () => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(appointmentUrl);
+      setIsCopied(true);
+      presentToast({
+        message: '¡Enlace de tu cita copiado al portapapeles!',
+        duration: 2500,
+        color: 'success',
+      });
+      setTimeout(() => setIsCopied(false), 2500);
+    }
+  };
+
+  const handleShareLink = async () => {
+    if (typeof navigator !== 'undefined' && typeof (navigator as any).share === 'function') {
+      try {
+        await (navigator as any).share({
+          title: `Cita en ${appointment?.tenantName || 'FinoWork'}`,
+          text: `Consulta o gestiona los detalles de mi cita (${appointment?.date || ''} - ${formatTime12h(appointment?.time) || ''}):`,
+          url: appointmentUrl,
+        });
+      } catch (e: any) {
+        if (e.name !== 'AbortError') {
+          handleCopyLink();
+        }
+      }
+    } else {
+      handleCopyLink();
+    }
+  };
+
+  const handleShareWhatsApp = () => {
+    const text = `Hola! Aquí tengo el enlace para consultar y gestionar mi cita en ${appointment?.tenantName || 'el negocio'} (${appointment?.date || ''} - ${formatTime12h(appointment?.time) || ''}):\n${appointmentUrl}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  };
 
   useEffect(() => {
     if (showReschedule && selectedDate && appointment?.tenantId) {
@@ -467,9 +520,9 @@ const PublicAppointmentManage: React.FC = () => {
                   </h2>
                   <span
                     style={{
-                      backgroundColor: '#ECFDF5',
-                      color: '#065F46',
-                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      backgroundColor: primarySoftBg,
+                      color: primaryReadable,
+                      border: `1px solid ${primaryColor}40`,
                       borderRadius: '999px',
                       padding: '2px 8px',
                       fontSize: '11px',
@@ -493,6 +546,149 @@ const PublicAppointmentManage: React.FC = () => {
             >
               Nueva Cita →
             </IonButton>
+          </div>
+
+          {/* Widget / Card: Enlace de tu Cita */}
+          <div
+            style={{
+              backgroundColor: isNewBooking ? primarySoftBg : '#ffffff',
+              borderRadius: '16px',
+              padding: '16px 18px',
+              marginBottom: '18px',
+              border: isNewBooking ? `1.5px solid ${primaryColor}` : '1px solid #E2E8F0',
+              boxShadow: isNewBooking
+                ? `0 4px 16px ${primarySoftBg}`
+                : '0 2px 8px rgba(15, 23, 42, 0.04)',
+            }}
+          >
+            {isNewBooking && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backgroundColor: primarySoftBg,
+                  padding: '8px 12px',
+                  borderRadius: '10px',
+                  marginBottom: '12px',
+                  color: primaryReadable,
+                  border: `1px solid ${primaryColor}40`,
+                }}
+              >
+                <IonIcon icon={sparklesOutline} style={{ fontSize: '20px', color: primaryColor, flexShrink: 0 }} />
+                <span style={{ fontSize: '13px', fontWeight: 700 }}>
+                  ¡Cita confirmada! Te redirigimos a tu panel para tenerla siempre a mano.
+                </span>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <IonIcon icon={linkOutline} style={{ fontSize: '18px', color: primaryReadable }} />
+                <span style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.2px' }}>
+                  Enlace de tu Cita
+                </span>
+              </div>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  backgroundColor: '#F1F5F9',
+                  color: '#475569',
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                }}
+              >
+                Acceso Privado
+              </span>
+            </div>
+
+            <p style={{ fontSize: '12.5px', color: '#64748B', margin: '0 0 10px 0', lineHeight: 1.4 }}>
+              Guarda este enlace en tus favoritos o notas. Podrás consultar el estado, reportar pagos o reprogramar en cualquier momento:
+            </p>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: isNewBooking ? '#ffffff' : '#F8FAFC',
+                border: '1px solid #CBD5E1',
+                borderRadius: '10px',
+                padding: '8px 12px',
+                marginBottom: '12px',
+                overflow: 'hidden',
+              }}
+            >
+              <span
+                style={{
+                  flex: 1,
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  color: '#1E293B',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  fontFamily: 'monospace',
+                }}
+                title={appointmentUrl}
+              >
+                {appointmentUrl}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <IonButton
+                fill="solid"
+                style={{
+                  flex: 1,
+                  minWidth: '140px',
+                  '--background': isCopied ? primaryReadable : primaryColor,
+                  '--color': primaryContrast,
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  '--border-radius': '10px',
+                  height: '40px',
+                }}
+                onClick={handleCopyLink}
+              >
+                <IonIcon slot="start" icon={isCopied ? checkmarkOutline : copyOutline} />
+                {isCopied ? '¡Enlace Copiado!' : 'Copiar Enlace'}
+              </IonButton>
+
+              <IonButton
+                fill="outline"
+                style={{
+                  flex: 1,
+                  minWidth: '110px',
+                  '--color': primaryReadable,
+                  '--border-color': primaryColor,
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  '--border-radius': '10px',
+                  height: '40px',
+                }}
+                onClick={handleShareLink}
+              >
+                <IonIcon slot="start" icon={shareSocialOutline} />
+                Compartir
+              </IonButton>
+
+              <IonButton
+                fill="outline"
+                style={{
+                  '--color': '#16A34A',
+                  '--border-color': '#86EFAC',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  '--border-radius': '10px',
+                  height: '40px',
+                }}
+                onClick={handleShareWhatsApp}
+                title="Compartir por WhatsApp"
+              >
+                <IonIcon slot="icon-only" icon={logoWhatsapp} />
+              </IonButton>
+            </div>
           </div>
 
           {!showReschedule ? (
@@ -529,7 +725,7 @@ const PublicAppointmentManage: React.FC = () => {
                       Tu cita ha sido reprogramada
                     </div>
                     <p style={{ fontSize: '13px', color: '#7c2d12', margin: '8px 0 8px 0', lineHeight: '1.4' }}>
-                      Tu cita que originalmente era el <strong>{appointment.originalDate || appointment.date}</strong> a las <strong>{appointment.originalTime || 'hora anterior'}</strong> ha sido reprogramada para el <strong>{appointment.date}</strong> a las <strong>{appointment.time}</strong>.
+                      Tu cita que originalmente era el <strong>{appointment.originalDate || appointment.date}</strong> a las <strong>{formatTime12h(appointment.originalTime) || 'hora anterior'}</strong> ha sido reprogramada para el <strong>{appointment.date}</strong> a las <strong>{formatTime12h(appointment.time)}</strong>.
                     </p>
                     {appointment.rescheduleReason && (
                       <div style={{ fontSize: '12px', background: '#ffedd5', padding: '6px 10px', borderRadius: '8px', color: '#9a3412', marginBottom: '10px', fontWeight: '500' }}>
@@ -553,7 +749,7 @@ const PublicAppointmentManage: React.FC = () => {
                 {appointment.rescheduleStatus === 'ACCEPTED' && (appointment.originalTime || appointment.originalDate) && (
                   <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <IonIcon icon={checkmarkCircleOutline} style={{ fontSize: '18px', color: '#16a34a' }} />
-                    Horario reprogramado ({appointment.date} a las {appointment.time}) aceptado y confirmado.
+                    Horario reprogramado ({appointment.date} a las {formatTime12h(appointment.time)}) aceptado y confirmado.
                   </div>
                 )}
 
@@ -574,7 +770,7 @@ const PublicAppointmentManage: React.FC = () => {
                         <div key={idx} style={{ fontSize: '13px', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: idx < appointment.serviceSpecialists.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
                           <span style={{ fontWeight: '600' }}>• {s.serviceName || 'Servicio'} ({s.durationMinutes || 30} min)</span>
                           {s.employeeName && (
-                            <span style={{ fontSize: '11px', fontWeight: '700', color: '#047857', background: '#ecfdf5', padding: '1px 6px', borderRadius: '4px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: '700', color: primaryReadable, background: primarySoftBg, padding: '1px 6px', borderRadius: '4px' }}>
                               👤 {s.employeeName}
                             </span>
                           )}
@@ -589,7 +785,7 @@ const PublicAppointmentManage: React.FC = () => {
                   {appointment.rescheduleStatus === 'DELAYED' && (
                     <div style={{ backgroundColor: '#fffbe8', border: '1px solid #fde68a', borderRadius: '8px', padding: '8px 12px', marginBottom: '10px', fontSize: '12px', color: '#92400e', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <IonIcon icon={timeOutline} style={{ fontSize: '16px', color: '#d97706' }} />
-                      Horario ajustado por retraso en sala: {appointment.time} {appointment.originalTime ? `(Original: ${appointment.originalTime})` : ''}
+                      Horario ajustado por retraso en sala: {formatTime12h(appointment.time)} {appointment.originalTime ? `(Original: ${formatTime12h(appointment.originalTime)})` : ''}
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: '16px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #e2e8f0' }}>
@@ -597,7 +793,7 @@ const PublicAppointmentManage: React.FC = () => {
                       <IonIcon icon={calendarOutline} style={{ marginRight: '6px', color: 'var(--ion-color-primary)' }}/> {appointment.date}
                     </p>
                     <p style={{ margin: 0, display: 'flex', alignItems: 'center', fontSize: '14px', fontWeight: '500', color: '#475569' }}>
-                      <IonIcon icon={timeOutline} style={{ marginRight: '6px', color: 'var(--ion-color-primary)' }}/> {appointment.time}
+                      <IonIcon icon={timeOutline} style={{ marginRight: '6px', color: 'var(--ion-color-primary)' }}/> {formatTime12h(appointment.time)}
                     </p>
                   </div>
                 </div>
@@ -605,19 +801,19 @@ const PublicAppointmentManage: React.FC = () => {
                 {/* Financial and Payment Section */}
                 {(totalAmount > 0 || !isPaidComplete || abonosTotal > 0) && (
                   <div style={{ 
-                    backgroundColor: isPaidComplete ? '#f0fdf4' : '#eff6ff', 
-                    border: `1px solid ${isPaidComplete ? '#bbf7d0' : '#bfdbfe'}`,
+                    backgroundColor: isPaidComplete ? primarySoftBg : '#eff6ff', 
+                    border: `1px solid ${isPaidComplete ? primaryColor : '#bfdbfe'}`,
                     padding: '16px', 
                     borderRadius: '12px', 
                     marginBottom: '20px' 
                   }}>
                     {/* Header with Status Pill */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', fontWeight: 'bold', fontSize: '16px', color: appointment.paymentStatus === 'PAID' ? '#15803d' : '#1d4ed8' }}>
+                      <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', fontWeight: 'bold', fontSize: '16px', color: appointment.paymentStatus === 'PAID' ? primaryReadable : '#1d4ed8' }}>
                         <IonIcon icon={walletOutline} style={{ marginRight: '8px', fontSize: '18px' }}/> Inversión & Pago
                       </h3>
                       {appointment.paymentStatus === 'PAID' ? (
-                        <span style={{ fontSize: '11px', fontWeight: 'bold', backgroundColor: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: '10px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 'bold', backgroundColor: primarySoftBg, color: primaryReadable, padding: '3px 8px', borderRadius: '10px' }}>
                           ✅ Verificado y Aprobado
                         </span>
                       ) : (appointment.paymentReported || (appointment.abonosHistory && appointment.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) ? (
@@ -639,11 +835,11 @@ const PublicAppointmentManage: React.FC = () => {
                     <div style={{ marginBottom: '12px' }}>
                       {appointment.paymentStatus === 'PAID' ? (
                         <div style={{
-                          backgroundColor: '#ecfdf5',
-                          border: '1.5px solid #10b981',
+                          backgroundColor: primarySoftBg,
+                          border: `1.5px solid ${primaryColor}`,
                           borderRadius: '10px',
                           padding: '10px 14px',
-                          color: '#065f46',
+                          color: primaryReadable,
                           fontSize: '13px',
                           fontWeight: '700',
                           display: 'flex',
@@ -896,7 +1092,7 @@ const PublicAppointmentManage: React.FC = () => {
                             color: selectedTime === t ? 'var(--ion-color-primary)' : '#333'
                           }}
                         >
-                          {t}
+                          {formatTime12h(t)}
                         </div>
                       ))}
                     </div>

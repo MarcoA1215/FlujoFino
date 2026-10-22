@@ -16,6 +16,7 @@ import { apiClient } from '../api/client';
 import { BuyUsdModal } from './BuyUsdModal';
 import { FondoCajaModal } from './FondoCajaModal';
 import type { TreasurySummary } from '../types';
+import { formatTime12h } from '../utils/time';
 
 interface DailyCashCloseModalProps {
   isOpen: boolean;
@@ -333,7 +334,7 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
                         <div>
                           <div style={{ fontWeight: '700', color: '#1E293B' }}>{exp.description}</div>
                           <span style={{ display: 'block', color: '#64748B', fontSize: '10px' }}>
-                            {exp.category === 'VALE_EMPLEADO' ? '👤 Vale Empleado' : exp.category} • {new Date(exp.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {exp.category === 'VALE_EMPLEADO' ? '👤 Vale Empleado' : exp.category} • {formatTime12h(new Date(exp.createdAt))}
                           </span>
                         </div>
                         <div style={{ textAlign: 'right', fontWeight: '800', color: '#DC2626' }}>

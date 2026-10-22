@@ -19,7 +19,8 @@ import {
   bicycleOutline,
   storefrontOutline,
   cartOutline,
-  trashOutline
+  trashOutline,
+  copyOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { OrderStatus, PaymentStatus, DeliveryMethod, UserRole } from '@finowork/shared-types';
@@ -29,10 +30,13 @@ import type { DeliveryZone } from '../types';
 import { AuthContext } from '../context/AuthContext';
 import AppHeader from '../components/AppHeader';
 import { formatWhatsAppUrl } from '../utils/whatsapp';
+import { formatTime12h } from '../utils/time';
 
 type OrderItem = {
   id: string;
   productName?: string;
+  variantId?: string;
+  variantName?: string;
   quantity: number;
   product?: {
     id?: string;
@@ -92,6 +96,7 @@ type Order = {
   discountValue?: number;
   abonosTotal?: number;
   abonosHistory?: any[];
+  nextAbonoDueDate?: string | Date | null;
   requestedDeliveryDate?: string | Date;
   employeeId?: string;
   employee?: {
@@ -136,6 +141,7 @@ const Orders: React.FC = () => {
     }
   };
   const [tab, setTab] = useState<'activos' | 'por_cobrar' | 'por_confirmar' | 'historial'>('activos');
+  const [onlyOverdueFilter, setOnlyOverdueFilter] = useState<boolean>(false);
   const [searchText, setSearchText] = useState('');
   const [exchangeRate, setExchangeRate] = useState<number>(40.0);
   const [currencySymbol, setCurrencySymbol] = useState<string>('Bs.');
@@ -153,6 +159,7 @@ const Orders: React.FC = () => {
   const [abonoMethod, setAbonoMethod] = useState<string>('USD');
   const [abonoRef, setAbonoRef] = useState<string>('');
   const [abonoBank, setAbonoBank] = useState<string>('');
+  const [abonoNextDueDate, setAbonoNextDueDate] = useState<string>('');
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('');
 
@@ -335,14 +342,133 @@ const Orders: React.FC = () => {
     setCobroBank('');
   };
 
+  const getAbonoDueInfo = (order: Order) => {
+    if (!order || order.paymentStatus === PaymentStatus.PAID || order.status === OrderStatus.CANCELED || order.status === OrderStatus.CANCELADO_PROVEEDOR) {
+      return null;
+    }
+    const defaultDays = Math.max(1, Number(systemSettings?.abonoDefaultDueDays || 7));
+    let dueDate: Date;
+    if (order.nextAbonoDueDate) {
+      dueDate = new Date(order.nextAbonoDueDate);
+    } else {
+      let baseDateStr = order.createdAt;
+      if (Array.isArray(order.abonosHistory) && order.abonosHistory.length > 0) {
+        const lastAbono = order.abonosHistory[order.abonosHistory.length - 1];
+        if (lastAbono?.date) baseDateStr = lastAbono.date;
+      }
+      dueDate = new Date(baseDateStr || Date.now());
+      dueDate.setDate(dueDate.getDate() + defaultDays);
+    }
+    if (isNaN(dueDate.getTime())) return null;
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const dueStart = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate()).getTime();
+    const diffDays = Math.round((dueStart - todayStart) / (1000 * 60 * 60 * 24));
+
+    const formattedDue = dueDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const isoDate = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`;
+
+    if (diffDays < 0) {
+      return {
+        status: 'OVERDUE' as const,
+        diffDays: Math.abs(diffDays),
+        formattedDue,
+        isoDate,
+        label: `⚠️ Abono Vencido (hace ${Math.abs(diffDays)} día${Math.abs(diffDays) === 1 ? '' : 's'}) • ${formattedDue}`,
+        bg: '#FEF2F2',
+        border: '#FECACA',
+        color: '#B91C1C',
+      };
+    } else if (diffDays <= 1) {
+      return {
+        status: 'DUE_SOON' as const,
+        diffDays,
+        formattedDue,
+        isoDate,
+        label: `⏳ Vence ${diffDays === 0 ? 'HOY' : 'mañana'} (${formattedDue})`,
+        bg: '#FFFBEB',
+        border: '#FDE68A',
+        color: '#92400E',
+      };
+    } else {
+      return {
+        status: 'ON_TIME' as const,
+        diffDays,
+        formattedDue,
+        isoDate,
+        label: `📅 Próximo abono: ${formattedDue} (en ${diffDays} días)`,
+        bg: '#ECFDF5',
+        border: '#A7F3D0',
+        color: '#065F46',
+      };
+    }
+  };
+
+  const handleCopyOrderSummary = async (order: Order, onlyCode: boolean = false) => {
+    if (!order) return;
+    const shortCode = `#ORD-${String(order.id || '').slice(0, 6).toUpperCase()}`;
+    if (onlyCode) {
+      try {
+        await navigator.clipboard.writeText(shortCode);
+        presentToast({ message: `📋 Código ${shortCode} copiado al portapapeles`, duration: 2000, color: 'success' });
+      } catch {
+        presentToast({ message: `Código: ${shortCode}`, duration: 2500, color: 'primary' });
+      }
+      return;
+    }
+
+    const orderItems = Array.isArray(order.items) ? order.items : [];
+    const itemsSum = orderItems.reduce((acc: number, it: any) => acc + (Number(it.subtotal) || (Number(it.unitPrice || 0) * Number(it.quantity || 1))), 0);
+    const orderRate = Number(order.exchangeRate) > 0 ? Number(order.exchangeRate) : (Number(exchangeRate) || 40);
+    const totalUsd = Number(order.totalAmount || 0) > 0 ? Number(order.totalAmount) : itemsSum;
+    const abonosTotal = Number(order.abonosTotal || 0);
+    const remaining = Math.max(0, totalUsd - abonosTotal);
+
+    const itemsLines = orderItems.map((it: any) => {
+      const pName = it.productName || it.product?.name || 'Producto';
+      const vName = it.variantName ? ` (${it.variantName})` : '';
+      const qty = Number(it.quantity) || 1;
+      const uPrice = Number(it.unitPrice) || 0;
+      return `• ${qty}x ${pName}${vName} - $${(uPrice * qty).toFixed(2)}`;
+    }).join('\n');
+
+    const dueInfo = getAbonoDueInfo(order);
+    const copEnabled = Boolean(systemSettings?.enableCopCurrency);
+    const copRate = Number((order as any).exchangeRateCop || systemSettings?.exchangeRateCop || 4000);
+    const copTotalStr = copEnabled ? ` | 🇨🇴 $${Math.round(totalUsd * copRate).toLocaleString('es-CO')} COP` : '';
+    const copRemStr = copEnabled ? ` | 🇨🇴 $${Math.round(remaining * copRate).toLocaleString('es-CO')} COP` : '';
+    const summaryLines = [
+      `🧾 *Comprobante de Venta ${shortCode}*`,
+      `👤 Cliente: ${order.customerName || 'Cliente General'}`,
+      itemsLines ? `\n📦 *Detalle:*\n${itemsLines}` : '',
+      `\n💵 *Total:* $${totalUsd.toFixed(2)} (${formatLocalAmount(totalUsd * orderRate)}${copTotalStr})`,
+      abonosTotal > 0 ? `✅ *Abonado:* $${abonosTotal.toFixed(2)}` : '',
+      order.paymentStatus !== PaymentStatus.PAID ? `⏳ *Saldo Pendiente:* $${remaining.toFixed(2)} (${formatLocalAmount(remaining * orderRate)}${copRemStr})` : '✅ *Estado:* PAGADO',
+      dueInfo && order.paymentStatus !== PaymentStatus.PAID ? `📅 *Próximo abono:* ${dueInfo.formattedDue}` : '',
+    ].filter(Boolean).join('\n');
+
+    try {
+      await navigator.clipboard.writeText(summaryLines);
+      presentToast({ message: `📋 Resumen y código (${shortCode}) copiados al portapapeles`, duration: 2200, color: 'success' });
+    } catch {
+      presentToast({ message: 'No se pudo copiar automáticamente', duration: 2500, color: 'warning' });
+    }
+  };
+
   const counts = useMemo(() => {
-    if (!Array.isArray(orders)) return { activos: 0, porCobrar: 0, porConfirmar: 0, historial: 0 };
+    if (!Array.isArray(orders)) return { activos: 0, porCobrar: 0, vencidos: 0, porConfirmar: 0, historial: 0 };
     const activos = orders.filter(o => o && (o.status === OrderStatus.PENDING || o.status === OrderStatus.PREPARING)).length;
-    const porCobrar = orders.filter(o => o && [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED && o.status !== OrderStatus.CANCELADO_PROVEEDOR && o.status !== OrderStatus.SOLICITUD_ENCARGO).length;
+    const porCobrarList = orders.filter(o => o && [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED && o.status !== OrderStatus.CANCELADO_PROVEEDOR && o.status !== OrderStatus.SOLICITUD_ENCARGO);
+    const porCobrar = porCobrarList.length;
+    const vencidos = porCobrarList.filter(o => {
+      const info = getAbonoDueInfo(o);
+      return info?.status === 'OVERDUE';
+    }).length;
     const porConfirmar = orders.filter(o => o && (o.status === OrderStatus.SOLICITUD_ENCARGO || Boolean(o.paymentReported))).length;
     const historial = orders.filter(o => o && (o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED || o.status === OrderStatus.CANCELADO_PROVEEDOR)).length;
-    return { activos, porCobrar, porConfirmar, historial };
-  }, [orders]);
+    return { activos, porCobrar, vencidos, porConfirmar, historial };
+  }, [orders, systemSettings]);
 
   const filteredOrders = useMemo(() => {
     if (!Array.isArray(orders)) return [];
@@ -355,6 +481,10 @@ const Orders: React.FC = () => {
 
       if (tab === 'activos' && !isActivo) return false;
       if (tab === 'por_cobrar' && !isPorCobrar) return false;
+      if (tab === 'por_cobrar' && onlyOverdueFilter) {
+        const dueInfo = getAbonoDueInfo(o);
+        if (dueInfo?.status !== 'OVERDUE') return false;
+      }
       if (tab === 'por_confirmar' && !isPorConfirmar) return false;
       if (tab === 'historial' && !isHistorial) return false;
 
@@ -370,18 +500,20 @@ const Orders: React.FC = () => {
       const q = searchText.toLowerCase();
       const custName = String(o.customerName || '').toLowerCase();
       const orderId = String(o.id || '').toLowerCase();
+      const shortCode = `#ord-${String(o.id || '').slice(0, 6).toLowerCase()}`;
       const notes = String(o.notes || '').toLowerCase();
       const empUser = String(o.employee?.username || '').toLowerCase();
       const empName = String(o.employee?.name || '').toLowerCase();
       return (
         custName.includes(q) ||
         orderId.includes(q) ||
+        shortCode.includes(q) ||
         notes.includes(q) ||
         empUser.includes(q) ||
         empName.includes(q)
       );
     });
-  }, [orders, tab, searchText, selectedEmployeeFilter]);
+  }, [orders, tab, onlyOverdueFilter, searchText, selectedEmployeeFilter, systemSettings]);
 
   return (
     <IonPage>
@@ -395,7 +527,7 @@ const Orders: React.FC = () => {
             <IonIcon icon={searchOutline} style={{ fontSize: '18px', color: '#64748B' }} />
             <input
               type="text"
-              placeholder="Buscar por cliente, empleado o pedido..."
+              placeholder="Buscar por cliente, código (#ORD-...), empleado o pedido..."
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
             />
@@ -415,7 +547,7 @@ const Orders: React.FC = () => {
                 type="button"
                 className={`ff-chip ${tab === 'activos' ? 'active bg-theme-primary text-white border-theme-primary' : ''}`}
                 style={tab === 'activos' ? { backgroundColor: 'var(--theme-primary)', color: '#ffffff', borderColor: 'var(--theme-primary)' } : {}}
-                onClick={() => setTab('activos')}
+                onClick={() => { setTab('activos'); setOnlyOverdueFilter(false); }}
               >
                 Activos ({counts.activos})
               </button>
@@ -426,12 +558,38 @@ const Orders: React.FC = () => {
                   onClick={() => setTab('por_cobrar')}
                 >
                   Por Cobrar ({counts.porCobrar})
+                  {counts.vencidos > 0 && (
+                    <span style={{ marginLeft: '6px', background: '#EF4444', color: '#ffffff', borderRadius: '999px', padding: '1px 6px', fontSize: '10px', fontWeight: '800' }}>
+                      {counts.vencidos} venc.
+                    </span>
+                  )}
+                </button>
+              )}
+              {!isKitchen && tab === 'por_cobrar' && (
+                <button
+                  type="button"
+                  onClick={() => setOnlyOverdueFilter(prev => !prev)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '999px',
+                    border: onlyOverdueFilter ? '1.5px solid #EF4444' : '1px solid #FECACA',
+                    background: onlyOverdueFilter ? '#EF4444' : '#FEF2F2',
+                    color: onlyOverdueFilter ? '#FFFFFF' : '#B91C1C',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  ⚠️ Vencidos ({counts.vencidos})
                 </button>
               )}
               <button
                 type="button"
                 className={`ff-chip ${tab === 'por_confirmar' ? 'active' : ''}`}
-                onClick={() => setTab('por_confirmar')}
+                onClick={() => { setTab('por_confirmar'); setOnlyOverdueFilter(false); }}
                 style={counts.porConfirmar > 0 ? { borderColor: '#A855F7', color: '#7E22CE', fontWeight: '800' } : {}}
               >
                 {systemSettings?.featureBuySell === false ? 'Por Verificar' : 'Por Confirmar'} ({counts.porConfirmar})
@@ -439,7 +597,7 @@ const Orders: React.FC = () => {
               <button
                 type="button"
                 className={`ff-chip ${tab === 'historial' ? 'active' : ''}`}
-                onClick={() => setTab('historial')}
+                onClick={() => { setTab('historial'); setOnlyOverdueFilter(false); }}
               >
                 Historial ({counts.historial})
               </button>
@@ -535,8 +693,15 @@ const Orders: React.FC = () => {
                     {/* Top Row: Customer & Status */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                       <div>
-                        <div style={{ fontSize: '16px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ fontSize: '16px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           <span>{order.customerName || 'Cliente General'}</span>
+                          <span
+                            onClick={() => handleCopyOrderSummary(order, true)}
+                            title="Clic para copiar código de venta"
+                            style={{ fontSize: '11px', fontWeight: '800', background: '#F1F5F9', color: '#475569', padding: '2px 6px', borderRadius: '6px', cursor: 'pointer', border: '1px solid #E2E8F0' }}
+                          >
+                            #ORD-{shortId.slice(0, 6)}
+                          </span>
                           {order.customerPhone && (
                             <a
                               href={formatWhatsAppUrl(order.customerPhone, `Hola ${order.customerName || 'Cliente'}, te escribimos respecto a tu pedido #${shortId}.`)}
@@ -548,6 +713,15 @@ const Orders: React.FC = () => {
                               <IonIcon icon={logoWhatsapp} style={{ fontSize: '18px' }} />
                             </a>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => handleCopyOrderSummary(order, false)}
+                            style={{ background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0', borderRadius: '6px', padding: '2px 6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                            title="Copiar código y resumen de venta para enviar por SMS/Telegram/Instagram"
+                          >
+                            <IonIcon icon={copyOutline} style={{ fontSize: '13px' }} />
+                            <span>Copiar</span>
+                          </button>
                         </div>
                         {formattedDate && (
                           <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
@@ -595,7 +769,22 @@ const Orders: React.FC = () => {
                         </span>
                       )}
                       {order.requestedDeliveryDate && (() => {
-                        const isPast = new Date(order.requestedDeliveryDate).getTime() < Date.now();
+                        const citaMatch = order.notes?.match(/\[Cita:\s*([^\s\]]+)(?:\s+([0-9:]+))?\]/);
+                        let displayDate = '';
+                        let isPast = false;
+
+                        if (citaMatch && citaMatch[1]) {
+                          const dateStr = citaMatch[1];
+                          const timeStr = citaMatch[2] ? (citaMatch[2].length <= 5 ? `${citaMatch[2]}:00` : citaMatch[2]) : '12:00:00';
+                          displayDate = citaMatch[2] ? `${dateStr} a las ${formatTime12h(citaMatch[2])}` : dateStr;
+                          const citaEpoch = new Date(`${dateStr}T${timeStr}-04:00`).getTime();
+                          isPast = !isNaN(citaEpoch) ? citaEpoch < Date.now() : new Date(order.requestedDeliveryDate).getTime() < Date.now();
+                        } else {
+                          const d = new Date(order.requestedDeliveryDate);
+                          displayDate = isNaN(d.getTime()) ? '' : d.toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short', hour12: true });
+                          isPast = !isNaN(d.getTime()) ? d.getTime() < Date.now() : false;
+                        }
+
                         return (
                           <span style={{
                             fontSize: '11px',
@@ -609,7 +798,7 @@ const Orders: React.FC = () => {
                             gap: '4px',
                             border: isPast && !isPaid ? '1px solid #FECACA' : 'none'
                           }}>
-                            {isPast && !isPaid ? '⏰ Cita Cumplida:' : '📅 Requerido:'} {new Date(order.requestedDeliveryDate).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
+                            {isPast && !isPaid ? '⏰ Cita Cumplida:' : '📅 Requerido:'} {displayDate}
                           </span>
                         );
                       })()}
@@ -701,6 +890,11 @@ const Orders: React.FC = () => {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <span style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                 {qty}x {pName}
+                                {it.variantName && (
+                                  <span style={{ fontSize: '10px', fontWeight: '800', color: '#1E293B', background: '#E2E8F0', padding: '1px 6px', borderRadius: '4px' }}>
+                                    🎨 {it.variantName}
+                                  </span>
+                                )}
                                 {it.employeeId && (
                                   <span style={{ fontSize: '10px', fontWeight: '700', color: '#047857', background: '#ECFDF5', padding: '1px 6px', borderRadius: '4px' }}>
                                     👤 {employeesMap[it.employeeId] || 'Especialista'}
@@ -778,6 +972,11 @@ const Orders: React.FC = () => {
                             <div style={{ fontSize: '11px', color: '#64748B' }}>
                               {totalLocalFormatted}
                             </div>
+                            {Boolean(systemSettings?.enableCopCurrency) && (
+                              <div style={{ fontSize: '11px', fontWeight: '800', color: '#854D0E' }}>
+                                🇨🇴 ${Math.round(totalUsd * Number((order as any).exchangeRateCop || systemSettings?.exchangeRateCop || 4000)).toLocaleString('es-CO')} COP
+                              </div>
+                            )}
                           </div>
 
                           <div
@@ -808,6 +1007,39 @@ const Orders: React.FC = () => {
                                     <div style={{ width: `${Math.min(100, (abonosTotal / (totalUsd || 1)) * 100)}%`, height: '100%', background: '#10B981' }} />
                                   </div>
                                 )}
+                                {/* Alerta de Fecha de Vencimiento entre Abonos */}
+                                {!isPreorderSolicitud && (() => {
+                                  const dueInfo = getAbonoDueInfo(order);
+                                  if (!dueInfo) return null;
+                                  return (
+                                    <div style={{
+                                      marginTop: '6px',
+                                      padding: '5px 8px',
+                                      borderRadius: '8px',
+                                      background: dueInfo.bg,
+                                      border: `1px solid ${dueInfo.border}`,
+                                      color: dueInfo.color,
+                                      fontWeight: '800',
+                                      fontSize: '11px',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                      gap: '6px'
+                                    }}>
+                                      <span>{dueInfo.label}</span>
+                                      {dueInfo.status === 'OVERDUE' && order.customerPhone && (
+                                        <a
+                                          href={formatWhatsAppUrl(order.customerPhone, `Hola ${order.customerName || 'Cliente'}, te recordamos amablemente tu abono pendiente de $${remaining.toFixed(2)} (${remainingLocalFormatted}) para tu cuenta #ORD-${shortId.slice(0, 6)}. ¡Gracias!`)}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          style={{ color: '#B91C1C', textDecoration: 'underline', fontSize: '10px', fontWeight: '900', whiteSpace: 'nowrap' }}
+                                        >
+                                          Recordar 📲
+                                        </a>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                                 {!order.paymentReported && (order.pagoMovilRef || order.transferRef || order.binanceRef) && (
                                   <div style={{ marginTop: '4px', fontSize: '10px', color: '#64748B' }}>
                                     Ref confirmada: <b>{order.pagoMovilRef || order.transferRef || order.binanceRef}</b> ({order.pagoMovilBank || order.transferBank || 'Pago Móvil'})
@@ -947,6 +1179,9 @@ const Orders: React.FC = () => {
                             setAbonoMethod('USD');
                             setAbonoRef('');
                             setAbonoBank('');
+                            const nextD = new Date();
+                            nextD.setDate(nextD.getDate() + Math.max(1, Number(systemSettings?.abonoDefaultDueDays || 7)));
+                            setAbonoNextDueDate(`${nextD.getFullYear()}-${String(nextD.getMonth() + 1).padStart(2, '0')}-${String(nextD.getDate()).padStart(2, '0')}`);
                           }}
                           style={{
                             flex: 1,
@@ -1522,6 +1757,9 @@ const Orders: React.FC = () => {
                                   setAbonoMethod('USD');
                                   setAbonoRef('');
                                   setAbonoBank('');
+                                  const nextD = new Date();
+                                  nextD.setDate(nextD.getDate() + Math.max(1, Number(systemSettings?.abonoDefaultDueDays || 7)));
+                                  setAbonoNextDueDate(`${nextD.getFullYear()}-${String(nextD.getMonth() + 1).padStart(2, '0')}-${String(nextD.getDate()).padStart(2, '0')}`);
                                 }}
                                 style={{
                                   padding: '12px',
@@ -1551,6 +1789,28 @@ const Orders: React.FC = () => {
                             </div>
                           </div>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleCopyOrderSummary(selectedOrderForDetails, false)}
+                          style={{
+                            padding: '12px',
+                            borderRadius: '12px',
+                            border: '1px solid #A7F3D0',
+                            background: '#ECFDF5',
+                            color: '#065F46',
+                            fontWeight: '800',
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <IonIcon icon={copyOutline} style={{ fontSize: '16px' }} />
+                          <span>📋 Copiar Código y Resumen de Venta</span>
+                        </button>
 
                         {selectedOrderForDetails.status === OrderStatus.DELIVERED && (
                           <div style={{
@@ -1700,7 +1960,8 @@ const Orders: React.FC = () => {
                   amount: effectiveUsd,
                   method: abonoMethod,
                   ref: abonoRef.trim() || undefined,
-                  bank: normalizeBankName(abonoBank) || undefined
+                  bank: normalizeBankName(abonoBank) || undefined,
+                  nextAbonoDueDate: abonoNextDueDate || undefined
                 });
                 presentToast({ message: `✓ ¡Abono de $${effectiveUsd.toFixed(2)} registrado con éxito!`, duration: 2500, color: 'success' });
                 setSelectedOrderForAbono(null);
@@ -1913,6 +2174,24 @@ const Orders: React.FC = () => {
                     )}
                   </div>
 
+                  {/* Fecha personalizada de próximo abono */}
+                  {effectiveUsd < restante - 0.01 && (
+                    <div style={{ marginBottom: '16px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', padding: '12px' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#92400E', marginBottom: '4px' }}>
+                        ⏰ Fecha de Vencimiento del Próximo Abono (Personalizable)
+                      </label>
+                      <input
+                        type="date"
+                        value={abonoNextDueDate}
+                        onChange={e => setAbonoNextDueDate(e.target.value)}
+                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #FCD34D', fontSize: '13px', fontWeight: '700', background: '#FFFFFF', color: '#0F172A' }}
+                      />
+                      <span style={{ display: 'block', fontSize: '11px', color: '#B45309', marginTop: '4px' }}>
+                        Por defecto {systemSettings?.abonoDefaultDueDays || 7} días. Recibirás alerta cuando llegue esta fecha.
+                      </span>
+                    </div>
+                  )}
+
                   {/* Confirm Button */}
                   <button
                     type="button"
@@ -1952,6 +2231,10 @@ const Orders: React.FC = () => {
                   await apiClient.patch(`/orders/${selectedOrderForCobro.id}/payment`, {
                     status: PaymentStatus.PAID,
                     paymentMethod: 'USD',
+                    usdReceived: received,
+                    changeAmount: changeUsd > 0 ? changeUsd : undefined,
+                    changeAmountBs: changeBs > 0 ? changeBs : undefined,
+                    changeMethod: changeUsd > 0 ? 'CASH_BS' : undefined,
                     notes: (selectedOrderForCobro.notes ? selectedOrderForCobro.notes + '\n' : '') + `Pago USD: $${restante.toFixed(2)} | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
                   });
                   presentToast({ message: 'Pago en USD registrado', duration: 2000, color: 'success' });

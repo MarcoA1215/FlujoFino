@@ -30,7 +30,8 @@ import {
   timeOutline,
   imageOutline,
   arrowForwardOutline,
-  flashOutline
+  flashOutline,
+  calendarOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
@@ -42,15 +43,27 @@ import AppHeader from '../components/AppHeader';
 import { SalaryAdvanceModal } from '../components/SalaryAdvanceModal';
 import { BankSelect } from '../components/BankSelect';
 
+type ProductVariant = {
+  id: string;
+  name: string;
+  sku?: string;
+  stockQuantity: number;
+  priceOverride?: number | null;
+  images?: string[];
+};
+
 type Product = {
   id: string;
   name: string;
+  code?: string;
   category?: string;
   stockQuantity: number;
   salePrice: number;
   baseCost: number;
   durationMinutes?: number;
   images?: string[] | string;
+  hasVariants?: boolean;
+  variants?: ProductVariant[];
   recipe?: any[];
   isCombo?: boolean;
   isPreAssembled?: boolean;
@@ -66,6 +79,8 @@ type Product = {
 type CartItem = {
   cartItemId: string;
   product: Product;
+  variantId?: string;
+  variantName?: string;
   quantity: number;
   unitPrice: number;
   employeeId?: string;
@@ -74,7 +89,7 @@ type CartItem = {
   hasModifications?: boolean;
 };
 
-type PaymentMethod = 'PENDING' | 'PAGO_MOVIL' | 'USD' | 'PUNTO' | 'BINANCE' | 'TRANSFER';
+type PaymentMethod = 'PENDING' | 'PAGO_MOVIL' | 'USD' | 'PUNTO' | 'BINANCE' | 'TRANSFER' | 'CASH_COP' | 'TRANSFER_COP';
 
 export function getProductStockBadgeLabel(pStock: number, isService: boolean = false, durationMinutes?: number): string {
   if (isService) {
@@ -118,6 +133,7 @@ const Pos: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
+  const [selectingVariantProduct, setSelectingVariantProduct] = useState<Product | null>(null);
 
   // Raw Materials & Customization (Extras / Retiro de Insumos)
   const [availableRawMaterials, setAvailableRawMaterials] = useState<any[]>([]);
@@ -165,6 +181,20 @@ const Pos: React.FC = () => {
     } catch (e) {}
     return 'Bs.';
   });
+  const [enableCopCurrency, setEnableCopCurrency] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('flujofino_enable_cop') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [exchangeRateCop, setExchangeRateCop] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('flujofino_exchange_rate_cop');
+      if (saved && !isNaN(Number(saved)) && Number(saved) > 0) return Number(saved);
+    } catch {}
+    return 4000;
+  });
   const [, setAllowPartialPayments] = useState<boolean>(false);
   const [settings, setSettings] = useState<any>(() => {
     try {
@@ -175,6 +205,11 @@ const Pos: React.FC = () => {
   });
   const [initialAbono, setInitialAbono] = useState<string>('');
   const [bypassMinDeposit, setBypassMinDeposit] = useState<boolean>(false);
+  const [nextAbonoDueDate, setNextAbonoDueDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split('T')[0];
+  });
 
   // Discounts
   const [discountType, setDiscountType] = useState<'FIXED' | 'PERCENTAGE'>('FIXED');
@@ -193,8 +228,12 @@ const Pos: React.FC = () => {
   const [transferRef, setTransferRef] = useState('');
   const [transferBank, setTransferBank] = useState('');
 
+  const [copReceived, setCopReceived] = useState<number | ''>('');
+  const [copRef, setCopRef] = useState('');
+  const [copBank, setCopBank] = useState('Nequi');
+
   const [usdReceived, setUsdReceived] = useState<number | ''>('');
-  const [changeMethod, setChangeMethod] = useState<'CASH_USD' | 'PAGO_MOVIL' | 'CASH_BS'>('CASH_USD');
+  const [changeMethod, setChangeMethod] = useState<'CASH_USD' | 'PAGO_MOVIL' | 'CASH_BS' | 'CASH_COP'>('CASH_USD');
   const [changeRef, setChangeRef] = useState('');
   const [changePhone, setChangePhone] = useState('');
   const [changeBank, setChangeBank] = useState('');
@@ -263,11 +302,26 @@ const Pos: React.FC = () => {
         setCurrencySymbol(s.currencySymbol);
         localStorage.setItem('flujofino_currency_symbol', s.currencySymbol);
       }
+      const copEnabled = Boolean(s.enableCopCurrency);
+      const copRate = Number(s.exchangeRateCop || 4000);
+      setEnableCopCurrency(copEnabled);
+      setExchangeRateCop(copRate);
+      localStorage.setItem('flujofino_enable_cop', String(copEnabled));
+      localStorage.setItem('flujofino_exchange_rate_cop', String(copRate));
+      if (s.companyCopBank) setCopBank(s.companyCopBank);
+
       localStorage.setItem('flujofino_cached_settings', JSON.stringify(s));
       setAllowPartialPayments(s.allowPartialPayments !== false);
 
+      const defaultDays = Number(s.abonoDefaultDueDays) > 0 ? Number(s.abonoDefaultDueDays) : 7;
+      const d = new Date();
+      d.setDate(d.getDate() + defaultDays);
+      setNextAbonoDueDate(d.toISOString().split('T')[0]);
+
       if (s.acceptPagoMovil !== false) setPaymentMethod('PAGO_MOVIL');
       else if (s.acceptCashUsd !== false) setPaymentMethod('USD');
+      else if (copEnabled && s.acceptCashCop !== false) setPaymentMethod('CASH_COP');
+      else if (copEnabled && s.acceptTransferCop === true) setPaymentMethod('TRANSFER_COP');
       else if (s.acceptCardPos === true) setPaymentMethod('PUNTO');
       else if (s.acceptBinance === true) setPaymentMethod('BINANCE');
       else if (s.acceptTransfer === true) setPaymentMethod('TRANSFER');
@@ -456,6 +510,12 @@ const Pos: React.FC = () => {
         }
         if (s.currencySymbol) {
           setCurrencySymbol(s.currencySymbol);
+        }
+        if (s.enableCopCurrency !== undefined) {
+          setEnableCopCurrency(Boolean(s.enableCopCurrency));
+        }
+        if (s.exchangeRateCop) {
+          setExchangeRateCop(Number(s.exchangeRateCop));
         }
         setSettings((prev: any) => ({ ...prev, ...s }));
       }
@@ -671,7 +731,15 @@ const Pos: React.FC = () => {
         } as Product));
     }
     return products.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const q = searchTerm.toLowerCase();
+      const matchesName = p.name.toLowerCase().includes(q);
+      const matchesCode = Boolean(p.code && p.code.toLowerCase().includes(q));
+      const matchesVariant = Boolean(
+        p.hasVariants &&
+        Array.isArray(p.variants) &&
+        p.variants.some(v => v.name?.toLowerCase().includes(q) || v.sku?.toLowerCase().includes(q))
+      );
+      const matchesSearch = matchesName || matchesCode || matchesVariant;
       const matchesCategory =
         selectedCategory === 'Todos' ||
         (selectedCategory === 'Servicios' ? (p.category === 'Servicios' || p.durationMinutes) : p.category === selectedCategory);
@@ -680,9 +748,23 @@ const Pos: React.FC = () => {
   }, [products, searchTerm, selectedCategory, availableRawMaterials]);
 
   // Cart operations
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, chosenVariant?: ProductVariant) => {
+    if (product.hasVariants && Array.isArray(product.variants) && product.variants.length > 0 && !chosenVariant) {
+      setSelectingVariantProduct(product);
+      return;
+    }
+
+    const effectivePrice = chosenVariant && chosenVariant.priceOverride !== undefined && chosenVariant.priceOverride !== null
+      ? Number(chosenVariant.priceOverride)
+      : product.salePrice;
+
     setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id && !item.hasModifications);
+      const existing = prev.find(
+        item =>
+          item.product.id === product.id &&
+          (item.variantId || '') === (chosenVariant?.id || '') &&
+          !item.hasModifications
+      );
       if (existing) {
         return prev.map(item =>
           item.cartItemId === existing.cartItemId
@@ -695,15 +777,21 @@ const Pos: React.FC = () => {
         {
           cartItemId: Date.now() + '_' + Math.random().toString(36).substring(2, 7),
           product,
+          variantId: chosenVariant?.id,
+          variantName: chosenVariant?.name,
           quantity: 1,
-          unitPrice: product.salePrice,
+          unitPrice: effectivePrice,
           hasModifications: false,
           removedIngredients: [],
           addedExtras: []
         }
       ];
     });
-    presentToast({ message: `+1 ${product.name}`, duration: 1000, color: 'success', position: 'top' });
+    const label = chosenVariant ? `${product.name} (${chosenVariant.name})` : product.name;
+    presentToast({ message: `+1 ${label}`, duration: 1000, color: 'success', position: 'top' });
+    if (chosenVariant) {
+      setSelectingVariantProduct(null);
+    }
   };
 
   const updateQuantity = (cartItemId: string, quantity: number) => {
@@ -850,23 +938,37 @@ const Pos: React.FC = () => {
     return totalCart * exchangeRate;
   }, [totalCart, exchangeRate]);
 
+  const totalCartCop = useMemo(() => {
+    return Math.round(totalCart * exchangeRateCop);
+  }, [totalCart, exchangeRateCop]);
+
   const formatLocalAmount = (val: number) => {
     return currencySymbol === 'COP'
       ? Number(val).toLocaleString('es-CO')
       : Number(val).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  // Vuelto calculation for Cash USD
+  // Vuelto calculation for Cash USD or Cash COP
   const vueltoUsd = useMemo(() => {
-    if (typeof usdReceived === 'number' && usdReceived >= totalCart) {
+    if (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived >= totalCart) {
       return usdReceived - totalCart;
     }
+    if (paymentMethod === 'CASH_COP' && typeof copReceived === 'number' && copReceived >= totalCartCop && exchangeRateCop > 0) {
+      return (copReceived - totalCartCop) / exchangeRateCop;
+    }
     return 0;
-  }, [usdReceived, totalCart]);
+  }, [paymentMethod, usdReceived, copReceived, totalCart, totalCartCop, exchangeRateCop]);
 
   const vueltoBs = useMemo(() => {
     return vueltoUsd * exchangeRate;
   }, [vueltoUsd, exchangeRate]);
+
+  const vueltoCop = useMemo(() => {
+    if (paymentMethod === 'CASH_COP' && typeof copReceived === 'number' && copReceived >= totalCartCop) {
+      return Math.round(copReceived - totalCartCop);
+    }
+    return Math.round(vueltoUsd * exchangeRateCop);
+  }, [paymentMethod, copReceived, totalCartCop, vueltoUsd, exchangeRateCop]);
 
   // Place / Confirm Order (handles Online & Offline with Dexie)
   const placeOrder = async () => {
@@ -896,6 +998,34 @@ const Pos: React.FC = () => {
           });
           return;
         }
+      }
+
+      if (paymentMethod === 'CASH_COP') {
+        if (copReceived === '' || copReceived === undefined || isNaN(Number(copReceived))) {
+          presentToast({
+            message: 'Por favor ingresa el monto de efectivo recibido en Pesos Colombianos ($ COP)',
+            duration: 3000,
+            color: 'warning'
+          });
+          return;
+        }
+        if (Number(copReceived) < totalCartCop) {
+          presentToast({
+            message: `El monto recibido ($${Number(copReceived).toLocaleString('es-CO')} COP) es menor al total a pagar ($${totalCartCop.toLocaleString('es-CO')} COP)`,
+            duration: 3000,
+            color: 'warning'
+          });
+          return;
+        }
+      }
+
+      if (paymentMethod === 'TRANSFER_COP' && !copRef.trim()) {
+        presentToast({
+          message: 'Por favor ingresa el número de referencia o comprobante Nequi / Bancolombia',
+          duration: 3000,
+          color: 'warning'
+        });
+        return;
       }
 
       if (paymentMethod === 'PAGO_MOVIL') {
@@ -948,7 +1078,10 @@ const Pos: React.FC = () => {
       }
     }
 
-    if (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) {
+    const hasChange = (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ||
+      (paymentMethod === 'CASH_COP' && typeof copReceived === 'number' && copReceived > totalCartCop);
+
+    if (hasChange) {
       if (changeMethod === 'PAGO_MOVIL' && !changeRef.trim()) {
         presentToast({
           message: 'Por favor indica la Referencia del Pago Móvil del vuelto para el arqueo de caja',
@@ -981,6 +1114,8 @@ const Pos: React.FC = () => {
       items: cart.map(item => ({
         id: item.cartItemId && !item.cartItemId.includes('_') ? item.cartItemId : (item as any).id,
         productId: item.product?.id || (item as any).productId,
+        variantId: item.variantId || undefined,
+        variantName: item.variantName || undefined,
         quantity: Number(item.quantity) || 1,
         unitPrice: Number(item.unitPrice || item.product?.salePrice || 0),
         employeeId: item.employeeId || undefined,
@@ -1000,19 +1135,38 @@ const Pos: React.FC = () => {
       binanceRef: paymentMethod === 'BINANCE' ? binanceRef : undefined,
       transferRef: paymentMethod === 'TRANSFER' ? transferRef : undefined,
       transferBank: paymentMethod === 'TRANSFER' ? transferBank : undefined,
+      copReceived: paymentMethod === 'CASH_COP' && typeof copReceived === 'number' ? copReceived : undefined,
+      copRef: paymentMethod === 'TRANSFER_COP' ? copRef : undefined,
+      copBank: paymentMethod === 'TRANSFER_COP' ? copBank : undefined,
       usdReceived: paymentMethod === 'USD' && typeof usdReceived === 'number' ? usdReceived : undefined,
-      changeAmount: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? vueltoUsd : undefined,
-      changeAmountBs: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? vueltoBs : undefined,
-      changeMethod: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? changeMethod : undefined,
-      changeRef: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart) ? (changeRef.trim() || undefined) : undefined,
-      changePhone: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart && changeMethod === 'PAGO_MOVIL') ? (changePhone.trim() || customerPhone.trim() || customerCedula.trim() || undefined) : undefined,
-      changeBank: (paymentMethod === 'USD' && typeof usdReceived === 'number' && usdReceived > totalCart && changeMethod === 'PAGO_MOVIL') ? (changeBank || undefined) : undefined,
+      changeAmount: hasChange ? vueltoUsd : undefined,
+      changeAmountBs: hasChange ? vueltoBs : undefined,
+      changeAmountCop: hasChange ? vueltoCop : undefined,
+      changeMethod: hasChange ? changeMethod : undefined,
+      changeRef: hasChange ? (changeRef.trim() || undefined) : undefined,
+      changePhone: (hasChange && changeMethod === 'PAGO_MOVIL') ? (changePhone.trim() || customerPhone.trim() || customerCedula.trim() || undefined) : undefined,
+      changeBank: (hasChange && changeMethod === 'PAGO_MOVIL') ? (changeBank || undefined) : undefined,
       initialAbono: paymentMethod === 'PENDING' ? abonoAmount : undefined,
+      nextAbonoDueDate: paymentMethod === 'PENDING' && abonoAmount < totalCart && nextAbonoDueDate ? nextAbonoDueDate : undefined,
       bypassMinDeposit: paymentMethod === 'PENDING' ? bypassMinDeposit : undefined,
       amountBs: Number(totalCartBs.toFixed(2)),
       exchangeRate: exchangeRate,
       exchangeRateBs: exchangeRate,
+      amountCop: enableCopCurrency ? totalCartCop : undefined,
+      exchangeRateCop: enableCopCurrency ? exchangeRateCop : undefined,
       linkedReservationId: linkedReservationId || undefined
+    };
+
+    const buildSaleCopySummary = (orderIdStr: string) => {
+      const code = `#ORD-${orderIdStr.slice(-6).toUpperCase()}`;
+      const itemsLines = cart
+        .map(it => `• ${it.quantity}x ${it.product.name}${it.variantName ? ` (${it.variantName})` : ''} - $${((it.unitPrice || it.product.salePrice) * it.quantity).toFixed(2)}`)
+        .join('\n');
+      const statusText = paymentMethod === 'PENDING'
+        ? (abonoAmount > 0 ? `Abonado ($${abonoAmount.toFixed(2)} USD) - Pendiente: $${Math.max(0, totalCart - abonoAmount).toFixed(2)} USD` : 'Cuenta Abierta / Por Pagar')
+        : 'Pagado ✓';
+      const copPart = enableCopCurrency ? ` | 🇨🇴 $${totalCartCop.toLocaleString('es-CO')} COP` : '';
+      return `🧾 *Comprobante de Venta ${code}*\n👤 Cliente: ${customerName.trim() || 'Cliente Mostrador'}\n\n*Detalle:*\n${itemsLines}\n\n💵 *Total:* $${totalCart.toFixed(2)} USD (${currencySymbol} ${formatLocalAmount(totalCartBs)}${copPart})\n📌 *Estado:* ${statusText}`;
     };
 
     const executeOrderSubmit = async (orderPayload: any) => {
@@ -1050,10 +1204,19 @@ const Pos: React.FC = () => {
               return updated;
             });
 
+            const summaryToCopy = buildSaleCopySummary(offlineId);
             presentToast({
               message: '✓ Venta guardada localmente (Modo Offline)',
-              duration: 3000,
-              color: 'success'
+              duration: 4500,
+              color: 'success',
+              buttons: [
+                {
+                  text: '📋 Copiar Código',
+                  handler: () => {
+                    navigator.clipboard?.writeText(summaryToCopy);
+                  }
+                }
+              ]
             });
 
             // Reset cart and modal
@@ -1070,6 +1233,8 @@ const Pos: React.FC = () => {
             setBinanceRef('');
             setTransferRef('');
             setTransferBank('');
+            setCopReceived('');
+            setCopRef('');
             setUsdReceived('');
             setChangeMethod('CASH_USD');
             setChangeRef('');
@@ -1091,13 +1256,32 @@ const Pos: React.FC = () => {
 
         // ONLINE MODE: Send to server
         try {
+          let createdOrUpdatedOrder: any = null;
           if (editingOrderId) {
-            await apiClient.put(`/orders/${editingOrderId}`, orderPayload);
-            presentToast({ message: 'Pedido actualizado con éxito', duration: 2500, color: 'success' });
+            const res = await apiClient.put(`/orders/${editingOrderId}`, orderPayload);
+            createdOrUpdatedOrder = res.data;
           } else {
-            await apiClient.post('/orders', orderPayload);
-            presentToast({ message: '✓ ¡Pedido registrado con éxito!', duration: 2500, color: 'success' });
+            const res = await apiClient.post('/orders', orderPayload);
+            createdOrUpdatedOrder = res.data;
           }
+
+          const orderIdForCopy = createdOrUpdatedOrder?.id || editingOrderId || String(Date.now());
+          const summaryToCopy = buildSaleCopySummary(orderIdForCopy);
+          const shortCode = `#ORD-${orderIdForCopy.slice(-6).toUpperCase()}`;
+
+          presentToast({
+            message: editingOrderId ? `Pedido ${shortCode} actualizado` : `✓ ¡Venta ${shortCode} registrada!`,
+            duration: 5000,
+            color: 'success',
+            buttons: [
+              {
+                text: '📋 Copiar Código',
+                handler: () => {
+                  navigator.clipboard?.writeText(summaryToCopy);
+                }
+              }
+            ]
+          });
 
           setCart([]);
           setCustomerName('');
@@ -1112,6 +1296,8 @@ const Pos: React.FC = () => {
           setBinanceRef('');
           setTransferRef('');
           setTransferBank('');
+          setCopReceived('');
+          setCopRef('');
           setUsdReceived('');
           setChangeMethod('CASH_USD');
           setChangeRef('');
@@ -1417,6 +1603,20 @@ const Pos: React.FC = () => {
 
                       {/* Card Content */}
                       <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                        {(p.code || (p.hasVariants && Array.isArray(p.variants) && p.variants.length > 0)) && (
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                            {p.code && (
+                              <span style={{ fontSize: '9px', fontWeight: '800', color: '#475569', background: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>
+                                #{p.code}
+                              </span>
+                            )}
+                            {p.hasVariants && Array.isArray(p.variants) && p.variants.length > 0 && (
+                              <span style={{ fontSize: '9px', fontWeight: '800', color: '#6D28D9', background: '#F3E8FF', padding: '1px 6px', borderRadius: '4px' }}>
+                                🎨 {p.variants.length} var.
+                              </span>
+                            )}
+                          </div>
+                        )}
                         <div
                           style={{
                             fontSize: '13px',
@@ -1444,6 +1644,11 @@ const Pos: React.FC = () => {
                           <div style={{ fontSize: '11px', fontWeight: '500', color: '#64748B', marginTop: '1px' }}>
                             ({currencySymbol} {currencySymbol === 'COP' ? Number(p.salePrice * exchangeRate).toLocaleString('es-CO') : (p.salePrice * exchangeRate).toFixed(2)})
                           </div>
+                          {enableCopCurrency && (
+                            <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#854D0E', marginTop: '1px' }}>
+                              🇨🇴 ${Math.round(p.salePrice * exchangeRateCop).toLocaleString('es-CO')} COP
+                            </div>
+                          )}
                         </div>
 
                         {/* Meta badge & Add button */}
@@ -1513,6 +1718,7 @@ const Pos: React.FC = () => {
                 </div>
                 <div style={{ fontSize: '11px', color: '#94A3B8' }}>
                   {currencySymbol} {currencySymbol === 'COP' ? Number(totalCartBs).toLocaleString('es-CO') : totalCartBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {enableCopCurrency ? ` • 🇨🇴 $${totalCartCop.toLocaleString('es-CO')} COP` : ''}
                 </div>
               </div>
             </div>
@@ -1579,6 +1785,11 @@ const Pos: React.FC = () => {
                       <div style={{ flex: 1, paddingRight: '8px' }}>
                         <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           <span>{item.quantity}x {item.product.name}</span>
+                          {item.variantName && (
+                            <span style={{ fontSize: '10px', fontWeight: '800', background: '#F3E8FF', color: '#6D28D9', padding: '1px 6px', borderRadius: '4px' }}>
+                              🎨 {item.variantName}
+                            </span>
+                          )}
                           {item.employeeId && (
                             <span style={{ fontSize: '10px', fontWeight: '700', background: '#ECFDF5', color: '#065F46', padding: '1px 6px', borderRadius: '4px' }}>
                               👤 {employees.find(e => e.id === item.employeeId)?.name || employees.find(e => e.id === item.employeeId)?.username || 'Especialista'}
@@ -1673,6 +1884,7 @@ const Pos: React.FC = () => {
                       <span style={{ fontSize: '13px', fontWeight: '600', color: '#64748B' }}>Total a Pagar:</span>
                       <div style={{ fontSize: '11px', color: '#64748B' }}>
                         Tasa: {currencySymbol} {currencySymbol === 'COP' ? Number(exchangeRate).toLocaleString('es-CO') : exchangeRate.toFixed(2)}
+                        {enableCopCurrency ? ` • 🇨🇴 $${exchangeRateCop.toLocaleString('es-CO')} COP` : ''}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -1682,6 +1894,11 @@ const Pos: React.FC = () => {
                       <div style={{ fontSize: '12px', fontWeight: '700', color: '#0F172A' }}>
                         {currencySymbol} {currencySymbol === 'COP' ? Number(totalCartBs).toLocaleString('es-CO') : totalCartBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
+                      {enableCopCurrency && (
+                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#854D0E', marginTop: '2px' }}>
+                          🇨🇴 ${totalCartCop.toLocaleString('es-CO')} COP
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2168,6 +2385,54 @@ const Pos: React.FC = () => {
                       </button>
                     )}
 
+                    {/* Efectivo COP (Pesos Colombianos) */}
+                    {enableCopCurrency && settings?.acceptCashCop !== false && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('CASH_COP')}
+                        style={{
+                          padding: '12px 10px',
+                          borderRadius: '12px',
+                          border: paymentMethod === 'CASH_COP' ? '2px solid #CA8A04' : '1px solid #E2E8F0',
+                          background: paymentMethod === 'CASH_COP' ? '#FEF9C3' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <span style={{ fontSize: '16px' }}>🇨🇴</span>
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'CASH_COP' ? '#854D0E' : '#0F172A' }}>
+                          Efectivo COP
+                        </span>
+                      </button>
+                    )}
+
+                    {/* Nequi / Bancolombia / Daviplata (COP) */}
+                    {enableCopCurrency && settings?.acceptTransferCop === true && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('TRANSFER_COP')}
+                        style={{
+                          padding: '12px 10px',
+                          borderRadius: '12px',
+                          border: paymentMethod === 'TRANSFER_COP' ? '2px solid #CA8A04' : '1px solid #E2E8F0',
+                          background: paymentMethod === 'TRANSFER_COP' ? '#FEF9C3' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <span style={{ fontSize: '16px' }}>📲</span>
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'TRANSFER_COP' ? '#854D0E' : '#0F172A' }}>
+                          {settings?.companyCopBank || 'Nequi / COP'}
+                        </span>
+                      </button>
+                    )}
+
                     {/* Punto de Venta */}
                     {settings?.acceptCardPos === true && (
                       <button
@@ -2294,6 +2559,111 @@ const Pos: React.FC = () => {
                           value={pagoMovilBank}
                           onChange={val => setPagoMovilBank(val)}
                           placeholder="Selecciona banco..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Dynamic Fields: Efectivo COP + Vuelto Card */}
+                {paymentMethod === 'CASH_COP' && (
+                  <div style={{ background: '#FEFCE8', borderRadius: '16px', border: '1px solid #FDE047', padding: '14px', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: '800', color: '#854D0E' }}>
+                        🇨🇴 Efectivo Recibido ($ COP)
+                      </label>
+                      <span style={{ fontSize: '12px', fontWeight: '900', color: '#0F172A' }}>
+                        Total: ${totalCartCop.toLocaleString('es-CO')} COP
+                      </span>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      value={copReceived}
+                      onChange={e => setCopReceived(e.target.value ? parseFloat(e.target.value) : '')}
+                      placeholder={`Ej. ${Math.ceil(totalCartCop / 1000) * 1000}`}
+                      style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #FDE047', fontSize: '15px', fontWeight: '800', background: '#ffffff', marginBottom: '8px' }}
+                    />
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                      {[totalCartCop, 20000, 50000, 100000].map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setCopReceived(preset)}
+                          style={{
+                            padding: '5px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #FDE047',
+                            background: '#ffffff',
+                            color: '#854D0E',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {idx === 0 ? `Exacto ($${preset.toLocaleString('es-CO')})` : `$${preset.toLocaleString('es-CO')}`}
+                        </button>
+                      ))}
+                    </div>
+
+                    {typeof copReceived === 'number' && copReceived >= totalCartCop && (
+                      <div style={{ background: '#ffffff', border: '1px solid #FDE047', borderRadius: '12px', padding: '12px', marginTop: '6px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '800', color: '#854D0E', marginBottom: '4px' }}>
+                          💵 Vuelto a Entregar (Triángulo COP / USD / Bs):
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                          <span style={{ fontSize: '17px', fontWeight: '900', color: '#854D0E' }}>
+                            🇨🇴 ${vueltoCop.toLocaleString('es-CO')} COP
+                          </span>
+                          <span style={{ fontSize: '13px', fontWeight: '800', color: '#047857' }}>
+                            💵 ${vueltoUsd.toFixed(2)} USD
+                          </span>
+                          <span style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A' }}>
+                            🇻🇪 {currencySymbol} {formatLocalAmount(vueltoBs)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Dynamic Fields: Nequi / Bancolombia / Daviplata (TRANSFER_COP) */}
+                {paymentMethod === 'TRANSFER_COP' && (
+                  <div style={{ background: '#FEFCE8', borderRadius: '16px', border: '1px solid #FDE047', padding: '14px', marginBottom: '16px' }}>
+                    {settings?.companyCopAccountNumber && (
+                      <div style={{ background: '#ffffff', borderRadius: '10px', padding: '10px 12px', border: '1px solid #FEF08A', marginBottom: '10px', fontSize: '12px', color: '#0F172A' }}>
+                        <div style={{ fontWeight: '800', color: '#854D0E' }}>
+                          📲 Enviar ${totalCartCop.toLocaleString('es-CO')} COP a {settings.companyCopBank || 'Nequi / Bancolombia'}:
+                        </div>
+                        <div style={{ fontWeight: '700', marginTop: '2px' }}>
+                          Cuenta/Celular: {settings.companyCopAccountNumber} {settings.companyCopAccountHolder ? `• ${settings.companyCopAccountHolder}` : ''}
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#854D0E', marginBottom: '4px' }}>
+                          Referencia / Comprobante *
+                        </label>
+                        <input
+                          type="text"
+                          value={copRef}
+                          onChange={e => setCopRef(e.target.value)}
+                          placeholder="Ej. M1234567"
+                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#ffffff' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#854D0E', marginBottom: '4px' }}>
+                          Plataforma / Banco COP
+                        </label>
+                        <input
+                          type="text"
+                          value={copBank}
+                          onChange={e => setCopBank(e.target.value)}
+                          placeholder="Nequi / Bancolombia"
+                          style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#ffffff' }}
                         />
                       </div>
                     </div>
@@ -2631,6 +3001,24 @@ const Pos: React.FC = () => {
                         />
                       </div>
 
+                      {saldoPendiente > 0.01 && (
+                        <div style={{ marginBottom: '12px' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: '#78350F', marginBottom: '4px' }}>
+                            <IonIcon icon={calendarOutline} style={{ fontSize: '15px' }} />
+                            Fecha de Vencimiento del Próximo Abono
+                          </label>
+                          <input
+                            type="date"
+                            value={nextAbonoDueDate}
+                            onChange={e => setNextAbonoDueDate(e.target.value)}
+                            style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #FCD34D', fontSize: '13px', fontWeight: '700', background: '#ffffff', color: '#0F172A' }}
+                          />
+                          <div style={{ fontSize: '10.5px', color: '#92400E', marginTop: '3px' }}>
+                            Se mostrará alerta de vencimiento en Caja/Pedidos al cumplirse esta fecha.
+                          </div>
+                        </div>
+                      )}
+
                       {/* Saldo Breakdown Card */}
                       <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #FCD34D', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
@@ -2892,6 +3280,132 @@ const Pos: React.FC = () => {
               >
                 {editingCartItemId ? 'Guardar Cambios ✓' : 'Agregar al Carrito ✓'}
               </button>
+            </div>
+          </div>
+        </IonModal>
+
+        {/* Modal Selector de Sub-producto / Variante */}
+        <IonModal isOpen={Boolean(selectingVariantProduct)} onDidDismiss={() => setSelectingVariantProduct(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#F8FAFC' }}>
+            <div style={{ background: '#ffffff', padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: '800', color: '#6D28D9', textTransform: 'uppercase' }}>
+                  🎨 Seleccionar Sub-producto / Variante
+                </div>
+                <h3 style={{ margin: '2px 0 0 0', fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
+                  {selectingVariantProduct?.name}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectingVariantProduct(null)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748B' }}
+              >
+                <IonIcon icon={closeOutline} style={{ fontSize: '20px' }} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                {(selectingVariantProduct?.variants || []).map(v => {
+                  const vPrice = v.priceOverride !== undefined && v.priceOverride !== null
+                    ? Number(v.priceOverride)
+                    : Number(selectingVariantProduct?.salePrice || 0);
+                  const vStock = Number(v.stockQuantity || 0);
+                  const vImg = Array.isArray(v.images) && v.images.length > 0 ? v.images[0] : null;
+                  const inCartCount = cart
+                    .filter(it => it.product.id === selectingVariantProduct?.id && it.variantId === v.id)
+                    .reduce((acc, it) => acc + it.quantity, 0);
+
+                  return (
+                    <div
+                      key={v.id}
+                      onClick={() => {
+                        if (selectingVariantProduct) {
+                          addToCart(selectingVariantProduct, v);
+                        }
+                      }}
+                      className="ff-card ff-card-interactive"
+                      style={{
+                        background: '#ffffff',
+                        borderRadius: '14px',
+                        border: inCartCount > 0 ? '2px solid #10B981' : '1px solid #E2E8F0',
+                        padding: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {vImg ? (
+                        <img
+                          src={vImg}
+                          alt={v.name}
+                          onClick={e => {
+                            e.stopPropagation();
+                            openImage(vImg, `${selectingVariantProduct?.name} - ${v.name}`);
+                          }}
+                          style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0, border: '1px solid #E2E8F0' }}
+                        />
+                      ) : (
+                        <div style={{ width: '56px', height: '56px', borderRadius: '10px', background: '#F3E8FF', color: '#6D28D9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '18px', flexShrink: 0 }}>
+                          🎨
+                        </div>
+                      )}
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '14px', fontWeight: '800', color: '#0F172A' }}>
+                            {v.name}
+                          </span>
+                          {v.sku && (
+                            <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748B', background: '#F1F5F9', padding: '1px 5px', borderRadius: '4px' }}>
+                              #{v.sku}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '14px', fontWeight: '800', color: '#10B981', marginTop: '2px' }}>
+                          ${vPrice.toFixed(2)} USD
+                          <span style={{ fontSize: '11px', fontWeight: '600', color: '#64748B', marginLeft: '6px' }}>
+                            ({currencySymbol} {formatLocalAmount(vPrice * exchangeRate)})
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                          <span style={{
+                            fontSize: '10.5px',
+                            fontWeight: '700',
+                            padding: '2px 7px',
+                            borderRadius: '6px',
+                            background: vStock <= 0 ? '#FEF2F2' : '#ECFDF5',
+                            color: vStock <= 0 ? '#DC2626' : '#065F46'
+                          }}>
+                            {vStock <= 0 ? (vStock < 0 ? `Por producir: ${Math.abs(vStock)}` : 'Agotado (0)') : `Stock: ${vStock}`}
+                          </span>
+                          {inCartCount > 0 && (
+                            <span style={{ fontSize: '10.5px', fontWeight: '800', color: '#065F46', background: '#D1FAE5', padding: '2px 7px', borderRadius: '6px' }}>
+                              {inCartCount} en carrito
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: '50%',
+                        background: '#10B981',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <IonIcon icon={addOutline} style={{ fontSize: '18px' }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </IonModal>

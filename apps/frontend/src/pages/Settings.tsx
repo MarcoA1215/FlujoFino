@@ -75,11 +75,21 @@ interface Settings {
   exchangeRateMode?: 'BCV' | 'PARALELO' | 'USDT' | 'EUR' | 'MANUAL' | 'COP';
   manualExchangeRate?: number | null;
   currencySymbol?: string;
+  enableCopCurrency?: boolean;
+  exchangeRateCop?: number;
+  exchangeRateCopMode?: 'AUTO' | 'MANUAL';
+  manualExchangeRateCop?: number | null;
+  companyCopBank?: string;
+  companyCopAccountNumber?: string;
+  companyCopAccountHolder?: string;
+  acceptCashCop?: boolean;
+  acceptTransferCop?: boolean;
   availableRates?: {
     bcv?: number;
     parallel?: number;
     usdt?: number;
     eur?: number;
+    cop?: number;
     updatedAt?: string;
   } | null;
   companyBank?: string;
@@ -93,6 +103,7 @@ interface Settings {
   allowPartialPayments?: boolean;
   minDepositPercentage?: number;
   allowCashierBypassDeposit?: boolean;
+  abonoDefaultDueDays?: number;
   acceptCashUsd?: boolean;
   acceptPagoMovil?: boolean;
   acceptCardPos?: boolean;
@@ -279,8 +290,9 @@ const SettingsPage: React.FC = () => {
         }
         setSyncCooldown(30);
         const bcvRate = res.data.availableRates?.bcv || res.data.exchangeRateBs;
+        const copRate = res.data.availableRates?.cop;
         presentToast({
-          message: `¡Tasas de mercado sincronizadas con éxito! BCV: Bs. ${Number(bcvRate).toFixed(2)}`,
+          message: `¡Tasas sincronizadas! BCV: Bs. ${Number(bcvRate).toFixed(2)}${copRate ? ` • TRM COP: $${Math.round(Number(copRate)).toLocaleString('es-CO')}` : ''}`,
           duration: 3500,
           color: 'success',
         });
@@ -334,6 +346,15 @@ const SettingsPage: React.FC = () => {
         exchangeRateBs: Number(settings.exchangeRateBs) || undefined,
         manualExchangeRate: settings.manualExchangeRate !== undefined && settings.manualExchangeRate !== null ? Number(settings.manualExchangeRate) : null,
         currencySymbol: settings.currencySymbol || (settings.exchangeRateMode === 'COP' ? 'COP' : (settings.exchangeRateMode === 'EUR' ? '€' : 'Bs.')),
+        enableCopCurrency: Boolean(settings.enableCopCurrency),
+        exchangeRateCopMode: settings.exchangeRateCopMode || 'MANUAL',
+        exchangeRateCop: Number(settings.exchangeRateCop) || 4000,
+        manualExchangeRateCop: settings.manualExchangeRateCop !== undefined && settings.manualExchangeRateCop !== null ? Number(settings.manualExchangeRateCop) : null,
+        companyCopBank: settings.companyCopBank,
+        companyCopAccountNumber: settings.companyCopAccountNumber,
+        companyCopAccountHolder: settings.companyCopAccountHolder,
+        acceptCashCop: settings.acceptCashCop !== false,
+        acceptTransferCop: settings.acceptTransferCop === true,
         companyBank: settings.companyBank, 
         companyCedula: settings.companyCedula, 
         companyPhone: settings.companyPhone,
@@ -345,6 +366,7 @@ const SettingsPage: React.FC = () => {
         allowPartialPayments: settings.allowPartialPayments,
         minDepositPercentage: Number(settings.minDepositPercentage) || 0,
         allowCashierBypassDeposit: settings.allowCashierBypassDeposit !== false,
+        abonoDefaultDueDays: Math.max(1, Number(settings.abonoDefaultDueDays) || 7),
         acceptCashUsd: settings.acceptCashUsd !== false,
         acceptPagoMovil: settings.acceptPagoMovil !== false,
         acceptCardPos: settings.acceptCardPos === true,
@@ -815,6 +837,23 @@ const SettingsPage: React.FC = () => {
                           onIonChange={e => setSettings({...settings, allowCashierBypassDeposit: e.detail.checked})} 
                         />
                       </IonItem>
+
+                      <IonItem style={{ marginTop: '8px', background: '#f8fafc', borderRadius: '8px' }}>
+                        <IonLabel position="stacked">
+                          Plazo entre Abonos / Alerta de Vencimiento (Días)
+                          <small style={{ display: 'block', color: '#64748b' }}>
+                            Días por defecto para el próximo pago en cuentas abiertas antes de activar la alerta de vencimiento (Ej. 7 días).
+                          </small>
+                        </IonLabel>
+                        <IonInput
+                          type="number"
+                          min="1"
+                          max="365"
+                          value={settings.abonoDefaultDueDays !== undefined ? settings.abonoDefaultDueDays : 7}
+                          onIonInput={e => setSettings({...settings, abonoDefaultDueDays: Math.max(1, parseInt(e.detail.value!, 10) || 7)})}
+                          placeholder="7"
+                        />
+                      </IonItem>
                     </>
                   )}
 
@@ -1057,17 +1096,32 @@ const SettingsPage: React.FC = () => {
                     <IonCardTitle style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       💱 Tasa de Facturación y Conversión
                     </IonCardTitle>
-                    <span style={{
-                      background: '#ecfdf5',
-                      color: '#065f46',
-                      border: '1px solid #a7f3d0',
-                      padding: '4px 12px',
-                      borderRadius: '20px',
-                      fontWeight: 800,
-                      fontSize: '12px'
-                    }}>
-                      TASA ACTIVA: {settings.currencySymbol || (settings.exchangeRateMode === 'EUR' ? '€' : 'Bs.')} {Number(settings.exchangeRateBs || exchangeRate || 40).toFixed(2)}
-                    </span>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{
+                        background: '#ecfdf5',
+                        color: '#065f46',
+                        border: '1px solid #a7f3d0',
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        fontWeight: 800,
+                        fontSize: '12px'
+                      }}>
+                        TASA ACTIVA: {settings.currencySymbol || (settings.exchangeRateMode === 'EUR' ? '€' : 'Bs.')} {Number(settings.exchangeRateBs || exchangeRate || 40).toFixed(2)}
+                      </span>
+                      {settings.enableCopCurrency && (
+                        <span style={{
+                          background: '#fffbeb',
+                          color: '#92400e',
+                          border: '1px solid #fcd34d',
+                          padding: '4px 12px',
+                          borderRadius: '20px',
+                          fontWeight: 800,
+                          fontSize: '12px'
+                        }}>
+                          🇨🇴 COP ACTIVO: ${Math.round(Number(settings.exchangeRateCop || 4000)).toLocaleString('es-CO')} / USD
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </IonCardHeader>
 
@@ -1165,7 +1219,7 @@ const SettingsPage: React.FC = () => {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                       {settings.availableRates?.updatedAt && (
                                         <div style={{ fontSize: '11px', color: '#64748b' }}>
-                                          Última actualización: {new Date(settings.availableRates.updatedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} ({new Date(settings.availableRates.updatedAt).toLocaleDateString('es-VE')})
+                                          Última actualización: {new Date(settings.availableRates.updatedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true })} ({new Date(settings.availableRates.updatedAt).toLocaleDateString('es-VE')})
                                         </div>
                                       )}
                                       <button
@@ -1332,6 +1386,189 @@ const SettingsPage: React.FC = () => {
                           </div>
                         </IonCol>
                       )}
+
+                      {/* Triángulo Multi-Moneda: Pesos Colombianos (COP) Opcional */}
+                      <IonCol size="12">
+                        <div style={{
+                          marginTop: '14px',
+                          padding: '16px',
+                          borderRadius: '14px',
+                          border: settings.enableCopCurrency ? '2px solid #F59E0B' : '1px solid #E2E8F0',
+                          background: settings.enableCopCurrency ? 'linear-gradient(135deg, #FFFBEB 0%, #FFFFFF 100%)' : '#F8FAFC',
+                          transition: 'all 0.2s ease'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                            <div style={{ flex: 1, minWidth: '240px' }}>
+                              <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>🇨🇴</span> Triángulo Multi-Moneda: Pesos Colombianos (COP)
+                                {settings.enableCopCurrency && (
+                                  <span style={{ background: '#F59E0B', color: '#fff', fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '10px' }}>
+                                    ACTIVO
+                                  </span>
+                                )}
+                              </div>
+                              <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#64748B', lineHeight: '1.4' }}>
+                                Habilita esta opción si tu negocio opera con Pesos Colombianos además de USD y Bolívares. Podrás usar la <strong>TRM Oficial de Colombia</strong> o fijar tu propia tasa fronteriza personalizada.
+                              </p>
+                            </div>
+                            <IonToggle
+                              checked={Boolean(settings.enableCopCurrency)}
+                              onIonChange={e => setSettings({ ...settings, enableCopCurrency: e.detail.checked })}
+                            />
+                          </div>
+
+                          {settings.enableCopCurrency && (
+                            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #FDE68A' }}>
+                              {/* Visualizador del Triángulo USD - Bs - COP */}
+                              {(() => {
+                                const activeBs = Number(settings.exchangeRateBs || exchangeRate || 40);
+                                const officialTrm = Number(settings.availableRates?.cop || 4000);
+                                const activeCop = settings.exchangeRateCopMode === 'AUTO'
+                                  ? officialTrm
+                                  : Number(settings.manualExchangeRateCop || settings.exchangeRateCop || officialTrm || 4000);
+                                const copPerBs = activeBs > 0 ? Math.round(activeCop / activeBs) : 0;
+
+                                return (
+                                  <>
+                                    <div style={{
+                                      display: 'grid',
+                                      gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                                      gap: '10px',
+                                      marginBottom: '14px'
+                                    }}>
+                                      <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B' }}>🇺🇸 Base Ancla</div>
+                                        <div style={{ fontSize: '17px', fontWeight: 900, color: '#10B981', marginTop: '2px' }}>$1.00 USD</div>
+                                      </div>
+                                      <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B' }}>🇻🇪 Equivalente Bs.</div>
+                                        <div style={{ fontSize: '17px', fontWeight: 900, color: '#0F172A', marginTop: '2px' }}>Bs. {activeBs.toFixed(2)}</div>
+                                      </div>
+                                      <div style={{ background: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#92400E' }}>🇨🇴 Equivalente COP</div>
+                                        <div style={{ fontSize: '17px', fontWeight: 900, color: '#92400E', marginTop: '2px' }}>${Math.round(activeCop).toLocaleString('es-CO')} COP</div>
+                                        <div style={{ fontSize: '10.5px', color: '#B45309', fontWeight: 600 }}>≈ ${copPerBs.toLocaleString('es-CO')} COP por 1 Bs.</div>
+                                      </div>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+                                      <div
+                                        onClick={() => setSettings({
+                                          ...settings,
+                                          exchangeRateCopMode: 'AUTO',
+                                          exchangeRateCop: officialTrm,
+                                        })}
+                                        style={{
+                                          padding: '12px 14px',
+                                          borderRadius: '10px',
+                                          border: settings.exchangeRateCopMode === 'AUTO' ? '2px solid #10B981' : '1px solid #CBD5E1',
+                                          background: settings.exchangeRateCopMode === 'AUTO' ? '#ECFDF5' : '#FFFFFF',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                          <span style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>🌐 TRM Oficial Colombia (Auto)</span>
+                                          <span style={{ fontSize: '14px', fontWeight: 900, color: '#059669' }}>${Math.round(officialTrm).toLocaleString('es-CO')}</span>
+                                        </div>
+                                        <p style={{ margin: '4px 0 0 0', fontSize: '11.5px', color: '#64748B' }}>
+                                          Se actualiza automáticamente con la TRM vigente de la Superfinanciera / DolarApi Colombia.
+                                        </p>
+                                      </div>
+
+                                      <div
+                                        onClick={() => setSettings({
+                                          ...settings,
+                                          exchangeRateCopMode: 'MANUAL',
+                                        })}
+                                        style={{
+                                          padding: '12px 14px',
+                                          borderRadius: '10px',
+                                          border: (settings.exchangeRateCopMode || 'MANUAL') === 'MANUAL' ? '2px solid #F59E0B' : '1px solid #CBD5E1',
+                                          background: (settings.exchangeRateCopMode || 'MANUAL') === 'MANUAL' ? '#FFFBEB' : '#FFFFFF',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                          <span style={{ fontSize: '13px', fontWeight: 800, color: '#92400E' }}>✏️ Tasa Personalizada / Frontera</span>
+                                          <span style={{ fontSize: '11px', fontWeight: 800, background: '#FDE68A', color: '#92400E', padding: '2px 8px', borderRadius: '8px' }}>
+                                            Libre elección
+                                          </span>
+                                        </div>
+                                        <p style={{ margin: '4px 0 0 0', fontSize: '11.5px', color: '#78350F' }}>
+                                          Define tú mismo a cuántos pesos recibes el dólar en tu zona (ej. 3.800 o 4.000 COP).
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    {(settings.exchangeRateCopMode || 'MANUAL') === 'MANUAL' && (
+                                      <div style={{ marginTop: '12px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <div style={{ flex: 1, minWidth: '200px' }}>
+                                          <label style={{ display: 'block', fontSize: '12px', fontWeight: 800, color: '#92400E', marginBottom: '4px' }}>
+                                            Tasa Personalizada COP por 1 USD:
+                                          </label>
+                                          <input
+                                            type="number"
+                                            step="10"
+                                            min="100"
+                                            value={settings.manualExchangeRateCop ?? settings.exchangeRateCop ?? 4000}
+                                            onChange={e => {
+                                              const val = parseFloat(e.target.value);
+                                              setSettings({
+                                                ...settings,
+                                                exchangeRateCopMode: 'MANUAL',
+                                                manualExchangeRateCop: isNaN(val) ? null : val,
+                                                exchangeRateCop: isNaN(val) ? 4000 : val,
+                                              });
+                                            }}
+                                            placeholder="Ej. 4000"
+                                            style={{
+                                              width: '100%',
+                                              height: '40px',
+                                              padding: '0 12px',
+                                              borderRadius: '8px',
+                                              border: '1px solid #F59E0B',
+                                              background: '#FFFFFF',
+                                              fontSize: '16px',
+                                              fontWeight: 800,
+                                              color: '#0F172A'
+                                            }}
+                                          />
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const roundedTrm = Math.round(officialTrm);
+                                            setSettings({
+                                              ...settings,
+                                              exchangeRateCopMode: 'MANUAL',
+                                              manualExchangeRateCop: roundedTrm,
+                                              exchangeRateCop: roundedTrm,
+                                            });
+                                          }}
+                                          style={{
+                                            marginTop: '18px',
+                                            height: '40px',
+                                            padding: '0 14px',
+                                            borderRadius: '8px',
+                                            border: '1px solid #CBD5E1',
+                                            background: '#FFFFFF',
+                                            color: '#334155',
+                                            fontWeight: 700,
+                                            fontSize: '12px',
+                                            cursor: 'pointer'
+                                          }}
+                                        >
+                                          Usar TRM Oficial (${Math.round(officialTrm).toLocaleString('es-CO')})
+                                        </button>
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      </IonCol>
                     </IonRow>
                   </IonGrid>
                 </IonCardContent>
@@ -1510,6 +1747,83 @@ const SettingsPage: React.FC = () => {
                             </IonGrid>
                           </div>
                         </IonCol>
+                      )}
+
+                      {settings.enableCopCurrency && (
+                        <>
+                          <IonCol size="12" sizeMd="6">
+                            <IonItem>
+                              <IonLabel className="ion-text-wrap">
+                                <h2>🇨🇴 Efectivo Pesos Colombianos (COP)</h2>
+                                <p style={{ color: '#64748b', fontSize: '13px' }}>Cobro en billetes de pesos en caja y cálculo de vuelto en COP.</p>
+                              </IonLabel>
+                              <IonToggle
+                                checked={settings.acceptCashCop !== false}
+                                onIonChange={e => setSettings({ ...settings, acceptCashCop: e.detail.checked })}
+                              />
+                            </IonItem>
+                          </IonCol>
+
+                          <IonCol size="12" sizeMd="6">
+                            <IonItem>
+                              <IonLabel className="ion-text-wrap">
+                                <h2>📲 Nequi / Bancolombia / Daviplata (COP)</h2>
+                                <p style={{ color: '#64748b', fontSize: '13px' }}>Transferencias digitales en Pesos Colombianos.</p>
+                              </IonLabel>
+                              <IonToggle
+                                checked={settings.acceptTransferCop === true}
+                                onIonChange={e => setSettings({ ...settings, acceptTransferCop: e.detail.checked })}
+                              />
+                            </IonItem>
+                          </IonCol>
+
+                          {settings.acceptTransferCop === true && (
+                            <IonCol size="12">
+                              <div style={{ background: '#fffbeb', padding: '14px', borderRadius: '10px', border: '1px solid #fde68a', marginTop: '4px', marginBottom: '8px' }}>
+                                <h4 style={{ margin: '0 0 6px 0', fontSize: '0.95rem', fontWeight: 'bold', color: '#92400e', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  🇨🇴 Datos para Transferencias en Pesos (Nequi / Bancolombia)
+                                </h4>
+                                <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#78350f' }}>
+                                  Estos datos se mostrarán en la tienda online y caja cuando el cliente elija pagar por Nequi o transferencia en pesos.
+                                </p>
+                                <IonGrid style={{ padding: 0 }}>
+                                  <IonRow>
+                                    <IonCol size="12" sizeMd="4">
+                                      <IonItem color="light" style={{ borderRadius: '8px' }}>
+                                        <IonLabel position="stacked">Plataforma / Banco (COP) *</IonLabel>
+                                        <IonInput
+                                          value={settings.companyCopBank || ''}
+                                          onIonInput={e => setSettings({ ...settings, companyCopBank: e.detail.value! })}
+                                          placeholder="Ej. Nequi / Bancolombia / Daviplata"
+                                        />
+                                      </IonItem>
+                                    </IonCol>
+                                    <IonCol size="12" sizeMd="4">
+                                      <IonItem color="light" style={{ borderRadius: '8px' }}>
+                                        <IonLabel position="stacked">N° Celular Nequi / Cuenta *</IonLabel>
+                                        <IonInput
+                                          value={settings.companyCopAccountNumber || ''}
+                                          onIonInput={e => setSettings({ ...settings, companyCopAccountNumber: e.detail.value! })}
+                                          placeholder="Ej. 300 123 4567"
+                                        />
+                                      </IonItem>
+                                    </IonCol>
+                                    <IonCol size="12" sizeMd="4">
+                                      <IonItem color="light" style={{ borderRadius: '8px' }}>
+                                        <IonLabel position="stacked">Titular de la Cuenta *</IonLabel>
+                                        <IonInput
+                                          value={settings.companyCopAccountHolder || ''}
+                                          onIonInput={e => setSettings({ ...settings, companyCopAccountHolder: e.detail.value! })}
+                                          placeholder="Ej. Juan Pérez"
+                                        />
+                                      </IonItem>
+                                    </IonCol>
+                                  </IonRow>
+                                </IonGrid>
+                              </div>
+                            </IonCol>
+                          )}
+                        </>
                       )}
                     </IonRow>
                   </IonGrid>

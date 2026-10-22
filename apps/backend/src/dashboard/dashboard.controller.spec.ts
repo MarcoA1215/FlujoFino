@@ -36,7 +36,18 @@ describe('DashboardController (Unit Tests)', () => {
     const req = { user: { tenantId: 'tenant-barinas-1' } };
     const result = await controller.getSummary(req);
 
-    expect(service.getSummary).toHaveBeenCalledWith('tenant-barinas-1');
+    expect(service.getSummary).toHaveBeenCalledWith('tenant-barinas-1', undefined);
+    expect(result).toEqual(mockSummary);
+  });
+
+  it('getSummary debe llamar al servicio con el tenantId y el mes si se proporciona', async () => {
+    const mockSummary = { historicalRevenue: 1500 };
+    mockDashboardService.getSummary.mockResolvedValue(mockSummary);
+
+    const req = { user: { tenantId: 'tenant-barinas-1' } };
+    const result = await controller.getSummary(req, '2026-10');
+
+    expect(service.getSummary).toHaveBeenCalledWith('tenant-barinas-1', '2026-10');
     expect(result).toEqual(mockSummary);
   });
 });

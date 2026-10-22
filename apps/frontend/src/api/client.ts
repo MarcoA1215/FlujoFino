@@ -9,8 +9,21 @@ declare module 'axios' {
   }
 }
 
+const getBaseURL = () => {
+  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+    const hostname = window.location.hostname;
+    // Si estamos navegando desde el celular o cualquier dispositivo en la red local
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      // Usar el mismo origen (proxy de Vite en puerto 5173) para que todas las peticiones
+      // fluyan sin bloqueos de firewall en puertos secundarios ni conflictos de host
+      return window.location.origin;
+    }
+  }
+  return import.meta.env.VITE_API_URL || 'http://localhost:3001';
+};
+
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+  baseURL: getBaseURL(),
   headers: {
     'Content-Type': 'application/json',
   },

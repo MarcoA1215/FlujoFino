@@ -5,6 +5,7 @@ import { IsOptional, IsArray, IsString, IsNumber, IsBoolean, IsEnum } from 'clas
 import { Order, SplitPaymentItem } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Product } from '../entities/product.entity';
+import { ProductVariant } from '../entities/product-variant.entity';
 import { StockMovement } from '../entities/stock-movement.entity';
 import { PaymentStatus, OrderStatus, MovementType, DeliveryMethod, UserRole, ReservationStatus } from '@finowork/shared-types';
 import { RawMaterial } from '../entities/raw-material.entity';
@@ -163,10 +164,36 @@ export class CreateOrderDto {
   exchangeRateBs?: number;
 
   @IsOptional()
+  @IsNumber()
+  amountCop?: number;
+
+  @IsOptional()
+  @IsNumber()
+  exchangeRateCop?: number;
+
+  @IsOptional()
+  @IsNumber()
+  copReceived?: number;
+
+  @IsOptional()
+  @IsNumber()
+  changeAmountCop?: number;
+
+  @IsOptional()
+  @IsString()
+  copRef?: string;
+
+  @IsOptional()
+  @IsString()
+  copBank?: string;
+
+  @IsOptional()
   @IsArray()
   items: {
     id?: string;
     productId: string;
+    variantId?: string;
+    variantName?: string;
     quantity: number;
     unitPrice: number;
     employeeId?: string;
@@ -228,6 +255,9 @@ export class CreateOrderDto {
 
   @IsOptional()
   requestedDeliveryDate?: string | Date;
+
+  @IsOptional()
+  nextAbonoDueDate?: string | Date;
 }
 
 export class UpdatePaymentDto {
@@ -320,6 +350,30 @@ export class UpdatePaymentDto {
   exchangeRateBs?: number;
 
   @IsOptional()
+  @IsNumber()
+  amountCop?: number;
+
+  @IsOptional()
+  @IsNumber()
+  exchangeRateCop?: number;
+
+  @IsOptional()
+  @IsNumber()
+  copReceived?: number;
+
+  @IsOptional()
+  @IsNumber()
+  changeAmountCop?: number;
+
+  @IsOptional()
+  @IsString()
+  copRef?: string;
+
+  @IsOptional()
+  @IsString()
+  copBank?: string;
+
+  @IsOptional()
   @IsArray()
   splitPayments?: SplitPaymentItem[];
 }
@@ -350,14 +404,41 @@ export class OrdersService implements OnModuleInit {
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "binanceRef" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferRef" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "transferBank" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "amountCop" numeric(14,2);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "exchangeRateCop" numeric(12,4);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "copReceived" numeric(14,2);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changeAmountCop" numeric(14,2);
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "copRef" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "copBank" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "nextAbonoDueDate" timestamp;
         ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "employeeId" character varying;
+        ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "variantId" character varying;
+        ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "variantName" character varying;
+        ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "code" character varying;
+        ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "hasVariants" boolean DEFAULT false;
+        ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "abonoDefaultDueDays" integer DEFAULT 7;
+        CREATE TABLE IF NOT EXISTS "product_variant" (
+          "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+          "productId" uuid NOT NULL,
+          "tenantId" character varying,
+          "name" character varying NOT NULL,
+          "sku" character varying,
+          "attributes" jsonb,
+          "stockQuantity" numeric(12,4) NOT NULL DEFAULT 0,
+          "cost" numeric(12,2),
+          "salePrice" numeric(12,2),
+          "images" text,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+          "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+          CONSTRAINT "PK_product_variant" PRIMARY KEY ("id")
+        );
       `);
     } catch (e: any) {
       // Ignorar si las columnas ya existen o si no hay permisos DDL
     }
   }
 
-  async addAbono(tenantId: string, orderId: string, amount: number, method?: string, ref?: string, bank?: string) {
+  async addAbono(tenantId: string, orderId: string, amount: number, method?: string, ref?: string, bank?: string, nextAbonoDueDate?: string) {
     if (amount <= 0) throw new BadRequestException('El monto debe ser mayor a 0');
     const order = await this.dataSource.getRepository(Order).findOne({ where: { tenantId, id: orderId } });
     if (!order) throw new NotFoundException('Orden no encontrada');
@@ -384,8 +465,16 @@ export class OrdersService implements OnModuleInit {
     const roundedTotal = roundCurrency(order.totalAmount);
     if (roundedAbonos >= roundedTotal && roundedTotal > 0) {
       order.paymentStatus = PaymentStatus.PAID;
+      order.nextAbonoDueDate = null;
     } else if (roundedAbonos > 0) {
       order.paymentStatus = PaymentStatus.PARTIAL;
+      if (nextAbonoDueDate && !isNaN(new Date(nextAbonoDueDate).getTime())) {
+        order.nextAbonoDueDate = new Date(nextAbonoDueDate);
+      } else {
+        const tenantSettings = typeof this.settingsService?.getSettings === 'function' ? await this.settingsService.getSettings(tenantId) : null;
+        const dueDays = Math.max(1, Number((tenantSettings as any)?.abonoDefaultDueDays || 7));
+        order.nextAbonoDueDate = new Date(Date.now() + dueDays * 24 * 60 * 60 * 1000);
+      }
     } else {
       order.paymentStatus = PaymentStatus.PENDING;
     }
@@ -411,6 +500,18 @@ export class OrdersService implements OnModuleInit {
     }
 
     return saved;
+  }
+
+  async updateAbonoDueDate(tenantId: string, orderId: string, nextAbonoDueDate: string | null) {
+    const repo = this.dataSource.getRepository(Order);
+    const order = await repo.findOne({ where: { tenantId, id: orderId } });
+    if (!order) throw new NotFoundException('Orden no encontrada');
+    if (nextAbonoDueDate && !isNaN(new Date(nextAbonoDueDate).getTime())) {
+      order.nextAbonoDueDate = new Date(nextAbonoDueDate);
+    } else {
+      order.nextAbonoDueDate = null;
+    }
+    return repo.save(order);
   }
 
   async registerFondoCaja(tenantId: string, amount: number, description?: string, currency: 'USD' | 'BS' = 'USD') {
@@ -524,6 +625,11 @@ export class OrdersService implements OnModuleInit {
       ? Number(dto.exchangeRate)
       : (tenantSettings?.exchangeRateBs ? Number(tenantSettings.exchangeRateBs) : await this.settingsService.getEffectiveRate(tenantId));
 
+    const isCopEnabled = Boolean((tenantSettings as any)?.enableCopCurrency);
+    const orderExchangeRateCop = (dto.exchangeRateCop && Number(dto.exchangeRateCop) > 0)
+      ? Number(dto.exchangeRateCop)
+      : ((tenantSettings as any)?.exchangeRateCop ? Number((tenantSettings as any).exchangeRateCop) : 4000.0);
+
     return this.dataSource.transaction(async (manager) => {
       if (dto.paymentMethod === 'PAGO_MOVIL' && dto.pagoMovilRef && dto.pagoMovilRef.trim().length > 0) {
         const cleanRef = dto.pagoMovilRef.trim();
@@ -594,7 +700,7 @@ export class OrdersService implements OnModuleInit {
         }
         products = await manager.find(Product, {
           where: { tenantId, id: In(productIds) },
-          relations: { comboItems: { component: { recipe: { rawMaterial: true } } }, recipe: { rawMaterial: true } }
+          relations: { comboItems: { component: { recipe: { rawMaterial: true } } }, recipe: { rawMaterial: true }, variants: true }
         });
       }
       const productMap = new Map(products.map(p => [p.id, p]));
@@ -692,6 +798,8 @@ export class OrdersService implements OnModuleInit {
           vueltoNote = `[Vuelto: $${Number(dto.changeAmount).toFixed(2)} (Bs. ${Number(dto.changeAmountBs || 0).toFixed(2)}) vía Pago Móvil Ref: ${dto.changeRef || 'S/R'}${bankStr}${phoneStr}]`;
         } else if (dto.changeMethod === 'CASH_BS') {
           vueltoNote = `[Vuelto: $${Number(dto.changeAmount).toFixed(2)} en Efectivo Bs. ${Number(dto.changeAmountBs || 0).toFixed(2)}]`;
+        } else if (dto.changeMethod === 'CASH_COP') {
+          vueltoNote = `[Vuelto: $${Number(dto.changeAmount).toFixed(2)} en Efectivo COP $${Math.round(Number(dto.changeAmountCop || (Number(dto.changeAmount) * orderExchangeRateCop))).toLocaleString('es-CO')}]`;
         } else {
           vueltoNote = `[Vuelto: $${Number(dto.changeAmount).toFixed(2)} USD en Efectivo]`;
         }
@@ -703,6 +811,12 @@ export class OrdersService implements OnModuleInit {
         const recNote = `[Efectivo Recibido: $${Number(dto.usdReceived).toFixed(2)}]`;
         if (!finalNotes.includes('Efectivo Recibido:')) {
           finalNotes = finalNotes ? `${recNote} | ${finalNotes}` : recNote;
+        }
+      }
+      if ((dto.paymentMethod === 'CASH_COP' || dto.paymentMethod === 'COP') && dto.copReceived) {
+        const recCopNote = `[Efectivo COP Recibido: $${Math.round(Number(dto.copReceived)).toLocaleString('es-CO')} COP]`;
+        if (!finalNotes.includes('Efectivo COP Recibido:')) {
+          finalNotes = finalNotes ? `${recCopNote} | ${finalNotes}` : recCopNote;
         }
       }
 
@@ -738,7 +852,7 @@ export class OrdersService implements OnModuleInit {
         notes: finalNotes,
         tableNumber: dto.tableNumber || '',
         paymentStatus: dto.paymentStatus || PaymentStatus.PENDING,
-        paymentReported: Boolean(dto.paymentReported || (dto.pagoMovilRef || dto.transferRef || dto.binanceRef)) && dto.paymentStatus !== PaymentStatus.PAID,
+        paymentReported: Boolean(dto.paymentReported || (dto.pagoMovilRef || dto.transferRef || dto.binanceRef || dto.copRef)) && dto.paymentStatus !== PaymentStatus.PAID,
         paymentProofUrl: dto.paymentProofUrl || undefined,
         paymentRejectedReason: dto.paymentRejectedReason || undefined,
         status: initialStatus,
@@ -764,6 +878,10 @@ export class OrdersService implements OnModuleInit {
         binanceRef: dto.binanceRef,
         transferRef: dto.transferRef,
         transferBank: dto.transferBank,
+        copRef: dto.copRef,
+        copBank: dto.copBank,
+        copReceived: dto.copReceived,
+        changeAmountCop: dto.changeAmountCop,
         usdReceived: dto.usdReceived,
         changeAmount: dto.changeAmount,
         changeAmountBs: dto.changeAmountBs,
@@ -773,10 +891,12 @@ export class OrdersService implements OnModuleInit {
         changeBank: dto.changeBank,
         amountBs: dto.amountBs,
         exchangeRate: orderExchangeRate,
+        amountCop: dto.amountCop,
+        exchangeRateCop: (isCopEnabled || dto.exchangeRateCop || dto.amountCop || dto.copReceived) ? orderExchangeRateCop : undefined,
         offlineId: dto.offlineId || (dto as any)?.payload?.offlineId || undefined,
         createdAt: orderCreatedAt,
         abonosTotal: dto.initialAbono || 0,
-        abonosHistory: (dto.initialAbono && dto.initialAbono > 0) ? [{ id: Date.now().toString(), amount: dto.initialAbono, date: new Date().toISOString() }] : []
+        abonosHistory: (dto.initialAbono && dto.initialAbono > 0) ? [{ id: Date.now().toString(), amount: dto.initialAbono, method: 'USD', status: 'APPROVED', date: new Date().toISOString() }] : []
       });
       order.createdAt = orderCreatedAt;
         
@@ -867,17 +987,50 @@ export class OrdersService implements OnModuleInit {
               const isMadeToOrder = isFoodOrPrepared;
 
               if (!isService && !isMadeToOrder) {
-                const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
                 const isBajoEncargo = product.availabilityType === 'BAJO_ENCARGO';
-                if (!allowNegativeStock && currentStock < itemDto.quantity && !isBajoEncargo) {
-                  throw new BadRequestException(`Stock insuficiente para "${product.name}". Disponible: ${currentStock}, solicitado: ${itemDto.quantity}`);
+                if (product.hasVariants && Array.isArray(product.variants) && product.variants.length > 0) {
+                  const targetVariant = product.variants.find(
+                    v => (itemDto.variantId && v.id === itemDto.variantId) || (itemDto.variantName && v.name === itemDto.variantName)
+                  );
+                  if (targetVariant) {
+                    const currentVarStock = Number(targetVariant.stockQuantity) || 0;
+                    if (!allowNegativeStock && currentVarStock < itemDto.quantity && !isBajoEncargo) {
+                      throw new BadRequestException(`Stock insuficiente para "${product.name} (${targetVariant.name})". Disponible: ${currentVarStock}, solicitado: ${itemDto.quantity}`);
+                    }
+                    targetVariant.stockQuantity = allowNegativeStock
+                      ? currentVarStock - itemDto.quantity
+                      : (isBajoEncargo ? Math.max(0, currentVarStock - itemDto.quantity) : currentVarStock - itemDto.quantity);
+                    await manager.save(ProductVariant, targetVariant);
+
+                    const sumVarStock = product.variants.reduce((acc, v) => acc + Math.max(0, Number(v.stockQuantity || 0)), 0);
+                    product.stock = sumVarStock;
+                    product.stockQuantity = sumVarStock;
+                    product.physicalStock = sumVarStock;
+                    await manager.save(Product, product);
+                  } else {
+                    const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
+                    if (!allowNegativeStock && currentStock < itemDto.quantity && !isBajoEncargo) {
+                      throw new BadRequestException(`Stock insuficiente para "${product.name}". Disponible: ${currentStock}, solicitado: ${itemDto.quantity}`);
+                    }
+                    const newStock = allowNegativeStock
+                      ? currentStock - itemDto.quantity
+                      : (isBajoEncargo ? Math.max(0, currentStock - itemDto.quantity) : currentStock - itemDto.quantity);
+                    product.stock = newStock;
+                    product.stockQuantity = product.stock;
+                    await manager.save(Product, product);
+                  }
+                } else {
+                  const currentStock = Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0;
+                  if (!allowNegativeStock && currentStock < itemDto.quantity && !isBajoEncargo) {
+                    throw new BadRequestException(`Stock insuficiente para "${product.name}". Disponible: ${currentStock}, solicitado: ${itemDto.quantity}`);
+                  }
+                  const newStock = allowNegativeStock
+                    ? currentStock - itemDto.quantity
+                    : (isBajoEncargo ? Math.max(0, currentStock - itemDto.quantity) : currentStock - itemDto.quantity);
+                  product.stock = newStock;
+                  product.stockQuantity = product.stock;
+                  await manager.save(Product, product);
                 }
-                const newStock = allowNegativeStock
-                  ? currentStock - itemDto.quantity
-                  : (isBajoEncargo ? Math.max(0, currentStock - itemDto.quantity) : currentStock - itemDto.quantity);
-                product.stock = newStock;
-                product.stockQuantity = product.stock;
-                await manager.save(Product, product);
               }
             }
 
@@ -922,10 +1075,17 @@ export class OrdersService implements OnModuleInit {
                   );
                   if (!isRemoved && ri.rawMaterial) unitCost += ri.quantity * ri.rawMaterial.costPerUnit;
               }
-          } else if (product.cost !== undefined && product.cost !== null && Number(product.cost) > 0) {
-              unitCost = Number(product.cost);
-          } else if (product.estimatedCost) {
-              unitCost = Number(product.estimatedCost);
+          } else {
+              const matchedVar = product.hasVariants && Array.isArray(product.variants)
+                ? product.variants.find(v => (itemDto.variantId && v.id === itemDto.variantId) || (itemDto.variantName && v.name === itemDto.variantName))
+                : null;
+              if (matchedVar && matchedVar.cost !== null && matchedVar.cost !== undefined && Number(matchedVar.cost) > 0) {
+                unitCost = Number(matchedVar.cost);
+              } else if (product.cost !== undefined && product.cost !== null && Number(product.cost) > 0) {
+                unitCost = Number(product.cost);
+              } else if (product.estimatedCost) {
+                unitCost = Number(product.estimatedCost);
+              }
           }
 
           // Sumar costo de insumos extra
@@ -948,10 +1108,21 @@ export class OrdersService implements OnModuleInit {
           itemDto.hasModifications
         );
 
+        const matchedVariantObj = (!extraMaterial && product?.hasVariants && Array.isArray(product?.variants))
+          ? product.variants.find(v => (itemDto.variantId && v.id === itemDto.variantId) || (itemDto.variantName && v.name === itemDto.variantName))
+          : null;
+        const resolvedVariantName = itemDto.variantName || matchedVariantObj?.name || undefined;
+        const baseProductName = extraMaterial ? `Extra: ${extraMaterial.name}` : product!.name;
+        const finalProductName = (resolvedVariantName && !baseProductName.includes(`(${resolvedVariantName})`))
+          ? `${baseProductName} (${resolvedVariantName})`
+          : baseProductName;
+
         const orderItem = manager.create(OrderItem, { tenantId,
           orderId: savedOrder.id,
           productId: extraMaterial ? extraMaterial.id : product!.id,
-          productName: extraMaterial ? `Extra: ${extraMaterial.name}` : product!.name,
+          productName: finalProductName,
+          variantId: itemDto.variantId || matchedVariantObj?.id || undefined,
+          variantName: resolvedVariantName,
           employeeId: itemDto.employeeId || undefined,
           quantity: itemDto.quantity,
           unitPrice: itemDto.unitPrice,
@@ -989,8 +1160,17 @@ export class OrdersService implements OnModuleInit {
         savedOrder.amountBs = (dto.amountBs !== undefined && Number(dto.amountBs) > 0)
           ? Number(dto.amountBs)
           : Number((savedOrder.totalAmount * orderExchangeRate).toFixed(2));
+        if (isCopEnabled || dto.exchangeRateCop || dto.amountCop || dto.copReceived) {
+          savedOrder.exchangeRateCop = orderExchangeRateCop;
+          savedOrder.amountCop = (dto.amountCop !== undefined && Number(dto.amountCop) > 0)
+            ? Math.round(Number(dto.amountCop))
+            : Math.round(savedOrder.totalAmount * orderExchangeRateCop);
+        }
         if (savedOrder.changeAmount && (!savedOrder.changeAmountBs || Number(savedOrder.changeAmountBs) === 0)) {
           savedOrder.changeAmountBs = Number((Number(savedOrder.changeAmount) * orderExchangeRate).toFixed(2));
+        }
+        if (savedOrder.changeAmount && savedOrder.changeMethod === 'CASH_COP' && (!savedOrder.changeAmountCop || Number(savedOrder.changeAmountCop) === 0)) {
+          savedOrder.changeAmountCop = Math.round(Number(savedOrder.changeAmount) * orderExchangeRateCop);
         }
         if (savedOrder.totalAmount === 0) {
           savedOrder.paymentStatus = PaymentStatus.PAID;
@@ -1002,6 +1182,9 @@ export class OrdersService implements OnModuleInit {
             totalReceivedUSD = Math.max(totalReceivedUSD, splitSum);
           } else if (dto.usdReceived && Number(dto.usdReceived) > 0) {
             totalReceivedUSD = Math.max(totalReceivedUSD, Number(dto.usdReceived) - Number(savedOrder.changeAmount || 0));
+          } else if (dto.copReceived && Number(dto.copReceived) > 0 && orderExchangeRateCop > 0) {
+            const copUsdEquiv = Number(dto.copReceived) / orderExchangeRateCop;
+            totalReceivedUSD = Math.max(totalReceivedUSD, copUsdEquiv - Number(savedOrder.changeAmount || 0));
           }
 
           const roundedReceived = roundCurrency(totalReceivedUSD);
@@ -1010,6 +1193,17 @@ export class OrdersService implements OnModuleInit {
             savedOrder.paymentStatus = PaymentStatus.PAID;
           } else if (roundedReceived > 0 && roundedReceived < roundedTotal) {
             savedOrder.paymentStatus = PaymentStatus.PARTIAL;
+          }
+        }
+
+        if (savedOrder.paymentStatus === PaymentStatus.PAID) {
+          savedOrder.nextAbonoDueDate = null;
+        } else {
+          if (dto.nextAbonoDueDate && !isNaN(new Date(dto.nextAbonoDueDate).getTime())) {
+            savedOrder.nextAbonoDueDate = new Date(dto.nextAbonoDueDate);
+          } else {
+            const dueDays = Math.max(1, Number((tenantSettings as any)?.abonoDefaultDueDays || 7));
+            savedOrder.nextAbonoDueDate = new Date(orderCreatedAt.getTime() + dueDays * 24 * 60 * 60 * 1000);
           }
         }
 
@@ -1153,6 +1347,12 @@ export class OrdersService implements OnModuleInit {
     if (dto.binanceRef !== undefined) order.binanceRef = dto.binanceRef;
     if (dto.transferRef !== undefined) order.transferRef = dto.transferRef;
     if (dto.transferBank !== undefined) order.transferBank = dto.transferBank;
+    if (dto.copRef !== undefined) order.copRef = dto.copRef;
+    if (dto.copBank !== undefined) order.copBank = dto.copBank;
+    if (dto.copReceived !== undefined) order.copReceived = dto.copReceived;
+    if (dto.changeAmountCop !== undefined) order.changeAmountCop = dto.changeAmountCop;
+    if (dto.amountCop !== undefined) order.amountCop = dto.amountCop;
+    if (dto.exchangeRateCop !== undefined) order.exchangeRateCop = dto.exchangeRateCop;
     if (dto.usdReceived !== undefined) order.usdReceived = dto.usdReceived;
     if (dto.changeAmount !== undefined) order.changeAmount = dto.changeAmount;
     if (dto.changeAmountBs !== undefined) order.changeAmountBs = dto.changeAmountBs;
@@ -1179,6 +1379,26 @@ export class OrdersService implements OnModuleInit {
         order.paymentStatus = PaymentStatus.PAID;
       } else if (roundedPaid > 0 && roundedPaid < roundedTotal) {
         order.paymentStatus = PaymentStatus.PARTIAL;
+      }
+    }
+
+    if (order.paymentStatus === PaymentStatus.PAID && !wasPaid) {
+      const totalAmt = Number(order.totalAmount || 0);
+      const abonosAmt = Number(order.abonosTotal || 0);
+      const restante = Math.max(0, totalAmt - abonosAmt);
+      if (restante > 0.01 && (abonosAmt > 0 || (Array.isArray(order.abonosHistory) && order.abonosHistory.length > 0))) {
+        const history = Array.isArray(order.abonosHistory) ? [...order.abonosHistory] : [];
+        history.push({
+          id: randomUUID(),
+          amount: Number(restante.toFixed(2)),
+          method: (order.paymentMethod || 'USD').toUpperCase(),
+          ref: order.pagoMovilRef || order.puntoRef || order.transferRef || order.binanceRef || undefined,
+          bank: order.pagoMovilBank || order.puntoBank || order.transferBank || undefined,
+          date: new Date().toISOString(),
+          status: 'APPROVED',
+        });
+        order.abonosHistory = history;
+        order.abonosTotal = totalAmt;
       }
     }
 
@@ -1225,9 +1445,50 @@ export class OrdersService implements OnModuleInit {
     }
 
     // Calcular abonos aprobados reales (incluyendo abonos manuales que no traen status)
-    const historySum = Array.isArray(order.abonosHistory)
-      ? order.abonosHistory.filter((e: any) => !e.status || e.status === 'APPROVED').reduce((acc: number, e: any) => acc + (Number(e.amount) || 0), 0)
-      : 0;
+    const validAbonos = Array.isArray(order.abonosHistory)
+      ? order.abonosHistory.filter((e: any) => !e.status || e.status === 'APPROVED')
+      : [];
+
+    if (validAbonos.length > 0) {
+      const rateToUse = Number(order.exchangeRate) > 0 ? Number(order.exchangeRate) : 1;
+      order.splitPayments = validAbonos.map((a: any) => {
+        const usd = Number(a.amount || 0);
+        const bs = (a.amountBs !== undefined && a.amountBs !== null && Number(a.amountBs) > 0)
+          ? Number(a.amountBs)
+          : Number((usd * rateToUse).toFixed(2));
+        return {
+          method: (a.method || order.paymentMethod || 'PAGO_MOVIL').toUpperCase(),
+          amountUSD: usd,
+          amountBS: bs,
+          reference: a.reference || a.ref || undefined,
+        };
+      });
+
+      const distinctMethods = Array.from(new Set(order.splitPayments.map(s => s.method)));
+      if (!order.paymentMethod || ['ON_ARRIVAL', 'PENDING'].includes(order.paymentMethod.toUpperCase())) {
+        if (distinctMethods.length === 1) {
+          order.paymentMethod = distinctMethods[0];
+        } else if (distinctMethods.length > 1) {
+          order.paymentMethod = 'SPLIT';
+        }
+      }
+
+      for (const s of order.splitPayments) {
+        if (s.reference) {
+          if (['PAGO_MOVIL', 'PAGOMOVIL'].includes(s.method) && !order.pagoMovilRef) order.pagoMovilRef = s.reference;
+          else if (['TRANSFER', 'TRANSFERENCIA'].includes(s.method) && !order.transferRef) order.transferRef = s.reference;
+          else if (['BINANCE', 'BINANCE_USDT', 'USDT'].includes(s.method) && !order.binanceRef) order.binanceRef = s.reference;
+          else if (['PUNTO', 'POS', 'CARD_POS'].includes(s.method) && !order.puntoRef) order.puntoRef = s.reference;
+        }
+      }
+
+      const totalBsFromAbonos = order.splitPayments.reduce((acc, s) => acc + (Number(s.amountBS) || 0), 0);
+      if (totalBsFromAbonos > 0 && (!order.amountBs || Number(order.amountBs) <= 0)) {
+        order.amountBs = totalBsFromAbonos;
+      }
+    }
+
+    const historySum = validAbonos.reduce((acc: number, e: any) => acc + (Number(e.amount) || 0), 0);
 
     if (historySum > 0) {
       order.abonosTotal = historySum;
@@ -1447,13 +1708,14 @@ export class OrdersService implements OnModuleInit {
       }
 
       if (status === OrderStatus.CANCELED) {
+        order.nextAbonoDueDate = null;
         const wasPreorder = order.status === OrderStatus.SOLICITUD_ENCARGO || order.status === OrderStatus.CANCELADO_PROVEEDOR;
         if (!wasPreorder) {
           // Reverse inventory
           const itemProductIds = Array.from(new Set((order.items || []).map(i => i.productId).filter(Boolean)));
           const products = itemProductIds.length > 0 ? await manager.find(Product, {
             where: { tenantId, id: In(itemProductIds) },
-            relations: { comboItems: { component: true }, recipe: { rawMaterial: true } }
+            relations: { comboItems: { component: true }, recipe: { rawMaterial: true }, variants: true }
           }) : [];
           const productMap = new Map(products.map(p => [p.id, p]));
 
@@ -1496,13 +1758,28 @@ export class OrdersService implements OnModuleInit {
               } else if (!product.isCombo || product.isPreAssembled) {
                   const isService = product.is_service === true || (product.is_service !== false && product.category === 'Servicios');
                   if (!isService) {
-                    const restored = (Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0) + item.quantity;
-                    product.stock = restored;
-                    product.stockQuantity = restored;
-                    if (order.status === OrderStatus.DELIVERED) {
-                      product.physicalStock = (Number(product.physicalStock) || 0) + item.quantity;
+                    if (product.hasVariants && Array.isArray(product.variants) && product.variants.length > 0) {
+                      const targetVar = product.variants.find(
+                        v => (item.variantId && v.id === item.variantId) || (item.variantName && v.name === item.variantName)
+                      );
+                      if (targetVar) {
+                        targetVar.stockQuantity = (Number(targetVar.stockQuantity) || 0) + item.quantity;
+                        await manager.save(ProductVariant, targetVar);
+                      }
+                      const sumVarStock = product.variants.reduce((acc, v) => acc + Math.max(0, Number(v.stockQuantity || 0)), 0);
+                      product.stock = sumVarStock;
+                      product.stockQuantity = sumVarStock;
+                      product.physicalStock = sumVarStock;
+                      await manager.save(Product, product);
+                    } else {
+                      const restored = (Number(product.stock !== undefined && product.stock !== null ? product.stock : product.stockQuantity) || 0) + item.quantity;
+                      product.stock = restored;
+                      product.stockQuantity = restored;
+                      if (order.status === OrderStatus.DELIVERED) {
+                        product.physicalStock = (Number(product.physicalStock) || 0) + item.quantity;
+                      }
+                      await manager.save(Product, product);
                     }
-                    await manager.save(Product, product);
                   }
               }
 
@@ -2325,11 +2602,26 @@ export class OrdersService implements OnModuleInit {
       }
 
       // Punto de Venta vs Pago Movil vs Cash Divisas (Soporte Split Tender y Retrocompatibilidad)
-      const hasSplitPayments = Array.isArray(o.splitPayments) && o.splitPayments.length > 0;
+      const approvedAbonos = Array.isArray(o.abonosHistory)
+        ? o.abonosHistory.filter((a: any) => !a.status || a.status === 'APPROVED')
+        : [];
 
-      if (hasSplitPayments) {
+      const splitsToProcess = (Array.isArray(o.splitPayments) && o.splitPayments.length > 0)
+        ? o.splitPayments
+        : (approvedAbonos.length > 0
+            ? approvedAbonos.map((a: any) => ({
+                method: (a.method || o.paymentMethod || 'PAGO_MOVIL').toUpperCase(),
+                amountUSD: Number(a.amount || 0),
+                amountBS: (a.amountBs !== undefined && a.amountBs !== null && Number(a.amountBs) > 0)
+                  ? Number(a.amountBs)
+                  : Number(((Number(a.amount || 0)) * orderRate).toFixed(2)),
+                reference: a.reference || a.ref || undefined,
+              }))
+            : null);
+
+      if (splitsToProcess && splitsToProcess.length > 0) {
         // --- OBJETIVO 1: Procesar pagos mixtos (Split Tender) ---
-        for (const item of o.splitPayments!) {
+        for (const item of splitsToProcess) {
           const method = (item.method || '').toUpperCase();
           const amtUsd = Number(item.amountUSD) || 0;
           const amtBs = (item.amountBS !== undefined && item.amountBS !== null && Number(item.amountBS) > 0)

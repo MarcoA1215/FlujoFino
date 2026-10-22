@@ -51,7 +51,14 @@ export class SettingsController {
     const rate = typeof body?.rate === 'number' ? body.rate : (typeof body === 'number' ? body : undefined);
     const mode = body?.mode;
     const manualRate = body?.manualRate;
-    return this.settingsService.updateExchangeRate(rate, req.user?.tenantId, mode, manualRate);
+    const copOptions = (body?.exchangeRateCop !== undefined || body?.exchangeRateCopMode !== undefined || body?.manualExchangeRateCop !== undefined)
+      ? {
+          exchangeRateCop: body?.exchangeRateCop !== undefined ? Number(body.exchangeRateCop) : undefined,
+          exchangeRateCopMode: body?.exchangeRateCopMode,
+          manualExchangeRateCop: body?.manualExchangeRateCop !== undefined ? Number(body.manualExchangeRateCop) : undefined,
+        }
+      : undefined;
+    return this.settingsService.updateExchangeRate(rate, req.user?.tenantId, mode, manualRate, copOptions);
   }
 
   @UseGuards(RolesGuard)

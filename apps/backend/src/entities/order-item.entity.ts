@@ -20,6 +20,13 @@ export class OrderItem {
   @Column({ nullable: true })
   productName: string;
 
+  @Index()
+  @Column({ nullable: true })
+  variantId?: string;
+
+  @Column({ nullable: true })
+  variantName?: string;
+
   @Column({ nullable: true })
   employeeId?: string;
 

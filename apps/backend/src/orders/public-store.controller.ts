@@ -76,7 +76,7 @@ export class PublicStoreController {
 
     const products = await this.productRepo.find({
       where: { tenantId },
-      relations: { comboItems: { component: true } },
+      relations: { comboItems: { component: true }, variants: true },
       order: { category: 'ASC', name: 'ASC' },
     });
 
@@ -95,8 +95,11 @@ export class PublicStoreController {
       const isFoodOrPrepared = (hasRecipe && !p.isPreAssembled) || isFormula || (isFoodCategory && !p.isPreAssembled);
       const isMadeToOrder = isFoodOrPrepared;
 
+      const hasActiveVariants = Boolean(p.hasVariants && Array.isArray(p.variants) && p.variants.length > 0);
       let availableStock = Math.max(0, Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.stockQuantity || 0)));
-      if (p.isCombo && !p.isPreAssembled && p.comboItems && p.comboItems.length > 0) {
+      if (hasActiveVariants) {
+        availableStock = p.variants.reduce((acc, v) => acc + Math.max(0, Number(v.stockQuantity || 0)), 0);
+      } else if (p.isCombo && !p.isPreAssembled && p.comboItems && p.comboItems.length > 0) {
         let minAvail = Infinity;
         for (const ci of p.comboItems) {
           const compStock = ci.component?.physicalStock ?? ci.component?.stockQuantity ?? 0;
@@ -118,6 +121,7 @@ export class PublicStoreController {
       return {
         id: p.id,
         name: p.name,
+        code: p.code || undefined,
         description: p.description || '',
         category: p.category || 'General',
         salePrice: Number(p.salePrice || 0),
@@ -126,6 +130,16 @@ export class PublicStoreController {
           : typeof p.images === 'string' && (p.images as string).trim().length > 0
           ? (p.images as string).split(',').map((s) => s.trim())
           : [],
+        hasVariants: hasActiveVariants,
+        variants: hasActiveVariants ? p.variants.map(v => ({
+          id: v.id,
+          name: v.name,
+          sku: v.sku || undefined,
+          attributes: v.attributes || {},
+          stockQuantity: Math.max(0, Number(v.stockQuantity || 0)),
+          salePrice: v.salePrice !== null && v.salePrice !== undefined ? Number(v.salePrice) : null,
+          images: Array.isArray(v.images) ? v.images.slice(0, 3) : [],
+        })) : [],
         stockQuantity: availableStock,
         stock: availableStock,
         availabilityType: p.availabilityType || 'INMEDIATO',
@@ -149,6 +163,13 @@ export class PublicStoreController {
       rate = Number(globalSettings?.exchangeRateBs || 40.0);
     }
 
+    const enableCopCurrency = Boolean(settings?.enableCopCurrency);
+    let rateCop = Number(settings?.exchangeRateCop || 0);
+    if (!rateCop) {
+      const globalSettings = await this.settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+      rateCop = Number(globalSettings?.ratesCache?.cop || globalSettings?.exchangeRateCop || 4000.0);
+    }
+
     return {
       tenant: {
         id: token,
@@ -156,11 +177,16 @@ export class PublicStoreController {
       },
       settings: {
         exchangeRateBs: rate,
+        enableCopCurrency,
+        exchangeRateCop: rateCop,
         companyBank: settings?.companyBank || '',
         companyCedula: settings?.companyCedula || '',
         companyPhone: settings?.companyPhone || '',
         companyAccountNumber: settings?.companyAccountNumber || '',
         companyAccountHolder: settings?.companyAccountHolder || '',
+        companyCopBank: settings?.companyCopBank || '',
+        companyCopAccountNumber: settings?.companyCopAccountNumber || '',
+        companyCopAccountHolder: settings?.companyCopAccountHolder || '',
         binancePayId: settings?.binancePayId || '',
         binanceEmail: settings?.binanceEmail || '',
         acceptCashUsd: settings?.acceptCashUsd !== false,
@@ -168,6 +194,8 @@ export class PublicStoreController {
         acceptCardPos: settings?.acceptCardPos === true,
         acceptBinance: settings?.acceptBinance === true,
         acceptTransfer: settings?.acceptTransfer === true,
+        acceptCashCop: settings?.acceptCashCop !== false,
+        acceptTransferCop: settings?.acceptTransferCop === true,
         themePrimaryColor: settings?.themePrimaryColor || '#10b981',
         themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
         companyLogoUrl: settings?.companyLogoUrl || null,
@@ -236,7 +264,7 @@ export class PublicStoreController {
 
       const product = await this.productRepo.findOne({
         where: { tenantId, id: item.productId },
-        relations: { comboItems: { component: true } },
+        relations: { comboItems: { component: true }, variants: true },
       });
 
       if (!product) {
@@ -265,6 +293,21 @@ export class PublicStoreController {
 
       const isExemptFromStock = product.isSupplierPreorder || product.availabilityType === 'BAJO_ENCARGO' || isMadeToOrder;
       if (!isExemptFromStock) {
+        if (product.hasVariants && Array.isArray(product.variants) && product.variants.length > 0) {
+          const matchedVar = product.variants.find(
+            v => (item.variantId && v.id === item.variantId) || (item.variantName && v.name === item.variantName)
+          );
+          if (matchedVar) {
+            const varStock = Math.max(0, Number(matchedVar.stockQuantity || 0));
+            if (varStock <= 0) {
+              throw new BadRequestException(`La variante "${matchedVar.name}" de "${product.name}" se encuentra agotada.`);
+            }
+            if (item.quantity > varStock) {
+              throw new BadRequestException(`No hay suficiente stock para "${product.name} (${matchedVar.name})". Disponible: ${varStock}, solicitado: ${item.quantity}.`);
+            }
+            continue;
+          }
+        }
         let availableStock = Math.max(0, Number(product.stock !== undefined && product.stock !== null ? product.stock : (product.stockQuantity || 0)));
         if (product.isCombo && !product.isPreAssembled && product.comboItems && product.comboItems.length > 0) {
           let minAvail = Infinity;
@@ -291,7 +334,7 @@ export class PublicStoreController {
     }
 
     // 2. Crear orden mediante OrdersService con sanitización estricta de seguridad
-    const hasElectronicPayment = Boolean(dto.pagoMovilRef || dto.transferRef || dto.binanceRef || dto.paymentReported);
+    const hasElectronicPayment = Boolean(dto.pagoMovilRef || dto.transferRef || dto.binanceRef || dto.copRef || dto.paymentReported);
     const normalizedCedula = this.normalizeDocumentId((dto as any).customerCedula || (dto as any).identification || dto.pagoMovilCedula);
     const orderPayload: CreateOrderDto = {
       items: dto.items,
@@ -314,8 +357,12 @@ export class PublicStoreController {
       binanceRef: dto.binanceRef?.trim(),
       transferRef: dto.transferRef?.trim(),
       transferBank: dto.transferBank?.trim(),
+      copRef: dto.copRef?.trim(),
+      copBank: dto.copBank?.trim(),
       amountBs: dto.amountBs ? Number(dto.amountBs) : undefined,
       exchangeRate: dto.exchangeRate ? Number(dto.exchangeRate) : undefined,
+      amountCop: dto.amountCop ? Number(dto.amountCop) : undefined,
+      exchangeRateCop: dto.exchangeRateCop ? Number(dto.exchangeRateCop) : undefined,
       splitPayments: undefined,
       usdReceived: undefined,
       changeAmount: undefined,
@@ -359,6 +406,8 @@ export class PublicStoreController {
       abonosHistory: createdOrder.abonosHistory || [],
       totalAmount: createdOrder.totalAmount,
       totalAmountBs: createdOrder.amountBs,
+      totalAmountCop: createdOrder.amountCop,
+      exchangeRateCop: createdOrder.exchangeRateCop,
       deliveryMethod: createdOrder.deliveryMethod,
       customerName: createdOrder.customerName,
       customerPhone: createdOrder.customerPhone,
@@ -431,6 +480,7 @@ export class PublicStoreController {
     @Body() dto: {
       amount: number;
       amountBs?: number;
+      amountCop?: number;
       method: string;
       reference: string;
       bank?: string;
@@ -462,6 +512,7 @@ export class PublicStoreController {
       id: Date.now().toString(),
       amount: Number(dto.amount),
       amountBs: dto.amountBs ? Number(dto.amountBs) : undefined,
+      amountCop: dto.amountCop ? Number(dto.amountCop) : undefined,
       method: cleanMethod,
       ref: cleanRef,
       reference: cleanRef,
@@ -487,6 +538,9 @@ export class PublicStoreController {
     } else if (cleanMethod === 'TRANSFER') {
       order.transferRef = cleanRef;
       if (cleanBank) order.transferBank = cleanBank;
+    } else if (cleanMethod === 'TRANSFER_COP' || cleanMethod === 'COP') {
+      order.copRef = cleanRef;
+      if (cleanBank) order.copBank = cleanBank;
     } else if (cleanMethod === 'BINANCE') {
       order.binanceRef = cleanRef;
     } else {
@@ -498,7 +552,7 @@ export class PublicStoreController {
       order.paymentProofUrl = dto.paymentProofUrl;
     }
 
-    const methodLabel = cleanMethod === 'PAGO_MOVIL' ? 'Pago Móvil' : cleanMethod === 'BINANCE' ? 'Binance' : cleanMethod === 'TRANSFER' ? 'Transferencia' : 'Pago';
+    const methodLabel = cleanMethod === 'PAGO_MOVIL' ? 'Pago Móvil' : cleanMethod === 'BINANCE' ? 'Binance' : cleanMethod === 'TRANSFER_COP' ? 'Transferencia COP / Nequi' : cleanMethod === 'TRANSFER' ? 'Transferencia' : 'Pago';
     const noteTag = `[Abono/Pago Reportado: $${Number(dto.amount).toFixed(2)} vía ${methodLabel} Ref: ${cleanRef}${cleanBank ? ` (${cleanBank})` : ''}]`;
     order.notes = order.notes ? `${order.notes} | ${noteTag}` : noteTag;
 
@@ -603,6 +657,8 @@ export class PublicStoreController {
       pagoMovilBank: order.pagoMovilBank,
       transferRef: order.transferRef,
       transferBank: order.transferBank,
+      copRef: order.copRef,
+      copBank: order.copBank,
       binanceRef: order.binanceRef,
       customerName: order.customerName,
       customerPhone: order.customerPhone,
@@ -613,6 +669,8 @@ export class PublicStoreController {
       amountBs: order.amountBs,
       grandTotalBs: Number(order.amountBs),
       exchangeRate: Number(order.exchangeRate || 40),
+      amountCop: order.amountCop ? Number(order.amountCop) : undefined,
+      exchangeRateCop: order.exchangeRateCop ? Number(order.exchangeRateCop) : undefined,
       deliveryMethod: order.deliveryMethod,
       customerAddress: order.customerAddress,
       createdAt: order.createdAt,

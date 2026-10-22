@@ -90,11 +90,26 @@ export interface ComboItemDTO {
   totalItemCost?: number;
 }
 
+export interface ProductVariantDTO {
+  id?: string;
+  productId?: string;
+  tenantId?: string;
+  name: string;
+  sku?: string;
+  attributes?: Record<string, any>;
+  stockQuantity: number;
+  cost?: number;
+  salePrice?: number;
+  images?: string[];
+}
+
 export interface ProductDTO {
   id?: string;
   name: string;
+  code?: string;
   description?: string;
   category?: string;
+  images?: string[];
   salePrice: number;
   stockQuantity: number;
   durationMinutes?: number;
@@ -111,12 +126,16 @@ export interface ProductDTO {
   product_type?: 'REVENTA' | 'FORMULA' | 'SERVICIO' | string;
   availabilityType?: ProductAvailabilityType;
   isSupplierPreorder?: boolean;
+  hasVariants?: boolean;
+  variants?: ProductVariantDTO[];
 }
 
 export interface OrderItemDTO {
   id?: string;
   productId: string;
   productName?: string;
+  variantId?: string;
+  variantName?: string;
   employeeId?: string;
   quantity: number;
   deliveredQuantity?: number;
@@ -144,6 +163,7 @@ export interface OrderDTO {
   customerId?: string;
   identification?: string;
   requestedDeliveryDate?: string | Date;
+  nextAbonoDueDate?: string | Date;
   employeeId?: string;
   employee?: {
     id: string;
@@ -334,6 +354,7 @@ export interface SettingsDTO {
   allowPartialPayments?: boolean;
   minDepositPercentage?: number;
   allowCashierBypassDeposit?: boolean;
+  abonoDefaultDueDays?: number;
   acceptCashUsd?: boolean;
   acceptPagoMovil?: boolean;
   acceptCardPos?: boolean;

@@ -26,6 +26,7 @@ describe('ReservationsService Suite', () => {
 
   beforeEach(async () => {
     mockOrderRepo = {
+      find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn().mockResolvedValue(null),
       save: jest.fn((e) => Promise.resolve(e)),
       create: jest.fn((dto) => dto),
@@ -505,6 +506,58 @@ describe('ReservationsService Suite', () => {
       expect(mockOrderRepo.save).toHaveBeenCalled();
       expect(mockLinkedOrder.status).toBe('CANCELED');
       expect(mockRepo.remove).toHaveBeenCalledWith(mockReservation);
+    });
+
+    it('al tener abonos aprobados debe sincronizar splitPayments, paymentMethod, amountBs y referencias a la orden vinculada', async () => {
+      const tenantId = 'tenant-123';
+      const resId = 'res-abono-sync';
+
+      const mockReservation: any = {
+        id: resId,
+        tenantId,
+        totalAmount: 25,
+        abonosTotal: 25,
+        paymentStatus: PaymentStatus.PAID,
+        abonosHistory: [
+          {
+            id: 'abono-1',
+            amount: 25,
+            amountBs: 21978.06,
+            method: 'PAGO_MOVIL',
+            reference: '7959',
+            status: 'APPROVED',
+            date: '2026-10-15T20:47:37.849Z',
+          },
+        ],
+      };
+
+      const mockLinkedOrder: any = {
+        id: 'ord-abono-sync',
+        tenantId,
+        linkedReservationId: resId,
+        paymentMethod: 'ON_ARRIVAL',
+        paymentStatus: PaymentStatus.PENDING,
+        totalAmount: 25,
+        exchangeRate: 879.1225,
+      };
+
+      mockOrderRepo.find.mockResolvedValue([mockLinkedOrder]);
+
+      await service.syncLinkedOrder(tenantId, mockReservation);
+
+      expect(mockOrderRepo.save).toHaveBeenCalled();
+      expect(mockLinkedOrder.paymentStatus).toBe(PaymentStatus.PAID);
+      expect(mockLinkedOrder.paymentMethod).toBe('PAGO_MOVIL');
+      expect(mockLinkedOrder.amountBs).toBe(21978.06);
+      expect(mockLinkedOrder.pagoMovilRef).toBe('7959');
+      expect(mockLinkedOrder.splitPayments).toBeDefined();
+      expect(mockLinkedOrder.splitPayments).toHaveLength(1);
+      expect(mockLinkedOrder.splitPayments[0]).toEqual({
+        method: 'PAGO_MOVIL',
+        amountUSD: 25,
+        amountBS: 21978.06,
+        reference: '7959',
+      });
     });
   });
 
