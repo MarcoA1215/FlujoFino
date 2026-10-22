@@ -2041,7 +2041,7 @@ const SuperAdminDashboard: React.FC = () => {
                     </IonCardTitle>
                   </IonCardHeader>
                   <IonCardContent style={{ padding: 0 }}>
-                    {selectedPromoterForPayout.commissions.length === 0 ? (
+                    {(!Array.isArray(selectedPromoterForPayout.commissions) || selectedPromoterForPayout.commissions.length === 0) ? (
                       <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
                         Este promotor aún no tiene comisiones generadas.
                       </div>
@@ -2059,7 +2059,7 @@ const SuperAdminDashboard: React.FC = () => {
                             </tr>
                           </thead>
                           <tbody>
-                            {selectedPromoterForPayout.commissions.map((comm) => (
+                            {(selectedPromoterForPayout.commissions || []).map((comm) => (
                               <tr key={comm.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                 <td style={{ padding: '10px 14px' }}>
                                   {comm.type === 'ACTIVATION' ? (

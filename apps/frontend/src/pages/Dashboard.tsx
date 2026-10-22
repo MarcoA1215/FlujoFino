@@ -805,11 +805,11 @@ const Dashboard: React.FC = () => {
                     Productos Más Vendidos
                   </h3>
 
-                  {summary.topProducts.length === 0 ? (
+                  {(!Array.isArray(summary.topProducts) || summary.topProducts.length === 0) ? (
                     <p style={{ color: '#64748B', fontSize: '13px' }}>Aún no se han registrado ventas.</p>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {summary.topProducts.map((p, i) => (
+                      {(summary.topProducts || []).map((p, i) => (
                         <div
                           key={i}
                           style={{
@@ -850,11 +850,11 @@ const Dashboard: React.FC = () => {
                       <IonIcon icon={alertCircleOutline} style={{ color: '#EF4444' }} />
                       Insumos por Reabastecer
                     </h3>
-                    {summary.lowStockMaterials.length === 0 ? (
+                    {(!Array.isArray(summary.lowStockMaterials) || summary.lowStockMaterials.length === 0) ? (
                       <p style={{ color: '#64748B', fontSize: '13px' }}>Todos los insumos están en niveles óptimos.</p>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {summary.lowStockMaterials.map(alert => (
+                        {(summary.lowStockMaterials || []).map(alert => (
                           <div
                             key={'mat-' + alert.id}
                             style={{
@@ -890,11 +890,11 @@ const Dashboard: React.FC = () => {
                       <IonIcon icon={alertCircleOutline} style={{ color: '#F59E0B' }} />
                       Pedidos por Fabricar
                     </h3>
-                    {summary.lowStockProducts.length === 0 ? (
+                    {(!Array.isArray(summary.lowStockProducts) || summary.lowStockProducts.length === 0) ? (
                       <p style={{ color: '#64748B', fontSize: '13px' }}>No hay pedidos pendientes por fabricar.</p>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {summary.lowStockProducts.map(prod => (
+                        {(summary.lowStockProducts || []).map(prod => (
                           <div
                             key={'prod-' + prod.id}
                             style={{
