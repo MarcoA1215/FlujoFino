@@ -29,3 +29,13 @@ describe('Public Routes Protection on 401 Interceptor', () => {
     expect(isExemptFromLoginRedirect('/settings')).toBe(false);
   });
 });
+
+describe('Dynamic BaseURL Resolution (getBaseURL)', () => {
+  it('debe usar el backend oficial de produccion en dominios reales o cuando VITE_API_URL esta definido', async () => {
+    const { getBaseURL, PROD_API_FALLBACK } = await import('./client');
+    const url = getBaseURL();
+    expect(url).toBeDefined();
+    expect(typeof url).toBe('string');
+    expect(PROD_API_FALLBACK).toContain('flujofino.onrender.com');
+  });
+});

@@ -9,17 +9,42 @@ declare module 'axios' {
   }
 }
 
-const getBaseURL = () => {
+export const PROD_API_FALLBACK = 'https://flujofino.onrender.com';
+
+export const getBaseURL = () => {
+  // 1. En compilación de producción de Vite (PROD) siempre debe respetarse el backend
+  if (import.meta.env.PROD) {
+    return import.meta.env.VITE_API_URL || PROD_API_FALLBACK;
+  }
+
+  const envApiUrl = import.meta.env.VITE_API_URL;
+
   if (typeof window !== 'undefined' && window.location && window.location.hostname) {
     const hostname = window.location.hostname;
-    // Si estamos navegando desde el celular o cualquier dispositivo en la red local
-    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      // Usar el mismo origen (proxy de Vite en puerto 5173) para que todas las peticiones
-      // fluyan sin bloqueos de firewall en puertos secundarios ni conflictos de host
+
+    // 2. Si estamos en un dominio web real de producción (Vercel, dominio propio)
+    if (
+      hostname.includes('finowork.com') ||
+      hostname.includes('onrender.com') ||
+      hostname.includes('vercel.app')
+    ) {
+      return envApiUrl || PROD_API_FALLBACK;
+    }
+
+    // 3. Si estamos en desarrollo local accediendo desde celular/tablet en red local (LAN)
+    const isLocalLan =
+      /^192\.168\./.test(hostname) ||
+      /^10\./.test(hostname) ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
+      hostname.endsWith('.local');
+
+    if (isLocalLan) {
+      // Usar el mismo origen para canalizar mediante el proxy inverso de Vite en puerto 5173
       return window.location.origin;
     }
   }
-  return import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+  return envApiUrl || 'http://localhost:3001';
 };
 
 export const apiClient = axios.create({
@@ -75,6 +100,10 @@ if (apiClient?.interceptors?.response) {
       if (activeRequestsCount === 0) {
         getGlobalLoadingHandler()?.hide();
       }
+    }
+    // Protección contra respuestas HTML erróneas (por ejemplo, SPA rewrites de Vercel en rutas API inexistentes)
+    if (typeof response.data === 'string' && response.data.trim().toLowerCase().startsWith('<!doctype')) {
+      return Promise.reject(new Error('Respuesta inválida del servidor (se recibió documento HTML en lugar de JSON). Verifique la conexión con el backend.'));
     }
     return response;
   },

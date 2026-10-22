@@ -9,8 +9,9 @@ import { Preferences } from '@capacitor/preferences';
 import axios from 'axios';
 import { useEffect } from 'react';
 import { DEFAULT_SUPERADMIN_EMAIL, UserRole } from '@finowork/shared-types';
+import { getBaseURL } from '../api/client';
 
-const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const apiBase = getBaseURL();
 const FALLBACK_VAPID_PUBLIC_KEY =
   'BOVNV5aBYlzYON15tj1DdHNuR-YNYsotD3BRGgoCjIOEchUZ2C8rRd7nhDOP-Qis-x5rPKcmpdXOJ9N2hPNGsAI';
 

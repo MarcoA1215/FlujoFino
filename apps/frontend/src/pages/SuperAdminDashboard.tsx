@@ -162,10 +162,10 @@ const SuperAdminDashboard: React.FC = () => {
         apiClient.get<any>('/superadmin/profile').catch(() => ({ data: null })),
         apiClient.get<any>('/superadmin/rates').catch(() => ({ data: null })),
       ]);
-      setTenants(tenantsRes.data || []);
-      setPendingPayments(paymentsRes.data || []);
-      setSupportMessages(supportRes.data || []);
-      setPromoters(promotersRes.data || []);
+      setTenants(Array.isArray(tenantsRes.data) ? tenantsRes.data : []);
+      setPendingPayments(Array.isArray(paymentsRes.data) ? paymentsRes.data : []);
+      setSupportMessages(Array.isArray(supportRes.data) ? supportRes.data : []);
+      setPromoters(Array.isArray(promotersRes.data) ? promotersRes.data : []);
       if (ratesRes?.data) {
         setPlatformRates(ratesRes.data);
       }
@@ -508,16 +508,20 @@ const SuperAdminDashboard: React.FC = () => {
   };
 
   // KPIs
-  const totalTenants = tenants.length;
-  const activeTenants = tenants.filter((t) => t.status === TenantStatus.ACTIVE).length;
-  const trialTenants = tenants.filter((t) => t.status === TenantStatus.TRIAL).length;
-  const pendingCount = pendingPayments.length;
-  const estimatedRevenue = tenants
+  const safeTenants = Array.isArray(tenants) ? tenants : [];
+  const safePendingPayments = Array.isArray(pendingPayments) ? pendingPayments : [];
+  const safePromoters = Array.isArray(promoters) ? promoters : [];
+
+  const totalTenants = safeTenants.length;
+  const activeTenants = safeTenants.filter((t) => t.status === TenantStatus.ACTIVE).length;
+  const trialTenants = safeTenants.filter((t) => t.status === TenantStatus.TRIAL).length;
+  const pendingCount = safePendingPayments.length;
+  const estimatedRevenue = safeTenants
     .filter((t) => t.status === TenantStatus.ACTIVE || t.status === TenantStatus.TRIAL)
     .reduce((sum, t) => sum + (t.finalFee || 0), 0);
 
   // Filtered tenants
-  const filteredTenants = tenants.filter((t) => {
+  const filteredTenants = safeTenants.filter((t) => {
     const q = searchTerm.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -1162,7 +1166,7 @@ const SuperAdminDashboard: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {promoters
+                    {safePromoters
                       .filter((p) => {
                         const q = searchTerm.toLowerCase();
                         return (
@@ -1836,7 +1840,7 @@ const SuperAdminDashboard: React.FC = () => {
                         style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 14px' }}
                       >
                         <IonSelectOption value="">(Ninguno / Sin Referidor)</IonSelectOption>
-                        {tenants
+                        {safeTenants
                           .filter((item) => item.id !== selectedTenant.id)
                           .map((item) => (
                             <IonSelectOption key={item.id} value={item.id}>
