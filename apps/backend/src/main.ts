@@ -4,6 +4,13 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { types } from 'pg';
+
+// Forzar a node-postgres a interpretar TIMESTAMP sin zona horaria (OID 1114) en UTC
+// evitando desplazamientos incorrectos por la zona horaria del servidor o máquina local
+types.setTypeParser(1114, (stringValue: string) => {
+  return stringValue ? new Date(stringValue.replace(' ', 'T') + 'Z') : null;
+});
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

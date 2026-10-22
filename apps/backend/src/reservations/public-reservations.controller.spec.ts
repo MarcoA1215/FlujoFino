@@ -328,7 +328,7 @@ describe('PublicReservationsController Suite', () => {
         getMany: jest.fn().mockResolvedValue([]),
       });
 
-      const slots = await controller.getAvailability('token-valido', '2026-10-21', '');
+      const slots = await controller.getAvailability('token-valido', '2026-10-28', '');
       expect(slots).toBeInstanceOf(Array);
       expect(slots.length).toBeGreaterThan(0);
       expect(slots).toContain('08:00');
@@ -354,7 +354,7 @@ describe('PublicReservationsController Suite', () => {
         getMany: jest.fn().mockResolvedValue([]),
       });
 
-      const slots = await controller.getAvailability('token-valido', '2026-10-21', '');
+      const slots = await controller.getAvailability('token-valido', '2026-10-28', '');
       expect(slots).toBeInstanceOf(Array);
       expect(slots).toEqual(['09:00', '09:30', '10:00', '10:30', '11:00', '11:30']);
     });
@@ -388,7 +388,7 @@ describe('PublicReservationsController Suite', () => {
         ]),
       });
 
-      const slots = await controller.getAvailability('token-valido', '2026-10-21', 'svc-a,svc-b');
+      const slots = await controller.getAvailability('token-valido', '2026-10-28', 'svc-a,svc-b');
       expect(slots).toEqual(['10:00', '10:30']);
     });
 
@@ -415,7 +415,7 @@ describe('PublicReservationsController Suite', () => {
         getMany: jest.fn().mockResolvedValue([]),
       });
 
-      const slots = await controller.getAvailability('token-valido', '2026-10-21', 'svc-a,svc-b');
+      const slots = await controller.getAvailability('token-valido', '2026-10-28', 'svc-a,svc-b');
       expect(slots).toEqual(['10:00', '10:30', '11:00']);
     });
   });

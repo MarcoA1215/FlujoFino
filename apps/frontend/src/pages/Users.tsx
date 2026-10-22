@@ -37,6 +37,7 @@ import { AuthContext } from '../context/AuthContext';
 import { UserRole } from '@finowork/shared-types';
 import { AppHeader } from '../components/AppHeader';
 import SalaryAdvanceModal from '../components/SalaryAdvanceModal';
+import { formatTime12h, formatTimeRange12h } from '../utils/time';
 
 interface UserData {
   id: string;
@@ -687,7 +688,9 @@ const Users: React.FC = () => {
                           <IonRow style={{ padding: 0 }}>
                             <IonCol size="6" style={{ paddingLeft: 0, paddingRight: '4px' }}>
                               <IonItem>
-                                <IonLabel position="stacked">Hora Entrada</IonLabel>
+                                <IonLabel position="stacked">
+                                  Hora Entrada {entryTime && <span style={{ color: '#059669', fontWeight: 600 }}>({formatTime12h(entryTime)})</span>}
+                                </IonLabel>
                                 <IonInput 
                                   type="time" 
                                   value={entryTime} 
@@ -697,7 +700,9 @@ const Users: React.FC = () => {
                             </IonCol>
                             <IonCol size="6" style={{ paddingLeft: '4px', paddingRight: 0 }}>
                               <IonItem>
-                                <IonLabel position="stacked">Hora Salida</IonLabel>
+                                <IonLabel position="stacked">
+                                  Hora Salida {exitTime && <span style={{ color: '#059669', fontWeight: 600 }}>({formatTime12h(exitTime)})</span>}
+                                </IonLabel>
                                 <IonInput 
                                   type="time" 
                                   value={exitTime} 
@@ -709,7 +714,9 @@ const Users: React.FC = () => {
                           <IonRow style={{ padding: 0 }}>
                             <IonCol size="6" style={{ paddingLeft: 0, paddingRight: '4px' }}>
                               <IonItem>
-                                <IonLabel position="stacked">Inicio Almuerzo / Receso (Opcional)</IonLabel>
+                                <IonLabel position="stacked">
+                                  Inicio Almuerzo / Receso {lunchStart && <span style={{ color: '#059669', fontWeight: 600 }}>({formatTime12h(lunchStart)})</span>}
+                                </IonLabel>
                                 <IonInput 
                                   type="time" 
                                   value={lunchStart} 
@@ -719,7 +726,9 @@ const Users: React.FC = () => {
                             </IonCol>
                             <IonCol size="6" style={{ paddingLeft: '4px', paddingRight: 0 }}>
                               <IonItem>
-                                <IonLabel position="stacked">Fin Almuerzo / Receso (Opcional)</IonLabel>
+                                <IonLabel position="stacked">
+                                  Fin Almuerzo / Receso {lunchEnd && <span style={{ color: '#059669', fontWeight: 600 }}>({formatTime12h(lunchEnd)})</span>}
+                                </IonLabel>
                                 <IonInput 
                                   type="time" 
                                   value={lunchEnd} 
@@ -855,7 +864,9 @@ const Users: React.FC = () => {
                           <IonRow style={{ padding: 0 }}>
                             <IonCol size="6" style={{ paddingLeft: 0, paddingRight: '4px' }}>
                               <IonItem>
-                                <IonLabel position="stacked">Hora Entrada</IonLabel>
+                                <IonLabel position="stacked">
+                                  Hora Entrada {entryTime && <span style={{ color: '#059669', fontWeight: 600 }}>({formatTime12h(entryTime)})</span>}
+                                </IonLabel>
                                 <IonInput 
                                   type="time" 
                                   value={entryTime} 
@@ -865,7 +876,9 @@ const Users: React.FC = () => {
                             </IonCol>
                             <IonCol size="6" style={{ paddingLeft: '4px', paddingRight: 0 }}>
                               <IonItem>
-                                <IonLabel position="stacked">Hora Salida</IonLabel>
+                                <IonLabel position="stacked">
+                                  Hora Salida {exitTime && <span style={{ color: '#059669', fontWeight: 600 }}>({formatTime12h(exitTime)})</span>}
+                                </IonLabel>
                                 <IonInput 
                                   type="time" 
                                   value={exitTime} 
@@ -877,7 +890,9 @@ const Users: React.FC = () => {
                           <IonRow style={{ padding: 0 }}>
                             <IonCol size="6" style={{ paddingLeft: 0, paddingRight: '4px' }}>
                               <IonItem>
-                                <IonLabel position="stacked">Inicio Almuerzo / Receso (Opcional)</IonLabel>
+                                <IonLabel position="stacked">
+                                  Inicio Almuerzo / Receso {lunchStart && <span style={{ color: '#059669', fontWeight: 600 }}>({formatTime12h(lunchStart)})</span>}
+                                </IonLabel>
                                 <IonInput 
                                   type="time" 
                                   value={lunchStart} 
@@ -887,7 +902,9 @@ const Users: React.FC = () => {
                             </IonCol>
                             <IonCol size="6" style={{ paddingLeft: '4px', paddingRight: 0 }}>
                               <IonItem>
-                                <IonLabel position="stacked">Fin Almuerzo / Receso (Opcional)</IonLabel>
+                                <IonLabel position="stacked">
+                                  Fin Almuerzo / Receso {lunchEnd && <span style={{ color: '#059669', fontWeight: 600 }}>({formatTime12h(lunchEnd)})</span>}
+                                </IonLabel>
                                 <IonInput 
                                   type="time" 
                                   value={lunchEnd} 
@@ -1061,10 +1078,10 @@ const Users: React.FC = () => {
                                 <td>
                                   {u.entryTime && u.exitTime ? (
                                     <div>
-                                      <span style={{ fontSize: '0.85rem' }}>{u.entryTime} - {u.exitTime}</span>
+                                      <span style={{ fontSize: '0.85rem' }}>{formatTimeRange12h(u.entryTime, u.exitTime)}</span>
                                       {u.lunchStart && u.lunchEnd && (
                                         <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
-                                          🍽️ {u.lunchStart} - {u.lunchEnd}
+                                          🍽️ {formatTimeRange12h(u.lunchStart, u.lunchEnd)}
                                         </div>
                                       )}
                                     </div>
@@ -1073,7 +1090,7 @@ const Users: React.FC = () => {
                                       <span style={{ fontSize: '0.85rem', color: '#888' }}>Sin definir</span>
                                       {u.lunchStart && u.lunchEnd && (
                                         <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
-                                          🍽️ {u.lunchStart} - {u.lunchEnd}
+                                          🍽️ {formatTimeRange12h(u.lunchStart, u.lunchEnd)}
                                         </div>
                                       )}
                                     </div>
@@ -1288,11 +1305,11 @@ const Users: React.FC = () => {
                               </IonBadge>
                             </td>
                             <td>
-                              <strong style={{ color: '#b45309' }}>⏱️ {req.attemptTime}</strong>
+                              <strong style={{ color: '#b45309' }}>⏱️ {formatTime12h(req.attemptTime)}</strong>
                             </td>
                             <td>
                               {req.entryTime && req.exitTime ? (
-                                <span>{req.entryTime} - {req.exitTime}</span>
+                                <span>{formatTimeRange12h(req.entryTime, req.exitTime)}</span>
                               ) : (
                                 <span style={{ color: '#888' }}>Sin horario</span>
                               )}
@@ -1407,7 +1424,9 @@ const Users: React.FC = () => {
             <IonRow style={{ padding: 0 }}>
               <IonCol size="6" style={{ paddingLeft: 0, paddingRight: '4px' }}>
                 <IonItem>
-                  <IonLabel position="stacked">Hora Entrada</IonLabel>
+                  <IonLabel position="stacked">
+                    Hora Entrada {editEntryTime && <span style={{ color: '#059669', fontWeight: 600 }}>({formatTime12h(editEntryTime)})</span>}
+                  </IonLabel>
                   <IonInput 
                     type="time" 
                     value={editEntryTime} 
@@ -1417,7 +1436,9 @@ const Users: React.FC = () => {
               </IonCol>
               <IonCol size="6" style={{ paddingLeft: '4px', paddingRight: 0 }}>
                 <IonItem>
-                  <IonLabel position="stacked">Hora Salida</IonLabel>
+                  <IonLabel position="stacked">
+                    Hora Salida {editExitTime && <span style={{ color: '#059669', fontWeight: 600 }}>({formatTime12h(editExitTime)})</span>}
+                  </IonLabel>
                   <IonInput 
                     type="time" 
                     value={editExitTime} 
@@ -1430,7 +1451,9 @@ const Users: React.FC = () => {
             <IonRow style={{ padding: 0 }}>
               <IonCol size="6" style={{ paddingLeft: 0, paddingRight: '4px' }}>
                 <IonItem>
-                  <IonLabel position="stacked">Inicio Almuerzo / Receso (Opcional)</IonLabel>
+                  <IonLabel position="stacked">
+                    Inicio Almuerzo / Receso {editLunchStart && <span style={{ color: '#059669', fontWeight: 600 }}>({formatTime12h(editLunchStart)})</span>}
+                  </IonLabel>
                   <IonInput 
                     type="time" 
                     value={editLunchStart} 
@@ -1440,7 +1463,9 @@ const Users: React.FC = () => {
               </IonCol>
               <IonCol size="6" style={{ paddingLeft: '4px', paddingRight: 0 }}>
                 <IonItem>
-                  <IonLabel position="stacked">Fin Almuerzo / Receso (Opcional)</IonLabel>
+                  <IonLabel position="stacked">
+                    Fin Almuerzo / Receso {editLunchEnd && <span style={{ color: '#059669', fontWeight: 600 }}>({formatTime12h(editLunchEnd)})</span>}
+                  </IonLabel>
                   <IonInput 
                     type="time" 
                     value={editLunchEnd} 
@@ -1953,7 +1978,7 @@ const Users: React.FC = () => {
                       </div>
                     )}
                     <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>
-                      {new Date(del.date).toLocaleString()} • Total orden: ${del.totalAmount.toFixed(2)}
+                      {new Date(del.date).toLocaleDateString()} {formatTime12h(new Date(del.date))} • Total orden: ${del.totalAmount.toFixed(2)}
                     </div>
                   </div>
                 ))}

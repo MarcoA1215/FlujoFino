@@ -13,6 +13,23 @@ import { CashExchange } from '../entities/cash-exchange.entity';
 import { Settings } from '../entities/settings.entity';
 import { MovementType, OrderStatus, InvestmentType, ReservationStatus, PaymentStatus } from '@finowork/shared-types';
 
+export function toCaracasDateStr(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (!d || isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Caracas' }).format(d);
+}
+
+export function normalizePaymentMethod(method?: string): 'CASH_USD' | 'DIGITAL_USD' | 'PAGO_MOVIL' | 'PUNTO' | 'TRANSFER' {
+  if (!method) return 'CASH_USD';
+  const m = method.toUpperCase().trim();
+  if (['PUNTO', 'CARD_POS', 'POS', 'TARJETA', 'DEBITO', 'CREDITO'].some(k => m.includes(k))) return 'PUNTO';
+  if (['PAGO_MOVIL', 'PAGOMOVIL', 'MOVIL'].some(k => m.includes(k))) return 'PAGO_MOVIL';
+  if (['TRANSFER', 'TRANSFERENCIA'].some(k => m.includes(k))) return 'TRANSFER';
+  if (['BINANCE', 'USDT', 'ZELLE', 'CRYPTO', 'BITCOIN', 'PAYPAL'].some(k => m.includes(k))) return 'DIGITAL_USD';
+  if (['USD', 'CASH', 'EFECTIVO', 'DIVISA', 'DOLAR', 'DOLARES', 'BILLETE'].some(k => m.includes(k))) return 'CASH_USD';
+  return 'CASH_USD';
+}
+
 @Injectable()
 export class DashboardService {
   constructor(
@@ -258,16 +275,15 @@ export class DashboardService {
     const effectiveProductionCost = totalCostOfSales;
     const historicalProfit = Number((historicalRevenue - effectiveProductionCost - totalOperatingExpenses).toFixed(2));
 
-    // Calcular ventas de los últimos 7 días únicamente
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
-
-    const last7Days = Array.from({length: 7}, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      return d.toISOString().split('T')[0];
+    // Calcular ventas de los últimos 7 días únicamente (Zona horaria Caracas UTC-4)
+    const todayCaracas = toCaracasDateStr(new Date());
+    const [cy, cm, cd] = todayCaracas.split('-').map(Number);
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(Date.UTC(cy, cm - 1, cd - i, 12, 0, 0));
+      return toCaracasDateStr(d);
     }).reverse();
+
+    const sevenDaysAgo = new Date(Date.UTC(cy, cm - 1, cd - 7, 0, 0, 0));
 
     const recentOrders = await this.orderRepo.createQueryBuilder('o')
       .select(['o.createdAt', 'o.totalAmount'])
@@ -280,7 +296,7 @@ export class DashboardService {
     last7Days.forEach(d => salesByDay[d] = 0);
 
     recentOrders.forEach(o => {
-      const dateStr = new Date(o.createdAt).toISOString().split('T')[0];
+      const dateStr = toCaracasDateStr(o.createdAt);
       if (salesByDay[dateStr] !== undefined) {
         salesByDay[dateStr] += Number(o.totalAmount || 0);
       }
@@ -300,8 +316,8 @@ export class DashboardService {
 
     recentReservations.forEach(r => {
       const dateStr = r.date
-        ? (typeof r.date === 'string' ? r.date.split('T')[0] : new Date(r.date).toISOString().split('T')[0])
-        : new Date(r.createdAt).toISOString().split('T')[0];
+        ? (typeof r.date === 'string' ? r.date.split('T')[0] : toCaracasDateStr(r.date))
+        : toCaracasDateStr(r.createdAt);
       if (salesByDay[dateStr] !== undefined) {
         salesByDay[dateStr] += Number(r.totalAmount || 0);
       }
@@ -413,6 +429,15 @@ export class DashboardService {
     let puntoBs = 0;
     let transferBs = 0;
 
+    const addPaymentToBuckets = (method: string, amtUsd: number, amtBs: number) => {
+      const norm = normalizePaymentMethod(method);
+      if (norm === 'PUNTO') puntoBs += amtBs;
+      else if (norm === 'PAGO_MOVIL') pagoMovilBs += amtBs;
+      else if (norm === 'TRANSFER') transferBs += amtBs;
+      else if (norm === 'DIGITAL_USD') digitalUSD += amtUsd;
+      else cashUSD += amtUsd;
+    };
+
     for (const o of monthOrders) {
       const total = Number(o.totalAmount || 0);
       const cost = Number(o.totalCost || 0);
@@ -432,31 +457,82 @@ export class DashboardService {
         pendingReceivable += Math.max(0, total - paidPart);
       }
 
+      const approvedAbonos = Array.isArray(o.abonosHistory)
+        ? o.abonosHistory.filter((a: any) => !a.status || a.status === 'APPROVED')
+        : [];
+
       if (Array.isArray(o.splitPayments) && o.splitPayments.length > 0) {
         for (const sp of o.splitPayments) {
-          const method = (sp.method || '').toUpperCase();
           const amtUsd = Number(sp.amountUSD) || 0;
           const amtBs = Number(sp.amountBS) > 0 ? Number(sp.amountBS) : Number((amtUsd * orderRate).toFixed(2));
           const effUsd = amtUsd > 0 ? amtUsd : (orderRate > 0 ? amtBs / orderRate : 0);
+          addPaymentToBuckets(sp.method || '', effUsd, amtBs);
+        }
+      } else if (approvedAbonos.length > 0) {
+        let sumAbonosUsd = 0;
+        for (const ab of approvedAbonos) {
+          const method = ab.method || o.paymentMethod || 'USD';
+          const amtUsd = Number(ab.amount || 0);
+          const amtBs = (ab.amountBs !== undefined && ab.amountBs !== null && Number(ab.amountBs) > 0)
+            ? Number(ab.amountBs)
+            : Number((amtUsd * orderRate).toFixed(2));
+          const effUsd = amtUsd > 0 ? amtUsd : (orderRate > 0 ? amtBs / orderRate : 0);
+          sumAbonosUsd += effUsd;
+          addPaymentToBuckets(method, effUsd, amtBs);
+        }
 
-          if (['PUNTO', 'CARD_POS', 'POS', 'TARJETA'].includes(method)) puntoBs += amtBs;
-          else if (['PAGO_MOVIL', 'PAGOMOVIL'].includes(method)) pagoMovilBs += amtBs;
-          else if (['TRANSFER', 'TRANSFERENCIA'].includes(method)) transferBs += amtBs;
-          else if (['BINANCE', 'BINANCE_USDT', 'USDT', 'ZELLE'].includes(method)) digitalUSD += effUsd;
-          else cashUSD += effUsd;
+        // Si la orden está pagada totalmente (PAID), pero los abonos no cubren el total,
+        // registrar la diferencia pagada al liquidar
+        if (o.paymentStatus === PaymentStatus.PAID && total > sumAbonosUsd) {
+          const remainingUsd = Number((total - sumAbonosUsd).toFixed(2));
+          const remainingBs = Number((remainingUsd * orderRate).toFixed(2));
+          addPaymentToBuckets(o.paymentMethod || 'USD', remainingUsd, remainingBs);
         }
       } else if (o.paymentStatus === PaymentStatus.PAID || (o.paymentStatus === PaymentStatus.PARTIAL && abonos > 0)) {
-        const method = (o.paymentMethod || 'USD').toUpperCase();
         const effectivePaidUsd = o.paymentStatus === PaymentStatus.PAID ? total : abonos;
         const effectivePaidBs = Number(o.amountBs) > 0 && o.paymentStatus === PaymentStatus.PAID
           ? Number(o.amountBs)
           : Number((effectivePaidUsd * orderRate).toFixed(2));
 
-        if (['PUNTO', 'CARD_POS', 'POS', 'TARJETA'].includes(method)) puntoBs += effectivePaidBs;
-        else if (['PAGO_MOVIL', 'PAGOMOVIL'].includes(method)) pagoMovilBs += effectivePaidBs;
-        else if (['TRANSFER', 'TRANSFERENCIA'].includes(method)) transferBs += effectivePaidBs;
-        else if (['BINANCE', 'BINANCE_USDT', 'USDT', 'ZELLE'].includes(method)) digitalUSD += effectivePaidUsd;
-        else cashUSD += effectivePaidUsd;
+        addPaymentToBuckets(o.paymentMethod || 'USD', effectivePaidUsd, effectivePaidBs);
+      }
+    }
+
+    // Citas / Reservas independientes del mes (sin orden POS vinculada)
+    const standaloneRes = typeof this.reservationRepo?.find === 'function'
+      ? await this.reservationRepo.find({ where: { tenantId } })
+      : [];
+
+    const monthRes = standaloneRes.filter(r => {
+      if (r.status === ReservationStatus.CANCELED) return false;
+      if (r.orderId && r.orderId.trim() !== '') return false;
+      const d = r.date ? new Date(r.date) : new Date(r.createdAt);
+      return d >= startDate && d <= endDate;
+    });
+
+    for (const r of monthRes) {
+      const total = Number(r.totalAmount || 0);
+      const isPaid = r.paymentStatus === PaymentStatus.PAID;
+      const abono = Number(r.abonosTotal || 0);
+
+      invoicedRevenue += total;
+      if (isPaid) {
+        paidOrdersCount++;
+        collectedRevenue += total;
+      } else if (abono > 0) {
+        pendingOrdersCount++;
+        collectedRevenue += abono;
+        pendingReceivable += Math.max(0, total - abono);
+      } else {
+        pendingOrdersCount++;
+        pendingReceivable += total;
+      }
+
+      const effUsd = isPaid ? total : (abono > 0 ? abono : 0);
+      if (effUsd > 0) {
+        const effBs = Number((effUsd * rate).toFixed(2));
+        const resMethod = (r as any).paymentMethod || (Array.isArray(r.abonosHistory) && r.abonosHistory[0]?.method) || 'USD';
+        addPaymentToBuckets(resMethod, effUsd, effBs);
       }
     }
 
@@ -574,11 +650,13 @@ export class DashboardService {
         : 'Venta general';
 
       if (Array.isArray(o.abonosHistory) && o.abonosHistory.length > 0) {
+        let sumAbonos = 0;
         for (const ab of o.abonosHistory) {
           const abDate = new Date(ab.date || o.createdAt);
           if (abDate >= startDate && abDate <= endDate) {
             const amt = Number(ab.amount || 0);
             if (amt > 0) {
+              sumAbonos += amt;
               const dt = formatDateTime(abDate);
               rawRows.push({
                 timestamp: abDate.getTime(),
@@ -590,6 +668,31 @@ export class DashboardService {
                 party: o.customerName || 'Cliente',
                 method: ab.method || o.paymentMethod || 'USD',
                 debe: Number(amt.toFixed(2)),
+                haber: 0,
+              });
+            }
+          }
+        }
+
+        // Si la orden está pagada totalmente (PAID) y el total supera los abonos, registrar el finiquito
+        if (o.paymentStatus === PaymentStatus.PAID) {
+          const oDate = new Date(o.createdAt);
+          if (oDate >= startDate && oDate <= endDate) {
+            const total = Number(o.totalAmount || 0);
+            const remaining = Number((total - sumAbonos).toFixed(2));
+            if (remaining > 0) {
+              const dt = formatDateTime(oDate);
+              const ref = o.pagoMovilRef || o.puntoRef || o.transferRef || o.binanceRef;
+              rawRows.push({
+                timestamp: oDate.getTime(),
+                date: dt.date,
+                time: dt.time,
+                reference: ref ? `${shortId} (Finiquito Ref: ${ref})` : `${shortId} (Finiquito)`,
+                type: 'COBRO FINAL',
+                concept: `Cobro finiquito orden #${shortId}: ${itemsSummary}`,
+                party: o.customerName || 'Cliente',
+                method: o.paymentMethod || 'USD',
+                debe: remaining,
                 haber: 0,
               });
             }
@@ -615,6 +718,42 @@ export class DashboardService {
               haber: 0,
             });
           }
+        }
+      }
+    }
+
+    // 1b. Citas / Reservas directas (DEBE)
+    const standaloneResReport = typeof this.reservationRepo?.find === 'function'
+      ? await this.reservationRepo.find({ where: { tenantId } })
+      : [];
+
+    for (const r of standaloneResReport) {
+      if (r.status === ReservationStatus.CANCELED) continue;
+      if (r.orderId && r.orderId.trim() !== '') continue;
+
+      const rDate = r.date ? new Date(r.date) : new Date(r.createdAt);
+      if (rDate >= startDate && rDate <= endDate) {
+        const isPaid = r.paymentStatus === PaymentStatus.PAID;
+        const abono = Number(r.abonosTotal || 0);
+        const total = Number(r.totalAmount || 0);
+        const effUsd = isPaid ? total : (abono > 0 ? abono : 0);
+
+        if (effUsd > 0) {
+          const dt = formatDateTime(rDate);
+          const shortId = `RES-${(r.id || '').slice(0, 8).toUpperCase()}`;
+          const resMethod = (r as any).paymentMethod || (Array.isArray(r.abonosHistory) && r.abonosHistory[0]?.method) || 'USD';
+          rawRows.push({
+            timestamp: rDate.getTime(),
+            date: dt.date,
+            time: dt.time,
+            reference: shortId,
+            type: isPaid ? 'CITA PAGADA' : 'ABONO CITA',
+            concept: `Cita/Servicio: ${r.serviceName || 'Servicio'} (${r.customerName || 'Cliente'})`,
+            party: r.customerName || 'Cliente',
+            method: resMethod,
+            debe: Number(effUsd.toFixed(2)),
+            haber: 0,
+          });
         }
       }
     }
@@ -741,8 +880,17 @@ export class DashboardService {
     let transferBs = 0;
     let bsOut = 0;
 
+    const addTreasuryPayment = (method: string, amtUsd: number, amtBs: number) => {
+      const norm = normalizePaymentMethod(method);
+      if (norm === 'PUNTO') puntoBs += amtBs;
+      else if (norm === 'PAGO_MOVIL') pagoMovilBs += amtBs;
+      else if (norm === 'TRANSFER') transferBs += amtBs;
+      else if (norm === 'DIGITAL_USD') digitalUSDIn += amtUsd;
+      else cashUSDIn += amtUsd;
+    };
+
     for (const o of orders) {
-      if (o.status === OrderStatus.CANCELED) continue;
+      if (o.status === OrderStatus.CANCELED || o.status === OrderStatus.CANCELADO_PROVEEDOR) continue;
       // Solo contar cobros que hayan sido pagados total o parcialmente
       if (o.paymentStatus !== PaymentStatus.PAID && o.paymentStatus !== PaymentStatus.PARTIAL) continue;
 
@@ -760,62 +908,80 @@ export class DashboardService {
       }
 
       // Pagos
+      const approvedAbonos = Array.isArray(o.abonosHistory)
+        ? o.abonosHistory.filter((a: any) => !a.status || a.status === 'APPROVED')
+        : [];
+
       if (Array.isArray(o.splitPayments) && o.splitPayments.length > 0) {
         for (const sp of o.splitPayments) {
-          const method = (sp.method || '').toUpperCase();
           const amtUsd = Number(sp.amountUSD) || 0;
           const amtBs = (sp.amountBS !== undefined && sp.amountBS !== null && Number(sp.amountBS) > 0)
             ? Number(sp.amountBS)
             : Number((amtUsd * orderRate).toFixed(2));
           const effectiveUsd = amtUsd > 0 ? amtUsd : (orderRate > 0 ? amtBs / orderRate : 0);
+          addTreasuryPayment(sp.method || '', effectiveUsd, amtBs);
+        }
+      } else if (approvedAbonos.length > 0) {
+        let sumAbonosUsd = 0;
+        for (const ab of approvedAbonos) {
+          const method = ab.method || o.paymentMethod || 'USD';
+          const amtUsd = Number(ab.amount || 0);
+          const amtBs = (ab.amountBs !== undefined && ab.amountBs !== null && Number(ab.amountBs) > 0)
+            ? Number(ab.amountBs)
+            : Number((amtUsd * orderRate).toFixed(2));
+          const effectiveUsd = amtUsd > 0 ? amtUsd : (orderRate > 0 ? amtBs / orderRate : 0);
+          sumAbonosUsd += effectiveUsd;
+          addTreasuryPayment(method, effectiveUsd, amtBs);
+        }
 
-          if (['PUNTO', 'CARD_POS', 'POS', 'TARJETA'].includes(method)) {
-            puntoBs += amtBs;
-          } else if (['PAGO_MOVIL', 'PAGOMOVIL'].includes(method)) {
-            pagoMovilBs += amtBs;
-          } else if (['TRANSFER', 'TRANSFERENCIA'].includes(method)) {
-            transferBs += amtBs;
-          } else if (['USD', 'CASH', 'CASH_USD', 'EFECTIVO'].includes(method)) {
-            cashUSDIn += effectiveUsd;
-          } else if (['BINANCE', 'BINANCE_USDT', 'USDT', 'ZELLE'].includes(method)) {
-            digitalUSDIn += effectiveUsd;
-          }
+        // Si la orden está pagada totalmente (PAID) pero los abonos no cubren el total,
+        // computar el saldo restante liquidado
+        const total = Number(o.totalAmount || 0);
+        if (o.paymentStatus === PaymentStatus.PAID && total > sumAbonosUsd) {
+          const remainingUsd = Number((total - sumAbonosUsd).toFixed(2));
+          const remainingBs = Number((remainingUsd * orderRate).toFixed(2));
+          addTreasuryPayment(o.paymentMethod || 'USD', remainingUsd, remainingBs);
         }
       } else {
-        const method = (o.paymentMethod || '').toUpperCase();
         const amtUsd = Number(o.totalAmount || 0);
         const amtBs = (o.amountBs !== undefined && o.amountBs !== null && Number(o.amountBs) > 0)
           ? Number(o.amountBs)
           : Number((amtUsd * orderRate).toFixed(2));
 
         if (o.paymentStatus === PaymentStatus.PAID) {
-          if (['PUNTO', 'CARD_POS', 'POS'].includes(method)) {
-            puntoBs += amtBs;
-          } else if (['PAGO_MOVIL', 'PAGOMOVIL'].includes(method)) {
-            pagoMovilBs += amtBs;
-          } else if (['TRANSFER', 'TRANSFERENCIA'].includes(method)) {
-            transferBs += amtBs;
-          } else if (['USD', 'CASH', 'CASH_USD', 'EFECTIVO'].includes(method)) {
-            const usdIn = Number(o.usdReceived) || amtUsd;
+          const normMethod = normalizePaymentMethod(o.paymentMethod || 'USD');
+          if (normMethod === 'CASH_USD') {
+            const usdIn = Number(o.usdReceived) > 0 ? Number(o.usdReceived) : amtUsd;
             cashUSDIn += usdIn;
-          } else if (['BINANCE', 'BINANCE_USDT', 'USDT', 'ZELLE'].includes(method)) {
-            digitalUSDIn += amtUsd;
+          } else {
+            addTreasuryPayment(o.paymentMethod || 'USD', amtUsd, amtBs);
           }
         } else if (o.paymentStatus === PaymentStatus.PARTIAL && Number(o.abonosTotal) > 0) {
           const abonos = Number(o.abonosTotal);
           const abonosBs = Number(o.amountBs) > 0 ? Number(o.amountBs) : Number((abonos * orderRate).toFixed(2));
-          if (['USD', 'CASH', 'CASH_USD', 'EFECTIVO'].includes(method)) {
-            cashUSDIn += abonos;
-          } else if (['BINANCE', 'BINANCE_USDT', 'USDT', 'ZELLE'].includes(method)) {
-            digitalUSDIn += abonos;
-          } else if (['PAGO_MOVIL'].includes(method)) {
-            pagoMovilBs += abonosBs;
-          } else if (['PUNTO'].includes(method)) {
-            puntoBs += abonosBs;
-          } else if (['TRANSFER'].includes(method)) {
-            transferBs += abonosBs;
-          }
+          addTreasuryPayment(o.paymentMethod || 'USD', abonos, abonosBs);
         }
+      }
+    }
+
+    // Citas / Reservas independientes (sin orden POS vinculada)
+    const standaloneResTreasury = typeof this.reservationRepo?.find === 'function'
+      ? await this.reservationRepo.find({ where: { tenantId } })
+      : [];
+
+    for (const r of standaloneResTreasury) {
+      if (r.status === ReservationStatus.CANCELED) continue;
+      if (r.orderId && r.orderId.trim() !== '') continue;
+
+      const isPaid = r.paymentStatus === PaymentStatus.PAID;
+      const abono = Number(r.abonosTotal || 0);
+      const total = Number(r.totalAmount || 0);
+      const effUsd = isPaid ? total : (abono > 0 ? abono : 0);
+
+      if (effUsd > 0) {
+        const effBs = Number((effUsd * rate).toFixed(2));
+        const resMethod = (r as any).paymentMethod || (Array.isArray(r.abonosHistory) && r.abonosHistory[0]?.method) || 'USD';
+        addTreasuryPayment(resMethod, effUsd, effBs);
       }
     }
 

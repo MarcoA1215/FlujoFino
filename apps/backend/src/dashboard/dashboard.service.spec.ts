@@ -70,6 +70,7 @@ describe('DashboardService', () => {
       createQueryBuilder: jest.fn().mockReturnValue(createDummyQueryBuilder()),
     };
     reservationRepo = {
+      find: jest.fn().mockResolvedValue([]),
       createQueryBuilder: jest.fn().mockReturnValue(createDummyQueryBuilder()),
     };
     cashExchangeRepo = {
@@ -181,6 +182,131 @@ describe('DashboardService', () => {
       expect(activeInLowStock).toBeDefined();
       expect(activeInLowStock?.debt).toBe(1); // 1 unidad requerida por déficit del producto
       expect(activeInLowStock?.effectiveStock).toBe(1); // 2 de stock - 1 de deuda = 1 <= minStockAlert (5)
+    });
+  });
+
+  describe('getTreasurySummary - Detección de Abonos de Citas', () => {
+    it('debe computar en banco los pagos móviles aprobados en abonosHistory aunque paymentMethod sea ON_ARRIVAL', async () => {
+      const tenantId = 'tenant-exotica';
+      settingsRepo.findOne.mockResolvedValue({
+        id: tenantId,
+        exchangeRateBs: 880,
+        initialBankBs: 0,
+        initialCashUSD: 0,
+        currencySymbol: 'Bs.',
+      });
+
+      orderRepo.find.mockResolvedValue([
+        {
+          id: 'ord-maria-moro',
+          tenantId,
+          status: 'DELIVERED',
+          paymentStatus: 'PAID',
+          paymentMethod: 'ON_ARRIVAL',
+          totalAmount: 25,
+          exchangeRate: 880,
+          splitPayments: null,
+          abonosHistory: [
+            {
+              id: 'abono-1',
+              amount: 25,
+              amountBs: 22000,
+              method: 'PAGO_MOVIL',
+              status: 'APPROVED',
+              reference: '7959',
+            },
+          ],
+        },
+      ]);
+
+      expenseRepo.find.mockResolvedValue([]);
+      cashExchangeRepo.find.mockResolvedValue([]);
+
+      const treasury = await service.getTreasurySummary(tenantId);
+
+      expect(treasury.pagoMovilBs).toBe(22000);
+      expect(treasury.bankBs).toBe(22000);
+      expect(treasury.cashUSD).toBe(0);
+    });
+
+    it('debe computar correctamente pagos en divisas / USD con finiquito tras abono previo en tesorería y arqueo mensual', async () => {
+      const tenantId = 'tenant-divisas';
+      settingsRepo.findOne.mockResolvedValue({
+        id: tenantId,
+        exchangeRateBs: 50,
+        initialBankBs: 0,
+        initialCashUSD: 0,
+        currencySymbol: 'Bs.',
+      });
+
+      // Orden de $50 total, con abono de $20 en USD y luego cobro finiquito de $30 en USD (paymentStatus = PAID)
+      orderRepo.find.mockResolvedValue([
+        {
+          id: 'ord-divisas-1',
+          tenantId,
+          status: 'COMPLETED',
+          paymentStatus: 'PAID',
+          paymentMethod: 'USD',
+          totalAmount: 50,
+          totalCost: 15,
+          exchangeRate: 50,
+          createdAt: new Date(),
+          abonosHistory: [
+            {
+              id: 'abono-usd-1',
+              amount: 20,
+              method: 'USD',
+              status: 'APPROVED',
+            },
+          ],
+        },
+      ]);
+
+      expenseRepo.find.mockResolvedValue([]);
+      cashExchangeRepo.find.mockResolvedValue([]);
+
+      const treasury = await service.getTreasurySummary(tenantId);
+      // El total de $50 debe estar en gaveta de efectivo USD ($20 del abono + $30 del finiquito)
+      expect(treasury.cashUSD).toBe(50);
+
+      const monthly = await service.getMonthlySummary(tenantId);
+      expect(monthly.byMethod.USD).toBe(50);
+      expect(monthly.collectedRevenue).toBe(50);
+    });
+
+    it('debe computar citas completadas en divisas sin orden POS vinculada en tesorería y arqueo', async () => {
+      const tenantId = 'tenant-citas';
+      settingsRepo.findOne.mockResolvedValue({
+        id: tenantId,
+        exchangeRateBs: 50,
+        initialBankBs: 0,
+        initialCashUSD: 0,
+        currencySymbol: 'Bs.',
+      });
+
+      orderRepo.find.mockResolvedValue([]);
+      expenseRepo.find.mockResolvedValue([]);
+      cashExchangeRepo.find.mockResolvedValue([]);
+
+      reservationRepo.find.mockResolvedValue([
+        {
+          id: 'res-divisas-1',
+          tenantId,
+          status: 'COMPLETED',
+          paymentStatus: 'PAID',
+          paymentMethod: 'DIVISAS',
+          totalAmount: 35,
+          orderId: null,
+          createdAt: new Date(),
+        },
+      ]);
+
+      const treasury = await service.getTreasurySummary(tenantId);
+      expect(treasury.cashUSD).toBe(35);
+
+      const monthly = await service.getMonthlySummary(tenantId);
+      expect(monthly.byMethod.USD).toBe(35);
+      expect(monthly.collectedRevenue).toBe(35);
     });
   });
 });

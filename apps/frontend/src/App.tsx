@@ -15,6 +15,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { NotificationPermissionBanner } from './components/NotificationPermissionBanner';
+import { resetToDefaultTheme } from './utils/colors';
 
 // Code Splitting / Lazy Loading de páginas para optimización de bundle
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -283,6 +284,32 @@ const MainLayout: React.FC = () => {
   const isExpiredRoute = location.pathname === '/subscription-expired';
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
   const isPromotor = user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR';
+
+  // Blindaje estricto de colores de marca FinoWork:
+  // En login, register, landing, términos, políticas, suscripción vencida y rutas de plataforma
+  // SIN tenant autenticado, NUNCA deben heredarse colores de clientes previos.
+  useEffect(() => {
+    const isPlatformAuthRoute = 
+      location.pathname === '/login' ||
+      location.pathname === '/register' ||
+      location.pathname === '/landing' ||
+      location.pathname === '/terms' ||
+      location.pathname === '/privacy' ||
+      location.pathname === '/delete-account' ||
+      location.pathname === '/solicitud-eliminacion' ||
+      location.pathname === '/subscription-expired' ||
+      (location.pathname === '/' && !user);
+
+    const isCustomerPublicRoute = 
+      location.pathname.startsWith('/book') || 
+      location.pathname.startsWith('/store') || 
+      location.pathname.startsWith('/tienda') || 
+      location.pathname.startsWith('/appointment');
+
+    if (isPlatformAuthRoute || (!isCustomerPublicRoute && !user?.tenantId)) {
+      resetToDefaultTheme();
+    }
+  }, [location.pathname, user?.tenantId]);
 
   return (
     <>

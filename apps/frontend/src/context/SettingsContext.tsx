@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { apiClient } from '../api/client';
 import { AuthContext } from './AuthContext';
-import { getContrastColor, ensureReadableColor } from '../utils/colors';
+import { applyThemeToDom, resetToDefaultTheme } from '../utils/colors';
 
 export interface SettingsContextType {
   settings: any;
@@ -33,22 +33,16 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const applyThemeToDom = useCallback((currentSettings: any) => {
+  const applyTenantTheme = useCallback((currentSettings: any) => {
     if (typeof document === 'undefined') return;
+    if (!isAuthenticated || !user?.tenantId) {
+      resetToDefaultTheme();
+      return;
+    }
     const primary = currentSettings?.themePrimaryColor || '#10b981';
-    const header = currentSettings?.themeHeaderColor || '#ffffff';
-    const contrastText = getContrastColor(primary);
-    const headerContrastText = getContrastColor(header);
-    const readablePrimary = ensureReadableColor(primary);
-
-    document.documentElement.style.setProperty('--theme-primary', primary);
-    document.documentElement.style.setProperty('--theme-primary-contrast', contrastText);
-    document.documentElement.style.setProperty('--theme-primary-readable', readablePrimary);
-    document.documentElement.style.setProperty('--theme-header', header);
-    document.documentElement.style.setProperty('--theme-header-contrast', headerContrastText);
-    document.documentElement.style.setProperty('--ion-color-primary', primary);
-    document.documentElement.style.setProperty('--ion-color-primary-contrast', contrastText);
-  }, []);
+    const header = currentSettings?.themeHeaderColor || primary;
+    applyThemeToDom(primary, header);
+  }, [isAuthenticated, user?.tenantId]);
 
   const refreshSettings = useCallback(async () => {
     if (!isAuthenticated || !user?.tenantId) return;
@@ -58,27 +52,29 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (res.data) {
         setSettings(res.data);
         localStorage.setItem('tenant_settings', JSON.stringify(res.data));
-        applyThemeToDom(res.data);
+        applyTenantTheme(res.data);
       }
     } catch (err) {
       console.error('Error cargando configuración:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, user?.tenantId, applyThemeToDom]);
+  }, [isAuthenticated, user?.tenantId, applyTenantTheme]);
 
   const updateSettings = useCallback((newSettings: any) => {
     setSettings((prev: any) => {
       const merged = { ...prev, ...newSettings };
       localStorage.setItem('tenant_settings', JSON.stringify(merged));
-      applyThemeToDom(merged);
+      applyTenantTheme(merged);
       return merged;
     });
-  }, [applyThemeToDom]);
+  }, [applyTenantTheme]);
 
   useEffect(() => {
     if (isAuthenticated && user?.tenantId) {
       refreshSettings();
+    } else {
+      resetToDefaultTheme();
     }
   }, [isAuthenticated, user?.tenantId, refreshSettings]);
 
@@ -94,12 +90,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [updateSettings]);
 
-  // Aplicar tema inicial una sola vez
+  // Aplicar tema inicial solo si el usuario está autenticado en un tenant
   useEffect(() => {
-    if (settings && Object.keys(settings).length > 0) {
-      applyThemeToDom(settings);
+    if (isAuthenticated && user?.tenantId && settings && Object.keys(settings).length > 0) {
+      applyTenantTheme(settings);
     }
-  }, [applyThemeToDom]);
+  }, [isAuthenticated, user?.tenantId, applyTenantTheme]);
 
   const exchangeRate = useMemo(() => {
     return Number(settings?.exchangeRate || settings?.effectiveExchangeRate || 1);

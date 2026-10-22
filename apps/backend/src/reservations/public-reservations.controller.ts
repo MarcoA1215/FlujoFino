@@ -522,8 +522,8 @@ export class PublicReservationsController {
 
       let reqDeliveryDate: Date | undefined;
       if (dto.date) {
-        const timePart = dto.time ? `${dto.time}:00` : '12:00:00';
-        const parsedD = new Date(`${dto.date}T${timePart}`);
+        const timePart = dto.time ? (dto.time.length <= 5 ? `${dto.time}:00` : dto.time) : '12:00:00';
+        const parsedD = new Date(`${dto.date}T${timePart}-04:00`);
         if (!isNaN(parsedD.getTime())) reqDeliveryDate = parsedD;
       }
 
@@ -807,8 +807,12 @@ export class PublicReservationsController {
 
     const methodLabel = dto.method === 'PAGO_MOVIL' ? 'Pago Móvil' : dto.method === 'BINANCE' ? 'Binance' : dto.method === 'TRANSFER' ? 'Transferencia' : 'Pago';
     const noteTag = `[Pago Reportado: $${Number(dto.amount).toFixed(2)} vía ${methodLabel} Ref: ${dto.reference.trim()}]`;
-    reservation.notes = reservation.notes ? `${reservation.notes} | ${noteTag}` : noteTag;
     await reservationRepo.save(reservation);
+    try {
+      await this.reservationsService.syncLinkedOrder(reservation.tenantId, reservation);
+    } catch (e) {
+      console.error('Error syncing linked order on reportPayment:', e);
+    }
 
     try {
       await this.notificationsService.sendNotificationToNegocio(reservation.tenantId, {
@@ -1050,7 +1054,8 @@ export class PublicReservationsController {
           ]
         });
         if (linkedOrder) {
-          const parsedD = new Date(`${saved.date}T${saved.time}`);
+          const timePart = saved.time ? (saved.time.length <= 5 ? `${saved.time}:00` : saved.time) : '12:00:00';
+          const parsedD = new Date(`${saved.date}T${timePart}-04:00`);
           if (!isNaN(parsedD.getTime())) linkedOrder.requestedDeliveryDate = parsedD;
           const prefix = `[Cita: ${saved.date} ${newTimeDisplay}]`;
           if (linkedOrder.notes && linkedOrder.notes.includes('[Cita:')) {

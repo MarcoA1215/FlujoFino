@@ -111,3 +111,90 @@ export const PRESET_THEME_COLORS = [
   { name: 'Ámbar Intenso', hex: '#D97706' },
   { name: 'Grafito', hex: '#334155' }
 ];
+
+export const FINOWORK_DEFAULT_THEME = {
+  primary: '#10B981',
+  primaryRgb: '16, 185, 129',
+  primaryContrast: '#ffffff',
+  primaryContrastRgb: '255, 255, 255',
+  primaryShade: '#059669',
+  primaryTint: '#34D399',
+  primaryReadable: '#065F46',
+  primarySoftBg: '#ECFDF5',
+  header: '#ffffff',
+  headerContrast: '#0F172A',
+};
+
+export function applyThemeToDom(primaryColor?: string | null, headerColor?: string | null): void {
+  if (typeof document === 'undefined') return;
+
+  const validHex = (c?: string | null) => (c && /^#[0-9A-Fa-f]{6}$/i.test(c.trim()) ? c.trim() : null);
+
+  const primary = validHex(primaryColor) || FINOWORK_DEFAULT_THEME.primary;
+  const header = validHex(headerColor) || primary;
+
+  const [r, g, b] = hexToRgb(primary);
+  const contrast = getContrastColor(primary);
+  const [cr, cg, cb] = hexToRgb(contrast);
+  const readable = ensureReadableColor(primary);
+  const headerContrast = getContrastColor(header);
+
+  const [h, s, l] = rgbToHsl(r, g, b);
+  const shade = rgbToHex(...hslToRgb(h, s, Math.max(0, l - 0.08)));
+  const tint = rgbToHex(...hslToRgb(h, s, Math.min(1, l + 0.1)));
+  const softBg = (primary.startsWith('#') ? primary : `#${primary}`) + '18';
+
+  const root = document.documentElement;
+  root.style.setProperty('--theme-primary', primary);
+  root.style.setProperty('--theme-primary-rgb', `${r}, ${g}, ${b}`);
+  root.style.setProperty('--theme-primary-contrast', contrast);
+  root.style.setProperty('--theme-primary-contrast-rgb', `${cr}, ${cg}, ${cb}`);
+  root.style.setProperty('--theme-primary-readable', readable);
+  root.style.setProperty('--theme-primary-shade', shade);
+  root.style.setProperty('--theme-primary-tint', tint);
+  root.style.setProperty('--theme-primary-soft', softBg);
+  root.style.setProperty('--theme-header', header);
+  root.style.setProperty('--theme-header-contrast', headerContrast);
+
+  // Ionic global palette tokens
+  root.style.setProperty('--ion-color-primary', primary);
+  root.style.setProperty('--ion-color-primary-rgb', `${r}, ${g}, ${b}`);
+  root.style.setProperty('--ion-color-primary-contrast', contrast);
+  root.style.setProperty('--ion-color-primary-contrast-rgb', `${cr}, ${cg}, ${cb}`);
+  root.style.setProperty('--ion-color-primary-shade', shade);
+  root.style.setProperty('--ion-color-primary-tint', tint);
+
+  // FinoWork CSS tokens (so .ff-btn-primary, .ff-chip.active, etc. adapt automatically)
+  root.style.setProperty('--ff-emerald', primary);
+  root.style.setProperty('--ff-emerald-dark', shade);
+  root.style.setProperty('--ff-emerald-light', softBg);
+}
+
+export function resetToDefaultTheme(): void {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  const d = FINOWORK_DEFAULT_THEME;
+
+  root.style.setProperty('--theme-primary', d.primary);
+  root.style.setProperty('--theme-primary-rgb', d.primaryRgb);
+  root.style.setProperty('--theme-primary-contrast', d.primaryContrast);
+  root.style.setProperty('--theme-primary-contrast-rgb', d.primaryContrastRgb);
+  root.style.setProperty('--theme-primary-readable', d.primaryReadable);
+  root.style.setProperty('--theme-primary-shade', d.primaryShade);
+  root.style.setProperty('--theme-primary-tint', d.primaryTint);
+  root.style.setProperty('--theme-primary-soft', d.primarySoftBg);
+  root.style.setProperty('--theme-header', d.header);
+  root.style.setProperty('--theme-header-contrast', d.headerContrast);
+
+  root.style.setProperty('--ion-color-primary', d.primary);
+  root.style.setProperty('--ion-color-primary-rgb', d.primaryRgb);
+  root.style.setProperty('--ion-color-primary-contrast', d.primaryContrast);
+  root.style.setProperty('--ion-color-primary-contrast-rgb', d.primaryContrastRgb);
+  root.style.setProperty('--ion-color-primary-shade', d.primaryShade);
+  root.style.setProperty('--ion-color-primary-tint', d.primaryTint);
+
+  root.style.setProperty('--ff-emerald', d.primary);
+  root.style.setProperty('--ff-emerald-dark', d.primaryShade);
+  root.style.setProperty('--ff-emerald-light', d.primarySoftBg);
+}
+

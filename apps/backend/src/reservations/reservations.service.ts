@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, OnModuleInit, NotFoundException } from
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, EntityManager } from 'typeorm';
 import { Reservation } from '../entities/reservation.entity';
-import { Order } from '../entities/order.entity';
+import { Order, SplitPaymentItem } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Product } from '../entities/product.entity';
 import { ReservationStatus, PaymentStatus, UserRole, OrderStatus, DeliveryMethod } from '@finowork/shared-types';
@@ -67,7 +67,7 @@ export class ReservationsService implements OnModuleInit {
         // Sincronizar fecha/hora requerida y notas
         if (reservation.date) {
           const timePart = reservation.time ? (reservation.time.length <= 5 ? `${reservation.time}:00` : reservation.time) : '12:00:00';
-          const parsedD = new Date(`${reservation.date}T${timePart}`);
+          const parsedD = new Date(`${reservation.date}T${timePart}-04:00`);
           if (!isNaN(parsedD.getTime())) {
             order.requestedDeliveryDate = parsedD;
           }
@@ -103,6 +103,60 @@ export class ReservationsService implements OnModuleInit {
         }
         if (Array.isArray(reservation.abonosHistory)) {
           order.abonosHistory = reservation.abonosHistory;
+        }
+
+        // Sincronizar abonos confirmados a splitPayments, paymentMethod y amountBs
+        const validAbonos = Array.isArray(reservation.abonosHistory)
+          ? reservation.abonosHistory.filter((a: any) => !a.status || a.status === 'APPROVED')
+          : [];
+
+        if (validAbonos.length > 0) {
+          const rateToUse = Number(order.exchangeRate) > 0 ? Number(order.exchangeRate) : 1;
+          const mappedSplits: SplitPaymentItem[] = validAbonos.map((a: any) => {
+            const usd = Number(a.amount || 0);
+            const bs = (a.amountBs !== undefined && a.amountBs !== null && Number(a.amountBs) > 0)
+              ? Number(a.amountBs)
+              : Number((usd * rateToUse).toFixed(2));
+            return {
+              method: (a.method || order.paymentMethod || 'PAGO_MOVIL').toUpperCase(),
+              amountUSD: usd,
+              amountBS: bs,
+              reference: a.reference || a.ref || undefined,
+            };
+          });
+
+          order.splitPayments = mappedSplits;
+
+          // Si el paymentMethod de la orden era ON_ARRIVAL, PENDING o estaba vacío, actualizarlo
+          const distinctMethods = Array.from(new Set(mappedSplits.map(s => s.method)));
+          if (!order.paymentMethod || ['ON_ARRIVAL', 'PENDING'].includes(order.paymentMethod.toUpperCase())) {
+            if (distinctMethods.length === 1) {
+              order.paymentMethod = distinctMethods[0];
+            } else if (distinctMethods.length > 1) {
+              order.paymentMethod = 'SPLIT';
+            }
+          }
+
+          // Sincronizar referencias según los métodos aprobados
+          for (const s of mappedSplits) {
+            if (s.reference) {
+              if (['PAGO_MOVIL', 'PAGOMOVIL'].includes(s.method) && !order.pagoMovilRef) {
+                order.pagoMovilRef = s.reference;
+              } else if (['TRANSFER', 'TRANSFERENCIA'].includes(s.method) && !order.transferRef) {
+                order.transferRef = s.reference;
+              } else if (['BINANCE', 'BINANCE_USDT', 'USDT'].includes(s.method) && !order.binanceRef) {
+                order.binanceRef = s.reference;
+              } else if (['PUNTO', 'POS', 'CARD_POS'].includes(s.method) && !order.puntoRef) {
+                order.puntoRef = s.reference;
+              }
+            }
+          }
+
+          // Sincronizar amountBs de la orden si está vacío o es 0
+          const totalBsFromAbonos = mappedSplits.reduce((acc, s) => acc + (Number(s.amountBS) || 0), 0);
+          if (totalBsFromAbonos > 0 && (!order.amountBs || Number(order.amountBs) <= 0)) {
+            order.amountBs = totalBsFromAbonos;
+          }
         }
 
         // Sincronizar y auto-curar totalAmount si es 0
@@ -229,7 +283,7 @@ export class ReservationsService implements OnModuleInit {
       let reqDeliveryDate: Date | undefined;
       if (reservation.date) {
         const timePart = reservation.time ? (reservation.time.length <= 5 ? `${reservation.time}:00` : reservation.time) : '12:00:00';
-        const parsedD = new Date(`${reservation.date}T${timePart}`);
+        const parsedD = new Date(`${reservation.date}T${timePart}-04:00`);
         if (!isNaN(parsedD.getTime())) reqDeliveryDate = parsedD;
       }
 
@@ -1280,7 +1334,8 @@ export class ReservationsService implements OnModuleInit {
     const total = Number(res.totalAmount || 0);
     res.abonosTotal = total;
     res.abonosHistory = res.abonosHistory || [];
-    res.abonosHistory.push({ id: randomUUID(), amount: total, date: new Date().toISOString(), status: 'APPROVED' });
+    const methodToUse = (res as any).paymentMethod && (res as any).paymentMethod !== 'ON_ARRIVAL' ? (res as any).paymentMethod : 'PAGO_MOVIL';
+    res.abonosHistory.push({ id: randomUUID(), amount: total, date: new Date().toISOString(), status: 'APPROVED', method: methodToUse });
     res.paymentStatus = PaymentStatus.PAID;
     res.paymentReported = false;
     res.paymentRejectedReason = null as any;

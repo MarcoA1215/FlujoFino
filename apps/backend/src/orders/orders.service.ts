@@ -896,7 +896,7 @@ export class OrdersService implements OnModuleInit {
         offlineId: dto.offlineId || (dto as any)?.payload?.offlineId || undefined,
         createdAt: orderCreatedAt,
         abonosTotal: dto.initialAbono || 0,
-        abonosHistory: (dto.initialAbono && dto.initialAbono > 0) ? [{ id: Date.now().toString(), amount: dto.initialAbono, date: new Date().toISOString() }] : []
+        abonosHistory: (dto.initialAbono && dto.initialAbono > 0) ? [{ id: Date.now().toString(), amount: dto.initialAbono, method: 'USD', status: 'APPROVED', date: new Date().toISOString() }] : []
       });
       order.createdAt = orderCreatedAt;
         
@@ -1382,6 +1382,26 @@ export class OrdersService implements OnModuleInit {
       }
     }
 
+    if (order.paymentStatus === PaymentStatus.PAID && !wasPaid) {
+      const totalAmt = Number(order.totalAmount || 0);
+      const abonosAmt = Number(order.abonosTotal || 0);
+      const restante = Math.max(0, totalAmt - abonosAmt);
+      if (restante > 0.01 && (abonosAmt > 0 || (Array.isArray(order.abonosHistory) && order.abonosHistory.length > 0))) {
+        const history = Array.isArray(order.abonosHistory) ? [...order.abonosHistory] : [];
+        history.push({
+          id: randomUUID(),
+          amount: Number(restante.toFixed(2)),
+          method: (order.paymentMethod || 'USD').toUpperCase(),
+          ref: order.pagoMovilRef || order.puntoRef || order.transferRef || order.binanceRef || undefined,
+          bank: order.pagoMovilBank || order.puntoBank || order.transferBank || undefined,
+          date: new Date().toISOString(),
+          status: 'APPROVED',
+        });
+        order.abonosHistory = history;
+        order.abonosTotal = totalAmt;
+      }
+    }
+
     const saved = await orderRepo.save(order);
     if (!wasPaid && saved.paymentStatus === PaymentStatus.PAID && saved.customerId) {
       await this.customersService.incrementVisits(tenantId, saved.customerId);
@@ -1425,9 +1445,50 @@ export class OrdersService implements OnModuleInit {
     }
 
     // Calcular abonos aprobados reales (incluyendo abonos manuales que no traen status)
-    const historySum = Array.isArray(order.abonosHistory)
-      ? order.abonosHistory.filter((e: any) => !e.status || e.status === 'APPROVED').reduce((acc: number, e: any) => acc + (Number(e.amount) || 0), 0)
-      : 0;
+    const validAbonos = Array.isArray(order.abonosHistory)
+      ? order.abonosHistory.filter((e: any) => !e.status || e.status === 'APPROVED')
+      : [];
+
+    if (validAbonos.length > 0) {
+      const rateToUse = Number(order.exchangeRate) > 0 ? Number(order.exchangeRate) : 1;
+      order.splitPayments = validAbonos.map((a: any) => {
+        const usd = Number(a.amount || 0);
+        const bs = (a.amountBs !== undefined && a.amountBs !== null && Number(a.amountBs) > 0)
+          ? Number(a.amountBs)
+          : Number((usd * rateToUse).toFixed(2));
+        return {
+          method: (a.method || order.paymentMethod || 'PAGO_MOVIL').toUpperCase(),
+          amountUSD: usd,
+          amountBS: bs,
+          reference: a.reference || a.ref || undefined,
+        };
+      });
+
+      const distinctMethods = Array.from(new Set(order.splitPayments.map(s => s.method)));
+      if (!order.paymentMethod || ['ON_ARRIVAL', 'PENDING'].includes(order.paymentMethod.toUpperCase())) {
+        if (distinctMethods.length === 1) {
+          order.paymentMethod = distinctMethods[0];
+        } else if (distinctMethods.length > 1) {
+          order.paymentMethod = 'SPLIT';
+        }
+      }
+
+      for (const s of order.splitPayments) {
+        if (s.reference) {
+          if (['PAGO_MOVIL', 'PAGOMOVIL'].includes(s.method) && !order.pagoMovilRef) order.pagoMovilRef = s.reference;
+          else if (['TRANSFER', 'TRANSFERENCIA'].includes(s.method) && !order.transferRef) order.transferRef = s.reference;
+          else if (['BINANCE', 'BINANCE_USDT', 'USDT'].includes(s.method) && !order.binanceRef) order.binanceRef = s.reference;
+          else if (['PUNTO', 'POS', 'CARD_POS'].includes(s.method) && !order.puntoRef) order.puntoRef = s.reference;
+        }
+      }
+
+      const totalBsFromAbonos = order.splitPayments.reduce((acc, s) => acc + (Number(s.amountBS) || 0), 0);
+      if (totalBsFromAbonos > 0 && (!order.amountBs || Number(order.amountBs) <= 0)) {
+        order.amountBs = totalBsFromAbonos;
+      }
+    }
+
+    const historySum = validAbonos.reduce((acc: number, e: any) => acc + (Number(e.amount) || 0), 0);
 
     if (historySum > 0) {
       order.abonosTotal = historySum;
@@ -2541,11 +2602,26 @@ export class OrdersService implements OnModuleInit {
       }
 
       // Punto de Venta vs Pago Movil vs Cash Divisas (Soporte Split Tender y Retrocompatibilidad)
-      const hasSplitPayments = Array.isArray(o.splitPayments) && o.splitPayments.length > 0;
+      const approvedAbonos = Array.isArray(o.abonosHistory)
+        ? o.abonosHistory.filter((a: any) => !a.status || a.status === 'APPROVED')
+        : [];
 
-      if (hasSplitPayments) {
+      const splitsToProcess = (Array.isArray(o.splitPayments) && o.splitPayments.length > 0)
+        ? o.splitPayments
+        : (approvedAbonos.length > 0
+            ? approvedAbonos.map((a: any) => ({
+                method: (a.method || o.paymentMethod || 'PAGO_MOVIL').toUpperCase(),
+                amountUSD: Number(a.amount || 0),
+                amountBS: (a.amountBs !== undefined && a.amountBs !== null && Number(a.amountBs) > 0)
+                  ? Number(a.amountBs)
+                  : Number(((Number(a.amount || 0)) * orderRate).toFixed(2)),
+                reference: a.reference || a.ref || undefined,
+              }))
+            : null);
+
+      if (splitsToProcess && splitsToProcess.length > 0) {
         // --- OBJETIVO 1: Procesar pagos mixtos (Split Tender) ---
-        for (const item of o.splitPayments!) {
+        for (const item of splitsToProcess) {
           const method = (item.method || '').toUpperCase();
           const amtUsd = Number(item.amountUSD) || 0;
           const amtBs = (item.amountBS !== undefined && item.amountBS !== null && Number(item.amountBS) > 0)

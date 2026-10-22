@@ -30,6 +30,7 @@ import type { DeliveryZone } from '../types';
 import { AuthContext } from '../context/AuthContext';
 import AppHeader from '../components/AppHeader';
 import { formatWhatsAppUrl } from '../utils/whatsapp';
+import { formatTime12h } from '../utils/time';
 
 type OrderItem = {
   id: string;
@@ -768,7 +769,22 @@ const Orders: React.FC = () => {
                         </span>
                       )}
                       {order.requestedDeliveryDate && (() => {
-                        const isPast = new Date(order.requestedDeliveryDate).getTime() < Date.now();
+                        const citaMatch = order.notes?.match(/\[Cita:\s*([^\s\]]+)(?:\s+([0-9:]+))?\]/);
+                        let displayDate = '';
+                        let isPast = false;
+
+                        if (citaMatch && citaMatch[1]) {
+                          const dateStr = citaMatch[1];
+                          const timeStr = citaMatch[2] ? (citaMatch[2].length <= 5 ? `${citaMatch[2]}:00` : citaMatch[2]) : '12:00:00';
+                          displayDate = citaMatch[2] ? `${dateStr} a las ${formatTime12h(citaMatch[2])}` : dateStr;
+                          const citaEpoch = new Date(`${dateStr}T${timeStr}-04:00`).getTime();
+                          isPast = !isNaN(citaEpoch) ? citaEpoch < Date.now() : new Date(order.requestedDeliveryDate).getTime() < Date.now();
+                        } else {
+                          const d = new Date(order.requestedDeliveryDate);
+                          displayDate = isNaN(d.getTime()) ? '' : d.toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short', hour12: true });
+                          isPast = !isNaN(d.getTime()) ? d.getTime() < Date.now() : false;
+                        }
+
                         return (
                           <span style={{
                             fontSize: '11px',
@@ -782,7 +798,7 @@ const Orders: React.FC = () => {
                             gap: '4px',
                             border: isPast && !isPaid ? '1px solid #FECACA' : 'none'
                           }}>
-                            {isPast && !isPaid ? '⏰ Cita Cumplida:' : '📅 Requerido:'} {new Date(order.requestedDeliveryDate).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
+                            {isPast && !isPaid ? '⏰ Cita Cumplida:' : '📅 Requerido:'} {displayDate}
                           </span>
                         );
                       })()}
@@ -2215,6 +2231,10 @@ const Orders: React.FC = () => {
                   await apiClient.patch(`/orders/${selectedOrderForCobro.id}/payment`, {
                     status: PaymentStatus.PAID,
                     paymentMethod: 'USD',
+                    usdReceived: received,
+                    changeAmount: changeUsd > 0 ? changeUsd : undefined,
+                    changeAmountBs: changeBs > 0 ? changeBs : undefined,
+                    changeMethod: changeUsd > 0 ? 'CASH_BS' : undefined,
                     notes: (selectedOrderForCobro.notes ? selectedOrderForCobro.notes + '\n' : '') + `Pago USD: $${restante.toFixed(2)} | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
                   });
                   presentToast({ message: 'Pago en USD registrado', duration: 2000, color: 'success' });

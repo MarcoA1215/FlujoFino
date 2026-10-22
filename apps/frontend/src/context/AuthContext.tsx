@@ -4,6 +4,7 @@ import { apiClient } from '../api/client';
 import { UserRole } from '@finowork/shared-types';
 import { Preferences } from '@capacitor/preferences';
 import { offlineDb } from '../services/offline-db';
+import { resetToDefaultTheme } from '../utils/colors';
 
 interface User {
   id: string;
@@ -96,6 +97,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Si cambia de workspace, limpiar la caché del workspace anterior
     if (user?.tenantId && user.tenantId !== tenantId) {
       await offlineDb.clearTenantCache(user.tenantId);
+      localStorage.removeItem('tenant_settings');
       localStorage.removeItem('flujofino_exchange_rate');
       localStorage.removeItem('flujofino_rate_mode');
       localStorage.removeItem('flujofino_currency_symbol');
@@ -116,6 +118,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await Preferences.remove({ key: 'token' });
       await Preferences.remove({ key: 'user' });
       delete apiClient.defaults.headers.common['Authorization'];
+      resetToDefaultTheme();
       window.location.href = '/login';
       return;
     }
@@ -166,10 +169,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await offlineDb.clearTenantCache(currentTenant);
     }
     localStorage.removeItem('flujofino_active_tenant_id');
+    localStorage.removeItem('tenant_settings');
     localStorage.removeItem('flujofino_exchange_rate');
     localStorage.removeItem('flujofino_rate_mode');
     localStorage.removeItem('flujofino_currency_symbol');
     localStorage.removeItem('flujofino_simulating_offline');
+
+    resetToDefaultTheme();
 
     setToken(null);
     setUser(null);

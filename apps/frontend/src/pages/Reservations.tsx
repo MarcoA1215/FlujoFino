@@ -33,6 +33,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
+import esLocale from '@fullcalendar/core/locales/es';
 import { apiClient } from '../api/client';
 import { ReservationStatus } from '@finowork/shared-types';
 import { offlineDb } from '../services/offline-db';
@@ -40,6 +41,7 @@ import { AuthContext } from '../context/AuthContext';
 import { useImageViewer } from '../context/ImageViewerContext';
 import AppHeader from '../components/AppHeader';
 import { formatWhatsAppUrl } from '../utils/whatsapp';
+import { formatTime12h } from '../utils/time';
 
 export const formatDateLocal = (d: Date): string => {
   const year = d.getFullYear();
@@ -569,7 +571,7 @@ const Reservations: React.FC = () => {
         if (newReservation?.id) {
           const appointmentUrl = `${window.location.origin}/appointment/${newReservation.id}`;
           if (customerPhone) {
-            const msg = `Hola ${customerName}, tu cita para ${sNames || 'nuestro servicio'} ha sido agendada con éxito en ${user?.tenantName || 'FinoWork'} para el ${date} a las ${time}.\n\nPuedes ver los detalles, gestionar tu cita o reportar tu pago aquí:\n${appointmentUrl}`;
+            const msg = `Hola ${customerName}, tu cita para ${sNames || 'nuestro servicio'} ha sido agendada con éxito en ${user?.tenantName || 'FinoWork'} para el ${date} a las ${formatTime12h(time)}.\n\nPuedes ver los detalles, gestionar tu cita o reportar tu pago aquí:\n${appointmentUrl}`;
             const waUrl = formatWhatsAppUrl(customerPhone, msg);
 
             presentAlert({
@@ -1111,8 +1113,8 @@ const Reservations: React.FC = () => {
                           boxShadow: 'var(--ff-shadow-sm)'
                         }}
                       >
-                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A' }}>
-                          {res.time ? res.time.substring(0, 5) : ''}
+                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A', whiteSpace: 'nowrap' }}>
+                          {res.time ? formatTime12h(res.time) : ''}
                         </div>
                         <div style={{ fontSize: '11px', fontWeight: '600', color: '#64748B' }}>
                           {duration} min
@@ -1288,7 +1290,7 @@ const Reservations: React.FC = () => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 const appointmentUrl = `${window.location.origin}/appointment/${res.id}`;
-                                const text = `Hola ${res.customerName}, te escribimos de ${user?.tenantName || 'FinoWork'} respecto a tu cita para ${res.serviceName || 'nuestro servicio'} el ${res.date} a las ${res.time}.\n\nPuedes ver los detalles, gestionar tu cita o reportar tu pago aquí:\n${appointmentUrl}`;
+                                const text = `Hola ${res.customerName}, te escribimos de ${user?.tenantName || 'FinoWork'} respecto a tu cita para ${res.serviceName || 'nuestro servicio'} el ${res.date} a las ${formatTime12h(res.time)}.\n\nPuedes ver los detalles, gestionar tu cita o reportar tu pago aquí:\n${appointmentUrl}`;
                                 window.open(formatWhatsAppUrl(res.customerPhone, text), '_blank');
                               }}
                               style={{
@@ -1493,7 +1495,29 @@ const Reservations: React.FC = () => {
                   center: 'title',
                   right: 'timeGridWeek,dayGridMonth'
                 }}
+                locales={[esLocale]}
                 locale="es"
+                buttonText={{
+                  today: 'Hoy',
+                  month: 'Mes',
+                  week: 'Semana',
+                  day: 'Día',
+                  list: 'Agenda'
+                }}
+                allDayText="Todo el día"
+                slotLabelFormat={{
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  omitZeroMinute: false,
+                  meridiem: 'short',
+                  hour12: true
+                }}
+                eventTimeFormat={{
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  meridiem: 'short',
+                  hour12: true
+                }}
                 events={events}
                 eventClick={(info) => {
                   const res = reservations.find(r => r.id === info.event.id);
@@ -1809,7 +1833,7 @@ const Reservations: React.FC = () => {
                       ⚠️ No hay cupos automáticos calculados para esta fecha o especialista. Si deseas autorizar una excepción, ajusta la hora manual a continuación.
                     </div>
                   ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(68px, 1fr))', gap: '8px', maxHeight: '160px', overflowY: 'auto', padding: '2px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(82px, 1fr))', gap: '8px', maxHeight: '160px', overflowY: 'auto', padding: '2px' }}>
                       {availableSlots.map((slot, idx) => {
                         const isChosen = time === slot || time.substring(0, 5) === slot;
                         return (
@@ -1828,18 +1852,19 @@ const Reservations: React.FC = () => {
                               cursor: 'pointer',
                               boxShadow: isChosen ? '0 2px 6px rgba(16,185,129,0.3)' : 'none',
                               transition: 'all 0.15s ease',
+                              whiteSpace: 'nowrap'
                             }}
                           >
-                            {slot}
+                            {formatTime12h(slot)}
                           </button>
                         );
                       })}
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed #CBD5E1' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed #CBD5E1', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '12px', fontWeight: '700', color: '#475569' }}>
-                      Hora Seleccionada:
+                      Hora Seleccionada: {time ? <b style={{ color: '#047857' }}>{formatTime12h(time)}</b> : <span style={{ color: '#94A3B8' }}>(Ninguna)</span>}
                     </span>
                     <input
                       type="time"
@@ -1922,15 +1947,15 @@ const Reservations: React.FC = () => {
                       </div>
                     )}
                     <div style={{ fontSize: '13px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <span>📅 {selectedEvent.date} a las <b>{selectedEvent.time ? selectedEvent.time.substring(0, 5) : ''}</b> ({Number(selectedEvent.durationMinutes) || 30} min)</span>
+                      <span>📅 {selectedEvent.date} a las <b>{selectedEvent.time ? formatTime12h(selectedEvent.time) : ''}</b> ({Number(selectedEvent.durationMinutes) || 30} min)</span>
                       {selectedEvent.rescheduleStatus === 'DELAYED' && (
                         <span style={{ fontSize: '11px', background: '#FEF3C7', color: '#92400E', padding: '2px 8px', borderRadius: '6px', fontWeight: '800' }}>
-                          ⏱️ Retrasada {selectedEvent.originalTime ? `(Original: ${selectedEvent.originalTime})` : ''}
+                          ⏱️ Retrasada {selectedEvent.originalTime ? `(Original: ${formatTime12h(selectedEvent.originalTime)})` : ''}
                         </span>
                       )}
                       {selectedEvent.rescheduleStatus === 'PENDING_ACCEPTANCE' && (
                         <span style={{ fontSize: '11px', background: '#FEF3C7', color: '#B45309', padding: '2px 8px', borderRadius: '6px', fontWeight: '800' }}>
-                          ⏳ Reprogramada (Por Aceptar por Cliente) {selectedEvent.originalDate ? `(Orig: ${selectedEvent.originalDate} ${selectedEvent.originalTime || ''})` : ''}
+                          ⏳ Reprogramada (Por Aceptar por Cliente) {selectedEvent.originalDate ? `(Orig: ${selectedEvent.originalDate} ${formatTime12h(selectedEvent.originalTime)})` : ''}
                         </span>
                       )}
                       {selectedEvent.rescheduleStatus === 'ACCEPTED' && (
@@ -2341,7 +2366,7 @@ const Reservations: React.FC = () => {
                               type="button"
                               onClick={() => {
                                 const appointmentUrl = `${window.location.origin}/appointment/${selectedEvent.id}`;
-                                const msg = `Hola ${selectedEvent.customerName}, te escribimos de ${user?.tenantName || 'FinoWork'} respecto a tu cita para ${selectedEvent.serviceName || 'nuestro servicio'} el ${selectedEvent.date} a las ${selectedEvent.time}.\n\nPuedes ver los detalles, gestionar tu cita o reportar tu pago aquí:\n${appointmentUrl}`;
+                                const msg = `Hola ${selectedEvent.customerName}, te escribimos de ${user?.tenantName || 'FinoWork'} respecto a tu cita para ${selectedEvent.serviceName || 'nuestro servicio'} el ${selectedEvent.date} a las ${formatTime12h(selectedEvent.time)}.\n\nPuedes ver los detalles, gestionar tu cita o reportar tu pago aquí:\n${appointmentUrl}`;
                                 window.open(formatWhatsAppUrl(selectedEvent.customerPhone, msg), '_blank');
                               }}
                               style={{
@@ -2465,7 +2490,9 @@ const Reservations: React.FC = () => {
               Todas las citas del día de hoy a partir de la hora seleccionada se desplazarán automáticamente.
             </p>
             <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>A partir de (Hora):</label>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>
+                A partir de (Hora): {shiftTimeFrom ? <b style={{ color: '#D97706' }}>({formatTime12h(shiftTimeFrom)})</b> : ''}
+              </label>
               <input type="time" value={shiftTimeFrom} onChange={e => setShiftTimeFrom(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1' }} />
             </div>
             <div style={{ marginBottom: '16px' }}>
@@ -2508,7 +2535,7 @@ const Reservations: React.FC = () => {
                 <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '12px', border: '1px solid #E2E8F0', marginBottom: '16px' }}>
                   <div style={{ fontSize: '14px', fontWeight: '800', color: '#0F172A' }}>{selectedEvent.customerName}</div>
                   <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
-                    Horario Actual: 📅 {selectedEvent.date} a las <b>{selectedEvent.time ? selectedEvent.time.substring(0, 5) : ''}</b> ({Number(selectedEvent.durationMinutes) || 30} min)
+                    Horario Actual: 📅 {selectedEvent.date} a las <b>{selectedEvent.time ? formatTime12h(selectedEvent.time) : ''}</b> ({Number(selectedEvent.durationMinutes) || 30} min)
                   </div>
                   {selectedEvent.serviceName && (
                     <div style={{ fontSize: '12px', color: '#059669', fontWeight: '700', marginTop: '2px' }}>
@@ -2532,7 +2559,7 @@ const Reservations: React.FC = () => {
 
               <div style={{ marginBottom: '14px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '4px' }}>
-                  Nueva Hora *
+                  Nueva Hora * {rescheduleTime ? <b style={{ color: '#047857' }}>({formatTime12h(rescheduleTime)})</b> : ''}
                 </label>
                 <input
                   type="time"

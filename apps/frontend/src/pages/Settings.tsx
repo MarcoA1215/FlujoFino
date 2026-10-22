@@ -1219,7 +1219,7 @@ const SettingsPage: React.FC = () => {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                       {settings.availableRates?.updatedAt && (
                                         <div style={{ fontSize: '11px', color: '#64748b' }}>
-                                          Última actualización: {new Date(settings.availableRates.updatedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })} ({new Date(settings.availableRates.updatedAt).toLocaleDateString('es-VE')})
+                                          Última actualización: {new Date(settings.availableRates.updatedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true })} ({new Date(settings.availableRates.updatedAt).toLocaleDateString('es-VE')})
                                         </div>
                                       )}
                                       <button

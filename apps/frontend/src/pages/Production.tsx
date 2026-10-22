@@ -3,6 +3,7 @@ import { IonContent, IonPage, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, I
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { AppHeader } from '../components/AppHeader';
+import { formatTime12h } from '../utils/time';
 
 type Product = {
   id: string;
@@ -252,7 +253,7 @@ const Production: React.FC = () => {
                 <IonLabel>
                   <h2>{b.product?.name}</h2>
                   <p>Cantidad: <strong>{b.quantity}</strong></p>
-                  <p style={{ fontSize: '0.8rem', color: 'gray' }}>{new Date(b.createdAt).toLocaleString()}</p>
+                  <p style={{ fontSize: '0.8rem', color: 'gray' }}>{new Date(b.createdAt).toLocaleDateString()} {formatTime12h(new Date(b.createdAt))}</p>
                 </IonLabel>
                 <IonButton slot="end" color="danger" fill="clear" onClick={() => openRevertAlert(b)}>
                   <IonIcon icon={trashOutline} />

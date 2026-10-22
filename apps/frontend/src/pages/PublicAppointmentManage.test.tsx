@@ -157,7 +157,7 @@ describe('PublicAppointmentManage - Suite de Reprogramación y Aceptación', () 
 
     await waitFor(() => {
       expect(screen.getByText(/Horario ajustado por retraso en sala/i)).toBeDefined();
-      expect(screen.getByText(/Original: 15:00/i)).toBeDefined();
+      expect(screen.getByText(/Original: 03:00 PM/i)).toBeDefined();
     });
   });
 

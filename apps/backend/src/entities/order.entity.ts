@@ -189,7 +189,7 @@ export class Order {
   transferBank: string;
 
   @Index()
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn()
   createdAt: Date;
 
   @OneToMany(() => OrderItem, item => item.order)

@@ -43,8 +43,9 @@ import { CustomerNotificationPrompt } from '../components/CustomerNotificationPr
 import { formatWhatsAppUrl } from '../utils/whatsapp';
 import { playNotificationSound } from '../utils/audio';
 import { BankSelect } from '../components/BankSelect';
-import { getContrastColor, ensureReadableColor } from '../utils/colors';
+import { getContrastColor, ensureReadableColor, applyThemeToDom, resetToDefaultTheme } from '../utils/colors';
 import { normalizeCedula, analyzeCedulaInput, type CedulaPrefix } from '../utils/cedula';
+import { formatTime12h } from '../utils/time';
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -793,7 +794,14 @@ const PublicStore: React.FC = () => {
         setCustomerCedula(normalizedCustomerCedula);
       }
 
-      const deliveryDateNote = requestedDeliveryDate.trim() ? `Fecha requerida: ${requestedDeliveryDate.replace('T', ' ')}` : '';
+      const deliveryDateNote = requestedDeliveryDate.trim() ? (
+        (() => {
+          const parts = requestedDeliveryDate.split('T');
+          const datePart = parts[0] || '';
+          const timePart = parts[1] ? ` (${formatTime12h(parts[1])})` : '';
+          return `Fecha requerida: ${datePart}${timePart}`;
+        })()
+      ) : '';
       const cedulaNote = normalizedCustomerCedula ? `Cédula: ${normalizedCustomerCedula}` : '';
       const finalNotes = [notes.trim(), deliveryDateNote, cedulaNote, paymentNote].filter(Boolean).join(' | ');
 
@@ -917,7 +925,8 @@ const PublicStore: React.FC = () => {
 
     if (orderResult.requestedDeliveryDate) {
       try {
-        lines.push(`📅 *Fecha requerida:* ${new Date(orderResult.requestedDeliveryDate).toLocaleString('es-ES')}`);
+        const d = new Date(orderResult.requestedDeliveryDate);
+        lines.push(`📅 *Fecha requerida:* ${d.toLocaleDateString('es-VE')} ${formatTime12h(d)}`);
       } catch (e) {}
     }
 
@@ -993,32 +1002,25 @@ const PublicStore: React.FC = () => {
     copyToClipboard(lines, 'Datos de Pago Móvil');
   };
 
-  const primaryColor = storeData?.settings?.themePrimaryColor || '#10b981';
-  const headerColor = storeData?.settings?.themeHeaderColor || primaryColor;
+  const primaryColor = storeData?.settings?.themePrimaryColor || storeData?.themePrimaryColor || '#10b981';
+  const headerColor = storeData?.settings?.themeHeaderColor || storeData?.themeHeaderColor || primaryColor;
   const headerContrast = getContrastColor(headerColor);
   const primaryContrast = getContrastColor(primaryColor);
   const primaryReadable = ensureReadableColor(primaryColor);
   const primarySoftBg = (primaryColor.startsWith('#') ? primaryColor : `#${primaryColor}`) + '18';
-  const companyLogoUrl = storeData?.settings?.companyLogoUrl || null;
-  const logoShape = storeData?.settings?.logoShape || 'ROUNDED';
-  const logoFit = storeData?.settings?.logoFit || 'contain';
+  const companyLogoUrl = storeData?.settings?.companyLogoUrl || storeData?.companyLogoUrl || null;
+  const logoShape = storeData?.settings?.logoShape || storeData?.logoShape || 'ROUNDED';
+  const logoFit = storeData?.settings?.logoFit || storeData?.logoFit || 'contain';
 
   useEffect(() => {
-    if (storeData?.settings) {
-      const pColor = storeData.settings.themePrimaryColor || '#10b981';
-      const hColor = storeData.settings.themeHeaderColor || pColor;
-      const pContrast = getContrastColor(pColor);
-      const hContrast = getContrastColor(hColor);
-      const pReadable = ensureReadableColor(pColor);
-
-      document.documentElement.style.setProperty('--theme-primary', pColor);
-      document.documentElement.style.setProperty('--theme-primary-contrast', pContrast);
-      document.documentElement.style.setProperty('--theme-primary-readable', pReadable);
-      document.documentElement.style.setProperty('--theme-header', hColor);
-      document.documentElement.style.setProperty('--theme-header-contrast', hContrast);
-      document.documentElement.style.setProperty('--ion-color-primary', pColor);
-      document.documentElement.style.setProperty('--ion-color-primary-contrast', pContrast);
+    if (storeData) {
+      const pColor = storeData?.settings?.themePrimaryColor || storeData?.themePrimaryColor || '#10b981';
+      const hColor = storeData?.settings?.themeHeaderColor || storeData?.themeHeaderColor || pColor;
+      applyThemeToDom(pColor, hColor);
     }
+    return () => {
+      resetToDefaultTheme();
+    };
   }, [storeData]);
 
   if (loading) {
@@ -1257,19 +1259,19 @@ const PublicStore: React.FC = () => {
               return (
                 <>
                   <div style={{
-                    backgroundColor: isPaidFull ? '#ECFDF5' : '#EFF6FF',
-                    border: `1.5px solid ${isPaidFull ? '#10B981' : '#BFDBFE'}`,
+                    backgroundColor: isPaidFull ? primarySoftBg : '#EFF6FF',
+                    border: `1.5px solid ${isPaidFull ? primaryColor : '#BFDBFE'}`,
                     borderRadius: '14px',
                     padding: '16px',
                     margin: '16px 0',
                     textAlign: 'left',
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '6px' }}>
-                      <div style={{ fontWeight: 800, fontSize: '15px', color: isPaidFull ? '#065F46' : '#1E3A8A' }}>
+                      <div style={{ fontWeight: 800, fontSize: '15px', color: isPaidFull ? primaryReadable : '#1E3A8A' }}>
                         💳 Estado de Pago y Abonos
                       </div>
                       {isPaidFull ? (
-                        <span style={{ fontSize: '11px', fontWeight: 800, backgroundColor: '#DCFCE7', color: '#065F46', padding: '4px 10px', borderRadius: '999px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 800, backgroundColor: primarySoftBg, color: primaryReadable, padding: '4px 10px', borderRadius: '999px' }}>
                           ✅ Verificado y Pagado
                         </span>
                       ) : hasReportedPending ? (
@@ -1304,7 +1306,7 @@ const PublicStore: React.FC = () => {
                       </div>
                       <div>
                         <span style={{ fontSize: '11px', color: '#64748B', display: 'block', textTransform: 'uppercase', fontWeight: 700 }}>Por Pagar</span>
-                        <span style={{ fontSize: '16px', fontWeight: 800, color: isPaidFull || remainingOrderUsd <= 0 ? '#059669' : '#DC2626' }}>
+                        <span style={{ fontSize: '16px', fontWeight: 800, color: isPaidFull || remainingOrderUsd <= 0 ? primaryReadable : '#DC2626' }}>
                           ${isPaidFull ? '0.00' : remainingOrderUsd.toFixed(2)}
                         </span>
                         <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px' }}>
@@ -1313,8 +1315,8 @@ const PublicStore: React.FC = () => {
                       </div>
                       {abonosOrderUsd > 0 && (
                         <div style={{ gridColumn: 'span 2', borderTop: '1px dashed #E2E8F0', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-                          <span style={{ color: '#065F46', fontWeight: 700 }}>Abonado / Reportado:</span>
-                          <span style={{ color: '#059669', fontWeight: 800 }}>${abonosOrderUsd.toFixed(2)} USD</span>
+                          <span style={{ color: primaryReadable, fontWeight: 700 }}>Abonado / Reportado:</span>
+                          <span style={{ color: primaryReadable, fontWeight: 800 }}>${abonosOrderUsd.toFixed(2)} USD</span>
                         </div>
                       )}
                     </div>
@@ -1373,7 +1375,7 @@ const PublicStore: React.FC = () => {
                                     {ab.method || 'Pago'} {ab.ref || ab.reference ? `(Ref: ${ab.ref || ab.reference})` : ''}
                                   </span>
                                 </div>
-                                <span style={{ color: ab.status === 'REJECTED' ? '#DC2626' : ab.status === 'REPORTED_PENDING_APPROVAL' ? '#D97706' : '#059669', fontWeight: 800, fontSize: '11px' }}>
+                                <span style={{ color: ab.status === 'REJECTED' ? '#DC2626' : ab.status === 'REPORTED_PENDING_APPROVAL' ? '#D97706' : primaryReadable, fontWeight: 800, fontSize: '11px' }}>
                                   {ab.status === 'REJECTED' ? 'Rechazado' : ab.status === 'REPORTED_PENDING_APPROVAL' ? 'En revisión' : '✓ Aprobado'}
                                 </span>
                               </div>
@@ -1393,8 +1395,8 @@ const PublicStore: React.FC = () => {
                           width: '100%',
                           padding: '12px 16px',
                           borderRadius: '10px',
-                          background: '#10B981',
-                          color: '#FFFFFF',
+                          background: primaryColor,
+                          color: primaryContrast,
                           border: 'none',
                           fontWeight: 800,
                           fontSize: '14px',
@@ -1433,7 +1435,7 @@ const PublicStore: React.FC = () => {
                           </div>
                           <div style={{ textAlign: 'right' }}>
                             <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>Saldo Pendiente</div>
-                            <div style={{ fontSize: '18px', fontWeight: 900, color: '#10B981' }}>${remainingOrderUsd.toFixed(2)}</div>
+                            <div style={{ fontSize: '18px', fontWeight: 900, color: primaryColor }}>${remainingOrderUsd.toFixed(2)}</div>
                             <div style={{ fontSize: '11px', color: '#475569' }}>≈ Bs. {remainingOrderBs.toFixed(2)}</div>
                           </div>
                         </div>
@@ -1446,9 +1448,9 @@ const PublicStore: React.FC = () => {
                             style={{
                               padding: '10px',
                               borderRadius: '10px',
-                              border: orderPaymentType === 'FULL' ? '2px solid #10B981' : '1px solid #CBD5E1',
-                              background: orderPaymentType === 'FULL' ? '#ECFDF5' : '#FFFFFF',
-                              color: orderPaymentType === 'FULL' ? '#065F46' : '#475569',
+                              border: orderPaymentType === 'FULL' ? `2px solid ${primaryColor}` : '1px solid #CBD5E1',
+                              background: orderPaymentType === 'FULL' ? primarySoftBg : '#FFFFFF',
+                              color: orderPaymentType === 'FULL' ? primaryReadable : '#475569',
                               fontWeight: 800,
                               fontSize: '13px',
                               cursor: 'pointer',
@@ -1462,9 +1464,9 @@ const PublicStore: React.FC = () => {
                             style={{
                               padding: '10px',
                               borderRadius: '10px',
-                              border: orderPaymentType === 'PARTIAL' ? '2px solid #10B981' : '1px solid #CBD5E1',
-                              background: orderPaymentType === 'PARTIAL' ? '#ECFDF5' : '#FFFFFF',
-                              color: orderPaymentType === 'PARTIAL' ? '#065F46' : '#475569',
+                              border: orderPaymentType === 'PARTIAL' ? `2px solid ${primaryColor}` : '1px solid #CBD5E1',
+                              background: orderPaymentType === 'PARTIAL' ? primarySoftBg : '#FFFFFF',
+                              color: orderPaymentType === 'PARTIAL' ? primaryReadable : '#475569',
                               fontWeight: 800,
                               fontSize: '13px',
                               cursor: 'pointer',
@@ -1489,7 +1491,7 @@ const PublicStore: React.FC = () => {
                               width: '100%',
                               padding: '10px 12px',
                               borderRadius: '10px',
-                              border: '1.5px solid #10B981',
+                              border: `1.5px solid ${primaryColor}`,
                               fontSize: '16px',
                               fontWeight: 800,
                               color: '#0F172A',
@@ -1497,7 +1499,7 @@ const PublicStore: React.FC = () => {
                             }}
                           />
                           {inputPayAmt > 0 && (
-                            <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: 700, color: '#059669' }}>
+                            <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: 700, color: primaryReadable }}>
                               Equivalente a transferir: Bs. {inputPayBs.toFixed(2)} (Tasa BCV: Bs. {activeRate.toFixed(2)})
                             </div>
                           )}
@@ -1521,9 +1523,9 @@ const PublicStore: React.FC = () => {
                                 style={{
                                   padding: '10px 8px',
                                   borderRadius: '10px',
-                                  border: orderPaymentMethod === m.id ? '2px solid #10B981' : '1px solid #CBD5E1',
-                                  background: orderPaymentMethod === m.id ? '#ECFDF5' : '#FFFFFF',
-                                  color: orderPaymentMethod === m.id ? '#065F46' : '#475569',
+                                  border: orderPaymentMethod === m.id ? `2px solid ${primaryColor}` : '1px solid #CBD5E1',
+                                  background: orderPaymentMethod === m.id ? primarySoftBg : '#FFFFFF',
+                                  color: orderPaymentMethod === m.id ? primaryReadable : '#475569',
                                   fontWeight: 700,
                                   fontSize: '12px',
                                   cursor: 'pointer',
@@ -1595,8 +1597,8 @@ const PublicStore: React.FC = () => {
                             width: '100%',
                             padding: '14px',
                             borderRadius: '12px',
-                            background: '#10B981',
-                            color: '#FFFFFF',
+                            background: primaryColor,
+                            color: primaryContrast,
                             border: 'none',
                             fontWeight: 800,
                             fontSize: '15px',
@@ -1909,7 +1911,7 @@ const PublicStore: React.FC = () => {
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#059669',
+                  color: primaryReadable,
                   fontSize: '18px',
                   cursor: 'pointer',
                   padding: '4px',
@@ -1995,9 +1997,9 @@ const PublicStore: React.FC = () => {
               </h2>
               <span
                 style={{
-                  backgroundColor: '#ECFDF5',
-                  color: '#065F46',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  backgroundColor: primarySoftBg,
+                  color: primaryReadable,
+                  border: `1px solid ${primaryColor}40`,
                   borderRadius: '999px',
                   padding: '2px 8px',
                   fontSize: '11px',
@@ -2304,7 +2306,7 @@ const PublicStore: React.FC = () => {
                                 borderRadius: '5px',
                                 objectFit: 'cover',
                                 cursor: 'pointer',
-                                border: imageUrl === thumbUrl ? '2px solid #10B981' : '1px solid rgba(255,255,255,0.6)',
+                                border: imageUrl === thumbUrl ? `2px solid ${primaryColor}` : '1px solid rgba(255,255,255,0.6)',
                                 flexShrink: 0,
                               }}
                             />
@@ -2642,7 +2644,7 @@ const PublicStore: React.FC = () => {
                             <span
                               style={{
                                 fontSize: '0.75rem',
-                                color: '#059669',
+                                color: primaryReadable,
                                 display: 'block',
                                 marginTop: '2px',
                                 fontWeight: '500',
@@ -2765,7 +2767,7 @@ const PublicStore: React.FC = () => {
                         Cédula / RIF (Opcional - Autocompleta tus datos)
                       </label>
                       {cedulaAnalysis.normalized && cedulaAnalysis.digits.length >= 5 && (
-                        <span style={{ fontSize: '11px', fontWeight: 700, backgroundColor: '#ecfdf5', color: '#065f46', padding: '2px 8px', borderRadius: '10px', border: '1px solid #a7f3d0' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, backgroundColor: primarySoftBg, color: primaryReadable, padding: '2px 8px', borderRadius: '10px', border: `1px solid ${primaryColor}40` }}>
                           ✓ Se guardará: {cedulaAnalysis.normalized}
                         </span>
                       )}
@@ -2784,9 +2786,9 @@ const PublicStore: React.FC = () => {
                             style={{
                               padding: '3px 9px',
                               borderRadius: '6px',
-                              border: isSelected ? '1.5px solid #10b981' : '1px solid #cbd5e1',
-                              backgroundColor: isSelected ? '#ecfdf5' : '#f8fafc',
-                              color: isSelected ? '#065f46' : '#475569',
+                              border: isSelected ? `1.5px solid ${primaryColor}` : '1px solid #cbd5e1',
+                              backgroundColor: isSelected ? primarySoftBg : '#f8fafc',
+                              color: isSelected ? primaryReadable : '#475569',
                               fontSize: '11px',
                               fontWeight: 700,
                               cursor: 'pointer',
@@ -2874,7 +2876,9 @@ const PublicStore: React.FC = () => {
                     </div>
                     <IonItem lines="none" style={{ '--background': '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                       <IonLabel position="stacked" style={{ color: '#92400e', fontWeight: 'bold' }}>
-                        ¿Para cuándo lo necesitas? * (Fecha y Hora)
+                        ¿Para cuándo lo necesitas? * (Fecha y Hora) {requestedDeliveryDate && requestedDeliveryDate.includes('T') && (
+                          <span style={{ color: primaryReadable, fontWeight: 600 }}>({formatTime12h(requestedDeliveryDate.split('T')[1])})</span>
+                        )}
                       </IonLabel>
                       <IonInput
                         type="datetime-local"
@@ -2973,7 +2977,7 @@ const PublicStore: React.FC = () => {
                       {/* Monto exacto a transferir */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0', background: '#F8FAFC', padding: '6px 10px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                         <span style={{ fontSize: '13px' }}>
-                          <b>Monto en Bs:</b> <span style={{ color: '#059669', fontWeight: '800' }}>Bs. {grandTotalBs.toFixed(2)}</span>
+                          <b>Monto en Bs:</b> <span style={{ color: primaryReadable, fontWeight: '800' }}>Bs. {grandTotalBs.toFixed(2)}</span>
                         </span>
                         <IonButton fill="clear" size="small" onClick={() => copyToClipboard(grandTotalBs.toFixed(2), 'Monto en Bs')}>
                           <IonIcon icon={copiedField === 'Monto en Bs' ? checkmarkDoneOutline : copyOutline} slot="icon-only" color={copiedField === 'Monto en Bs' ? 'success' : undefined} />
@@ -3021,11 +3025,11 @@ const PublicStore: React.FC = () => {
                   )}
 
                   {paymentOption === 'USD' && (
-                    <div style={{ background: '#ecfdf5', padding: '14px', borderRadius: '10px', marginTop: '10px', border: '1px solid #a7f3d0' }}>
-                      <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 'bold', color: '#065f46' }}>
+                    <div style={{ background: primarySoftBg, padding: '14px', borderRadius: '10px', marginTop: '10px', border: `1px solid ${primaryColor}40` }}>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 'bold', color: primaryReadable }}>
                         💵 Pago en Efectivo (Total: ${grandTotalUSD.toFixed(2)} USD)
                       </p>
-                      <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#047857' }}>
+                      <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: primaryReadable }}>
                         Indica con qué billete pagarás para preparar tu vuelto:
                       </p>
 
@@ -3034,9 +3038,9 @@ const PublicStore: React.FC = () => {
                           type="button"
                           onClick={() => setCashReceivedAmount(grandTotalUSD.toFixed(2))}
                           style={{
-                            background: cashReceivedAmount === grandTotalUSD.toFixed(2) ? '#059669' : '#ffffff',
-                            color: cashReceivedAmount === grandTotalUSD.toFixed(2) ? '#ffffff' : '#065F46',
-                            border: '1px solid #A7F3D0',
+                            background: cashReceivedAmount === grandTotalUSD.toFixed(2) ? primaryColor : '#ffffff',
+                            color: cashReceivedAmount === grandTotalUSD.toFixed(2) ? primaryContrast : primaryReadable,
+                            border: `1px solid ${primaryColor}40`,
                             borderRadius: '6px',
                             padding: '4px 8px',
                             fontSize: '11px',
@@ -3052,9 +3056,9 @@ const PublicStore: React.FC = () => {
                             type="button"
                             onClick={() => setCashReceivedAmount(denom.toString())}
                             style={{
-                              background: cashReceivedAmount === denom.toString() ? '#059669' : '#ffffff',
-                              color: cashReceivedAmount === denom.toString() ? '#ffffff' : '#065F46',
-                              border: '1px solid #A7F3D0',
+                              background: cashReceivedAmount === denom.toString() ? primaryColor : '#ffffff',
+                              color: cashReceivedAmount === denom.toString() ? primaryContrast : primaryReadable,
+                              border: `1px solid ${primaryColor}40`,
                               borderRadius: '6px',
                               padding: '4px 8px',
                               fontSize: '11px',
@@ -3078,7 +3082,7 @@ const PublicStore: React.FC = () => {
                       </IonItem>
 
                       {parseFloat(cashReceivedAmount) >= grandTotalUSD && (
-                        <div style={{ marginTop: '8px', padding: '8px 10px', background: '#d1fae5', borderRadius: '6px', fontSize: '13px', color: '#065f46', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ marginTop: '8px', padding: '8px 10px', background: primarySoftBg, borderRadius: '6px', fontSize: '13px', color: primaryReadable, fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', border: `1px solid ${primaryColor}40` }}>
                           <span>Vuelto requerido:</span>
                           <span>${(parseFloat(cashReceivedAmount) - grandTotalUSD).toFixed(2)} USD</span>
                         </div>
@@ -3380,8 +3384,8 @@ const PublicStore: React.FC = () => {
                       width: '54px',
                       height: '54px',
                       borderRadius: '50%',
-                      backgroundColor: '#ecfdf5',
-                      color: '#10b981',
+                      backgroundColor: primarySoftBg,
+                      color: primaryColor,
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',

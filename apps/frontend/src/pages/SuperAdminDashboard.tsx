@@ -1283,7 +1283,7 @@ const SuperAdminDashboard: React.FC = () => {
                   </h3>
                   <div style={{ fontSize: '12px', color: '#64748b' }}>
                     {platformRates?.ratesCache?.updatedAt ? (
-                      <>Última sincronización: <strong>{new Date(platformRates.ratesCache.updatedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}</strong> ({new Date(platformRates.ratesCache.updatedAt).toLocaleDateString('es-VE')})</>
+                      <>Última sincronización: <strong>{new Date(platformRates.ratesCache.updatedAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true })}</strong> ({new Date(platformRates.ratesCache.updatedAt).toLocaleDateString('es-VE')})</>
                     ) : (
                       'Sincronización automática activa (09:15 AM y 05:45 PM Caracas)'
                     )}
