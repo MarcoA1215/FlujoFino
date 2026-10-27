@@ -296,10 +296,10 @@ export class FiscalService {
       const isCreditNote = inv.documentType === FiscalDocumentType.CREDIT_NOTE;
       const multiplier = isCreditNote ? -1 : 1;
 
-      const rowTotalBs = Number(inv.amountBs) * multiplier;
-      const rowExemptBs = Number(inv.subtotalExempt * inv.exchangeRate) * multiplier;
-      const rowBaseBs = Number(inv.taxableBase * inv.exchangeRate) * multiplier;
-      const rowTaxBs = Number(inv.taxAmount * inv.exchangeRate) * multiplier;
+      const rowTotalBs = Math.abs(Number(inv.amountBs)) * multiplier;
+      const rowExemptBs = Math.abs(Number(inv.subtotalExempt * inv.exchangeRate)) * multiplier;
+      const rowBaseBs = Math.abs(Number(inv.taxableBase * inv.exchangeRate)) * multiplier;
+      const rowTaxBs = Math.abs(Number(inv.taxAmount * inv.exchangeRate)) * multiplier;
 
       totalVentasConIvaBs += rowTotalBs;
       totalExentoBs += rowExemptBs;

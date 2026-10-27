@@ -38,6 +38,7 @@ import { CashExchange } from '../../entities/cash-exchange.entity';
 import { Investment } from '../../entities/investment.entity';
 import { PushSubscription } from '../../entities/push-subscription.entity';
 import { ProductVariant } from '../../entities/product-variant.entity';
+import { FiscalInvoice } from '../../entities/fiscal-invoice.entity';
 
 // Enums
 import { 
@@ -47,7 +48,10 @@ import {
   OrderStatus, 
   PaymentStatus, 
   ReservationStatus, 
-  DeliveryMethod 
+  DeliveryMethod,
+  FiscalDocumentType,
+  FiscalInvoiceStatus,
+  FiscalProviderType,
 } from '@finowork/shared-types';
 
 async function runSeed() {
@@ -70,7 +74,8 @@ async function runSeed() {
       ComboItem, Order, OrderItem, Reservation, DeliveryZone, ProductionBatch,
       StockMovement, WorkSchedule, OperatingExpense, AccessRequest, Feedback,
       OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig,
-      Promoter, PromoterCommission, SalaryAdvance, CashExchange, Investment, PushSubscription
+      Promoter, PromoterCommission, SalaryAdvance, CashExchange, Investment, PushSubscription,
+      FiscalInvoice
     ],
     synchronize: false,
   });
@@ -95,6 +100,23 @@ async function runSeed() {
     `ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "roles" text DEFAULT '';`,
     `ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "job_title" character varying;`,
     `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "initialCashCop" numeric(14,2) DEFAULT 0;`,
+    `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "featureFiscalSupport" boolean DEFAULT false;`,
+    `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "fiscalDefaultTaxRate" numeric(5,2) DEFAULT 16.00;`,
+    `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "fiscalRif" character varying;`,
+    `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "fiscalCompanyName" character varying;`,
+    `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "fiscalAddress" character varying;`,
+    `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "fiscalPhone" character varying;`,
+    `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "fiscalMode" character varying DEFAULT 'INTERNAL';`,
+    `ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "isTaxExempt" boolean DEFAULT false;`,
+    `ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "taxRate" numeric(5,2) DEFAULT 16.00;`,
+    `ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "subtotalExempt" numeric(12,4) DEFAULT 0;`,
+    `ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "taxableBase" numeric(12,4) DEFAULT 0;`,
+    `ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "taxAmount" numeric(12,4) DEFAULT 0;`,
+    `ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "fiscalInvoiceId" character varying;`,
+    `ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "fiscalStatus" character varying;`,
+    `ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "isTaxExempt" boolean DEFAULT false;`,
+    `ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "taxRate" numeric(5,2) DEFAULT 16.00;`,
+    `ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "taxAmount" numeric(12,2) DEFAULT 0;`,
   ];
   for (const sql of safeColumns) {
     try {
@@ -119,6 +141,7 @@ async function runSeed() {
   const customerRepo = dataSource.getRepository(Customer);
   const expenseRepo = dataSource.getRepository(OperatingExpense);
   const variantRepo = dataSource.getRepository(ProductVariant);
+  const fiscalInvoiceRepo = dataSource.getRepository(FiscalInvoice);
 
   try {
     const passwordHash = await bcrypt.hash('123456', 10);
@@ -194,6 +217,10 @@ async function runSeed() {
         prod = productRepo.create({ ...data, tenantId });
         prod = await productRepo.save(prod);
         console.log(`   ✅ [PRODUCTO] ${prod.name} ($${prod.salePrice})`);
+      } else if (data.isTaxExempt !== undefined) {
+        prod.isTaxExempt = data.isTaxExempt;
+        if (data.taxRate !== undefined) prod.taxRate = data.taxRate;
+        await productRepo.save(prod);
       }
       return prod;
     }
@@ -220,18 +247,265 @@ async function runSeed() {
       return res;
     }
 
+    const invoiceSequenceMap: Record<string, number> = {};
+
+    async function getNextInvoiceSeq(tenantId: string): Promise<number> {
+      if (invoiceSequenceMap[tenantId] === undefined) {
+        const count = await fiscalInvoiceRepo.count({ where: { tenantId } });
+        invoiceSequenceMap[tenantId] = count;
+      }
+      invoiceSequenceMap[tenantId] += 1;
+      return invoiceSequenceMap[tenantId];
+    }
+
+    async function ensureOrderFiscalInvoice(
+      ord: Order,
+      tenantId: string,
+      items: { productId: string; productName: string; quantity: number; unitPrice: number; unitCost: number; isTaxExempt?: boolean; taxRate?: number }[] = [],
+      dateOffsetDays = 0,
+    ) {
+      let invoice = await fiscalInvoiceRepo.findOne({ where: { tenantId, orderId: ord.id } });
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+      const targetDay = Math.max(1, Math.min(28, now.getDate() - (dateOffsetDays % 25)));
+      const targetDate = new Date(currentYear, currentMonth, targetDay, 10 + (dateOffsetDays % 8), 15 + ((dateOffsetDays * 7) % 40));
+
+      let effectiveItems = items;
+      if (!effectiveItems || effectiveItems.length === 0) {
+        const dbItems = await orderItemRepo.find({ where: { orderId: ord.id } });
+        effectiveItems = dbItems.map(it => ({
+          productId: it.productId,
+          productName: it.productName || 'Producto',
+          quantity: it.quantity,
+          unitPrice: Number(it.unitPrice),
+          unitCost: Number(it.unitCost || 0),
+          isTaxExempt: it.isTaxExempt,
+          taxRate: it.taxRate,
+        }));
+      }
+
+      let subtotalExempt = 0;
+      let taxableBase = 0;
+      let taxAmount = 0;
+      const invoiceItems: any[] = [];
+
+      for (const item of effectiveItems) {
+        let isExempt = item.isTaxExempt;
+        let rate = item.taxRate;
+        if (isExempt === undefined && item.productId) {
+          const prod = await productRepo.findOne({ where: { id: item.productId } });
+          if (prod) {
+            isExempt = Boolean(prod.isTaxExempt);
+            rate = prod.taxRate;
+          }
+        }
+        isExempt = Boolean(isExempt);
+        const effectiveRate = isExempt ? 0 : (rate !== undefined && rate !== null ? Number(rate) : 16.0);
+        const lineSubtotal = Number(item.quantity) * Number(item.unitPrice);
+        const lineTax = isExempt ? 0 : Number(((lineSubtotal * effectiveRate) / 100).toFixed(2));
+
+        if (isExempt) {
+          subtotalExempt += lineSubtotal;
+        } else {
+          taxableBase += lineSubtotal;
+        }
+        taxAmount += lineTax;
+
+        invoiceItems.push({
+          productId: item.productId,
+          name: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          isTaxExempt: isExempt,
+          taxRate: effectiveRate,
+          taxAmount: lineTax,
+          subtotal: lineSubtotal,
+        });
+      }
+
+      const totalAmount = Number(ord.totalAmount) || (subtotalExempt + taxableBase + taxAmount);
+      if (taxableBase === 0 && subtotalExempt === 0) {
+        taxableBase = totalAmount;
+        taxAmount = Number(((taxableBase * 16.0) / 100).toFixed(2));
+      }
+
+      const rateBs = Number(ord.exchangeRate) || tasaActual;
+      const amountBs = totalAmount * rateBs;
+
+      if (!invoice) {
+        const seq = await getNextInvoiceSeq(tenantId);
+        const invoiceNumber = `FAC-${String(seq).padStart(8, '0')}`;
+        const fiscalControlNumber = `00-${String(seq).padStart(8, '0')}`;
+
+        let customerRif = 'V-00000000-0';
+        if (ord.customerId) {
+          const cust = await customerRepo.findOne({ where: { id: ord.customerId } });
+          if (cust?.identification) customerRif = cust.identification;
+        }
+        if (customerRif === 'V-00000000-0' && ord.customerPhone) {
+          const digits = ord.customerPhone.replace(/\D/g, '').slice(-8);
+          customerRif = `V-${digits.padStart(8, '1')}`;
+        }
+
+        const tenantSettings = await settingsRepo.findOne({ where: { tenantId } });
+        const issuerRif = tenantSettings?.fiscalRif || 'J-50000000-0';
+        const dateStr = targetDate.toISOString().split('T')[0];
+        const qrPayload = `${issuerRif}|${invoiceNumber}|${fiscalControlNumber}|${dateStr}|${amountBs.toFixed(2)}|${(taxAmount * rateBs).toFixed(2)}`;
+        const qrCodeUrl = `data:text/plain;charset=utf-8,${encodeURIComponent(qrPayload)}`;
+
+        invoice = fiscalInvoiceRepo.create({
+          tenantId,
+          orderId: ord.id,
+          documentType: FiscalDocumentType.INVOICE,
+          provider: FiscalProviderType.INTERNAL,
+          status: FiscalInvoiceStatus.ISSUED,
+          invoiceNumber,
+          fiscalControlNumber,
+          series: 'A',
+          customerName: ord.customerName || 'Cliente General',
+          customerRif,
+          customerAddress: 'Caracas, Venezuela',
+          customerPhone: ord.customerPhone || '',
+          subtotalExempt,
+          taxableBase,
+          taxRate: 16.0,
+          taxAmount,
+          totalAmount,
+          amountBs,
+          exchangeRate: rateBs,
+          qrCodeUrl,
+          items: invoiceItems,
+          metadata: {
+            generationMode: 'INTERNAL_AUTONOMOUS',
+            issuerRif,
+            issuerName: tenantSettings?.fiscalCompanyName || 'FinoWork Business',
+            qrPayload,
+            issuedAt: targetDate.toISOString(),
+          },
+          createdAt: targetDate,
+          updatedAt: targetDate,
+        } as Partial<FiscalInvoice>);
+
+        invoice = await fiscalInvoiceRepo.save(invoice);
+        console.log(`     🧾 [COMPROBANTE FISCAL] ${invoice.invoiceNumber} -> ${invoice.customerName} ($${invoice.totalAmount})`);
+      }
+
+      ord.fiscalInvoiceId = invoice.id;
+      ord.fiscalStatus = invoice.status;
+      ord.subtotalExempt = subtotalExempt;
+      ord.taxableBase = taxableBase;
+      ord.taxAmount = taxAmount;
+      ord.createdAt = targetDate;
+      await orderRepo.save(ord);
+
+      return invoice;
+    }
+
+    async function createCreditNoteForInvoice(
+      tenantId: string,
+      invoiceId: string,
+      reason: string,
+      dateOffsetDays = 1,
+    ) {
+      const originalInvoice = await fiscalInvoiceRepo.findOne({ where: { id: invoiceId, tenantId } });
+      if (!originalInvoice) return;
+
+      const existingNc = await fiscalInvoiceRepo.findOne({
+        where: {
+          tenantId,
+          documentType: FiscalDocumentType.CREDIT_NOTE,
+        },
+      });
+      if (existingNc) return;
+
+      const ncCount = await fiscalInvoiceRepo.count({
+        where: { tenantId, documentType: FiscalDocumentType.CREDIT_NOTE },
+      });
+      const ncSeq = ncCount + 1;
+      const creditNoteNumber = `NC-${String(ncSeq).padStart(8, '0')}`;
+      const creditNoteControlNumber = `NC-00-${String(ncSeq).padStart(8, '0')}`;
+
+      const now = new Date();
+      const targetDay = Math.max(1, Math.min(28, now.getDate() - (dateOffsetDays % 25)));
+      const targetDate = new Date(now.getFullYear(), now.getMonth(), targetDay, 15, 30);
+
+      originalInvoice.status = FiscalInvoiceStatus.CANCELED;
+      originalInvoice.rejectionReason = `Anulada: ${reason}`;
+      await fiscalInvoiceRepo.save(originalInvoice);
+
+      const creditNote = fiscalInvoiceRepo.create({
+        tenantId,
+        orderId: originalInvoice.orderId,
+        documentType: FiscalDocumentType.CREDIT_NOTE,
+        provider: FiscalProviderType.INTERNAL,
+        status: FiscalInvoiceStatus.ISSUED,
+        invoiceNumber: creditNoteNumber,
+        fiscalControlNumber: creditNoteControlNumber,
+        series: originalInvoice.series,
+        customerName: originalInvoice.customerName,
+        customerRif: originalInvoice.customerRif,
+        customerAddress: originalInvoice.customerAddress,
+        customerPhone: originalInvoice.customerPhone,
+        subtotalExempt: -Math.abs(Number(originalInvoice.subtotalExempt)),
+        taxableBase: -Math.abs(Number(originalInvoice.taxableBase)),
+        taxRate: originalInvoice.taxRate,
+        taxAmount: -Math.abs(Number(originalInvoice.taxAmount)),
+        totalAmount: -Math.abs(Number(originalInvoice.totalAmount)),
+        amountBs: -Math.abs(Number(originalInvoice.amountBs)),
+        exchangeRate: originalInvoice.exchangeRate,
+        items: originalInvoice.items,
+        metadata: {
+          affectedInvoiceId: originalInvoice.id,
+          affectedInvoiceNumber: originalInvoice.invoiceNumber,
+          reason,
+          canceledAt: targetDate.toISOString(),
+        },
+        createdAt: targetDate,
+        updatedAt: targetDate,
+      } as Partial<FiscalInvoice>);
+
+      await fiscalInvoiceRepo.save(creditNote);
+
+      if (originalInvoice.orderId) {
+        const order = await orderRepo.findOne({ where: { id: originalInvoice.orderId, tenantId } });
+        if (order) {
+          order.fiscalStatus = FiscalInvoiceStatus.CANCELED;
+          await orderRepo.save(order);
+        }
+      }
+
+      console.log(`     🧾 [NOTA DE CRÉDITO] ${creditNoteNumber} anulando ${originalInvoice.invoiceNumber} (${reason})`);
+    }
+
     async function getOrCreateOrder(
       tenantId: string, 
       orderData: Partial<Order>, 
-      items: { productId: string; productName: string; quantity: number; unitPrice: number; unitCost: number }[]
+      items: { productId: string; productName: string; quantity: number; unitPrice: number; unitCost: number; isTaxExempt?: boolean; taxRate?: number }[],
+      dateOffsetDays = 0,
+      skipFiscalInvoice = false,
     ) {
       let ord = await orderRepo.findOne({ 
         where: { tenantId, notes: orderData.notes } 
       });
+
+      const now = new Date();
+      const targetDay = Math.max(1, Math.min(28, now.getDate() - (dateOffsetDays % 25)));
+      const targetDate = new Date(now.getFullYear(), now.getMonth(), targetDay, 10 + (dateOffsetDays % 8), 15 + ((dateOffsetDays * 7) % 40));
+
       if (!ord) {
-        ord = orderRepo.create({ ...orderData, tenantId });
+        ord = orderRepo.create({ 
+          ...orderData, 
+          tenantId,
+          createdAt: targetDate,
+        });
         ord = await orderRepo.save(ord);
         for (const item of items) {
+          const itemExempt = Boolean(item.isTaxExempt);
+          const itemRate = itemExempt ? 0 : (item.taxRate ?? 16.0);
+          const itemSubtotal = item.quantity * item.unitPrice;
+          const itemTax = itemExempt ? 0 : Number(((itemSubtotal * itemRate) / 100).toFixed(2));
+
           await orderItemRepo.save(orderItemRepo.create({
             orderId: ord.id,
             productId: item.productId,
@@ -239,11 +513,19 @@ async function runSeed() {
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             unitCost: item.unitCost,
-            subtotal: item.quantity * item.unitPrice,
+            subtotal: itemSubtotal,
+            isTaxExempt: itemExempt,
+            taxRate: itemRate,
+            taxAmount: itemTax,
           }));
         }
         console.log(`   ✅ [ORDEN] ${ord.customerName} -> $${ord.totalAmount} (${ord.status})`);
       }
+
+      if (!skipFiscalInvoice) {
+        await ensureOrderFiscalInvoice(ord, tenantId, items, dateOffsetDays);
+      }
+
       return ord;
     }
 
@@ -353,6 +635,13 @@ async function runSeed() {
         initialBankBs: 180000.00,
         initialDigitalUSD: 50.00,
         initialCashCop: 600000.00,
+        featureFiscalSupport: true,
+        fiscalDefaultTaxRate: 16.0,
+        fiscalRif: 'J-50123456-7',
+        fiscalCompanyName: 'Boutique Moda Urbana, C.A.',
+        fiscalAddress: 'Av. Las Delicias, Centro Comercial La Cascada, Nivel 1, Local 12, Caracas',
+        fiscalPhone: '0414-1112233',
+        fiscalMode: 'INTERNAL',
       });
       await settingsRepo.save(settingsRetail);
     } else {
@@ -362,6 +651,13 @@ async function runSeed() {
       settingsRetail.initialBankBs = 180000.00;
       settingsRetail.initialDigitalUSD = 50.00;
       settingsRetail.initialCashCop = 600000.00;
+      settingsRetail.featureFiscalSupport = true;
+      settingsRetail.fiscalDefaultTaxRate = 16.0;
+      settingsRetail.fiscalRif = 'J-50123456-7';
+      settingsRetail.fiscalCompanyName = 'Boutique Moda Urbana, C.A.';
+      settingsRetail.fiscalAddress = 'Av. Las Delicias, Centro Comercial La Cascada, Nivel 1, Local 12, Caracas';
+      settingsRetail.fiscalPhone = '0414-1112233';
+      settingsRetail.fiscalMode = 'INTERNAL';
       await settingsRepo.save(settingsRetail);
     }
 
@@ -430,7 +726,7 @@ async function runSeed() {
       netProfit: 16.00,
       exchangeRate: tasaActual,
       notes: 'Venta de mostrador vestido casual. Pagó $30 billete, vuelto $2 USD.',
-    }, [{ productId: pVestido.id, productName: pVestido.name, quantity: 1, unitPrice: 28.00, unitCost: 12.00 }]);
+    }, [{ productId: pVestido.id, productName: pVestido.name, quantity: 1, unitPrice: 28.00, unitCost: 12.00 }], 1);
 
     await getOrCreateOrder(tenantRetail.id, {
       customerName: cGomez.name,
@@ -451,7 +747,7 @@ async function runSeed() {
       netProfit: 8.00,
       exchangeRate: tasaActual,
       notes: 'Pago en Efectivo Pesos COP: $60.000 COP. Billete $100k, vuelto $40k COP.',
-    }, [{ productId: pCamisa.id, productName: 'Camisa Oversize Algodón (Blanco / Talla M)', quantity: 1, unitPrice: 15.00, unitCost: 7.00 }]);
+    }, [{ productId: pCamisa.id, productName: 'Camisa Oversize Algodón (Blanco / Talla M)', quantity: 1, unitPrice: 15.00, unitCost: 7.00 }], 3);
 
     const due5Days = new Date();
     due5Days.setDate(due5Days.getDate() + 5);
@@ -472,7 +768,7 @@ async function runSeed() {
       nextAbonoDueDate: due5Days,
       abonosHistory: [{ amount: 20.00, date: new Date().toISOString(), method: 'PAGO_MOVIL', ref: 'PM-99238', notes: 'Abono inicial 45% al retirar' }],
       notes: 'Prendas entregadas bajo abono parcial. Próximo abono acordado en 5 días.',
-    }, [{ productId: pJean.id, productName: pJean.name, quantity: 2, unitPrice: 22.00, unitCost: 10.00 }]);
+    }, [{ productId: pJean.id, productName: pJean.name, quantity: 2, unitPrice: 22.00, unitCost: 10.00 }], 5);
 
     await getOrCreateOrder(tenantRetail.id, {
       customerName: cPena.name,
@@ -491,7 +787,7 @@ async function runSeed() {
       netProfit: 20.00,
       exchangeRate: tasaActual,
       notes: 'Compra de chaqueta denim pagada por Pago Móvil Banesco.',
-    }, [{ productId: pChaqueta.id, productName: pChaqueta.name, quantity: 1, unitPrice: 38.00, unitCost: 18.00 }]);
+    }, [{ productId: pChaqueta.id, productName: pChaqueta.name, quantity: 1, unitPrice: 38.00, unitCost: 18.00 }], 7);
 
     await getOrCreateOrder(tenantRetail.id, {
       customerName: cMorales.name,
@@ -510,7 +806,7 @@ async function runSeed() {
       netProfit: 7.50,
       exchangeRate: tasaActual,
       notes: 'Venta rápida mostrador de cinturón en efectivo.',
-    }, [{ productId: pCinturon.id, productName: pCinturon.name, quantity: 1, unitPrice: 12.00, unitCost: 4.50 }]);
+    }, [{ productId: pCinturon.id, productName: pCinturon.name, quantity: 1, unitPrice: 12.00, unitCost: 4.50 }], 9);
 
     await getOrCreateOrder(tenantRetail.id, {
       customerName: cCastillo.name,
@@ -532,7 +828,7 @@ async function runSeed() {
     }, [
       { productId: pVestido.id, productName: pVestido.name, quantity: 1, unitPrice: 28.00, unitCost: 12.00 },
       { productId: pFranela.id, productName: pFranela.name, quantity: 1, unitPrice: 10.00, unitCost: 4.00 },
-    ]);
+    ], 11);
 
     await getOrCreateOrder(tenantRetail.id, {
       customerName: cGomez.name,
@@ -553,7 +849,7 @@ async function runSeed() {
       netProfit: 20.00,
       exchangeRate: tasaActual,
       notes: 'Compra de chaqueta Denim pagada en pesos colombianos. $152.000 COP cobrados.',
-    }, [{ productId: pChaqueta.id, productName: pChaqueta.name, quantity: 1, unitPrice: 38.00, unitCost: 18.00 }]);
+    }, [{ productId: pChaqueta.id, productName: pChaqueta.name, quantity: 1, unitPrice: 38.00, unitCost: 18.00 }], 13);
 
     await getOrCreateOrder(tenantRetail.id, {
       customerName: cFuentes.name,
@@ -570,7 +866,7 @@ async function runSeed() {
       netProfit: 12.00,
       exchangeRate: tasaActual,
       notes: '2 Franelas básicas de algodón pagadas exactas en efectivo divisa.',
-    }, [{ productId: pFranela.id, productName: pFranela.name, quantity: 2, unitPrice: 10.00, unitCost: 4.00 }]);
+    }, [{ productId: pFranela.id, productName: pFranela.name, quantity: 2, unitPrice: 10.00, unitCost: 4.00 }], 16);
 
     await getOrCreateOrder(tenantRetail.id, {
       customerName: cMorales.name,
@@ -588,7 +884,7 @@ async function runSeed() {
       netProfit: 12.00,
       exchangeRate: tasaActual,
       notes: 'Pantalón Jean clásico pagado con tarjeta de débito en Punto POS.',
-    }, [{ productId: pJean.id, productName: pJean.name, quantity: 1, unitPrice: 22.00, unitCost: 10.00 }]);
+    }, [{ productId: pJean.id, productName: pJean.name, quantity: 1, unitPrice: 22.00, unitCost: 10.00 }], 18);
 
     await getOrCreateOrder(tenantRetail.id, {
       customerName: cPena.name,
@@ -607,7 +903,7 @@ async function runSeed() {
       netProfit: 8.00,
       exchangeRate: tasaActual,
       notes: 'Camisa Oversize Algodón blanca pagada por Pago Móvil BDV.',
-    }, [{ productId: pCamisa.id, productName: 'Camisa Oversize Algodón (Blanco / Talla M)', quantity: 1, unitPrice: 15.00, unitCost: 7.00 }]);
+    }, [{ productId: pCamisa.id, productName: 'Camisa Oversize Algodón (Blanco / Talla M)', quantity: 1, unitPrice: 15.00, unitCost: 7.00 }], 21);
 
     await getOrCreateOrder(tenantRetail.id, {
       customerName: cCastillo.name,
@@ -626,7 +922,16 @@ async function runSeed() {
       netProfit: 15.00,
       exchangeRate: tasaActual,
       notes: '2 cinturones de cuero de regalo. Pagó billete $50, vuelto $26 USD.',
-    }, [{ productId: pCinturon.id, productName: pCinturon.name, quantity: 2, unitPrice: 12.00, unitCost: 4.50 }]);
+    }, [{ productId: pCinturon.id, productName: pCinturon.name, quantity: 2, unitPrice: 12.00, unitCost: 4.50 }], 24);
+
+    // Simular 1 Nota de Crédito reglamentaria para comprobar el libro de ventas (deducciones y cálculo neto)
+    const firstInvoice = await fiscalInvoiceRepo.findOne({ 
+      where: { tenantId: tenantRetail.id, documentType: FiscalDocumentType.INVOICE },
+      order: { createdAt: 'DESC' }
+    });
+    if (firstInvoice) {
+      await createCreditNoteForInvoice(tenantRetail.id, firstInvoice.id, 'Devolución de prenda por talla no adecuada', 2);
+    }
 
     // =========================================================================
     // 2. ESPACIO 2: PANADERÍA LA ESPIGA (demo-panaderia) -> Producción + Fórmulas
@@ -668,11 +973,25 @@ async function runSeed() {
         acceptPagoMovil: true,
         initialCashUSD: 140.00,
         initialBankBs: 160000.00,
+        featureFiscalSupport: true,
+        fiscalDefaultTaxRate: 16.0,
+        fiscalRif: 'J-31415926-5',
+        fiscalCompanyName: 'Panadería y Pastelería La Espiga, C.A.',
+        fiscalAddress: 'Av. Rómulo Gallegos con Calle El Carmen, Edif. La Espiga, Caracas',
+        fiscalPhone: '0414-2223344',
+        fiscalMode: 'INTERNAL',
       });
       await settingsRepo.save(settingsPan);
     } else {
       settingsPan.initialCashUSD = 140.00;
       settingsPan.initialBankBs = 160000.00;
+      settingsPan.featureFiscalSupport = true;
+      settingsPan.fiscalDefaultTaxRate = 16.0;
+      settingsPan.fiscalRif = 'J-31415926-5';
+      settingsPan.fiscalCompanyName = 'Panadería y Pastelería La Espiga, C.A.';
+      settingsPan.fiscalAddress = 'Av. Rómulo Gallegos con Calle El Carmen, Edif. La Espiga, Caracas';
+      settingsPan.fiscalPhone = '0414-2223344';
+      settingsPan.fiscalMode = 'INTERNAL';
       await settingsRepo.save(settingsPan);
     }
 
@@ -696,12 +1015,12 @@ async function runSeed() {
     }
 
     // Productos Panadería
-    let panCampesino = await getOrCreateProduct(tenantPan.id, { name: 'Pan Campesino Tradicional', salePrice: 1.5, cost: 0.6, estimatedCost: 0.6, stock: 40, stockQuantity: 40, physicalStock: 40, category: 'Panadería', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&auto=format&fit=crop&q=80'] });
-    let croissant = await getOrCreateProduct(tenantPan.id, { name: 'Croissant Francés de Mantequilla', salePrice: 2.0, cost: 0.8, estimatedCost: 0.8, stock: 30, stockQuantity: 30, physicalStock: 30, category: 'Bollería', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=600&auto=format&fit=crop&q=80'] });
-    let cachito = await getOrCreateProduct(tenantPan.id, { name: 'Cachito Tradicional de Jamón', salePrice: 2.5, cost: 1.1, estimatedCost: 1.1, stock: 25, stockQuantity: 25, physicalStock: 25, category: 'Bollería', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=600&auto=format&fit=crop&q=80'] });
-    let canilla = await getOrCreateProduct(tenantPan.id, { name: 'Pan Canilla Artesanal', salePrice: 1.0, cost: 0.4, estimatedCost: 0.4, stock: 50, stockQuantity: 50, physicalStock: 50, category: 'Panadería', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=600&auto=format&fit=crop&q=80'] });
-    let tortaChoco = await getOrCreateProduct(tenantPan.id, { name: 'Torta Húmeda de Chocolate', salePrice: 18.0, cost: 7.0, estimatedCost: 7.0, stock: 8, stockQuantity: 8, physicalStock: 8, category: 'Pastelería', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&auto=format&fit=crop&q=80'] });
-    let cafeEspresso = await getOrCreateProduct(tenantPan.id, { name: 'Café Espresso Doble', salePrice: 1.5, cost: 0.3, estimatedCost: 0.3, stock: 100, stockQuantity: 100, physicalStock: 100, category: 'Cafetería', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?w=600&auto=format&fit=crop&q=80'] });
+    let panCampesino = await getOrCreateProduct(tenantPan.id, { name: 'Pan Campesino Tradicional', salePrice: 1.5, cost: 0.6, estimatedCost: 0.6, stock: 40, stockQuantity: 40, physicalStock: 40, category: 'Panadería', is_service: false, product_type: 'FORMULA', isTaxExempt: true, taxRate: 0, images: ['https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&auto=format&fit=crop&q=80'] });
+    let croissant = await getOrCreateProduct(tenantPan.id, { name: 'Croissant Francés de Mantequilla', salePrice: 2.0, cost: 0.8, estimatedCost: 0.8, stock: 30, stockQuantity: 30, physicalStock: 30, category: 'Bollería', is_service: false, product_type: 'FORMULA', isTaxExempt: false, taxRate: 16.0, images: ['https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=600&auto=format&fit=crop&q=80'] });
+    let cachito = await getOrCreateProduct(tenantPan.id, { name: 'Cachito Tradicional de Jamón', salePrice: 2.5, cost: 1.1, estimatedCost: 1.1, stock: 25, stockQuantity: 25, physicalStock: 25, category: 'Bollería', is_service: false, product_type: 'FORMULA', isTaxExempt: false, taxRate: 16.0, images: ['https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=600&auto=format&fit=crop&q=80'] });
+    let canilla = await getOrCreateProduct(tenantPan.id, { name: 'Pan Canilla Artesanal', salePrice: 1.0, cost: 0.4, estimatedCost: 0.4, stock: 50, stockQuantity: 50, physicalStock: 50, category: 'Panadería', is_service: false, product_type: 'FORMULA', isTaxExempt: true, taxRate: 0, images: ['https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=600&auto=format&fit=crop&q=80'] });
+    let tortaChoco = await getOrCreateProduct(tenantPan.id, { name: 'Torta Húmeda de Chocolate', salePrice: 18.0, cost: 7.0, estimatedCost: 7.0, stock: 8, stockQuantity: 8, physicalStock: 8, category: 'Pastelería', is_service: false, product_type: 'FORMULA', isTaxExempt: false, taxRate: 16.0, images: ['https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&auto=format&fit=crop&q=80'] });
+    let cafeEspresso = await getOrCreateProduct(tenantPan.id, { name: 'Café Espresso Doble', salePrice: 1.5, cost: 0.3, estimatedCost: 0.3, stock: 100, stockQuantity: 100, physicalStock: 100, category: 'Cafetería', is_service: true, product_type: 'SERVICIO', isTaxExempt: false, taxRate: 16.0, images: ['https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?w=600&auto=format&fit=crop&q=80'] });
 
     // Clientes Panadería
     const panBenitez = await getOrCreateCustomer(tenantPan.id, { name: 'Sra. Carmen Benítez', phone: '0414-2223344', identification: 'V-11223344', totalVisits: 12, notes: 'Compra pan caliente todas las tardes.' });
@@ -920,7 +1239,16 @@ async function runSeed() {
     }, [
       { productId: tortaChoco.id, productName: tortaChoco.name, quantity: 2, unitPrice: 18.00, unitCost: 7.00 },
       { productId: croissant.id, productName: croissant.name, quantity: 15, unitPrice: 2.00, unitCost: 0.80 },
-    ]);
+    ], 23);
+
+    // Simular 1 Nota de Crédito reglamentaria para comprobar el libro de ventas (deducciones y cálculo neto)
+    const firstPanInvoice = await fiscalInvoiceRepo.findOne({ 
+      where: { tenantId: tenantPan.id, documentType: FiscalDocumentType.INVOICE },
+      order: { createdAt: 'DESC' }
+    });
+    if (firstPanInvoice) {
+      await createCreditNoteForInvoice(tenantPan.id, firstPanInvoice.id, 'Ajuste de despacho por rotura de empaque', 3);
+    }
 
     // =========================================================================
     // 3. ESPACIO 3: BARBERÍA & SPA ÉLITE (demo-servicios) -> Citas con Agenda + Turnos
@@ -965,6 +1293,13 @@ async function runSeed() {
         initialBankBs: 140000.00,
         acceptCashUsd: true,
         acceptPagoMovil: true,
+        featureFiscalSupport: true,
+        fiscalDefaultTaxRate: 16.0,
+        fiscalRif: 'J-40987654-3',
+        fiscalCompanyName: 'Barbería y Estilo El Máster, C.A.',
+        fiscalAddress: 'Calle San Ignacio, Local 4, Chacao, Caracas',
+        fiscalPhone: '0412-8877665',
+        fiscalMode: 'INTERNAL',
         businessHours: {
           '1': { isOpen: true, startTime: '09:00', endTime: '19:00' },
           '2': { isOpen: true, startTime: '09:00', endTime: '19:00' },
@@ -981,6 +1316,13 @@ async function runSeed() {
       settingsSpa.initialBankBs = 140000.00;
       settingsSpa.acceptCashUsd = true;
       settingsSpa.acceptPagoMovil = true;
+      settingsSpa.featureFiscalSupport = true;
+      settingsSpa.fiscalDefaultTaxRate = 16.0;
+      settingsSpa.fiscalRif = 'J-40987654-3';
+      settingsSpa.fiscalCompanyName = 'Barbería y Estilo El Máster, C.A.';
+      settingsSpa.fiscalAddress = 'Calle San Ignacio, Local 4, Chacao, Caracas';
+      settingsSpa.fiscalPhone = '0412-8877665';
+      settingsSpa.fiscalMode = 'INTERNAL';
       await settingsRepo.save(settingsSpa);
     }
 
@@ -1213,11 +1555,25 @@ async function runSeed() {
         acceptPagoMovil: true,
         initialCashUSD: 100.00,
         initialBankBs: 140000.00,
+        featureFiscalSupport: true,
+        fiscalDefaultTaxRate: 16.0,
+        fiscalRif: 'J-41122334-9',
+        fiscalCompanyName: 'Autolavado y Detailing Express Pro, C.A.',
+        fiscalAddress: 'Av. Francisco de Miranda, Estación de Servicio El Rosal, Caracas',
+        fiscalPhone: '0416-5544332',
+        fiscalMode: 'INTERNAL',
       });
       await settingsRepo.save(settingsLavado);
     } else {
       settingsLavado.initialCashUSD = 100.00;
       settingsLavado.initialBankBs = 140000.00;
+      settingsLavado.featureFiscalSupport = true;
+      settingsLavado.fiscalDefaultTaxRate = 16.0;
+      settingsLavado.fiscalRif = 'J-41122334-9';
+      settingsLavado.fiscalCompanyName = 'Autolavado y Detailing Express Pro, C.A.';
+      settingsLavado.fiscalAddress = 'Av. Francisco de Miranda, Estación de Servicio El Rosal, Caracas';
+      settingsLavado.fiscalPhone = '0416-5544332';
+      settingsLavado.fiscalMode = 'INTERNAL';
       await settingsRepo.save(settingsLavado);
     }
 
@@ -1469,11 +1825,25 @@ async function runSeed() {
         acceptPagoMovil: true,
         initialCashUSD: 150.00,
         initialBankBs: 200000.00,
+        featureFiscalSupport: true,
+        fiscalDefaultTaxRate: 16.0,
+        fiscalRif: 'J-50876543-2',
+        fiscalCompanyName: 'Inversiones El Rincón del Sabor, C.A.',
+        fiscalAddress: 'Av. Principal de Las Mercedes, Calle Monterrey, Caracas',
+        fiscalPhone: '0424-9988776',
+        fiscalMode: 'INTERNAL',
       });
       await settingsRepo.save(settingsBurger);
     } else {
       settingsBurger.initialCashUSD = 150.00;
       settingsBurger.initialBankBs = 200000.00;
+      settingsBurger.featureFiscalSupport = true;
+      settingsBurger.fiscalDefaultTaxRate = 16.0;
+      settingsBurger.fiscalRif = 'J-50876543-2';
+      settingsBurger.fiscalCompanyName = 'Inversiones El Rincón del Sabor, C.A.';
+      settingsBurger.fiscalAddress = 'Av. Principal de Las Mercedes, Calle Monterrey, Caracas';
+      settingsBurger.fiscalPhone = '0424-9988776';
+      settingsBurger.fiscalMode = 'INTERNAL';
       await settingsRepo.save(settingsBurger);
     }
 
@@ -1770,11 +2140,25 @@ async function runSeed() {
         acceptPagoMovil: true,
         initialCashUSD: 160.00,
         initialBankBs: 200000.00,
+        featureFiscalSupport: true,
+        fiscalDefaultTaxRate: 16.0,
+        fiscalRif: 'J-50334455-1',
+        fiscalCompanyName: 'Centro de Estética Glow Spa, C.A.',
+        fiscalAddress: 'Centro Comercial San Ignacio, Nivel Jardín, Local J-18, Caracas',
+        fiscalPhone: '0414-6655443',
+        fiscalMode: 'INTERNAL',
       });
       await settingsRepo.save(settingsGlow);
     } else {
       settingsGlow.initialCashUSD = 160.00;
       settingsGlow.initialBankBs = 200000.00;
+      settingsGlow.featureFiscalSupport = true;
+      settingsGlow.fiscalDefaultTaxRate = 16.0;
+      settingsGlow.fiscalRif = 'J-50334455-1';
+      settingsGlow.fiscalCompanyName = 'Centro de Estética Glow Spa, C.A.';
+      settingsGlow.fiscalAddress = 'Centro Comercial San Ignacio, Nivel Jardín, Local J-18, Caracas';
+      settingsGlow.fiscalPhone = '0414-6655443';
+      settingsGlow.fiscalMode = 'INTERNAL';
       await settingsRepo.save(settingsGlow);
     }
 
@@ -2010,6 +2394,29 @@ async function runSeed() {
         settingsCentral.initialCashUSD = Math.max(Number(settingsCentral.initialCashUSD || 0), 100.00);
         settingsCentral.initialBankBs = Math.max(Number(settingsCentral.initialBankBs || 0), 100000.00);
         await settingsRepo.save(settingsCentral);
+      }
+    }
+
+    // =========================================================================
+    // 7. BARRIDO RETROACTIVO: COMPROBANTES FISCALES PARA ÓRDENES EXISTENTES
+    // =========================================================================
+    console.log('\n🧾 Sincronizando órdenes existentes sin comprobante fiscal para el Libro de Ventas...');
+    const demoTenants = [tenantRetail, tenantPan, tenantSpa, tenantLavado, tenantBurger, tenantGlow].filter(Boolean);
+    for (const t of demoTenants) {
+      const uninvoicedOrders = await orderRepo
+        .createQueryBuilder('o')
+        .where('o.tenantId = :tenantId', { tenantId: t.id })
+        .andWhere('(o.fiscalInvoiceId IS NULL OR o.fiscalInvoiceId = \'\')')
+        .orderBy('o.createdAt', 'ASC')
+        .getMany();
+
+      if (uninvoicedOrders.length > 0) {
+        console.log(`   🔄 Negocio ${t.name}: ${uninvoicedOrders.length} órdenes vinculando comprobante fiscal...`);
+        let offset = 2;
+        for (const ord of uninvoicedOrders) {
+          await ensureOrderFiscalInvoice(ord, t.id, [], offset);
+          offset = (offset + 3) % 25;
+        }
       }
     }
 
