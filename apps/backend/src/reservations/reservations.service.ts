@@ -26,13 +26,26 @@ export class ReservationsService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.repo.query(`ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "serviceSpecialists" jsonb;`);
+      await this.repo.query(`ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "isBlock" boolean DEFAULT false;`);
       await this.repo.query(`ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "employeeId" character varying;`);
     } catch (e: any) {
       console.warn('[ReservationsService onModuleInit] Notice:', e?.message || e);
     }
   }
 
+  private getFrontendBaseUrl(): string {
+    const rawUrl = (process.env.FRONTEND_URL || process.env.VITE_FRONTEND_URL || '').trim();
+    const isProd = process.env.NODE_ENV === 'production';
+    const isLocal = !rawUrl || rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1');
+
+    if (rawUrl && (!isProd || !isLocal)) {
+      return rawUrl.replace(/\/$/, '');
+    }
+    return 'https://www.finowork.com';
+  }
+
   async syncLinkedOrder(tenantId: string, reservation: Reservation, em?: EntityManager) {
+    if (reservation.isBlock) return;
     try {
       const manager = em || this.repo.manager;
       if (!manager?.getRepository) return;
@@ -87,6 +100,18 @@ export class ReservationsService implements OnModuleInit {
           order.status = OrderStatus.CANCELED;
         } else if (reservation.status === ReservationStatus.COMPLETED) {
           order.status = OrderStatus.DELIVERED;
+          try {
+            const orderItemRepo = manager.getRepository(OrderItem);
+            if (typeof orderItemRepo?.find === 'function') {
+              const ordItems = await orderItemRepo.find({ where: { orderId: order.id } });
+              for (const it of ordItems) {
+                if (it.deliveredQuantity !== it.quantity) {
+                  it.deliveredQuantity = it.quantity;
+                  await orderItemRepo.save(it);
+                }
+              }
+            }
+          } catch {}
         }
 
         // Sincronizar finanzas
@@ -269,6 +294,7 @@ export class ReservationsService implements OnModuleInit {
   }
 
   async createLinkedOrder(tenantId: string, reservation: Reservation, em?: EntityManager) {
+    if (reservation.isBlock) return null;
     try {
       const manager = em || this.repo.manager;
       if (!manager?.getRepository) return null;
@@ -351,6 +377,7 @@ export class ReservationsService implements OnModuleInit {
               productName: prod.name,
               employeeId: itemEmployeeId,
               quantity: 1,
+              deliveredQuantity: initialStatus === OrderStatus.DELIVERED ? 1 : 0,
               unitPrice: price,
               unitCost: cost,
               subtotal: price,
@@ -382,7 +409,11 @@ export class ReservationsService implements OnModuleInit {
   }
 
   findAll(tenantId: string) {
-    return this.repo.find({ where: { tenantId }, order: { date: 'ASC', time: 'ASC' } });
+    return this.repo.find({
+      where: { tenantId },
+      relations: { employee: true, customer: true },
+      order: { date: 'ASC', time: 'ASC' }
+    });
   }
 
   async validateBusinessHours(tenantId: string, date: string, time: string, durationMinutes = 30) {
@@ -442,6 +473,248 @@ export class ReservationsService implements OnModuleInit {
         }
       }
     }
+  }
+
+  async findAvailableSpecialist(
+    tenantId: string,
+    date: string,
+    time: string,
+    durationMinutes: number,
+    serviceId?: string,
+    serviceName?: string,
+    excludeReservationId?: string,
+    manager?: EntityManager,
+  ): Promise<{ employeeId: string; employeeName: string; staff: any } | null> {
+    const em = manager || this.repo.manager;
+    const accessRepo = em.getRepository(UserTenantAccess);
+    let allAccesses: any[] = [];
+    try {
+      allAccesses = await accessRepo.find({
+        where: { tenantId, isActive: true, status: 'ACCEPTED' },
+        relations: { user: true },
+      });
+    } catch {
+      allAccesses = [];
+    }
+
+    const staffList = allAccesses.filter(a => {
+      if (!a.user) return false;
+      const userRoles: string[] = Array.isArray(a.roles) && a.roles.length > 0
+        ? a.roles
+        : [a.role || a.user.role].filter(Boolean);
+      const isExclusivelyDelivery = userRoles.length > 0 && userRoles.every(r => r === UserRole.DELIVERY);
+      if (isExclusivelyDelivery) return false;
+
+      const titleAndName = `${a.jobTitle || ''} ${a.user?.name || ''} ${a.user?.username || ''}`.toLowerCase();
+      const isJanitorial = /limpieza|mantenimiento|vigilancia|seguridad|aseo/i.test(titleAndName);
+      if (isJanitorial) return false;
+
+      return true;
+    });
+
+    if (staffList.length === 0) return null;
+
+    const toMins = (t?: string | null) => {
+      if (!t || typeof t !== 'string' || !t.includes(':')) return null;
+      const [h, m] = t.split(':').map(Number);
+      if (isNaN(h) || isNaN(m)) return null;
+      return h * 60 + m;
+    };
+
+    const getStaffBounds = (st: any) => {
+      const entry = toMins(st?.entryTime);
+      let exit = toMins(st?.exitTime);
+      if (entry !== null && exit !== null && exit < entry && exit + 720 <= 1440 && exit + 720 > entry) {
+        exit += 720;
+      }
+      const lStart = toMins(st?.lunchStart);
+      const lEnd = toMins(st?.lunchEnd);
+      return { entry, exit, lStart, lEnd };
+    };
+
+    const [th, tm] = (time || '00:00').trim().split(':').map(Number);
+    const reqStart = (th || 0) * 60 + (tm || 0);
+    const reqEnd = reqStart + durationMinutes;
+
+    const productRepo = em.getRepository(Product);
+    const allProducts = await productRepo.find({ where: { tenantId } });
+    const productMap = new Map<string, Product>(allProducts.map(p => [p.id, p]));
+    const productNameMap = new Map<string, Product>(allProducts.map(p => [p.name.trim().toLowerCase(), p]));
+
+    const isStaffInSet = (st: any, set: string[]) =>
+      set.includes(st.userId) || set.includes(st.id) || (st.user && set.includes(st.user.id));
+
+    let candidateStaff = staffList;
+    const requestedServices = serviceId
+      ? serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean) as Product[]
+      : (serviceName ? serviceName.split(',').map(s => productNameMap.get(s.trim().toLowerCase())).filter(Boolean) as Product[] : []);
+
+    if (requestedServices.length > 0) {
+      const requiredStaffIdSets = requestedServices
+        .map(s => {
+          const raw = (s as any)?.assignedStaffIds;
+          if (Array.isArray(raw)) return raw;
+          if (typeof raw === 'string' && raw.trim()) return raw.split(',').map((x: string) => x.trim()).filter(Boolean);
+          return [];
+        })
+        .filter(arr => Array.isArray(arr) && arr.length > 0);
+
+      if (requiredStaffIdSets.length > 0) {
+        const activeStaffIdSets = requiredStaffIdSets.filter(set =>
+          staffList.some(st => isStaffInSet(st, set))
+        );
+
+        if (activeStaffIdSets.length > 0) {
+          const staffDoingAll = candidateStaff.filter(st =>
+            activeStaffIdSets.every(set => isStaffInSet(st, set))
+          );
+          if (staffDoingAll.length > 0) {
+            candidateStaff = staffDoingAll;
+          } else {
+            const partialStaff = candidateStaff.filter(st =>
+              activeStaffIdSets.some(set => isStaffInSet(st, set))
+            );
+            if (partialStaff.length > 0) {
+              candidateStaff = partialStaff;
+            }
+          }
+        }
+      }
+    }
+
+    const resRepo = em.getRepository(Reservation);
+    const qb = resRepo.createQueryBuilder('res')
+      .where('res.tenantId = :tenantId', { tenantId })
+      .andWhere('res.date = :date', { date })
+      .andWhere('res.status IN (:...statuses)', { statuses: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] });
+
+    if (excludeReservationId) {
+      qb.andWhere('res.id != :exclude', { exclude: excludeReservationId });
+    }
+    const existing = await qb.getMany();
+
+    const busyBookings: Array<{ employeeId: string | null; start: number; end: number; isBlock?: boolean; serviceId?: string }> = [];
+    const settingsRepo = em.getRepository('Settings');
+    const settings: any = await settingsRepo.findOne({ where: { tenantId } });
+    const interval = Number(settings?.slotInterval) || 30;
+
+    for (const res of existing) {
+      const [rh, rm] = (res.time || '00:00').trim().split(':').map(Number);
+      const exStart = (rh || 0) * 60 + (rm || 0);
+      let exDuration = Number(res.durationMinutes) || 0;
+      if (exDuration === 0 && res.serviceId) {
+        const sIds = res.serviceId.split(',').map(s => s.trim()).filter(Boolean);
+        for (const sId of sIds) {
+          const sp = productMap.get(sId);
+          if (sp && sp.durationMinutes) exDuration += Number(sp.durationMinutes);
+          else exDuration += interval;
+        }
+      }
+      if (exDuration <= 0) exDuration = interval;
+
+      if (Array.isArray(res.serviceSpecialists) && res.serviceSpecialists.length > 0 && !res.isBlock) {
+        let segStart = exStart;
+        for (const s of res.serviceSpecialists) {
+          const sp = s.serviceId ? productMap.get(s.serviceId) : null;
+          const dur = Number(s.durationMinutes) || Number(sp?.durationMinutes) || interval;
+          busyBookings.push({
+            employeeId: s.employeeId || null,
+            start: segStart,
+            end: segStart + dur,
+            isBlock: false,
+            serviceId: s.serviceId,
+          });
+          segStart += dur;
+        }
+      } else {
+        busyBookings.push({
+          employeeId: res.employeeId || null,
+          start: exStart,
+          end: exStart + exDuration,
+          isBlock: Boolean(res.isBlock),
+          serviceId: res.serviceId,
+        });
+      }
+    }
+
+    const availableStaff = candidateStaff.filter(st => {
+      const { entry, exit, lStart, lEnd } = getStaffBounds(st);
+      if (entry !== null && reqStart < entry) return false;
+      if (exit !== null && reqEnd > exit) return false;
+      if (lStart !== null && lEnd !== null && reqStart < lEnd && reqEnd > lStart) return false;
+
+      const hasCollision = busyBookings.some(b => {
+        const isThisStaff = b.employeeId === st.userId || b.employeeId === st.id || (st.user && b.employeeId === st.user.id);
+        return isThisStaff && reqStart < b.end && reqEnd > b.start;
+      });
+      if (hasCollision) return false;
+
+      // Ensure this staff member isn't the sole qualified provider for an unassigned booking overlapping this window
+      const overlappingUnassigned = busyBookings.filter(
+        b => !b.employeeId && !b.isBlock && reqStart < b.end && reqEnd > b.start
+      );
+      for (const ub of overlappingUnassigned) {
+        let ubQualifiedStaff = staffList;
+        if (ub.serviceId) {
+          const ubProd = productMap.get(ub.serviceId);
+          const raw: any = ubProd?.assignedStaffIds;
+          let ubAssignedIds: string[] = [];
+          if (Array.isArray(raw)) ubAssignedIds = raw;
+          else if (typeof raw === 'string' && raw.trim()) ubAssignedIds = raw.split(',').map((x: string) => x.trim()).filter(Boolean);
+          if (ubAssignedIds.length > 0) {
+            const match = staffList.filter(s => isStaffInSet(s, ubAssignedIds));
+            if (match.length > 0) ubQualifiedStaff = match;
+          }
+        }
+        const isThisStaffQualifiedForUb = ubQualifiedStaff.some(s => isStaffInSet(s, [st.userId, st.id, st.user?.id].filter(Boolean)));
+        if (isThisStaffQualifiedForUb) {
+          const otherFree = ubQualifiedStaff.filter(s => {
+            if (s.userId === st.userId || s.id === st.id || s.user?.id === st.user?.id) return false;
+            const { entry: se, exit: sx, lStart: sls, lEnd: sle } = getStaffBounds(s);
+            if (se !== null && reqStart < se) return false;
+            if (sx !== null && reqEnd > sx) return false;
+            if (sls !== null && sle !== null && reqStart < sle && reqEnd > sls) return false;
+            return !busyBookings.some(b => (b.employeeId === s.userId || b.employeeId === s.id || (s.user && b.employeeId === s.user.id)) && reqStart < b.end && reqEnd > b.start);
+          });
+          if (otherFree.length === 0) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    });
+
+    if (availableStaff.length === 0) return null;
+
+    if (availableStaff.length === 1) {
+      const emp = availableStaff[0];
+      const empId = emp.userId || emp.user?.id || emp.id;
+      const empName = emp.user?.name || emp.user?.username || emp.jobTitle || 'Especialista';
+      return { employeeId: empId, employeeName: empName, staff: emp };
+    }
+
+    // Load balancing: pick specialist with fewest appointments on this date
+    const staffApptCounts = new Map<string, number>();
+    for (const st of availableStaff) {
+      const sId = st.userId || st.user?.id || st.id;
+      const count = existing.filter(r =>
+        r.employeeId === sId || r.employeeId === st.id || r.employeeId === st.userId ||
+        (Array.isArray(r.serviceSpecialists) && r.serviceSpecialists.some((ss: any) => ss.employeeId === sId || ss.employeeId === st.id || ss.employeeId === st.userId))
+      ).length;
+      staffApptCounts.set(sId, count);
+    }
+
+    availableStaff.sort((a, b) => {
+      const aId = a.userId || a.user?.id || a.id;
+      const bId = b.userId || b.user?.id || b.id;
+      return (staffApptCounts.get(aId) || 0) - (staffApptCounts.get(bId) || 0);
+    });
+
+    const chosen = availableStaff[0];
+    const chosenId = chosen.userId || chosen.user?.id || chosen.id;
+    const chosenName = chosen.user?.name || chosen.user?.username || chosen.jobTitle || 'Especialista';
+    return { employeeId: chosenId, employeeName: chosenName, staff: chosen };
   }
 
   async validateSlotOverlap(
@@ -541,6 +814,8 @@ export class ReservationsService implements OnModuleInit {
       customerName: string;
       start: number;
       end: number;
+      isBlock?: boolean;
+      serviceId?: string;
     }
 
     const busyBookings: BusyBooking[] = [];
@@ -566,7 +841,7 @@ export class ReservationsService implements OnModuleInit {
       }
       if (exDuration <= 0) exDuration = interval;
 
-      if (Array.isArray(res.serviceSpecialists) && res.serviceSpecialists.length > 0) {
+      if (Array.isArray(res.serviceSpecialists) && res.serviceSpecialists.length > 0 && !res.isBlock) {
         let segStart = exStart;
         for (const s of res.serviceSpecialists) {
           const sp = s.serviceId ? productMap.get(s.serviceId) : null;
@@ -576,17 +851,31 @@ export class ReservationsService implements OnModuleInit {
             customerName: res.customerName || 'Cliente',
             start: segStart,
             end: segStart + dur,
+            isBlock: false,
+            serviceId: s.serviceId || res.serviceId,
           });
           segStart += dur;
         }
       } else {
         busyBookings.push({
           employeeId: res.employeeId || null,
-          customerName: res.customerName || 'Cliente',
+          customerName: res.customerName || (res.isBlock ? 'Bloqueo de Horario' : 'Cliente'),
           start: exStart,
           end: exStart + exDuration,
+          isBlock: Boolean(res.isBlock),
+          serviceId: res.serviceId,
         });
       }
+    }
+
+    // Check store-wide schedule blocks first (isBlock = true and no employeeId)
+    const storeBlockCollision = busyBookings.find(
+      b => b.isBlock && !b.employeeId && reqStart < b.end && reqEnd > b.start
+    );
+    if (storeBlockCollision) {
+      throw new BadRequestException(
+        `El comercio tiene un bloqueo de horario registrado ("${storeBlockCollision.customerName}" de ${formatTime(storeBlockCollision.start)} a ${formatTime(storeBlockCollision.end)}). Si deseas agendarla de todas formas, confirma para forzar.`
+      );
     }
 
     // Si la cita tiene asignación específica de especialistas por servicio
@@ -659,6 +948,11 @@ export class ReservationsService implements OnModuleInit {
                  segStart < b.end && segEnd > b.start
           );
           if (directCollision) {
+            if (directCollision.isBlock) {
+              throw new BadRequestException(
+                `El especialista ${spec.employeeName || emp?.user?.username || ''} tiene el horario bloqueado ("${directCollision.customerName}" de ${formatTime(directCollision.start)} a ${formatTime(directCollision.end)}). Si deseas agendarla de todas formas, confirma para forzar.`
+              );
+            }
             throw new BadRequestException(
               `El especialista ${spec.employeeName || emp?.user?.username || ''} ya tiene una cita con "${directCollision.customerName}" (${formatTime(directCollision.start)} a ${formatTime(directCollision.end)}). Si deseas agendarla de todas formas, confirma para forzar.`
             );
@@ -744,27 +1038,63 @@ export class ReservationsService implements OnModuleInit {
 
       // Check direct collision with this employee
       const directCollision = busyBookings.find(
-        b => b.employeeId === employeeId && reqStart < b.end && reqEnd > b.start
+        b => (b.employeeId === employeeId || (emp && (b.employeeId === emp.userId || b.employeeId === emp.id || (emp.user && b.employeeId === emp.user.id)))) &&
+             reqStart < b.end && reqEnd > b.start
       );
       if (directCollision) {
+        if (directCollision.isBlock) {
+          throw new BadRequestException(
+            `El especialista tiene un bloqueo de horario registrado ("${directCollision.customerName}" de ${formatTime(directCollision.start)} a ${formatTime(directCollision.end)}). Si deseas agendarla de todas formas, confirma para forzar.`
+          );
+        }
         throw new BadRequestException(
           `El especialista ya tiene una cita asignada con "${directCollision.customerName}" (${formatTime(directCollision.start)} a ${formatTime(directCollision.end)}). Si deseas agendarla de todas formas, confirma para forzar.`
         );
       }
 
       // Check unassigned bookings consuming total staff capacity
-      const unassignedCount = busyBookings.filter(
-        b => !b.employeeId && reqStart < b.end && reqEnd > b.start
-      ).length;
-      if (unassignedCount > 0) {
+      const overlappingUnassigned = busyBookings.filter(
+        b => !b.employeeId && !b.isBlock && reqStart < b.end && reqEnd > b.start
+      );
+      if (overlappingUnassigned.length > 0) {
+        for (const ub of overlappingUnassigned) {
+          let ubQualifiedStaff = staffList;
+          if (ub.serviceId) {
+            const ubProd = productMap.get(ub.serviceId);
+            const raw: any = ubProd?.assignedStaffIds;
+            let ubAssignedIds: string[] = [];
+            if (Array.isArray(raw)) ubAssignedIds = raw;
+            else if (typeof raw === 'string' && raw.trim()) ubAssignedIds = raw.split(',').map((x: string) => x.trim()).filter(Boolean);
+            if (ubAssignedIds.length > 0) {
+              const match = staffList.filter(st => ubAssignedIds.includes(st.userId) || ubAssignedIds.includes(st.id) || (st.user && ubAssignedIds.includes(st.user.id)));
+              if (match.length > 0) ubQualifiedStaff = match;
+            }
+          }
+          const isEmpQualifiedForUb = ubQualifiedStaff.some(st => st.userId === employeeId || st.id === employeeId || st.user?.id === employeeId);
+          if (isEmpQualifiedForUb) {
+            const otherFree = ubQualifiedStaff.filter(st => {
+              if (st.userId === employeeId || st.id === employeeId || st.user?.id === employeeId) return false;
+              if (st.entryTime && reqStart < toMins(st.entryTime)) return false;
+              if (st.exitTime && reqEnd > toMins(st.exitTime)) return false;
+              if (st.lunchStart && st.lunchEnd && reqStart < toMins(st.lunchEnd) && reqEnd > toMins(st.lunchStart)) return false;
+              return !busyBookings.some(b => (b.employeeId === st.userId || b.employeeId === st.id || (st.user && b.employeeId === st.user.id)) && reqStart < b.end && reqEnd > b.start);
+            });
+            if (otherFree.length === 0) {
+              throw new BadRequestException(
+                `El horario choca con otra cita pendiente de especialista ("${ub.customerName}" ${formatTime(ub.start)} a ${formatTime(ub.end)}) que requiere la atención de este especialista. Si deseas agendarla de todas formas, confirma para forzar.`
+              );
+            }
+          }
+        }
+
         const totalFreeWorkingStaff = staffList.filter(s => {
           if (s.entryTime && reqStart < toMins(s.entryTime)) return false;
           if (s.exitTime && reqEnd > toMins(s.exitTime)) return false;
           if (s.lunchStart && s.lunchEnd && reqStart < toMins(s.lunchEnd) && reqEnd > toMins(s.lunchStart)) return false;
-          return !busyBookings.some(b => b.employeeId === s.userId && reqStart < b.end && reqEnd > b.start);
+          return !busyBookings.some(b => (b.employeeId === s.userId || b.employeeId === s.id || (s.user && b.employeeId === s.user.id)) && reqStart < b.end && reqEnd > b.start);
         }).length;
 
-        if (totalFreeWorkingStaff <= unassignedCount) {
+        if (totalFreeWorkingStaff <= overlappingUnassigned.length) {
           throw new BadRequestException(
             `No hay capacidad disponible a las ${formatTime(reqStart)}. Los cupos para esa hora se encuentran copados.`
           );
@@ -815,11 +1145,11 @@ export class ReservationsService implements OnModuleInit {
         if (st.entryTime && reqStart < toMins(st.entryTime)) return false;
         if (st.exitTime && reqEnd > toMins(st.exitTime)) return false;
         if (st.lunchStart && st.lunchEnd && reqStart < toMins(st.lunchEnd) && reqEnd > toMins(st.lunchStart)) return false;
-        return !busyBookings.some(b => b.employeeId === st.userId && reqStart < b.end && reqEnd > b.start);
+        return !busyBookings.some(b => (b.employeeId === st.userId || b.employeeId === st.id || (st.user && b.employeeId === st.user.id)) && reqStart < b.end && reqEnd > b.start);
       });
 
       const unassignedOverlapCount = busyBookings.filter(
-        b => !b.employeeId && reqStart < b.end && reqEnd > b.start
+        b => !b.employeeId && !b.isBlock && reqStart < b.end && reqEnd > b.start
       ).length;
 
       const availableCapacity = freeCandidateStaff.length - unassignedOverlapCount;
@@ -872,14 +1202,52 @@ export class ReservationsService implements OnModuleInit {
 
       const duration = dto.durationMinutes || await this.calculateServiceDuration(tenantId, dto.serviceId, dto.serviceName);
 
+      // Auto-asignar especialista si no se especificó uno ("Cualquiera disponible")
+      if (!dto.employeeId && dto.date && dto.time) {
+        const autoStaff = await this.findAvailableSpecialist(
+          tenantId,
+          dto.date,
+          dto.time,
+          duration,
+          dto.serviceId,
+          dto.serviceName,
+          undefined,
+          manager,
+        );
+        if (autoStaff) {
+          dto.employeeId = autoStaff.employeeId;
+          dto.employeeName = autoStaff.employeeName;
+        }
+      } else if (dto.employeeId && !dto.employeeName) {
+        try {
+          const accessRepo = manager.getRepository(UserTenantAccess);
+          const empAcc = await accessRepo.findOne({
+            where: [
+              { userId: dto.employeeId, tenantId },
+              { id: dto.employeeId, tenantId },
+            ],
+            relations: { user: true },
+          });
+          if (empAcc) {
+            dto.employeeName = empAcc.user?.name || empAcc.user?.username || empAcc.jobTitle;
+          }
+        } catch (e) {}
+      }
+
       let effectiveSpecialists = dto.serviceSpecialists;
       if (!effectiveSpecialists && dto.serviceId && dto.serviceId.includes(',')) {
         const sIds = dto.serviceId.split(',').map((s: string) => s.trim()).filter(Boolean);
         const productRepo = manager.getRepository(Product);
         const autoSpecialists: any[] = [];
+        let segCurMins = (dto.time || '00:00').split(':').map(Number);
+        let curMins = (segCurMins[0] || 0) * 60 + (segCurMins[1] || 0);
+
         for (const sId of sIds) {
           const prod: any = await productRepo.findOne({ where: { id: sId, tenantId } });
           if (prod) {
+            const segDuration = Number(prod.durationMinutes || 30);
+            const segTimeStr = this.minutesToTime(curMins).substring(0, 5);
+
             let itemEmpId: string | undefined = dto.employeeId || undefined;
             let itemEmpName: string | undefined = dto.employeeName || undefined;
             const raw = prod.assignedStaffIds;
@@ -908,6 +1276,22 @@ export class ReservationsService implements OnModuleInit {
               itemEmpId = activeStaffIds[0];
             } else if (dto.employeeId && activeStaffIds.includes(dto.employeeId)) {
               itemEmpId = dto.employeeId;
+            } else if (!itemEmpId || (activeStaffIds.length > 0 && !activeStaffIds.includes(itemEmpId))) {
+              // Auto-assign qualified specialist for this segment
+              const segStaff = await this.findAvailableSpecialist(
+                tenantId,
+                dto.date,
+                segTimeStr,
+                segDuration,
+                prod.id,
+                prod.name,
+                undefined,
+                manager,
+              );
+              if (segStaff) {
+                itemEmpId = segStaff.employeeId;
+                itemEmpName = segStaff.employeeName;
+              }
             }
 
             if (itemEmpId && (!itemEmpName || itemEmpId !== dto.employeeId)) {
@@ -916,8 +1300,8 @@ export class ReservationsService implements OnModuleInit {
                   where: { userId: itemEmpId, tenantId },
                   relations: { user: true },
                 });
-                if (empAcc?.user?.username) {
-                  itemEmpName = empAcc.user.username;
+                if (empAcc?.user?.name || empAcc?.user?.username) {
+                  itemEmpName = empAcc.user.name || empAcc.user.username;
                 }
               } catch (e) {
                 // Non-fatal, continue with undefined name
@@ -930,12 +1314,18 @@ export class ReservationsService implements OnModuleInit {
               employeeId: itemEmpId,
               employeeName: itemEmpName,
               price: Number(prod.salePrice || 0),
-              durationMinutes: Number(prod.durationMinutes || 30),
+              durationMinutes: segDuration,
             });
+
+            curMins += segDuration;
           }
         }
         if (autoSpecialists.length > 0) {
           effectiveSpecialists = autoSpecialists;
+          if (!dto.employeeId && autoSpecialists[0]?.employeeId) {
+            dto.employeeId = autoSpecialists[0].employeeId;
+            dto.employeeName = autoSpecialists[0].employeeName;
+          }
         }
       }
 
@@ -950,6 +1340,8 @@ export class ReservationsService implements OnModuleInit {
       Object.assign(reservation, dto);
       reservation.tenantId = tenantId;
       reservation.durationMinutes = duration;
+      reservation.employeeId = dto.employeeId || null;
+      reservation.employeeName = dto.employeeName || null;
       if (effectiveSpecialists) {
         reservation.serviceSpecialists = effectiveSpecialists;
       }
@@ -1142,7 +1534,7 @@ export class ReservationsService implements OnModuleInit {
         });
       } catch (err) {}
 
-      const baseUrl = process.env.FRONTEND_URL || process.env.VITE_FRONTEND_URL || 'https://www.finowork.com';
+      const baseUrl = this.getFrontendBaseUrl();
       const waText = `Hola ${saved.customerName}, tu cita ha sido reprogramada para el ${saved.date} a las ${newTimeStr}.${reasonText} Puedes verificar los detalles aquí: ${baseUrl}/appointment/${saved.id}`;
       let phone = (saved.customerPhone || '').replace(/\D/g, '');
       if (phone && !phone.startsWith('58') && phone.length === 10) phone = '58' + phone;
@@ -1499,6 +1891,7 @@ export class ReservationsService implements OnModuleInit {
       const affected: any[] = [];
 
       for (const res of reservations) {
+        if (res.isBlock) continue;
         const startMins = this.timeToMinutes(res.time);
         const newStartMins = startMins + minutes;
         
@@ -1551,7 +1944,7 @@ export class ReservationsService implements OnModuleInit {
           });
         } catch (notifyErr) {}
 
-        const baseUrl = process.env.FRONTEND_URL || process.env.VITE_FRONTEND_URL || 'https://www.finowork.com';
+        const baseUrl = this.getFrontendBaseUrl();
         const msg = `Hola ${res.customerName}, debido a un imprevisto en el servicio, tu cita de las ${oldTimeStr} ha sido reprogramada para las ${res.time.substring(0,5)}. Por favor confírmanos si estás de acuerdo en tu enlace: ${baseUrl}/appointment/${res.id}`;
         let phone = res.customerPhone || '';
         phone = phone.replace(/\D/g, '');
@@ -1648,7 +2041,7 @@ export class ReservationsService implements OnModuleInit {
       sent = await this.notificationsService.notifyCustomerAppointment(saved, payload);
     } catch (err) {}
 
-    const baseUrl = process.env.FRONTEND_URL || process.env.VITE_FRONTEND_URL || 'https://www.finowork.com';
+    const baseUrl = this.getFrontendBaseUrl();
     const msg = `Hola ${saved.customerName}, debido a un retraso imprevisto de ${minutes} min, tu cita de las ${oldTimeStr} comenzará aprox. a las ${newTimeStr}. Gracias por tu comprensión. Puedes ver tu cita en: ${baseUrl}/appointment/${saved.id}`;
     let phone = (saved.customerPhone || '').replace(/\D/g, '');
     if (phone && !phone.startsWith('58') && phone.length === 10) phone = '58' + phone;
@@ -1853,6 +2246,8 @@ export class ReservationsService implements OnModuleInit {
       employeeId: string | null;
       start: number;
       end: number;
+      isBlock?: boolean;
+      serviceId?: string;
     }
 
     const busyBookings: BusyBooking[] = [];
@@ -1887,7 +2282,7 @@ export class ReservationsService implements OnModuleInit {
         rDuration = interval;
       }
 
-      if (Array.isArray(r.serviceSpecialists) && r.serviceSpecialists.length > 0) {
+      if (Array.isArray(r.serviceSpecialists) && r.serviceSpecialists.length > 0 && !r.isBlock) {
         let segStart = startMins;
         for (const s of r.serviceSpecialists) {
           const sp = s.serviceId ? productMap.get(s.serviceId) : null;
@@ -1896,6 +2291,8 @@ export class ReservationsService implements OnModuleInit {
             employeeId: s.employeeId || null,
             start: segStart,
             end: segStart + dur,
+            isBlock: false,
+            serviceId: s.serviceId || r.serviceId,
           });
           segStart += dur;
         }
@@ -1904,6 +2301,8 @@ export class ReservationsService implements OnModuleInit {
           employeeId: r.employeeId || null,
           start: startMins,
           end: startMins + rDuration,
+          isBlock: Boolean(r.isBlock),
+          serviceId: r.serviceId,
         });
       }
     }
@@ -1926,6 +2325,13 @@ export class ReservationsService implements OnModuleInit {
         }
 
         const slotEnd = currentMins + duration;
+
+        // Check store-wide schedule blocks first (isBlock = true and no employeeId)
+        const hasStoreBlock = busyBookings.some(b => b.isBlock && !b.employeeId && currentMins < b.end && slotEnd > b.start);
+        if (hasStoreBlock) {
+          currentMins += interval;
+          continue;
+        }
 
         if (isSoloBusiness) {
           const hasOverlap = busyBookings.some(b => currentMins < b.end && slotEnd > b.start);
@@ -1955,10 +2361,46 @@ export class ReservationsService implements OnModuleInit {
               b => (b.employeeId === emp.userId || b.employeeId === emp.id || b.employeeId === emp.user?.id) && currentMins < b.end && slotEnd > b.start
             );
             if (!empDirectOverlap) {
-              const unassignedCount = busyBookings.filter(
-                b => !b.employeeId && currentMins < b.end && slotEnd > b.start
-              ).length;
-              if (unassignedCount > 0) {
+              // Also ensure unassigned bookings haven't exhausted capacity or locked this specialist
+              const overlappingUnassigned = busyBookings.filter(
+                b => !b.employeeId && !b.isBlock && currentMins < b.end && slotEnd > b.start
+              );
+              let isBlockedByUnassigned = false;
+              for (const ub of overlappingUnassigned) {
+                let ubQualifiedStaff = staffList;
+                if (ub.serviceId) {
+                  const ubProd = productMap.get(ub.serviceId);
+                  const raw: any = ubProd?.assignedStaffIds;
+                  let ubAssignedIds: string[] = [];
+                  if (Array.isArray(raw)) ubAssignedIds = raw;
+                  else if (typeof raw === 'string' && raw.trim()) ubAssignedIds = raw.split(',').map((x: string) => x.trim()).filter(Boolean);
+                  if (ubAssignedIds.length > 0) {
+                    const match = staffList.filter(st => ubAssignedIds.includes(st.userId) || ubAssignedIds.includes(st.id) || (st.user && ubAssignedIds.includes(st.user.id)));
+                    if (match.length > 0) ubQualifiedStaff = match;
+                  }
+                }
+                const isEmpQualifiedForUb = ubQualifiedStaff.some(st => st.userId === emp.userId || st.id === emp.id || st.user?.id === emp.user?.id);
+                if (isEmpQualifiedForUb) {
+                  const otherFree = ubQualifiedStaff.filter(st => {
+                    if (st.userId === emp.userId || st.id === emp.id || st.user?.id === emp.user?.id) return false;
+                    const { entry: se, exit: sx, lStart: sls, lEnd: sle } = getStaffBounds(st);
+                    if (se !== null && currentMins < se) return false;
+                    if (sx !== null && slotEnd > sx) return false;
+                    if (sls !== null && sle !== null && currentMins < sle && slotEnd > sls) return false;
+                    return !busyBookings.some(b => (b.employeeId === st.userId || b.employeeId === st.id || b.employeeId === st.user?.id) && currentMins < b.end && slotEnd > b.start);
+                  });
+                  if (otherFree.length === 0) {
+                    isBlockedByUnassigned = true;
+                    break;
+                  }
+                }
+              }
+              if (isBlockedByUnassigned) {
+                currentMins += interval;
+                continue;
+              }
+
+              if (overlappingUnassigned.length > 0) {
                 const totalFreeWorkingStaff = staffList.filter(s => {
                   const { entry: sEntry, exit: sExit, lStart: sLStart, lEnd: sLEnd } = getStaffBounds(s);
                   if (sEntry !== null && currentMins < sEntry) return false;
@@ -1967,7 +2409,7 @@ export class ReservationsService implements OnModuleInit {
                   return !busyBookings.some(b => (b.employeeId === s.userId || b.employeeId === s.id || b.employeeId === s.user?.id) && currentMins < b.end && slotEnd > b.start);
                 }).length;
 
-                if (totalFreeWorkingStaff <= unassignedCount) {
+                if (totalFreeWorkingStaff <= overlappingUnassigned.length) {
                   currentMins += interval;
                   continue;
                 }
@@ -2016,7 +2458,7 @@ export class ReservationsService implements OnModuleInit {
             });
 
             const unassignedInSegment = busyBookings.filter(
-              b => !b.employeeId && segStart < b.end && segEnd > b.start
+              b => !b.employeeId && !b.isBlock && segStart < b.end && segEnd > b.start
             ).length;
 
             if (freeForThisSegment.length - unassignedInSegment <= 0) {
@@ -2043,7 +2485,7 @@ export class ReservationsService implements OnModuleInit {
           });
 
           const unassignedOverlapCount = busyBookings.filter(
-            b => !b.employeeId && currentMins < b.end && slotEnd > b.start
+            b => !b.employeeId && !b.isBlock && currentMins < b.end && slotEnd > b.start
           ).length;
 
           const availableCapacity = freeCandidateStaff.length - unassignedOverlapCount;
@@ -2066,6 +2508,116 @@ export class ReservationsService implements OnModuleInit {
   async checkSlotAvailability(tenantId: string, date: string, time: string, serviceId?: string, excludeReservationId?: string, employeeId?: string): Promise<boolean> {
     const slots = await this.calculateAvailableSlots(tenantId, date, serviceId, excludeReservationId, employeeId);
     return slots.includes(time.substring(0, 5));
+  }
+
+  async createScheduleBlock(
+    tenantId: string,
+    dto: {
+      startDate: string;
+      endDate?: string;
+      startTime?: string;
+      endTime?: string;
+      allDay?: boolean;
+      employeeId?: string;
+      employeeName?: string;
+      reason?: string;
+    }
+  ) {
+    if (!dto.startDate) {
+      throw new BadRequestException('La fecha de inicio es obligatoria');
+    }
+    const endDateStr = dto.endDate && dto.endDate.trim() ? dto.endDate.trim() : dto.startDate.trim();
+    if (endDateStr < dto.startDate) {
+      throw new BadRequestException('La fecha "Hasta" no puede ser anterior a la fecha "Desde"');
+    }
+
+    const startTimeStr = dto.allDay ? '00:00' : (dto.startTime || '08:00').substring(0, 5);
+    const endTimeStr = dto.allDay ? '23:59' : (dto.endTime || '18:00').substring(0, 5);
+
+    const startMins = this.timeToMinutes(startTimeStr);
+    const endMins = this.timeToMinutes(endTimeStr);
+    const durationMinutes = endMins - startMins;
+
+    if (durationMinutes <= 0) {
+      throw new BadRequestException('La hora "Hasta" debe ser posterior a la hora "Desde"');
+    }
+
+    // Generate list of dates from startDate to endDate (max 60 days safety cap)
+    const dates: string[] = [];
+    const [sy, sm, sd] = dto.startDate.split('-').map(Number);
+    const [ey, em, ed] = endDateStr.split('-').map(Number);
+    const current = new Date(Date.UTC(sy, sm - 1, sd, 12, 0, 0));
+    const end = new Date(Date.UTC(ey, em - 1, ed, 12, 0, 0));
+
+    let count = 0;
+    while (current <= end) {
+      if (count >= 60) {
+        throw new BadRequestException('El bloqueo no puede superar los 60 días continuos en una sola acción.');
+      }
+      const yyyy = current.getUTCFullYear();
+      const mm = String(current.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(current.getUTCDate()).padStart(2, '0');
+      dates.push(`${yyyy}-${mm}-${dd}`);
+      current.setUTCDate(current.getUTCDate() + 1);
+      count++;
+    }
+
+    const cleanReason = (dto.reason || '').trim() || (dto.allDay ? 'Día Libre / No Disponible' : 'Horario Bloqueado');
+    const targetLabel = dto.employeeId
+      ? `🔒 Bloqueo (${dto.employeeName || 'Especialista'})`
+      : '🔒 Cierre / Bloqueo de Comercio';
+
+    return this.repo.manager.transaction(async (manager) => {
+      let resolvedEmpName = dto.employeeName?.trim() || undefined;
+      if (dto.employeeId && !resolvedEmpName) {
+        try {
+          const accessRepo = manager.getRepository(UserTenantAccess);
+          const empAcc: any = await accessRepo.findOne({
+            where: [
+              { userId: dto.employeeId, tenantId },
+              { id: dto.employeeId, tenantId },
+            ],
+            relations: { user: true },
+          });
+          if (empAcc?.user) {
+            resolvedEmpName = empAcc.user.name || empAcc.user.username;
+          }
+        } catch (e) {}
+      }
+
+      const createdBlocks: Reservation[] = [];
+      for (const dateStr of dates) {
+        const block = new Reservation();
+        block.tenantId = tenantId;
+        block.isBlock = true;
+        block.customerName = cleanReason;
+        block.serviceName = resolvedEmpName ? `🔒 Bloqueo (${resolvedEmpName})` : targetLabel;
+        block.date = dateStr;
+        block.time = `${startTimeStr}:00`;
+        block.durationMinutes = durationMinutes;
+        block.employeeId = dto.employeeId || (null as any);
+        block.employeeName = resolvedEmpName || (null as any);
+        block.status = ReservationStatus.CONFIRMED;
+        block.paymentStatus = PaymentStatus.PAID;
+        block.totalAmount = 0;
+        block.abonosTotal = 0;
+        block.abonosHistory = [];
+        block.numberOfPeople = 1;
+        block.notes = `[Bloqueo de Horario: ${startTimeStr} a ${endTimeStr}] ${cleanReason}`;
+
+        const saved = await manager.save(Reservation, block);
+        createdBlocks.push(saved);
+      }
+
+      return {
+        success: true,
+        count: createdBlocks.length,
+        blocks: createdBlocks,
+        message: createdBlocks.length === 1
+          ? `Horario bloqueado con éxito para el ${dates[0]}`
+          : `Se bloquearon ${createdBlocks.length} días (${dates[0]} al ${dates[dates.length - 1]}) con éxito`,
+      };
+    });
   }
 }
 

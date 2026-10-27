@@ -205,7 +205,7 @@ body {
 
 .ff-chip.active {
   background: var(--ff-emerald);
-  color: #ffffff;
+  color: var(--theme-primary-contrast, #ffffff);
   border-color: var(--ff-emerald);
   box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
 }
@@ -270,7 +270,7 @@ body {
 /* Primary Button */
 .ff-btn-primary {
   background: var(--ff-emerald);
-  color: #ffffff;
+  color: var(--theme-primary-contrast, #ffffff);
   border: none;
   border-radius: var(--ff-radius-md);
   padding: 10px 18px;
@@ -408,8 +408,46 @@ ion-menu ion-footer {
   --background: var(--theme-header, #ffffff);
   --border-color: var(--ff-slate-200);
   --border-width: 0 0 1px 0;
-  --min-height: 56px;
+  --min-height: 52px;
   box-shadow: none;
+}
+
+/* Responsive Subbar for mobile status pills (Prevents horizontal cutoffs) */
+.ff-header-subbar-mobile {
+  background: var(--theme-header, #ffffff);
+  border-bottom: 1px solid var(--ff-slate-200);
+  padding: 4px 12px 8px 12px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 769px) {
+  .ff-header-subbar-mobile {
+    display: none !important;
+  }
+  .ff-header-pills-desktop {
+    display: flex !important;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 768px) {
+  .ff-header-subbar-mobile {
+    display: flex !important;
+  }
+  .ff-header-pills-desktop {
+    display: none !important;
+  }
+  .ff-header-toolbar.ff-has-subbar {
+    --border-width: 0 !important;
+    border-bottom: none !important;
+    --min-height: 48px;
+  }
 }
 
 /* Word break rule */
@@ -429,12 +467,12 @@ ion-badge, ion-button, th, td, ion-card-title, h1, h2, h3, p {
 }
 #inbox-list ion-item.selected {
   --background: var(--theme-primary) !important;
-  --color: #ffffff !important;
-  color: #ffffff !important;
+  --color: var(--theme-primary-contrast, #ffffff) !important;
+  color: var(--theme-primary-contrast, #ffffff) !important;
   font-weight: 800 !important;
 }
 #inbox-list ion-item.selected ion-icon {
-  color: #ffffff !important;
+  color: var(--theme-primary-contrast, #ffffff) !important;
 }
 
 /* Calendar styling adjustments */

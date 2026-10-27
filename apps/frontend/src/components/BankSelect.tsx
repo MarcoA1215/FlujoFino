@@ -239,9 +239,9 @@ export const BankSelect: React.FC<BankSelectProps> = ({
                       style={{
                         padding: '6px 10px',
                         borderRadius: '20px',
-                        border: isSelected ? '1.5px solid #10B981' : '1px solid #E2E8F0',
-                        background: isSelected ? '#ECFDF5' : '#FFFFFF',
-                        color: isSelected ? '#065F46' : '#1E293B',
+                        border: isSelected ? '1.5px solid var(--theme-primary, #10B981)' : '1px solid #E2E8F0',
+                        background: isSelected ? 'var(--theme-primary-soft, #ECFDF5)' : '#FFFFFF',
+                        color: isSelected ? 'var(--theme-primary-readable, #065F46)' : '#1E293B',
                         fontSize: '12px',
                         fontWeight: isSelected ? 700 : 600,
                         cursor: 'pointer',
@@ -281,8 +281,8 @@ export const BankSelect: React.FC<BankSelectProps> = ({
                   width: '100%',
                   padding: '10px 14px',
                   borderRadius: '10px',
-                  border: '1.5px solid #10B981',
-                  background: '#F0FDF4',
+                  border: '1.5px solid var(--theme-primary, #10B981)',
+                  background: 'var(--theme-primary-soft, #F0FDF4)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -290,10 +290,10 @@ export const BankSelect: React.FC<BankSelectProps> = ({
                   textAlign: 'left',
                 }}
               >
-                <span style={{ fontSize: '13px', fontWeight: 700, color: '#065F46' }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--theme-primary-readable, #065F46)' }}>
                   {normalizedValue} (Actual)
                 </span>
-                <IonIcon icon={checkmarkCircle} style={{ color: '#10B981', fontSize: '18px' }} />
+                <IonIcon icon={checkmarkCircle} style={{ color: 'var(--theme-primary, #10B981)', fontSize: '18px' }} />
               </button>
             </div>
           )}
@@ -345,8 +345,8 @@ export const BankSelect: React.FC<BankSelectProps> = ({
                       width: '100%',
                       padding: '10px 14px',
                       borderRadius: '10px',
-                      border: isSelected ? '1.5px solid #10B981' : '1px solid #E2E8F0',
-                      background: isSelected ? '#F0FDF4' : '#FFFFFF',
+                      border: isSelected ? '1.5px solid var(--theme-primary, #10B981)' : '1px solid #E2E8F0',
+                      background: isSelected ? 'var(--theme-primary-soft, #F0FDF4)' : '#FFFFFF',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',

@@ -8,6 +8,7 @@ import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { PlatformConfig } from '../entities/platform-config.entity';
 import { Promoter } from '../entities/promoter.entity';
 import { PromoterCommission } from '../entities/promoter-commission.entity';
+import { PlatformExpense } from '../entities/platform-expense.entity';
 import { User } from '../entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
@@ -27,6 +28,7 @@ describe('SuperAdminService', () => {
   let userRepo: any;
   let promoterRepo: any;
   let commissionRepo: any;
+  let platformExpenseRepo: any;
   let dataSource: any;
   let queryRunner: any;
   let notificationsService: any;
@@ -75,6 +77,14 @@ describe('SuperAdminService', () => {
       find: jest.fn(),
       findOne: jest.fn(),
       save: jest.fn((entity) => Promise.resolve(entity)),
+    };
+
+    platformExpenseRepo = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      create: jest.fn((data) => data),
+      save: jest.fn((entity) => Promise.resolve(entity)),
+      delete: jest.fn(),
     };
 
     queryRunner = {
@@ -132,6 +142,10 @@ describe('SuperAdminService', () => {
           useValue: commissionRepo,
         },
         {
+          provide: getRepositoryToken(PlatformExpense),
+          useValue: platformExpenseRepo,
+        },
+        {
           provide: DataSource,
           useValue: dataSource,
         },
@@ -146,7 +160,7 @@ describe('SuperAdminService', () => {
   });
 
   describe('calculateMonthlyFee', () => {
-    it('validates that a PIONEER tenant with 0 or 1 active referrals pays full price ($20)', async () => {
+    it('validates that a PIONEER tenant with 0 or 1 active referrals pays full price ($20 + 16% IVA = $23.20)', async () => {
       const mockTenant0 = {
         id: 'tenant-p0',
         name: 'Pioneer Zero',
@@ -167,7 +181,10 @@ describe('SuperAdminService', () => {
       expect(fee0.basePrice).toBe(20.0);
       expect(fee0.activeReferrals).toBe(0);
       expect(fee0.discountPercentage).toBe(0);
-      expect(fee0.finalFee).toBe(20.0);
+      expect(fee0.subtotalFee).toBe(20.0);
+      expect(fee0.ivaPercentage).toBe(16);
+      expect(fee0.ivaAmount).toBe(3.20);
+      expect(fee0.finalFee).toBe(23.20);
 
       const mockTenant1 = {
         id: 'tenant-p1',
@@ -189,7 +206,10 @@ describe('SuperAdminService', () => {
       expect(fee1.basePrice).toBe(20.0);
       expect(fee1.activeReferrals).toBe(1);
       expect(fee1.discountPercentage).toBe(0);
-      expect(fee1.finalFee).toBe(20.0);
+      expect(fee1.subtotalFee).toBe(20.0);
+      expect(fee1.ivaPercentage).toBe(16);
+      expect(fee1.ivaAmount).toBe(3.20);
+      expect(fee1.finalFee).toBe(23.20);
     });
 
     it('validates that a PIONEER tenant with >= 2 active referrals gets 100% discount ($0) and auto-activates', async () => {
@@ -215,6 +235,8 @@ describe('SuperAdminService', () => {
       expect(fee.basePrice).toBe(20.0);
       expect(fee.activeReferrals).toBe(2);
       expect(fee.discountPercentage).toBe(100);
+      expect(fee.subtotalFee).toBe(0);
+      expect(fee.ivaAmount).toBe(0);
       expect(fee.finalFee).toBe(0);
 
       // Validates auto-activation in DB with 30 days monthly extension
@@ -231,7 +253,7 @@ describe('SuperAdminService', () => {
       expect(diffDays).toBe(30);
     });
 
-    it('validates that a REGULAR tenant gets 10% per referral topado al 50% y con piso dinámico basePrice * 0.5 (probando 5, 8 y 10 referidos)', async () => {
+    it('validates that a REGULAR tenant gets 10% per referral topado al 50% y con piso dinámico basePrice * 0.5 + 16% IVA (probando 5, 8 y 10 referidos)', async () => {
       const mockTenant = {
         id: 'tenant-3',
         name: 'Regular Store',
@@ -241,7 +263,7 @@ describe('SuperAdminService', () => {
       };
       tenantRepo.findOne.mockResolvedValue(mockTenant);
 
-      // 1. Con 5 referidos: 50% descuento -> $15.00
+      // 1. Con 5 referidos: 50% descuento -> subtotal $15.00 + IVA $2.40 = $17.40
       const qbMock5 = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -252,9 +274,11 @@ describe('SuperAdminService', () => {
       const fee5 = await service.calculateMonthlyFee('tenant-3');
       expect(fee5.activeReferrals).toBe(5);
       expect(fee5.discountPercentage).toBe(50);
-      expect(fee5.finalFee).toBe(15.0);
+      expect(fee5.subtotalFee).toBe(15.0);
+      expect(fee5.ivaAmount).toBe(2.40);
+      expect(fee5.finalFee).toBe(17.40);
 
-      // 2. Con 8 referidos: topado al 50% -> $15.00
+      // 2. Con 8 referidos: topado al 50% -> subtotal $15.00 + IVA $2.40 = $17.40
       const qbMock8 = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -265,9 +289,11 @@ describe('SuperAdminService', () => {
       const fee8 = await service.calculateMonthlyFee('tenant-3');
       expect(fee8.activeReferrals).toBe(8);
       expect(fee8.discountPercentage).toBe(50);
-      expect(fee8.finalFee).toBe(15.0);
+      expect(fee8.subtotalFee).toBe(15.0);
+      expect(fee8.ivaAmount).toBe(2.40);
+      expect(fee8.finalFee).toBe(17.40);
 
-      // 3. Con 10 referidos: topado al 50% -> $15.00
+      // 3. Con 10 referidos: topado al 50% -> subtotal $15.00 + IVA $2.40 = $17.40
       const qbMock10 = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -278,7 +304,9 @@ describe('SuperAdminService', () => {
       const fee10 = await service.calculateMonthlyFee('tenant-3');
       expect(fee10.activeReferrals).toBe(10);
       expect(fee10.discountPercentage).toBe(50);
-      expect(fee10.finalFee).toBe(15.0);
+      expect(fee10.subtotalFee).toBe(15.0);
+      expect(fee10.ivaAmount).toBe(2.40);
+      expect(fee10.finalFee).toBe(17.40);
     });
 
     it('validates that query builder correctly queries referrals in ACTIVE status or unexpired TRIAL', async () => {
@@ -395,7 +423,7 @@ describe('SuperAdminService', () => {
           promoterId: 'promoter-123',
           tenantId: 'tenant-prom-1',
           type: PromoterCommissionType.ACTIVATION,
-          amountUSD: 10.00,
+          amountUSD: 2.00, // 10% of $20.00 for tier 1-49
           status: PromoterCommissionStatus.PENDING,
         }),
       );
@@ -421,7 +449,11 @@ describe('SuperAdminService', () => {
         return Promise.resolve(null);
       });
 
-      queryRunner.manager.count.mockResolvedValue(1); // Already has 1 activation commission
+      // First call is count(Tenant) -> say 10 active clients. Second call is count(PromoterCommission) -> 1
+      queryRunner.manager.count.mockImplementation((entity: any) => {
+        if (entity === Tenant) return Promise.resolve(10);
+        return Promise.resolve(1);
+      });
 
       const result = await service.approvePayment('report-rec');
       expect(result.success).toBe(true);
@@ -432,6 +464,86 @@ describe('SuperAdminService', () => {
           tenantId: 'tenant-prom-1',
           type: PromoterCommissionType.RECURRING,
           amountUSD: 1.00, // 10% of $10
+          status: PromoterCommissionStatus.PENDING,
+        }),
+      );
+    });
+
+    it('generates a 15% commission when promoter has 50 to 99 active clients (e.g. quarterly payment)', async () => {
+      const mockReport = {
+        id: 'report-trimestral',
+        tenant_id: 'tenant-prom-1',
+        amount: 60.0, // Trimestre $60
+        status: SaaSPaymentStatus.PENDING,
+      };
+      const mockTenant = {
+        id: 'tenant-prom-1',
+        name: 'Promo Store 1',
+        promoterId: 'promoter-123',
+        status: TenantStatus.ACTIVE,
+      };
+
+      queryRunner.manager.findOne.mockImplementation((entityClass: any) => {
+        if (entityClass === SaaSPaymentReport) return Promise.resolve(mockReport);
+        if (entityClass === Tenant) return Promise.resolve(mockTenant);
+        return Promise.resolve(null);
+      });
+
+      // 60 active clients (Tier 2: 15%), 1 prior commission
+      queryRunner.manager.count.mockImplementation((entity: any) => {
+        if (entity === Tenant) return Promise.resolve(60);
+        return Promise.resolve(1);
+      });
+
+      const result = await service.approvePayment('report-trimestral');
+      expect(result.success).toBe(true);
+      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+        PromoterCommission,
+        expect.objectContaining({
+          promoterId: 'promoter-123',
+          tenantId: 'tenant-prom-1',
+          type: PromoterCommissionType.RECURRING,
+          amountUSD: 9.00, // 15% of $60 = $9.00
+          status: PromoterCommissionStatus.PENDING,
+        }),
+      );
+    });
+
+    it('generates a 20% commission when promoter has 100+ active clients (e.g. annual payment)', async () => {
+      const mockReport = {
+        id: 'report-anual',
+        tenant_id: 'tenant-prom-1',
+        amount: 200.0, // Anual $200
+        status: SaaSPaymentStatus.PENDING,
+      };
+      const mockTenant = {
+        id: 'tenant-prom-1',
+        name: 'Promo Store 1',
+        promoterId: 'promoter-123',
+        status: TenantStatus.ACTIVE,
+      };
+
+      queryRunner.manager.findOne.mockImplementation((entityClass: any) => {
+        if (entityClass === SaaSPaymentReport) return Promise.resolve(mockReport);
+        if (entityClass === Tenant) return Promise.resolve(mockTenant);
+        return Promise.resolve(null);
+      });
+
+      // 105 active clients (Tier 3: 20%), 1 prior commission
+      queryRunner.manager.count.mockImplementation((entity: any) => {
+        if (entity === Tenant) return Promise.resolve(105);
+        return Promise.resolve(1);
+      });
+
+      const result = await service.approvePayment('report-anual');
+      expect(result.success).toBe(true);
+      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+        PromoterCommission,
+        expect.objectContaining({
+          promoterId: 'promoter-123',
+          tenantId: 'tenant-prom-1',
+          type: PromoterCommissionType.RECURRING,
+          amountUSD: 40.00, // 20% of $200 = $40.00
           status: PromoterCommissionStatus.PENDING,
         }),
       );

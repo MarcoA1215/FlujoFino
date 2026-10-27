@@ -9,7 +9,8 @@ import {
   useIonRouter,
   IonSelect,
   IonSelectOption,
-  IonSpinner
+  IonSpinner,
+  IonToggle
 } from '@ionic/react';
 import {
   addOutline,
@@ -26,7 +27,8 @@ import {
   cameraOutline,
   imageOutline,
   copyOutline,
-  linkOutline
+  linkOutline,
+  lockClosedOutline
 } from 'ionicons/icons';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -40,8 +42,10 @@ import { offlineDb } from '../services/offline-db';
 import { AuthContext } from '../context/AuthContext';
 import { useImageViewer } from '../context/ImageViewerContext';
 import AppHeader from '../components/AppHeader';
+import { FinoDatePicker, FinoTimePicker, FinoSelect } from '../components/ui';
 import { formatWhatsAppUrl } from '../utils/whatsapp';
 import { formatTime12h } from '../utils/time';
+import { getPublicBaseUrl } from '../utils/public-url';
 
 export const formatDateLocal = (d: Date): string => {
   const year = d.getFullYear();
@@ -92,6 +96,71 @@ const Reservations: React.FC = () => {
   const [settings, setSettings] = useState<any>({});
   const [, setIsOfflineMode] = useState<boolean>(!navigator.onLine);
   const [notifyingDelayId, setNotifyingDelayId] = useState<string | null>(null);
+
+  // States for Schedule Block Modal (Días Libres / Bloqueo de Horario)
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [blockTarget, setBlockTarget] = useState<string>(''); // '' = Todo el comercio, else employeeId
+  const [blockStartDate, setBlockStartDate] = useState<string>('');
+  const [blockEndDate, setBlockEndDate] = useState<string>('');
+  const [blockAllDay, setBlockAllDay] = useState<boolean>(false);
+  const [blockStartTime, setBlockStartTime] = useState<string>('08:00');
+  const [blockEndTime, setBlockEndTime] = useState<string>('18:00');
+  const [blockReason, setBlockReason] = useState<string>('');
+  const [isSubmittingBlock, setIsSubmittingBlock] = useState<boolean>(false);
+
+  const openBlockModal = () => {
+    setBlockTarget('');
+    setBlockStartDate(selectedDate || formatDateLocal(new Date()));
+    setBlockEndDate(selectedDate || formatDateLocal(new Date()));
+    setBlockAllDay(false);
+    setBlockStartTime('08:00');
+    setBlockEndTime('18:00');
+    setBlockReason('');
+    setShowBlockModal(true);
+  };
+
+  const handleCreateScheduleBlock = async () => {
+    if (!blockStartDate) {
+      presentToast({ message: 'Selecciona la fecha de inicio del bloqueo', duration: 2000, color: 'warning' });
+      return;
+    }
+    const effectiveEndDate = blockEndDate || blockStartDate;
+    if (effectiveEndDate < blockStartDate) {
+      presentToast({ message: 'La fecha "Hasta" no puede ser anterior a la fecha "Desde"', duration: 2500, color: 'warning' });
+      return;
+    }
+    if (!blockAllDay && (!blockStartTime || !blockEndTime || blockEndTime <= blockStartTime)) {
+      presentToast({ message: 'La hora "Hasta" debe ser posterior a la hora "Desde"', duration: 2500, color: 'warning' });
+      return;
+    }
+
+    setIsSubmittingBlock(true);
+    try {
+      const empObj = employees.find(e => e.id === blockTarget || e.userId === blockTarget);
+      const res = await apiClient.post('/reservations/block', {
+        startDate: blockStartDate,
+        endDate: effectiveEndDate,
+        startTime: blockAllDay ? '00:00' : blockStartTime,
+        endTime: blockAllDay ? '23:59' : blockEndTime,
+        allDay: blockAllDay,
+        employeeId: blockTarget ? (empObj?.userId || empObj?.id || blockTarget) : undefined,
+        employeeName: empObj ? (empObj.name || empObj.username) : undefined,
+        reason: blockReason.trim() || (blockAllDay ? 'Día Libre / No Disponible' : 'Horario Bloqueado'),
+      });
+      setShowBlockModal(false);
+      fetchReservations();
+      presentToast({
+        message: res.data?.message || '🔒 Bloqueo de horario registrado con éxito',
+        duration: 3000,
+        color: 'success',
+      });
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Error al registrar bloqueo de horario';
+      presentToast({ message: msg, duration: 3500, color: 'danger' });
+    } finally {
+      setIsSubmittingBlock(false);
+    }
+  };
 
   // States for Abono Modal
   const [selectedReservationForAbono, setSelectedReservationForAbono] = useState<any>(null);
@@ -569,7 +638,7 @@ const Reservations: React.FC = () => {
         presentToast({ message: 'Cita agendada con éxito', duration: 2000, color: 'success' });
 
         if (newReservation?.id) {
-          const appointmentUrl = `${window.location.origin}/appointment/${newReservation.id}`;
+          const appointmentUrl = `${getPublicBaseUrl()}/appointment/${newReservation.id}`;
           if (customerPhone) {
             const msg = `Hola ${customerName}, tu cita para ${sNames || 'nuestro servicio'} ha sido agendada con éxito en ${user?.tenantName || 'FinoWork'} para el ${date} a las ${formatTime12h(time)}.\n\nPuedes ver los detalles, gestionar tu cita o reportar tu pago aquí:\n${appointmentUrl}`;
             const waUrl = formatWhatsAppUrl(customerPhone, msg);
@@ -782,21 +851,24 @@ const Reservations: React.FC = () => {
   const events = useMemo(() => {
     return reservations.map(r => {
       let color = '#10B981';
-      if (r.status === ReservationStatus.PENDING) color = '#F59E0B';
-      if (r.status === ReservationStatus.CANCELED) color = '#EF4444';
-      if (r.status === ReservationStatus.COMPLETED) color = '#64748B';
+      if (r.isBlock) color = '#475569';
+      else if (r.status === ReservationStatus.PENDING) color = '#F59E0B';
+      else if (r.status === ReservationStatus.CANCELED) color = '#EF4444';
+      else if (r.status === ReservationStatus.COMPLETED) color = '#64748B';
 
       const [th, tm] = (r.time || '00:00').split(':').map(Number);
       const startMins = (th || 0) * 60 + (tm || 0);
       const dur = Number(r.durationMinutes) || 30;
-      const endMins = startMins + dur;
+      const endMins = Math.min(1439, startMins + dur);
       const eh = Math.floor(endMins / 60);
       const em = endMins % 60;
       const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}:00`;
 
       return {
         id: r.id,
-        title: `${r.customerName} - ${r.serviceName || 'Cita'}`,
+        title: r.isBlock
+          ? `🔒 ${r.customerName}${r.employeeName ? ` (${r.employeeName})` : ''}`
+          : `${r.customerName} - ${r.serviceName || 'Cita'}`,
         start: `${r.date}T${r.time}`,
         end: `${r.date}T${endTimeStr}`,
         color,
@@ -954,54 +1026,79 @@ const Reservations: React.FC = () => {
             />
           </div>
 
-          {/* 2. Segmented Pill Switch: [ Hoy ] vs [ Semana ] */}
-          <div
-            style={{
-              background: '#F1F5F9',
-              borderRadius: '999px',
-              padding: '4px',
-              display: 'flex',
-              marginBottom: '16px',
-              maxWidth: '300px'
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setViewMode('day')}
-              className={viewMode === 'day' ? 'bg-theme-primary' : ''}
+          {/* 2. Segmented Pill Switch + Quick Block Button */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <div
               style={{
-                flex: 1,
-                padding: '8px 16px',
+                background: '#F1F5F9',
                 borderRadius: '999px',
-                border: 'none',
-                background: viewMode === 'day' ? 'var(--theme-primary)' : 'transparent',
-                color: viewMode === 'day' ? 'var(--theme-primary-contrast, #ffffff)' : '#64748B',
-                fontSize: '13px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
+                padding: '4px',
+                display: 'flex',
+                flex: '1 1 200px',
+                maxWidth: '300px'
               }}
             >
-              Hoy
-            </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('day')}
+                className={viewMode === 'day' ? 'bg-theme-primary' : ''}
+                style={{
+                  flex: 1,
+                  padding: '8px 16px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  background: viewMode === 'day' ? 'var(--theme-primary)' : 'transparent',
+                  color: viewMode === 'day' ? 'var(--theme-primary-contrast, #ffffff)' : '#64748B',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                Hoy
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('week')}
+                className={viewMode === 'week' ? 'bg-theme-primary' : ''}
+                style={{
+                  flex: 1,
+                  padding: '8px 16px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  background: viewMode === 'week' ? 'var(--theme-primary)' : 'transparent',
+                  color: viewMode === 'week' ? 'var(--theme-primary-contrast, #ffffff)' : '#64748B',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                Semana
+              </button>
+            </div>
+
             <button
               type="button"
-              onClick={() => setViewMode('week')}
-              className={viewMode === 'week' ? 'bg-theme-primary' : ''}
+              onClick={openBlockModal}
+              title="Bloquear horario o días libres (sin cobro)"
               style={{
-                flex: 1,
-                padding: '8px 16px',
-                borderRadius: '999px',
-                border: 'none',
-                background: viewMode === 'week' ? 'var(--theme-primary)' : 'transparent',
-                color: viewMode === 'week' ? 'var(--theme-primary-contrast, #ffffff)' : '#64748B',
-                fontSize: '13px',
-                fontWeight: '700',
+                background: '#F8FAFC',
+                border: '1px solid #CBD5E1',
+                color: '#334155',
+                borderRadius: '12px',
+                padding: '9px 14px',
+                fontSize: '12px',
+                fontWeight: '800',
                 cursor: 'pointer',
-                transition: 'all 0.15s ease'
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: 'var(--ff-shadow-sm)'
               }}
             >
-              Semana
+              <IonIcon icon={lockClosedOutline} style={{ fontSize: '15px', color: '#475569' }} />
+              Bloquear Horario / Día Libre
             </button>
           </div>
 
@@ -1018,7 +1115,9 @@ const Reservations: React.FC = () => {
                   border: '1px solid #E2E8F0',
                   borderRadius: '16px',
                   padding: '10px 14px',
-                  marginBottom: '16px'
+                  marginBottom: '16px',
+                  flexWrap: 'wrap',
+                  gap: '8px'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1042,7 +1141,8 @@ const Reservations: React.FC = () => {
                       {formattedSelectedDate}
                     </div>
                     <div style={{ fontSize: '12px', fontWeight: '600', color: '#64748B' }}>
-                      {dayReservations.length} {dayReservations.length === 1 ? 'cita asignada' : 'citas asignadas'}
+                      {dayReservations.filter(r => !r.isBlock).length} {dayReservations.filter(r => !r.isBlock).length === 1 ? 'cita asignada' : 'citas asignadas'}
+                      {dayReservations.some(r => r.isBlock) && ` • ${dayReservations.filter(r => r.isBlock).length} bloqueo(s)`}
                     </div>
                   </div>
                 </div>
@@ -1090,6 +1190,124 @@ const Reservations: React.FC = () => {
                   const duration = Number(res.durationMinutes) || 30;
                   const isConfirmed = res.status === ReservationStatus.CONFIRMED;
                   const isPending = res.status === ReservationStatus.PENDING;
+
+                  if (res.isBlock) {
+                    const [th, tm] = (res.time || '00:00').split(':').map(Number);
+                    const startMins = (th || 0) * 60 + (tm || 0);
+                    const endMins = Math.min(1439, startMins + duration);
+                    const eh = Math.floor(endMins / 60);
+                    const em = endMins % 60;
+                    const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+                    const isAllDayBlock = duration >= 1400;
+
+                    return (
+                      <div
+                        key={res.id}
+                        style={{
+                          display: 'flex',
+                          gap: '12px',
+                          alignItems: 'flex-start'
+                        }}
+                      >
+                        {/* Left: Time Pill for Block */}
+                        <div
+                          style={{
+                            width: '68px',
+                            flexShrink: 0,
+                            background: '#F1F5F9',
+                            border: '1px solid #CBD5E1',
+                            borderRadius: '12px',
+                            padding: '8px 4px',
+                            textAlign: 'center'
+                          }}
+                        >
+                          <div style={{ fontSize: '12px', fontWeight: '800', color: '#334155', whiteSpace: 'nowrap' }}>
+                            {isAllDayBlock ? 'Todo el' : (res.time ? formatTime12h(res.time) : '')}
+                          </div>
+                          <div style={{ fontSize: '10px', fontWeight: '700', color: '#64748B' }}>
+                            {isAllDayBlock ? 'Día' : `a ${formatTime12h(endTimeStr)}`}
+                          </div>
+                        </div>
+
+                        {/* Right: Schedule Block Card */}
+                        <div
+                          className="ff-card"
+                          style={{
+                            flex: 1,
+                            padding: '14px',
+                            background: '#F8FAFC',
+                            border: '1.5px dashed #94A3B8'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '14px', fontWeight: '800', color: '#0F172A', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                  <IonIcon icon={lockClosedOutline} style={{ color: '#475569', fontSize: '15px' }} />
+                                  {res.customerName || 'Horario Bloqueado'}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: '10px',
+                                    fontWeight: '800',
+                                    padding: '2px 8px',
+                                    borderRadius: '999px',
+                                    background: res.employeeId ? '#FEF3C7' : '#E2E8F0',
+                                    color: res.employeeId ? '#92400E' : '#334155'
+                                  }}
+                                >
+                                  {res.employeeId
+                                    ? `👤 ${res.employeeName || res.employee?.name || res.employee?.username || 'Especialista'}`
+                                    : '🏪 Todo el Comercio'}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px', fontWeight: '600' }}>
+                                {isAllDayBlock
+                                  ? 'Bloqueo de jornada completa (Sin atención ni cobro)'
+                                  : `Desde ${formatTime12h(res.time)} hasta ${formatTime12h(endTimeStr)} • Solo reserva de horario`}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                presentAlert({
+                                  header: 'Desbloquear Horario',
+                                  message: `¿Deseas eliminar este bloqueo ("${res.customerName}") y liberar el horario nuevamente?`,
+                                  buttons: [
+                                    { text: 'Cancelar', role: 'cancel' },
+                                    {
+                                      text: 'Sí, Liberar Horario',
+                                      role: 'destructive',
+                                      handler: () => deleteReservation(res.id)
+                                    }
+                                  ]
+                                });
+                              }}
+                              style={{
+                                background: '#FEF2F2',
+                                border: '1px solid #FECACA',
+                                color: '#DC2626',
+                                borderRadius: '8px',
+                                padding: '6px 10px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                flexShrink: 0
+                              }}
+                              title="Eliminar bloqueo y liberar horario"
+                            >
+                              <IonIcon icon={trashOutline} style={{ fontSize: '13px' }} />
+                              Liberar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
 
                   return (
                     <div
@@ -1230,8 +1448,8 @@ const Reservations: React.FC = () => {
                           </div>
                         ) : (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#64748B', marginBottom: '8px' }}>
-                            <IonIcon icon={personOutline} style={{ fontSize: '14px' }} />
-                            <span>{res.employee?.name || res.employee?.username || 'Especialista Asignado'}</span>
+                            <IonIcon icon={personOutline} style={{ fontSize: '14px', color: (res.employee?.name || res.employee?.username || res.employeeName || res.employeeId) ? 'var(--theme-primary, #10B981)' : '#94A3B8' }} />
+                            <span>{res.employee?.name || res.employee?.username || res.employeeName || (res.employeeId ? 'Especialista Asignado' : 'Sin asignar')}</span>
                           </div>
                         )}
 
@@ -1289,7 +1507,7 @@ const Reservations: React.FC = () => {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const appointmentUrl = `${window.location.origin}/appointment/${res.id}`;
+                                const appointmentUrl = `${getPublicBaseUrl()}/appointment/${res.id}`;
                                 const text = `Hola ${res.customerName}, te escribimos de ${user?.tenantName || 'FinoWork'} respecto a tu cita para ${res.serviceName || 'nuestro servicio'} el ${res.date} a las ${formatTime12h(res.time)}.\n\nPuedes ver los detalles, gestionar tu cita o reportar tu pago aquí:\n${appointmentUrl}`;
                                 window.open(formatWhatsAppUrl(res.customerPhone, text), '_blank');
                               }}
@@ -1319,7 +1537,7 @@ const Reservations: React.FC = () => {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              const appointmentUrl = `${window.location.origin}/appointment/${res.id}`;
+                              const appointmentUrl = `${getPublicBaseUrl()}/appointment/${res.id}`;
                               navigator.clipboard.writeText(appointmentUrl);
                               presentToast({ message: '📋 Enlace de control de cita copiado', duration: 2000, color: 'success' });
                             }}
@@ -1469,15 +1687,37 @@ const Reservations: React.FC = () => {
                     <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748B' }}>
                       No hay citas agendadas para el {formattedSelectedDate}.
                     </p>
-                    <button
-                      type="button"
-                      onClick={openNew}
-                      className="ff-btn-primary bg-theme-primary"
-                      style={{ padding: '10px 20px', backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast, #ffffff)' }}
-                    >
-                      <IonIcon icon={addOutline} />
-                      Agendar Cita
-                    </button>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={openNew}
+                        className="ff-btn-primary bg-theme-primary"
+                        style={{ padding: '10px 20px', backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast, #ffffff)' }}
+                      >
+                        <IonIcon icon={addOutline} />
+                        Agendar Cita
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openBlockModal}
+                        style={{
+                          padding: '10px 16px',
+                          borderRadius: '12px',
+                          border: '1px solid #CBD5E1',
+                          background: '#F8FAFC',
+                          color: '#334155',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <IonIcon icon={lockClosedOutline} />
+                        Bloquear Horario
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1922,7 +2162,7 @@ const Reservations: React.FC = () => {
           <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
-                Detalles de la Cita
+                {selectedEvent?.isBlock ? '🔒 Bloqueo de Horario' : 'Detalles de la Cita'}
               </h2>
               <button
                 type="button"
@@ -1934,7 +2174,85 @@ const Reservations: React.FC = () => {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
-              {selectedEvent && (
+              {selectedEvent && selectedEvent.isBlock ? (
+                <div>
+                  <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #CBD5E1', padding: '18px', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        background: selectedEvent.employeeId ? '#FEF3C7' : '#E2E8F0',
+                        color: selectedEvent.employeeId ? '#92400E' : '#1E293B',
+                      }}>
+                        {selectedEvent.employeeId
+                          ? `👤 Especialista: ${selectedEvent.employee?.name || selectedEvent.employee?.username || 'Personal'}`
+                          : '🏪 Cierre / Bloqueo de Todo el Comercio'}
+                      </span>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        background: '#F1F5F9',
+                        color: '#475569',
+                      }}>
+                        Sin Cobro ($0.00)
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '18px', fontWeight: '900', color: '#0F172A', marginBottom: '6px' }}>
+                      {selectedEvent.notes || selectedEvent.serviceName || 'Horario No Disponible / Día Libre'}
+                    </div>
+
+                    <div style={{ fontSize: '13px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
+                      <div>
+                        📅 <b>Fecha:</b> {selectedEvent.date}
+                      </div>
+                      <div>
+                        ⏰ <b>Bloque reservado:</b>{' '}
+                        {(() => {
+                          const dur = Number(selectedEvent.durationMinutes) || 60;
+                          const [hh, mm] = (selectedEvent.time || '08:00').split(':').map(Number);
+                          const endTotal = hh * 60 + mm + dur;
+                          const endH = Math.min(23, Math.floor(endTotal / 60));
+                          const endM = endTotal % 60;
+                          const endTimeStr = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+                          return `${formatTime12h(selectedEvent.time)} — ${formatTime12h(endTimeStr)} (${dur >= 60 ? `${(dur / 60).toFixed(dur % 60 === 0 ? 0 : 1)}h` : `${dur} min`})`;
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '12px', padding: '12px 14px', fontSize: '12px', color: '#1E40AF', marginBottom: '20px', lineHeight: '1.45' }}>
+                    ℹ️ Este registro es únicamente un <b>bloqueo de disponibilidad</b> en la agenda. No suma dinero en caja ni genera órdenes de venta.
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => deleteReservation(selectedEvent.id)}
+                    style={{
+                      width: '100%',
+                      padding: '13px',
+                      borderRadius: '12px',
+                      border: '1px solid #FCA5A5',
+                      background: '#FEF2F2',
+                      color: '#DC2626',
+                      fontSize: '14px',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <IonIcon icon={trashOutline} style={{ fontSize: '16px' }} />
+                    Liberar Horario / Eliminar Bloqueo
+                  </button>
+                </div>
+              ) : selectedEvent && (
                 <div>
                   {/* Customer Card */}
                   <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
@@ -2338,7 +2656,7 @@ const Reservations: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              const url = `${window.location.origin}/appointment/${selectedEvent.id}`;
+                              const url = `${getPublicBaseUrl()}/appointment/${selectedEvent.id}`;
                               navigator.clipboard.writeText(url);
                               presentToast({ message: '📋 Enlace copiado al portapapeles', duration: 2500, color: 'success' });
                             }}
@@ -2365,7 +2683,7 @@ const Reservations: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => {
-                                const appointmentUrl = `${window.location.origin}/appointment/${selectedEvent.id}`;
+                                const appointmentUrl = `${getPublicBaseUrl()}/appointment/${selectedEvent.id}`;
                                 const msg = `Hola ${selectedEvent.customerName}, te escribimos de ${user?.tenantName || 'FinoWork'} respecto a tu cita para ${selectedEvent.serviceName || 'nuestro servicio'} el ${selectedEvent.date} a las ${formatTime12h(selectedEvent.time)}.\n\nPuedes ver los detalles, gestionar tu cita o reportar tu pago aquí:\n${appointmentUrl}`;
                                 window.open(formatWhatsAppUrl(selectedEvent.customerPhone, msg), '_blank');
                               }}
@@ -2753,6 +3071,233 @@ const Reservations: React.FC = () => {
                 </div>
               );
             })()}
+          </div>
+        </IonModal>
+
+        {/* Modal Bloquear Horario / Día Libre (Desde - Hasta sin monto) */}
+        <IonModal isOpen={showBlockModal} onDidDismiss={() => setShowBlockModal(false)} style={{ '--border-radius': '20px' } as any}>
+          <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <IonIcon icon={lockClosedOutline} style={{ color: '#475569' }} />
+                  Bloquear Horario / Día Libre
+                </h2>
+                <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#64748B' }}>
+                  Reserva bloques de tiempo sin sumar dinero ni crear ventas
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBlockModal(false)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <IonIcon icon={closeOutline} style={{ color: '#64748B' }} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
+              {/* Alcance del Bloqueo: Comercio completo o Especialista */}
+              <div style={{ marginBottom: '16px' }}>
+                <FinoSelect
+                  label="¿A quién aplica este bloqueo?"
+                  title="Seleccionar Alcance del Bloqueo"
+                  value={blockTarget}
+                  onChange={val => setBlockTarget(String(val))}
+                  options={[
+                    {
+                      value: 'ALL',
+                      label: '🏪 Todo el Comercio (Cierre Temporal / Feriado)',
+                      description: 'Nadie podrá reservar citas en este rango de horario',
+                    },
+                    ...availableSpecialists.map(emp => ({
+                      value: String(emp.id),
+                      label: `👤 ${emp.name || emp.username}`,
+                      description: 'Día libre, permiso o receso solo para este especialista',
+                    })),
+                  ]}
+                />
+              </div>
+
+              {/* Rango de Fechas: Desde Fecha - Hasta Fecha */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+                <FinoDatePicker
+                  label="Desde Fecha *"
+                  value={blockStartDate}
+                  onChange={d => {
+                    setBlockStartDate(d);
+                    if (blockEndDate < d) setBlockEndDate(d);
+                  }}
+                />
+                <FinoDatePicker
+                  label="Hasta Fecha *"
+                  value={blockEndDate}
+                  minDate={blockStartDate}
+                  onChange={d => setBlockEndDate(d)}
+                />
+              </div>
+
+              {/* Switch Jornada Completa */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  padding: '12px 14px',
+                  background: '#F8FAFC',
+                  borderRadius: '12px',
+                  border: '1px solid #E2E8F0',
+                  marginBottom: '16px',
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
+                    Bloquear Día Completo
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                    Cubre toda la jornada laboral del día seleccionado
+                  </div>
+                </div>
+                <IonToggle
+                  checked={blockAllDay}
+                  onIonChange={e => setBlockAllDay(e.detail.checked)}
+                />
+              </div>
+
+              {/* Rango de Horas: Desde Hora - Hasta Hora (si no es día completo) */}
+              {!blockAllDay && (
+                <div style={{ marginBottom: '16px', background: '#F8FAFC', padding: '14px', borderRadius: '14px', border: '1px solid #E2E8F0' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+                    <FinoTimePicker
+                      label="Desde (Hora Inicio) *"
+                      value={blockStartTime}
+                      onChange={t => setBlockStartTime(t)}
+                    />
+                    <FinoTimePicker
+                      label="Hasta (Hora Fin) *"
+                      value={blockEndTime}
+                      onChange={t => setBlockEndTime(t)}
+                    />
+                  </div>
+
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#64748B', marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Bloques Rápidos:
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {[
+                      { label: '🌅 Mañana (8am - 12pm)', from: '08:00', to: '12:00' },
+                      { label: '🍽️ Almuerzo (12pm - 2pm)', from: '12:00', to: '14:00' },
+                      { label: '🌇 Tarde (1pm - 6pm)', from: '13:00', to: '18:00' },
+                    ].map(preset => {
+                      const active = blockStartTime === preset.from && blockEndTime === preset.to;
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => {
+                            setBlockStartTime(preset.from);
+                            setBlockEndTime(preset.to);
+                          }}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '8px',
+                            border: active ? '1.5px solid var(--theme-primary, #10B981)' : '1px solid #CBD5E1',
+                            background: active ? 'var(--theme-primary, #10B981)' : '#ffffff',
+                            color: active ? 'var(--theme-primary-contrast, #ffffff)' : '#334155',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Motivo del bloqueo */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>
+                  Motivo / Etiqueta del Bloqueo
+                </label>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                  {['Día Libre', 'Permiso Personal', 'Hora de Almuerzo', 'Feriado / Cierre', 'Diligencia / Médico', 'Mantenimiento'].map(presetReason => {
+                    const isSelected = blockReason === presetReason;
+                    return (
+                      <button
+                        key={presetReason}
+                        type="button"
+                        onClick={() => setBlockReason(presetReason)}
+                        style={{
+                          padding: '5px 10px',
+                          borderRadius: '999px',
+                          border: isSelected ? '1.5px solid #334155' : '1px solid #CBD5E1',
+                          background: isSelected ? '#334155' : '#F8FAFC',
+                          color: isSelected ? '#ffffff' : '#475569',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {presetReason}
+                      </button>
+                    );
+                  })}
+                </div>
+                <input
+                  type="text"
+                  value={blockReason}
+                  onChange={e => setBlockReason(e.target.value)}
+                  placeholder="Ej. Día Libre, Cita médica, Vacaciones..."
+                  style={{
+                    width: '100%',
+                    padding: '11px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '14px',
+                    color: '#0F172A',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              {/* Aviso de $0 */}
+              <div style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', color: '#475569', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>🔒</span>
+                <span>
+                  Este bloqueo ocupa el horario seleccionado con <b>monto $0.00</b> (no genera cobros ni afecta las métricas de ventas).
+                </span>
+              </div>
+
+              <button
+                type="button"
+                disabled={isSubmittingBlock}
+                onClick={handleCreateScheduleBlock}
+                className="ff-btn-primary"
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  fontSize: '14px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                }}
+              >
+                {isSubmittingBlock ? (
+                  <IonSpinner name="crescent" />
+                ) : (
+                  <>
+                    <IonIcon icon={lockClosedOutline} />
+                    Confirmar Bloqueo de Horario
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </IonModal>
 

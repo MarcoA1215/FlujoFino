@@ -49,8 +49,10 @@ import axios from 'axios';
 import { BankSelect } from '../components/BankSelect';
 import { CustomerNotificationPrompt } from '../components/CustomerNotificationPrompt';
 import { getContrastColor, ensureReadableColor, applyThemeToDom, resetToDefaultTheme } from '../utils/colors';
+import { getBaseURL } from '../api/client';
+import { getPublicBaseUrl } from '../utils/public-url';
 
-const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const apiBase = getBaseURL();
 
 const formatDateLocal = (d: Date): string => {
   const year = d.getFullYear();
@@ -139,9 +141,7 @@ const PublicAppointmentManage: React.FC = () => {
     }
   }, [isNewBooking]);
 
-  const appointmentUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/appointment/${id}`
-    : `https://www.finowork.com/appointment/${id}`;
+  const appointmentUrl = `${getPublicBaseUrl()}/appointment/${id}`;
 
   const handleCopyLink = () => {
     if (navigator?.clipboard?.writeText) {

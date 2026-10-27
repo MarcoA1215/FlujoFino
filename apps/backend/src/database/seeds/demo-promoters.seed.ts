@@ -94,6 +94,7 @@ async function runSeed() {
     `ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "durationMinutes" integer;`,
     `ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "roles" text DEFAULT '';`,
     `ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "job_title" character varying;`,
+    `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "initialCashCop" numeric(14,2) DEFAULT 0;`,
   ];
   for (const sql of safeColumns) {
     try {
@@ -252,7 +253,12 @@ async function runSeed() {
     console.log('\n👥 Verificando cuentas de usuarios del sistema...');
     // Cuentas Maestras
     const superAdmin = await getOrCreateUser('superadmin@finowork.com', 'superadmin', UserRole.SUPERADMIN, 'Super Administrador', superPasswordHash);
-    const promoter = await getOrCreateUser('promotor@finowork.com', 'promotor', UserRole.ADMIN, 'Promotor Oficial FinoWork');
+    const promoter = await getOrCreateUser('promotor@finowork.com', 'promotor', UserRole.PROMOTOR, 'Promotor Oficial FinoWork');
+    if (promoter.role !== UserRole.PROMOTOR) {
+      promoter.role = UserRole.PROMOTOR;
+      await userRepo.save(promoter);
+      console.log('   🔄 [ROL ACTUALIZADO] promotor@finowork.com actualizado a PROMOTOR');
+    }
     const demoAdmin = await getOrCreateUser('admin@finowork.com', 'admin', UserRole.ADMIN, 'Administrador Demo');
 
     // Cuentas de Especialistas / Roles específicos
@@ -343,11 +349,19 @@ async function runSeed() {
         themeHeaderColor: '#eff6ff',
         acceptCashUsd: true,
         acceptPagoMovil: true,
+        initialCashUSD: 160.00,
+        initialBankBs: 180000.00,
+        initialDigitalUSD: 50.00,
+        initialCashCop: 600000.00,
       });
       await settingsRepo.save(settingsRetail);
     } else {
       settingsRetail.enableCopCurrency = true;
       settingsRetail.exchangeRateCop = 4000.0;
+      settingsRetail.initialCashUSD = 160.00;
+      settingsRetail.initialBankBs = 180000.00;
+      settingsRetail.initialDigitalUSD = 50.00;
+      settingsRetail.initialCashCop = 600000.00;
       await settingsRepo.save(settingsRetail);
     }
 
@@ -498,6 +512,122 @@ async function runSeed() {
       notes: 'Venta rápida mostrador de cinturón en efectivo.',
     }, [{ productId: pCinturon.id, productName: pCinturon.name, quantity: 1, unitPrice: 12.00, unitCost: 4.50 }]);
 
+    await getOrCreateOrder(tenantRetail.id, {
+      customerName: cCastillo.name,
+      customerPhone: cCastillo.phone,
+      customerId: cCastillo.id,
+      employeeId: asesorBoutiqueUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 38.00 * tasaActual,
+      pagoMovilRef: 'PM-901122',
+      pagoMovilBank: '0134 - Banesco',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 38.00,
+      totalCost: 16.00,
+      netProfit: 22.00,
+      exchangeRate: tasaActual,
+      notes: 'Combo vestido floral y franela básica pagado por Pago Móvil.',
+    }, [
+      { productId: pVestido.id, productName: pVestido.name, quantity: 1, unitPrice: 28.00, unitCost: 12.00 },
+      { productId: pFranela.id, productName: pFranela.name, quantity: 1, unitPrice: 10.00, unitCost: 4.00 },
+    ]);
+
+    await getOrCreateOrder(tenantRetail.id, {
+      customerName: cGomez.name,
+      customerPhone: cGomez.phone,
+      customerId: cGomez.id,
+      employeeId: cashierUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'CASH_COP',
+      amountCop: 152000,
+      exchangeRateCop: 4000,
+      copReceived: 200000,
+      changeAmountCop: 48000,
+      changeMethod: 'CASH_COP',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 38.00,
+      totalCost: 18.00,
+      netProfit: 20.00,
+      exchangeRate: tasaActual,
+      notes: 'Compra de chaqueta Denim pagada en pesos colombianos. $152.000 COP cobrados.',
+    }, [{ productId: pChaqueta.id, productName: pChaqueta.name, quantity: 1, unitPrice: 38.00, unitCost: 18.00 }]);
+
+    await getOrCreateOrder(tenantRetail.id, {
+      customerName: cFuentes.name,
+      customerPhone: cFuentes.phone,
+      customerId: cFuentes.id,
+      employeeId: asesorBoutiqueUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 20.00,
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 20.00,
+      totalCost: 8.00,
+      netProfit: 12.00,
+      exchangeRate: tasaActual,
+      notes: '2 Franelas básicas de algodón pagadas exactas en efectivo divisa.',
+    }, [{ productId: pFranela.id, productName: pFranela.name, quantity: 2, unitPrice: 10.00, unitCost: 4.00 }]);
+
+    await getOrCreateOrder(tenantRetail.id, {
+      customerName: cMorales.name,
+      customerPhone: cMorales.phone,
+      customerId: cMorales.id,
+      employeeId: cashierUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PUNTO',
+      amountBs: 22.00 * tasaActual,
+      puntoRef: 'POS-11902',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 22.00,
+      totalCost: 10.00,
+      netProfit: 12.00,
+      exchangeRate: tasaActual,
+      notes: 'Pantalón Jean clásico pagado con tarjeta de débito en Punto POS.',
+    }, [{ productId: pJean.id, productName: pJean.name, quantity: 1, unitPrice: 22.00, unitCost: 10.00 }]);
+
+    await getOrCreateOrder(tenantRetail.id, {
+      customerName: cPena.name,
+      customerPhone: cPena.phone,
+      customerId: cPena.id,
+      employeeId: asesorBoutiqueUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 15.00 * tasaActual,
+      pagoMovilRef: 'PM-445566',
+      pagoMovilBank: '0102 - Banco de Venezuela',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 15.00,
+      totalCost: 7.00,
+      netProfit: 8.00,
+      exchangeRate: tasaActual,
+      notes: 'Camisa Oversize Algodón blanca pagada por Pago Móvil BDV.',
+    }, [{ productId: pCamisa.id, productName: 'Camisa Oversize Algodón (Blanco / Talla M)', quantity: 1, unitPrice: 15.00, unitCost: 7.00 }]);
+
+    await getOrCreateOrder(tenantRetail.id, {
+      customerName: cCastillo.name,
+      customerPhone: cCastillo.phone,
+      customerId: cCastillo.id,
+      employeeId: cashierUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 50.00,
+      changeAmount: 26.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 24.00,
+      totalCost: 9.00,
+      netProfit: 15.00,
+      exchangeRate: tasaActual,
+      notes: '2 cinturones de cuero de regalo. Pagó billete $50, vuelto $26 USD.',
+    }, [{ productId: pCinturon.id, productName: pCinturon.name, quantity: 2, unitPrice: 12.00, unitCost: 4.50 }]);
+
     // =========================================================================
     // 2. ESPACIO 2: PANADERÍA LA ESPIGA (demo-panaderia) -> Producción + Fórmulas
     // =========================================================================
@@ -536,7 +666,13 @@ async function runSeed() {
         themeHeaderColor: '#fffbeb',
         acceptCashUsd: true,
         acceptPagoMovil: true,
+        initialCashUSD: 140.00,
+        initialBankBs: 160000.00,
       });
+      await settingsRepo.save(settingsPan);
+    } else {
+      settingsPan.initialCashUSD = 140.00;
+      settingsPan.initialBankBs = 160000.00;
       await settingsRepo.save(settingsPan);
     }
 
@@ -661,6 +797,131 @@ async function runSeed() {
       notes: 'Torta húmeda de chocolate para cumpleaños.',
     }, [{ productId: tortaChoco.id, productName: tortaChoco.name, quantity: 1, unitPrice: 18.0, unitCost: 7.0 }]);
 
+    await getOrCreateOrder(tenantPan.id, {
+      customerName: panBenitez.name,
+      customerPhone: panBenitez.phone,
+      customerId: panBenitez.id,
+      employeeId: despachoPanUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 25.00 * tasaActual,
+      pagoMovilRef: 'PM-223344',
+      pagoMovilBank: '0102 - Banco de Venezuela',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 25.00,
+      totalCost: 11.00,
+      netProfit: 14.00,
+      exchangeRate: tasaActual,
+      notes: '10 cachitos de jamón para evento matutino pagados por Pago Móvil BDV.',
+    }, [{ productId: cachito.id, productName: cachito.name, quantity: 10, unitPrice: 2.5, unitCost: 1.1 }]);
+
+    await getOrCreateOrder(tenantPan.id, {
+      customerName: panRincon.name,
+      customerPhone: panRincon.phone,
+      customerId: panRincon.id,
+      employeeId: despachoPanUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 45.00 * tasaActual,
+      pagoMovilRef: 'PM-556677',
+      pagoMovilBank: '0134 - Banesco',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 45.00,
+      totalCost: 18.00,
+      netProfit: 27.00,
+      exchangeRate: tasaActual,
+      notes: '30 panes campesinos despacho al mayor pagado por Pago Móvil Banesco.',
+    }, [{ productId: panCampesino.id, productName: panCampesino.name, quantity: 30, unitPrice: 1.5, unitCost: 0.6 }]);
+
+    await getOrCreateOrder(tenantPan.id, {
+      customerName: panDuarte.name,
+      customerPhone: panDuarte.phone,
+      customerId: panDuarte.id,
+      employeeId: despachoPanUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 20.00,
+      changeAmount: 4.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 16.00,
+      totalCost: 6.00,
+      netProfit: 10.00,
+      exchangeRate: tasaActual,
+      notes: 'Torta húmeda de chocolate familiar pagada en efectivo divisa.',
+    }, [{ productId: tortaChoco.id, productName: tortaChoco.name, quantity: 1, unitPrice: 18.0, unitCost: 7.0 }]);
+
+    await getOrCreateOrder(tenantPan.id, {
+      customerName: panDelgado.name,
+      customerPhone: panDelgado.phone,
+      customerId: panDelgado.id,
+      employeeId: despachoPanUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PUNTO',
+      amountBs: 14.00 * tasaActual,
+      puntoRef: 'POS-88912',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 14.00,
+      totalCost: 4.40,
+      netProfit: 9.60,
+      exchangeRate: tasaActual,
+      notes: 'Desayuno de 4 croissants y 4 cafés espresso pagado por Punto POS.',
+    }, [
+      { productId: croissant.id, productName: croissant.name, quantity: 4, unitPrice: 2.0, unitCost: 0.8 },
+      { productId: cafeEspresso.id, productName: cafeEspresso.name, quantity: 4, unitPrice: 1.5, unitCost: 0.3 },
+    ]);
+
+    // Despacho Corporativo Catering Matutino - Pago Móvil
+    await getOrCreateOrder(tenantPan.id, {
+      customerName: panRincon.name,
+      customerPhone: panRincon.phone,
+      customerId: panRincon.id,
+      employeeId: despachoPanUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 112.50 * tasaActual,
+      pagoMovilRef: 'PM-882299',
+      pagoMovilBank: '0134 - Banesco',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 112.50,
+      totalCost: 42.50,
+      netProfit: 70.00,
+      exchangeRate: tasaActual,
+      notes: 'Catering corporativo: 20 cachitos + 20 croissants + 15 cafés espresso.',
+    }, [
+      { productId: cachito.id, productName: cachito.name, quantity: 20, unitPrice: 2.50, unitCost: 1.10 },
+      { productId: croissant.id, productName: croissant.name, quantity: 20, unitPrice: 2.00, unitCost: 0.80 },
+      { productId: cafeEspresso.id, productName: cafeEspresso.name, quantity: 15, unitPrice: 1.50, unitCost: 0.30 },
+    ]);
+
+    // Evento Familiar Tortas y Bollería - Efectivo USD
+    await getOrCreateOrder(tenantPan.id, {
+      customerName: panDuarte.name,
+      customerPhone: panDuarte.phone,
+      customerId: panDuarte.id,
+      employeeId: despachoPanUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 70.00,
+      changeAmount: 4.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 66.00,
+      totalCost: 26.00,
+      netProfit: 40.00,
+      exchangeRate: tasaActual,
+      notes: '2 tortas de chocolate familiares y 15 croissants para reunión.',
+    }, [
+      { productId: tortaChoco.id, productName: tortaChoco.name, quantity: 2, unitPrice: 18.00, unitCost: 7.00 },
+      { productId: croissant.id, productName: croissant.name, quantity: 15, unitPrice: 2.00, unitCost: 0.80 },
+    ]);
+
     // =========================================================================
     // 3. ESPACIO 3: BARBERÍA & SPA ÉLITE (demo-servicios) -> Citas con Agenda + Turnos
     // =========================================================================
@@ -700,6 +961,10 @@ async function runSeed() {
         bookingRequireService: true,
         bookingAllowStaffSelection: true,
         slotInterval: 30,
+        initialCashUSD: 100.00,
+        initialBankBs: 140000.00,
+        acceptCashUsd: true,
+        acceptPagoMovil: true,
         businessHours: {
           '1': { isOpen: true, startTime: '09:00', endTime: '19:00' },
           '2': { isOpen: true, startTime: '09:00', endTime: '19:00' },
@@ -710,6 +975,12 @@ async function runSeed() {
           '0': { isOpen: false, startTime: '09:00', endTime: '14:00' },
         },
       });
+      await settingsRepo.save(settingsSpa);
+    } else {
+      settingsSpa.initialCashUSD = 100.00;
+      settingsSpa.initialBankBs = 140000.00;
+      settingsSpa.acceptCashUsd = true;
+      settingsSpa.acceptPagoMovil = true;
       await settingsRepo.save(settingsSpa);
     }
 
@@ -843,6 +1114,65 @@ async function runSeed() {
       notes: 'Limpieza facial profunda pagada por Pago Móvil BDV.',
     }, [{ productId: sFacial.id, productName: sFacial.name, quantity: 1, unitPrice: 18.00, unitCost: 3.00 }]);
 
+    await getOrCreateOrder(tenantSpa.id, {
+      customerName: bColmenares.name,
+      customerPhone: bColmenares.phone,
+      customerId: bColmenares.id,
+      employeeId: barberoUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 17.00 * tasaActual,
+      pagoMovilRef: 'PM-778899',
+      pagoMovilBank: '0134 - Banesco',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 17.00,
+      totalCost: 1.80,
+      netProfit: 15.20,
+      exchangeRate: tasaActual,
+      notes: 'Corte degradado con barba y afeitado tradicional con toalla caliente.',
+    }, [
+      { productId: sCorte.id, productName: sCorte.name, quantity: 1, unitPrice: 10.00, unitCost: 1.00 },
+      { productId: sAfeitado.id, productName: sAfeitado.name, quantity: 1, unitPrice: 7.00, unitCost: 0.80 },
+    ]);
+
+    await getOrCreateOrder(tenantSpa.id, {
+      customerName: bBriceno.name,
+      customerPhone: bBriceno.phone,
+      customerId: bBriceno.id,
+      employeeId: manicuristaUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 20.00,
+      changeAmount: 6.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 14.00,
+      totalCost: 2.50,
+      netProfit: 11.50,
+      exchangeRate: tasaActual,
+      notes: 'Manicura rusa y esmaltado semipermanente pagado en efectivo.',
+    }, [{ productId: sManicura.id, productName: sManicura.name, quantity: 1, unitPrice: 14.00, unitCost: 2.50 }]);
+
+    await getOrCreateOrder(tenantSpa.id, {
+      customerName: bHenriquez.name,
+      customerPhone: bHenriquez.phone,
+      customerId: bHenriquez.id,
+      employeeId: barbero2User.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PUNTO',
+      amountBs: 10.00 * tasaActual,
+      puntoRef: 'POS-90123',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 10.00,
+      totalCost: 1.00,
+      netProfit: 9.00,
+      exchangeRate: tasaActual,
+      notes: 'Corte degradado fade pagado por Punto POS.',
+    }, [{ productId: sCorte.id, productName: sCorte.name, quantity: 1, unitPrice: 10.00, unitCost: 1.00 }]);
+
     // =========================================================================
     // 4. ESPACIO 4: AUTO LAVADO EXPRESS (demo-autolavado) -> Servicios Rápidos
     // =========================================================================
@@ -881,7 +1211,13 @@ async function runSeed() {
         themeHeaderColor: '#f0f9ff',
         acceptCashUsd: true,
         acceptPagoMovil: true,
+        initialCashUSD: 100.00,
+        initialBankBs: 140000.00,
       });
+      await settingsRepo.save(settingsLavado);
+    } else {
+      settingsLavado.initialCashUSD = 100.00;
+      settingsLavado.initialBankBs = 140000.00;
       await settingsRepo.save(settingsLavado);
     }
 
@@ -896,6 +1232,7 @@ async function runSeed() {
     const sSedan = await getOrCreateProduct(tenantLavado.id, { name: 'Lavado Sencillo Sedan', salePrice: 7.0, cost: 1.2, estimatedCost: 1.2, category: 'Lavado', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1601362840469-51e4d8d58785?w=600&auto=format&fit=crop&q=80'] });
     const sMotor = await getOrCreateProduct(tenantLavado.id, { name: 'Lavado de Motor & Chasis a Vapor', salePrice: 15.0, cost: 3.0, estimatedCost: 3.0, category: 'Especiales', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=600&auto=format&fit=crop&q=80'] });
     const sPulitura = await getOrCreateProduct(tenantLavado.id, { name: 'Pulitura y Encerado 3M Orbital', salePrice: 35.0, cost: 8.0, estimatedCost: 8.0, category: 'Detailing', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1607860108855-64acf2078ed9?w=600&auto=format&fit=crop&q=80'] });
+    const sTapiceria = await getOrCreateProduct(tenantLavado.id, { name: 'Lavado y Desinfección de Tapicería a Vapor', salePrice: 25.0, cost: 4.0, estimatedCost: 4.0, category: 'Especiales', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=80'] });
     const pAroma = await getOrCreateProduct(tenantLavado.id, { name: 'Aromatizante Little Trees Black Ice', salePrice: 3.0, cost: 1.2, estimatedCost: 1.2, stock: 40, stockQuantity: 40, physicalStock: 40, category: 'Accesorios', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1616423640778-28d1b53229bd?w=600&auto=format&fit=crop&q=80'] });
 
     // Gastos y Fondo Auto Lavado
@@ -983,6 +1320,112 @@ async function runSeed() {
       { productId: pAroma.id, productName: pAroma.name, quantity: 1, unitPrice: 3.00, unitCost: 1.20 },
     ]);
 
+    await getOrCreateOrder(tenantLavado.id, {
+      customerName: lMendez.name,
+      customerPhone: lMendez.phone,
+      customerId: lMendez.id,
+      employeeId: lavadorUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 20.00,
+      changeAmount: 8.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 12.00,
+      totalCost: 2.50,
+      netProfit: 9.50,
+      exchangeRate: tasaActual,
+      notes: 'Lavado completo de camioneta Hilux con cera líquida.',
+    }, [{ productId: sCamioneta.id, productName: sCamioneta.name, quantity: 1, unitPrice: 12.00, unitCost: 2.50 }]);
+
+    await getOrCreateOrder(tenantLavado.id, {
+      customerName: lValera.name,
+      customerPhone: lValera.phone,
+      customerId: lValera.id,
+      employeeId: lavadorUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 10.00 * tasaActual,
+      pagoMovilRef: 'PM-990011',
+      pagoMovilBank: '0102 - Banco de Venezuela',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 10.00,
+      totalCost: 2.40,
+      netProfit: 7.60,
+      exchangeRate: tasaActual,
+      notes: 'Lavado sencillo Sedan + aromatizante Black Ice.',
+    }, [
+      { productId: sSedan.id, productName: sSedan.name, quantity: 1, unitPrice: 7.00, unitCost: 1.20 },
+      { productId: pAroma.id, productName: pAroma.name, quantity: 1, unitPrice: 3.00, unitCost: 1.20 },
+    ]);
+
+    await getOrCreateOrder(tenantLavado.id, {
+      customerName: lMendez.name,
+      customerPhone: lMendez.phone,
+      customerId: lMendez.id,
+      employeeId: supervisorLavadoUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 15.00 * tasaActual,
+      pagoMovilRef: 'PM-331122',
+      pagoMovilBank: '0134 - Banesco',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 15.00,
+      totalCost: 3.00,
+      netProfit: 12.00,
+      exchangeRate: tasaActual,
+      notes: 'Lavado a vapor de motor y chasis.',
+    }, [{ productId: sMotor.id, productName: sMotor.name, quantity: 1, unitPrice: 15.00, unitCost: 3.00 }]);
+
+    // Servicio Detailing Completo (Tapicería + Motor) - Pago Móvil
+    await getOrCreateOrder(tenantLavado.id, {
+      customerName: lVelasquez.name,
+      customerPhone: lVelasquez.phone,
+      customerId: lVelasquez.id,
+      employeeId: supervisorLavadoUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 40.00 * tasaActual,
+      pagoMovilRef: 'PM-776655',
+      pagoMovilBank: '0134 - Banesco',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 40.00,
+      totalCost: 7.00,
+      netProfit: 33.00,
+      exchangeRate: tasaActual,
+      notes: 'Limpieza profunda de tapicería a vapor y lavado de motor.',
+    }, [
+      { productId: sTapiceria.id, productName: sTapiceria.name, quantity: 1, unitPrice: 25.00, unitCost: 4.00 },
+      { productId: sMotor.id, productName: sMotor.name, quantity: 1, unitPrice: 15.00, unitCost: 3.00 },
+    ]);
+
+    // Pulitura 3M y Lavado General Camioneta - Efectivo USD
+    await getOrCreateOrder(tenantLavado.id, {
+      customerName: lMendez.name,
+      customerPhone: lMendez.phone,
+      customerId: lMendez.id,
+      employeeId: lavador2User.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 50.00,
+      changeAmount: 3.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 47.00,
+      totalCost: 10.50,
+      netProfit: 36.50,
+      exchangeRate: tasaActual,
+      notes: 'Pulitura orbital 3M y lavado completo de camioneta en divisa.',
+    }, [
+      { productId: sPulitura.id, productName: sPulitura.name, quantity: 1, unitPrice: 35.00, unitCost: 8.00 },
+      { productId: sCamioneta.id, productName: sCamioneta.name, quantity: 1, unitPrice: 12.00, unitCost: 2.50 },
+    ]);
+
     // =========================================================================
     // 5. ESPACIO 5: BURGER HOUSE GOURMET (demo-gastronomia) -> Cocina + Salón + Delivery
     // =========================================================================
@@ -1024,7 +1467,13 @@ async function runSeed() {
         themeHeaderColor: '#fff7ed',
         acceptCashUsd: true,
         acceptPagoMovil: true,
+        initialCashUSD: 150.00,
+        initialBankBs: 200000.00,
       });
+      await settingsRepo.save(settingsBurger);
+    } else {
+      settingsBurger.initialCashUSD = 150.00;
+      settingsBurger.initialBankBs = 200000.00;
       await settingsRepo.save(settingsBurger);
     }
 
@@ -1181,6 +1630,104 @@ async function runSeed() {
       notes: '3 combos de hamburguesa doble entregados en salón.',
     }, [{ productId: pBurgerDoble.id, productName: pBurgerDoble.name, quantity: 3, unitPrice: 7.50, unitCost: 2.50 }]);
 
+    // 6. Combo Familiar en Salón - Pago Móvil
+    await getOrCreateOrder(tenantBurger.id, {
+      customerName: bFamilia.name,
+      customerPhone: bFamilia.phone,
+      customerId: bFamilia.id,
+      employeeId: meseroUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 44.50 * tasaActual,
+      pagoMovilRef: 'PM-993812',
+      pagoMovilBank: '0134 - Banesco',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 44.50,
+      totalCost: 15.00,
+      netProfit: 29.50,
+      exchangeRate: tasaActual,
+      notes: 'Combo Familiar Salón: 3 especiales + 2 papas cheddar + 4 refrescos.',
+    }, [
+      { productId: pBurgerEspecial.id, productName: pBurgerEspecial.name, quantity: 3, unitPrice: 9.50, unitCost: 3.20 },
+      { productId: pPapas.id, productName: pPapas.name, quantity: 2, unitPrice: 4.00, unitCost: 1.20 },
+      { productId: pCocaCola.id, productName: pCocaCola.name, quantity: 4, unitPrice: 1.50, unitCost: 0.70 },
+    ]);
+
+    // 7. Pedido Corporativo Delivery - Pago Móvil
+    await getOrCreateOrder(tenantBurger.id, {
+      customerName: bMendoza.name,
+      customerPhone: bMendoza.phone,
+      customerId: bMendoza.id,
+      customerAddress: 'Torre Empresarial, Piso 5',
+      employeeId: deliveryUser.id,
+      driverId: deliveryUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 46.00 * tasaActual,
+      pagoMovilRef: 'PM-554411',
+      pagoMovilBank: '0102 - Banco de Venezuela',
+      deliveryMethod: DeliveryMethod.DELIVERY,
+      deliveryZoneId: zoneCentro?.id,
+      deliveryFee: 1.50,
+      totalAmount: 46.00,
+      totalCost: 14.80,
+      netProfit: 31.20,
+      exchangeRate: tasaActual,
+      notes: 'Almuerzo corporativo: 4 Doble Queso + 4 Papas Rústicas.',
+    }, [
+      { productId: pBurgerDoble.id, productName: pBurgerDoble.name, quantity: 4, unitPrice: 7.50, unitCost: 2.50 },
+      { productId: pPapas.id, productName: pPapas.name, quantity: 4, unitPrice: 4.00, unitCost: 1.20 },
+    ]);
+
+    // 8. Takeout en Mostrador - Efectivo USD
+    await getOrCreateOrder(tenantBurger.id, {
+      customerName: bRivas.name,
+      customerPhone: bRivas.phone,
+      customerId: bRivas.id,
+      employeeId: mesera2User.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 25.00,
+      changeAmount: 2.00,
+      changeMethod: 'CASH_USD',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 23.00,
+      totalCost: 8.20,
+      netProfit: 14.80,
+      exchangeRate: tasaActual,
+      notes: 'Para llevar: 2 especiales y 2 cervezas frías.',
+    }, [
+      { productId: pBurgerEspecial.id, productName: pBurgerEspecial.name, quantity: 2, unitPrice: 9.50, unitCost: 3.20 },
+      { productId: pCerveza.id, productName: pCerveza.name, quantity: 2, unitPrice: 2.00, unitCost: 0.90 },
+    ]);
+
+    // 9. Salón Celebración - Pago Móvil
+    await getOrCreateOrder(tenantBurger.id, {
+      customerName: bSilva.name,
+      customerPhone: bSilva.phone,
+      customerId: bSilva.id,
+      employeeId: meseroUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 69.50 * tasaActual,
+      pagoMovilRef: 'PM-778899',
+      pagoMovilBank: '0134 - Banesco',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 69.50,
+      totalCost: 24.10,
+      netProfit: 45.40,
+      exchangeRate: tasaActual,
+      notes: 'Mesa larga amigos: 5 Especiales + 3 Papas + 5 Cervezas.',
+    }, [
+      { productId: pBurgerEspecial.id, productName: pBurgerEspecial.name, quantity: 5, unitPrice: 9.50, unitCost: 3.20 },
+      { productId: pPapas.id, productName: pPapas.name, quantity: 3, unitPrice: 4.00, unitCost: 1.20 },
+      { productId: pCerveza.id, productName: pCerveza.name, quantity: 5, unitPrice: 2.00, unitCost: 0.90 },
+    ]);
+
     // =========================================================================
     // 6. ESPACIO 6: CENTRO ESTÉTICO GLOW (demo-estetica) -> Citas Médicas + Retail
     // =========================================================================
@@ -1221,7 +1768,13 @@ async function runSeed() {
         bookingAllowStaffSelection: true,
         acceptCashUsd: true,
         acceptPagoMovil: true,
+        initialCashUSD: 160.00,
+        initialBankBs: 200000.00,
       });
+      await settingsRepo.save(settingsGlow);
+    } else {
+      settingsGlow.initialCashUSD = 160.00;
+      settingsGlow.initialBankBs = 200000.00;
       await settingsRepo.save(settingsGlow);
     }
 
@@ -1360,6 +1913,105 @@ async function runSeed() {
       { productId: gAcido.id, productName: gAcido.name, quantity: 1, unitPrice: 25.00, unitCost: 11.00 },
       { productId: gSolar.id, productName: gSolar.name, quantity: 1, unitPrice: 22.00, unitCost: 10.00 },
     ]);
+
+    await getOrCreateOrder(tenantGlow.id, {
+      customerName: gColmenares.name,
+      customerPhone: gColmenares.phone,
+      customerId: gColmenares.id,
+      employeeId: recepcionGlowUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 46.00 * tasaActual,
+      pagoMovilRef: 'PM-889901',
+      pagoMovilBank: '0134 - Banesco',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 46.00,
+      totalCost: 12.00,
+      netProfit: 34.00,
+      exchangeRate: tasaActual,
+      notes: 'Sesión Drenaje Linfático y Sérum Vitamina C pagado con Pago Móvil.',
+    }, [
+      { productId: gDrenaje.id, productName: gDrenaje.name, quantity: 1, unitPrice: 28.00, unitCost: 4.00 },
+      { productId: gSerum.id, productName: gSerum.name, quantity: 1, unitPrice: 18.00, unitCost: 8.00 },
+    ]);
+
+    await getOrCreateOrder(tenantGlow.id, {
+      customerName: gSalas.name,
+      customerPhone: gSalas.phone,
+      customerId: gSalas.id,
+      employeeId: recepcionGlowUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 52.00 * tasaActual,
+      pagoMovilRef: 'PM-334455',
+      pagoMovilBank: '0102 - Banco de Venezuela',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 52.00,
+      totalCost: 15.50,
+      netProfit: 36.50,
+      exchangeRate: tasaActual,
+      notes: 'Limpieza Hidrafacial Profunda y Protector Solar FPS 50.',
+    }, [
+      { productId: gHidrafacial.id, productName: gHidrafacial.name, quantity: 1, unitPrice: 30.00, unitCost: 5.50 },
+      { productId: gSolar.id, productName: gSolar.name, quantity: 1, unitPrice: 22.00, unitCost: 10.00 },
+    ]);
+
+    await getOrCreateOrder(tenantGlow.id, {
+      customerName: gMendoza.name,
+      customerPhone: gMendoza.phone,
+      customerId: gMendoza.id,
+      employeeId: recepcionGlowUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'USD',
+      usdReceived: 50.00,
+      changeAmount: 0.00,
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 50.00,
+      totalCost: 15.00,
+      netProfit: 35.00,
+      exchangeRate: tasaActual,
+      notes: 'Masaje Descontracturante y Sérum Ácido Hialurónico en efectivo USD.',
+    }, [
+      { productId: gMasaje.id, productName: gMasaje.name, quantity: 1, unitPrice: 25.00, unitCost: 4.00 },
+      { productId: gAcido.id, productName: gAcido.name, quantity: 1, unitPrice: 25.00, unitCost: 11.00 },
+    ]);
+
+    await getOrCreateOrder(tenantGlow.id, {
+      customerName: gZambrano.name,
+      customerPhone: gZambrano.phone,
+      customerId: gZambrano.id,
+      employeeId: recepcionGlowUser.id,
+      status: OrderStatus.DELIVERED,
+      paymentStatus: PaymentStatus.PAID,
+      paymentMethod: 'PAGO_MOVIL',
+      amountBs: 58.00 * tasaActual,
+      pagoMovilRef: 'PM-123789',
+      pagoMovilBank: '0134 - Banesco',
+      deliveryMethod: DeliveryMethod.IN_STORE,
+      totalAmount: 58.00,
+      totalCost: 9.50,
+      netProfit: 48.50,
+      exchangeRate: tasaActual,
+      notes: 'Sesión integral: Limpieza Hidrafacial + Drenaje Linfático.',
+    }, [
+      { productId: gHidrafacial.id, productName: gHidrafacial.name, quantity: 1, unitPrice: 30.00, unitCost: 5.50 },
+      { productId: gDrenaje.id, productName: gDrenaje.name, quantity: 1, unitPrice: 28.00, unitCost: 4.00 },
+    ]);
+
+    // Espacio Central FinoWork
+    const tenantCentral = await tenantRepo.findOne({ where: { name: 'FinoWork Central' } });
+    if (tenantCentral) {
+      await linkAccess(demoAdmin.id, tenantCentral.id, UserRole.ADMIN, 'Administrador');
+      let settingsCentral = await settingsRepo.findOne({ where: { tenantId: tenantCentral.id } });
+      if (settingsCentral) {
+        settingsCentral.initialCashUSD = Math.max(Number(settingsCentral.initialCashUSD || 0), 100.00);
+        settingsCentral.initialBankBs = Math.max(Number(settingsCentral.initialBankBs || 0), 100000.00);
+        await settingsRepo.save(settingsCentral);
+      }
+    }
 
     console.log('\n==================================================');
     console.log('🎉 SEED COMPLETADO EXITOSAMENTE');

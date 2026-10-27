@@ -75,6 +75,8 @@ async function bootstrap() {
         allowedOrigins.includes(origin) ||
         origin.endsWith('.finowork.com') ||
         origin === 'https://finowork.com' ||
+        origin.endsWith('.vercel.app') ||
+        origin.endsWith('.onrender.com') ||
         /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin) ||
         (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) ||
         (process.env.FRONTEND_URL_APK && origin === process.env.FRONTEND_URL_APK)

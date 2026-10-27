@@ -45,6 +45,7 @@ const LandingPage = lazy(() => import('./pages/LandingPage'));
 const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const DeleteAccount = lazy(() => import('./pages/DeleteAccount'));
+const PromoterTermsAndConditions = lazy(() => import('./pages/PromoterTermsAndConditions'));
 
 const PageFallback: React.FC = () => (
   <div style={{
@@ -98,7 +99,7 @@ const HomeRedirector: React.FC = () => {
     return <Navigate to="/platform-admin" replace />;
   }
 
-  const isPromotor = user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR';
+  const isPromotor = user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR' || user?.tenantId === 'promoter-space';
   if (isPromotor) {
     return <Navigate to="/promoter" replace />;
   }
@@ -151,6 +152,8 @@ export const getRoleDefaultPath = (role?: UserRole | string): string => {
       return '/orders';
     case UserRole.INVENTORY:
       return '/raw-materials';
+    case UserRole.OPERATIVO:
+      return '/login';
     default:
       return '/dashboard';
   }
@@ -168,12 +171,18 @@ const PrivateRoute: React.FC<{ children: React.ReactNode; allowedRoles?: UserRol
     (user?.role as string) === 'SUPERADMIN' ||
     user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
 
+  const isAdmin =
+    user?.role === UserRole.ADMIN ||
+    (user?.role as string) === 'ADMIN';
+
   if (!isSuperAdmin && user?.tenantId && isExpired) {
     return <Navigate to="/subscription-expired" replace />;
   }
 
-  if (allowedRoles && user?.role && !isSuperAdmin) {
-    const hasRole = allowedRoles.includes(user.role as UserRole);
+  if (allowedRoles && user?.role && !isSuperAdmin && !isAdmin) {
+    const currentRole = user.role as UserRole;
+    const userRoles = Array.isArray(user.roles) && user.roles.length > 0 ? user.roles : [currentRole];
+    const hasRole = allowedRoles.includes(currentRole) || userRoles.some(r => allowedRoles.includes(r as UserRole));
     if (!hasRole) {
       return <Navigate to={getRoleDefaultPath(user.role)} replace />;
     }
@@ -219,7 +228,7 @@ const PromoterRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   if (isLoading) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
-  const isPromotor = user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR';
+  const isPromotor = user?.isPromoter || user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR' || user?.tenantId === 'promoter-space' || user?.workspaces?.some((w: any) => w.tenantId === 'promoter-space') || user?.email?.toLowerCase() === 'promotor@finowork.com';
   if (!isSuperAdmin && !isPromotor) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -276,6 +285,7 @@ const MainLayout: React.FC = () => {
                         location.pathname === '/landing' ||
                         location.pathname === '/terms' ||
                         location.pathname === '/privacy' ||
+                        location.pathname === '/promoter/terms' ||
                         location.pathname === '/delete-account' ||
                         location.pathname === '/solicitud-eliminacion' ||
                         location.pathname === '/login' ||
@@ -295,6 +305,7 @@ const MainLayout: React.FC = () => {
       location.pathname === '/landing' ||
       location.pathname === '/terms' ||
       location.pathname === '/privacy' ||
+      location.pathname === '/promoter/terms' ||
       location.pathname === '/delete-account' ||
       location.pathname === '/solicitud-eliminacion' ||
       location.pathname === '/subscription-expired' ||
@@ -325,6 +336,7 @@ const MainLayout: React.FC = () => {
         <Route path="/landing" element={Capacitor.isNativePlatform() ? <Navigate to="/login" replace /> : <Suspense fallback={<PageFallback />}><LandingPage /></Suspense>} />
         <Route path="/terms" element={<Suspense fallback={<PageFallback />}><TermsAndConditions /></Suspense>} />
         <Route path="/privacy" element={<Suspense fallback={<PageFallback />}><PrivacyPolicy /></Suspense>} />
+        <Route path="/promoter/terms" element={<Suspense fallback={<PageFallback />}><PromoterTermsAndConditions /></Suspense>} />
         <Route path="/delete-account" element={<Suspense fallback={<PageFallback />}><DeleteAccount /></Suspense>} />
         <Route path="/solicitud-eliminacion" element={<Suspense fallback={<PageFallback />}><DeleteAccount /></Suspense>} />
         <Route path="/" element={<HomeRedirector />} />
@@ -333,18 +345,18 @@ const MainLayout: React.FC = () => {
         <Route path="/select-workspace" element={<PrivateRoute><SelectWorkspace /></PrivateRoute>} />
         
         <Route path="/dashboard" element={<PrivateRoute allowedRoles={[UserRole.ADMIN]}><Dashboard /></PrivateRoute>} />
-        <Route path="/raw-materials" element={<PrivateRoute><RawMaterials /></PrivateRoute>} />
-        <Route path="/products" element={<PrivateRoute><Products /></PrivateRoute>} />
-        <Route path="/production" element={<PrivateRoute><Production /></PrivateRoute>} />
-        <Route path="/calculator" element={<PrivateRoute><Calculator /></PrivateRoute>} />
-        <Route path="/pos" element={<PrivateRoute><Pos /></PrivateRoute>} />
-        <Route path="/orders" element={<PrivateRoute><Orders /></PrivateRoute>} />
-        <Route path="/delivery-panel" element={<PrivateRoute><DeliveryPanel /></PrivateRoute>} />
-        <Route path="/delivery-zones" element={<PrivateRoute><DeliveryZones /></PrivateRoute>} />
+        <Route path="/raw-materials" element={<PrivateRoute allowedRoles={[UserRole.ADMIN, UserRole.INVENTORY]}><RawMaterials /></PrivateRoute>} />
+        <Route path="/products" element={<PrivateRoute allowedRoles={[UserRole.ADMIN, UserRole.INVENTORY]}><Products /></PrivateRoute>} />
+        <Route path="/production" element={<PrivateRoute allowedRoles={[UserRole.ADMIN, UserRole.INVENTORY, UserRole.KITCHEN]}><Production /></PrivateRoute>} />
+        <Route path="/calculator" element={<PrivateRoute allowedRoles={[UserRole.ADMIN, UserRole.INVENTORY, UserRole.POS]}><Calculator /></PrivateRoute>} />
+        <Route path="/pos" element={<PrivateRoute allowedRoles={[UserRole.ADMIN, UserRole.POS]}><Pos /></PrivateRoute>} />
+        <Route path="/orders" element={<PrivateRoute allowedRoles={[UserRole.ADMIN, UserRole.POS, UserRole.KITCHEN, UserRole.DELIVERY]}><Orders /></PrivateRoute>} />
+        <Route path="/delivery-panel" element={<PrivateRoute allowedRoles={[UserRole.ADMIN, UserRole.DELIVERY]}><DeliveryPanel /></PrivateRoute>} />
+        <Route path="/delivery-zones" element={<PrivateRoute allowedRoles={[UserRole.ADMIN, UserRole.DELIVERY]}><DeliveryZones /></PrivateRoute>} />
         <Route path="/users" element={<PrivateRoute allowedRoles={[UserRole.ADMIN]}><Users /></PrivateRoute>} />
         <Route path="/settings" element={<PrivateRoute allowedRoles={[UserRole.ADMIN]}><SettingsPage /></PrivateRoute>} />
-        <Route path="/reservations" element={<PrivateRoute><Reservations /></PrivateRoute>} />
-        <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
+        <Route path="/reservations" element={<PrivateRoute allowedRoles={[UserRole.ADMIN, UserRole.POS, UserRole.KITCHEN]}><Reservations /></PrivateRoute>} />
+        <Route path="/customers" element={<PrivateRoute allowedRoles={[UserRole.ADMIN, UserRole.POS]}><Customers /></PrivateRoute>} />
         <Route path="/feedback" element={<PrivateRoute><FeedbackPage /></PrivateRoute>} />
         <Route path="/promoter" element={<PromoterRoute><PromoterDashboard /></PromoterRoute>} />
         <Route path="/platform-admin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />

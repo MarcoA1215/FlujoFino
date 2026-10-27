@@ -433,7 +433,7 @@ const Customers: React.FC = () => {
         {/* FAB [+] Button */}
         <div
           onClick={openNew}
-          className="bg-theme-primary text-white"
+          className="bg-theme-primary"
           style={{
             position: 'fixed',
             bottom: '78px',

@@ -314,7 +314,7 @@ const RawMaterials: React.FC = () => {
 
   return (
     <IonPage>
-      <AppHeader title="Insumos (Materia Prima)" />
+      <AppHeader title="Insumos (Materia Prima)" onRefresh={fetchMaterials} />
       <IonContent
         ref={contentRef}
         fullscreen

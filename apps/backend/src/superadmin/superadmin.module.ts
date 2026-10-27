@@ -7,6 +7,7 @@ import { PlatformConfig } from '../entities/platform-config.entity';
 import { Promoter } from '../entities/promoter.entity';
 import { PromoterCommission } from '../entities/promoter-commission.entity';
 import { User } from '../entities/user.entity';
+import { PlatformExpense } from '../entities/platform-expense.entity';
 import { SuperAdminService } from './superadmin.service';
 import { SuperAdminController } from './superadmin.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -14,7 +15,7 @@ import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Tenant, SaaSPaymentReport, UserTenantAccess, PlatformConfig, Promoter, PromoterCommission, User]),
+    TypeOrmModule.forFeature([Tenant, SaaSPaymentReport, UserTenantAccess, PlatformConfig, Promoter, PromoterCommission, User, PlatformExpense]),
     NotificationsModule,
     SettingsModule,
   ],

@@ -79,7 +79,7 @@ const DeliveryZones: React.FC = () => {
 
   return (
     <IonPage>
-      <AppHeader title="Zonas de Delivery" />
+      <AppHeader title="Zonas de Delivery" onRefresh={fetchZones} />
       <IonContent fullscreen className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' } as any}>
         <div style={{ maxWidth: '800px', margin: '0 auto', paddingBottom: '90px' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px' }}>
@@ -138,8 +138,8 @@ const DeliveryZones: React.FC = () => {
           </div>
         </div>
 
-        <IonFab vertical="bottom" horizontal="end" slot="fixed">
-          <IonFabButton onClick={() => openModal()}>
+        <IonFab vertical="bottom" horizontal="end" slot="fixed" style={{ bottom: '72px' }}>
+          <IonFabButton onClick={() => openModal()} style={{ '--background': 'var(--theme-primary)', '--color': 'var(--theme-primary-contrast, #ffffff)' } as any}>
             <IonIcon icon={addOutline} />
           </IonFabButton>
         </IonFab>

@@ -140,7 +140,7 @@ const Production: React.FC = () => {
 
   return (
     <IonPage>
-      <AppHeader title="Producción de Lotes" />
+      <AppHeader title="Producción de Lotes" onRefresh={fetchData} />
       <IonContent fullscreen className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' } as any}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '90px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
@@ -154,8 +154,8 @@ const Production: React.FC = () => {
                   fontWeight: 600,
                   fontSize: '0.85rem',
                   cursor: 'pointer',
-                  background: tab === 'fabricar' ? '#10B981' : 'transparent',
-                  color: tab === 'fabricar' ? '#ffffff' : '#64748B',
+                  background: tab === 'fabricar' ? 'var(--theme-primary)' : 'transparent',
+                  color: tab === 'fabricar' ? 'var(--theme-primary-contrast, #ffffff)' : '#64748B',
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -170,8 +170,8 @@ const Production: React.FC = () => {
                   fontWeight: 600,
                   fontSize: '0.85rem',
                   cursor: 'pointer',
-                  background: tab === 'historial' ? '#10B981' : 'transparent',
-                  color: tab === 'historial' ? '#ffffff' : '#64748B',
+                  background: tab === 'historial' ? 'var(--theme-primary)' : 'transparent',
+                  color: tab === 'historial' ? 'var(--theme-primary-contrast, #ffffff)' : '#64748B',
                   transition: 'all 0.15s ease'
                 }}
               >

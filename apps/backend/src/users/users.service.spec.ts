@@ -3,6 +3,7 @@ import { UserRole, ReservationStatus, OrderStatus, PaymentStatus } from '@finowo
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Reservation } from '../entities/reservation.entity';
 import { Order } from '../entities/order.entity';
+import { OrderItem } from '../entities/order-item.entity';
 import { Product } from '../entities/product.entity';
 import { SalaryAdvance, SalaryAdvanceStatus } from '../entities/salary-advance.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
@@ -514,6 +515,165 @@ describe('UsersService', () => {
       expect(summary.commissionEarned).toBe(12); // 40% de $30 = $12
       expect(summary.workItems[0].amount).toBe(30);
       expect(summary.workItems[0].description).toBe('Corte');
+    });
+
+    it('debe calcular la comisión en ventas de Compra-Venta sobre la ganancia neta (precio venta - costo) y no sobre el monto bruto', async () => {
+      const mockAccessVendedor = {
+        userId: 'emp-retail',
+        tenantId: 'tenant-1',
+        compensationType: 'COMISION',
+        commissionPercentage: 20, // 20% sobre la ganancia
+        salaryAmount: 0,
+        user: { id: 'emp-retail', username: 'vendedor_1', name: 'Luis Vendedor' },
+      };
+
+      const retailOrder = {
+        id: 'ord-retail-100',
+        tenantId: 'tenant-1',
+        customerName: 'Cliente Tienda',
+        totalAmount: 100,
+        totalCost: 60,
+        netProfit: 40,
+        employeeId: 'emp-retail',
+        status: OrderStatus.DELIVERED,
+        paymentStatus: PaymentStatus.PAID,
+        createdAt: new Date('2026-10-14T15:00:00.000Z'),
+      };
+
+      const retailItems = [
+        {
+          id: 'item-1',
+          orderId: 'ord-retail-100',
+          productId: 'prod-1',
+          productName: 'Zapatos Deportivos',
+          quantity: 1,
+          unitPrice: 100,
+          unitCost: 60,
+          subtotal: 100,
+          employeeId: null,
+          product: { id: 'prod-1', is_service: false, category: 'Calzado', cost: 60 },
+        },
+      ];
+
+      mockUsersRepo.manager.findOne.mockResolvedValue(mockAccessVendedor);
+
+      const reservationQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+
+      const orderQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([retailOrder]),
+      };
+
+      mockUsersRepo.manager.createQueryBuilder.mockImplementation((entity: any) => {
+        if (entity === Reservation) return reservationQb;
+        return orderQb;
+      });
+
+      mockUsersRepo.manager.find.mockImplementation((entity: any) => {
+        if (entity === OrderItem) return Promise.resolve(retailItems);
+        return Promise.resolve([]);
+      });
+
+      const summary = await service.getPayrollSummary('tenant-1', 'emp-retail');
+
+      expect(summary.ordersCount).toBe(1);
+      expect(summary.ordersTotalBilled).toBe(100);
+      // Ganancia del producto = $100 - $60 = $40 -> 20% de $40 = $8 USD
+      expect(summary.commissionEarned).toBe(8);
+      expect(summary.workItems[0].amount).toBe(100);
+      expect((summary.workItems[0] as any).commissionableAmount).toBe(40);
+      expect(summary.workItems[0].commissionAmount).toBe(8);
+    });
+
+    it('debe atribuir productos de compra-venta sin especialista individual al empleado general de una orden mixta', async () => {
+      const mockAccessCajero = {
+        userId: 'emp-cajero',
+        tenantId: 'tenant-1',
+        compensationType: 'COMISION',
+        commissionPercentage: 10, // 10%
+        salaryAmount: 0,
+        user: { id: 'emp-cajero', username: 'cajero_ventas', name: 'Cajero' },
+      };
+
+      const mixedOrder = {
+        id: 'ord-mixed-1',
+        tenantId: 'tenant-1',
+        customerName: 'Cliente Mixto',
+        totalAmount: 80, // $30 servicio + $50 producto
+        employeeId: 'emp-cajero',
+        status: OrderStatus.DELIVERED,
+        paymentStatus: PaymentStatus.PAID,
+        createdAt: new Date('2026-10-14T16:00:00.000Z'),
+      };
+
+      const mixedItems = [
+        {
+          id: 'it-serv',
+          orderId: 'ord-mixed-1',
+          productId: 's-1',
+          productName: 'Corte',
+          quantity: 1,
+          unitPrice: 30,
+          unitCost: 0,
+          subtotal: 30,
+          employeeId: 'emp-estilista', // Especialista del servicio
+          product: { id: 's-1', is_service: true, category: 'Servicios' },
+        },
+        {
+          id: 'it-prod',
+          orderId: 'ord-mixed-1',
+          productId: 'p-shampoo',
+          productName: 'Shampoo Profesional',
+          quantity: 1,
+          unitPrice: 50,
+          unitCost: 30, // Ganancia = $20
+          subtotal: 50,
+          employeeId: null, // Sin especialista individual -> hereda o.employeeId ('emp-cajero')
+          product: { id: 'p-shampoo', is_service: false, category: 'Productos', cost: 30 },
+        },
+      ];
+
+      mockUsersRepo.manager.findOne.mockResolvedValue(mockAccessCajero);
+
+      const reservationQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+
+      const orderQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([mixedOrder]),
+      };
+
+      mockUsersRepo.manager.createQueryBuilder.mockImplementation((entity: any) => {
+        if (entity === Reservation) return reservationQb;
+        return orderQb;
+      });
+
+      mockUsersRepo.manager.find.mockImplementation((entity: any) => {
+        if (entity === OrderItem) return Promise.resolve(mixedItems);
+        return Promise.resolve([]);
+      });
+
+      const summary = await service.getPayrollSummary('tenant-1', 'emp-cajero');
+
+      expect(summary.ordersCount).toBe(1);
+      expect(summary.ordersTotalBilled).toBe(50); // Solo el Shampoo de $50
+      // Ganancia del Shampoo = $50 - $30 = $20 -> 10% de $20 = $2 USD
+      expect(summary.commissionEarned).toBe(2);
     });
   });
 

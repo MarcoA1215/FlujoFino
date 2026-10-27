@@ -723,53 +723,142 @@ export class UsersService implements OnModuleInit {
       }
     }
 
-    // Pedidos entregados atendidos por el empleado (excluyendo órdenes vinculadas a reservas ya contadas)
+    // Pedidos atendidos por el empleado (entregados o con pagos/abonos registrados, excluyendo anulados)
     const orderQuery = this.usersRepo.manager.createQueryBuilder(Order, 'ord')
       .where('ord.tenantId = :tenantId', { tenantId })
       .andWhere(
         '(CAST(ord.employeeId AS text) = :userId OR EXISTS (SELECT 1 FROM "order_item" oi WHERE oi."orderId" = ord.id AND CAST(oi."employeeId" AS text) = :userId))',
         { tenantId, userId }
       )
-      .andWhere('ord.status = :orderStatus', { orderStatus: OrderStatus.DELIVERED });
+      .andWhere('CAST(ord.status AS text) NOT IN (:...excludedStatuses)', {
+        excludedStatuses: [OrderStatus.CANCELED, OrderStatus.CANCELADO_PROVEEDOR],
+      })
+      .andWhere(
+        '(ord.status = :orderStatus OR ord.paymentStatus IN (:...paidStatuses))',
+        {
+          orderStatus: OrderStatus.DELIVERED,
+          paidStatuses: [PaymentStatus.PAID, PaymentStatus.PARTIAL],
+        }
+      );
 
     if (startDate) {
-      orderQuery.andWhere('ord.createdAt >= :startDateTime', { startDateTime: new Date(`${startDate}T00:00:00.000Z`) });
+      orderQuery.andWhere('ord.createdAt >= :startDateTime', { startDateTime: new Date(`${startDate}T00:00:00.000-04:00`) });
     }
     if (endDate) {
-      orderQuery.andWhere('ord.createdAt <= :endDateTime', { endDateTime: new Date(`${endDate}T23:59:59.999Z`) });
+      orderQuery.andWhere('ord.createdAt <= :endDateTime', { endDateTime: new Date(`${endDate}T23:59:59.999-04:00`) });
     }
     orderQuery.orderBy('ord.createdAt', 'DESC');
     const orders = await orderQuery.getMany();
 
-    const reservationIds = new Set(reservations.map(r => r.id));
-    const standaloneOrders = orders.filter(o => !o.linkedReservationId || !reservationIds.has(o.linkedReservationId));
+    const reservationMap = new Map(reservations.map(r => [r.id, r]));
 
     const relevantStandaloneOrders: Order[] = [];
-    // Auto-curar y calcular montos de órdenes independientes si totalAmount <= 0
-    for (const o of standaloneOrders) {
+    // Auto-curar y calcular montos y ganancia comisionable de órdenes
+    for (const o of orders) {
       try {
+        const linkedRes = o.linkedReservationId ? reservationMap.get(o.linkedReservationId) : undefined;
         const items = await this.usersRepo.manager.find(OrderItem, {
           where: { orderId: o.id },
+          relations: { product: true },
         });
 
-        // Identificar si la orden tiene ítems con especialistas específicos
-        const hasSpecificEmployees = items.some(it => !!it.employeeId);
-        if (hasSpecificEmployees) {
-          const userItems = items.filter(it => it.employeeId === userId);
-          if (userItems.length === 0) {
-            // Este empleado no participó en los ítems de esta orden compartida
+        // Si la orden está vinculada a una reserva ya contada, filtrar solo ítems adicionales de compra-venta
+        let candidateItems = items;
+        if (linkedRes) {
+          if (items.length === 0) {
             continue;
           }
-          const userPortion = userItems.reduce((s, it) => s + (Number(it.subtotal || 0) || (Number(it.quantity || 1) * Number(it.unitPrice || 0))), 0);
-          (o as any).userPortion = userPortion;
-          (o as any).userItemsDescription = userItems.map(it => it.productName || 'Servicio').join(', ');
-        } else if (o.employeeId && o.employeeId !== userId) {
-          // Si la orden no tiene especialistas por ítem y el empleado general es de otra persona, no corresponde
-          continue;
+          const resServiceIds = new Set<string>([
+            ...(linkedRes.serviceId ? String(linkedRes.serviceId).split(',').map((s: string) => s.trim()).filter(Boolean) : []),
+            ...(Array.isArray(linkedRes.serviceSpecialists) ? linkedRes.serviceSpecialists.map(s => s.serviceId).filter(Boolean) : []),
+          ]);
+          const resServiceNames = new Set<string>([
+            ...(linkedRes.serviceName ? String(linkedRes.serviceName).split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean) : []),
+            ...(Array.isArray(linkedRes.serviceSpecialists) ? linkedRes.serviceSpecialists.map(s => (s.serviceName || '').trim().toLowerCase()).filter(Boolean) : []),
+          ]);
+
+          candidateItems = items.filter(it => {
+            const isMatchedById = Boolean(it.productId && resServiceIds.has(it.productId));
+            const isMatchedByName = Boolean(it.productName && resServiceNames.has(it.productName.trim().toLowerCase()));
+            const isService = Boolean(it.product?.is_service || it.product?.category === 'Servicios' || it.product?.durationMinutes);
+            return !isMatchedById && !isMatchedByName && !isService;
+          });
+
+          if (candidateItems.length === 0) {
+            continue;
+          }
+        }
+
+        if (candidateItems.length > 0) {
+          // Cada ítem se atribuye a su especialista específico (it.employeeId) o, si no tiene (compra-venta), al vendedor general de la orden (o.employeeId)
+          const userItems = candidateItems.filter(it => (it.employeeId || o.employeeId) === userId);
+          if (userItems.length === 0) {
+            continue;
+          }
+
+          let userPortion = 0;
+          let userCommissionablePortion = 0;
+
+          for (const it of userItems) {
+            const itemSale = Number(it.subtotal || 0) || (Number(it.quantity || 1) * Number(it.unitPrice || 0));
+            userPortion += itemSale;
+
+            const isServiceItem = Boolean(
+              it.product?.is_service ||
+              it.product?.category === 'Servicios' ||
+              it.product?.durationMinutes
+            );
+
+            if (isServiceItem) {
+              userCommissionablePortion += itemSale;
+            } else {
+              const unitCost = Number(it.unitCost ?? it.product?.cost ?? it.product?.estimatedCost ?? 0);
+              const itemCost = unitCost * Number(it.quantity || 1);
+              if (itemCost > 0) {
+                userCommissionablePortion += Math.max(0, itemSale - itemCost);
+              } else if (
+                !linkedRes &&
+                userItems.length === items.length &&
+                (Number(o.totalCost || 0) > 0 || (o.netProfit !== undefined && o.netProfit !== null && Number(o.netProfit) > 0 && Number(o.netProfit) < Number(o.totalAmount || 0)))
+              ) {
+                const orderProfit = (o.netProfit !== undefined && o.netProfit !== null && Number(o.netProfit) > 0)
+                  ? Number(o.netProfit)
+                  : Math.max(0, Number(o.totalAmount || itemSale) - Number(o.deliveryFee || 0) - Number(o.totalCost || 0));
+                const totalItemsSale = items.reduce((s, x) => s + (Number(x.subtotal || 0) || (Number(x.quantity || 1) * Number(x.unitPrice || 0))), 0) || 1;
+                userCommissionablePortion += Number(((itemSale / totalItemsSale) * orderProfit).toFixed(2));
+              } else {
+                userCommissionablePortion += itemSale;
+              }
+            }
+          }
+
+          if (!linkedRes && userItems.length === items.length && Number(o.discountAmount || 0) > 0) {
+            const discount = Number(o.discountAmount || 0);
+            userPortion = Math.max(0, userPortion - discount);
+            userCommissionablePortion = Math.max(0, userCommissionablePortion - discount);
+          }
+
+          (o as any).userPortion = Number(userPortion.toFixed(2));
+          (o as any).userCommissionablePortion = Number(userCommissionablePortion.toFixed(2));
+          (o as any).userItemsDescription = userItems.map(it => it.productName || 'Producto').join(', ');
+        } else {
+          if (o.employeeId && o.employeeId !== userId) {
+            continue;
+          }
+          const fullSale = Number(o.totalAmount || 0);
+          let commBase = fullSale;
+          if (Number(o.totalCost || 0) > 0) {
+            commBase = (o.netProfit !== undefined && o.netProfit !== null && Number(o.netProfit) >= 0)
+              ? Number(o.netProfit)
+              : Math.max(0, fullSale - Number(o.deliveryFee || 0) - Number(o.totalCost || 0));
+          } else if (o.netProfit !== undefined && o.netProfit !== null && Number(o.netProfit) > 0 && Number(o.netProfit) < fullSale) {
+            commBase = Number(o.netProfit);
+          }
+          (o as any).userCommissionablePortion = Number(commBase.toFixed(2));
         }
 
         let oAmount = Number(o.totalAmount || 0);
-        if (oAmount <= 0) {
+        if (oAmount <= 0 && items.length > 0) {
           const itemsSum = items.reduce((s, it) => s + (Number(it.subtotal || 0) || (Number(it.quantity || 1) * Number(it.unitPrice || 0))), 0);
           if (itemsSum > 0) {
             o.totalAmount = itemsSum;
@@ -783,9 +872,11 @@ export class UsersService implements OnModuleInit {
       }
     }
 
-    // Determinar cobros efectivos y montos pendientes por cobrar
+    // Determinar cobros efectivos, montos pendientes por cobrar y bases comisionables
     let totalPaidBilled = 0;
     let totalPendingBilled = 0;
+    let totalPaidCommissionableBase = 0;
+    let totalPendingCommissionableBase = 0;
 
     const processedReservations = reservations.map(r => {
       const fullAmt = Number(r.totalAmount || 0);
@@ -809,6 +900,8 @@ export class UsersService implements OnModuleInit {
       const pending = Math.max(0, amt - paid);
       totalPaidBilled += paid;
       totalPendingBilled += pending;
+      totalPaidCommissionableBase += paid;
+      totalPendingCommissionableBase += pending;
       return {
         ...r,
         userBilledAmount: amt,
@@ -823,6 +916,9 @@ export class UsersService implements OnModuleInit {
       const fullAmt = Number(o.totalAmount || 0);
       const isCustomUser = (o as any).userPortion !== null && (o as any).userPortion !== undefined;
       const amt = isCustomUser ? Number((o as any).userPortion) : fullAmt;
+      const commBase = (o as any).userCommissionablePortion !== null && (o as any).userCommissionablePortion !== undefined
+        ? Number((o as any).userCommissionablePortion)
+        : amt;
 
       const isPaid = o.paymentStatus === PaymentStatus.PAID || (!o.paymentStatus && o.status === OrderStatus.DELIVERED);
       const abono = Number(o.abonosTotal || 0);
@@ -839,13 +935,28 @@ export class UsersService implements OnModuleInit {
         }
       }
       const pending = Math.max(0, amt - paid);
+
+      let paidCommBase = 0;
+      if (isPaid) {
+        paidCommBase = commBase;
+      } else if (paid > 0 && amt > 0) {
+        paidCommBase = Number((commBase * (paid / amt)).toFixed(2));
+      }
+      const pendingCommBase = Math.max(0, Number((commBase - paidCommBase).toFixed(2)));
+
       totalPaidBilled += paid;
       totalPendingBilled += pending;
+      totalPaidCommissionableBase += paidCommBase;
+      totalPendingCommissionableBase += pendingCommBase;
+
       return {
         ...o,
         userBilledAmount: amt,
+        calcCommissionableBase: commBase,
         calcPaid: paid,
         calcPending: pending,
+        calcPaidCommissionable: paidCommBase,
+        calcPendingCommissionable: pendingCommBase,
         isPaidEffective: isPaid,
         calcPaymentStatus: isPaid ? 'PAID' : (paid > 0 ? 'PARTIAL' : 'PENDING'),
       };
@@ -858,14 +969,14 @@ export class UsersService implements OnModuleInit {
     totalPendingBilled = Number(totalPendingBilled.toFixed(2));
     const totalBilled = Number((totalPaidBilled + totalPendingBilled).toFixed(2));
 
-    // Comisión liquidable a pagar: SOLO sobre trabajos cobrados
+    // Comisión liquidable a pagar: SOLO sobre trabajos cobrados (en Compra-Venta sobre ganancia neta; en Servicios sobre monto cobrado)
     let commissionEarned = 0;
     // Comisión por cobrar: trabajos completados pero aún no pagados por el cliente
     let pendingCommission = 0;
 
     if (compensationType === 'COMISION' || compensationType === 'MIXTO') {
-      commissionEarned = Number(((totalPaidBilled * (commissionPercentage || 0)) / 100).toFixed(2));
-      pendingCommission = Number(((totalPendingBilled * (commissionPercentage || 0)) / 100).toFixed(2));
+      commissionEarned = Number(((totalPaidCommissionableBase * (commissionPercentage || 0)) / 100).toFixed(2));
+      pendingCommission = Number(((totalPendingCommissionableBase * (commissionPercentage || 0)) / 100).toFixed(2));
     }
 
     let baseSalary = 0;
@@ -914,11 +1025,12 @@ export class UsersService implements OnModuleInit {
         client: o.customerName || 'Cliente',
         description: (o as any).userItemsDescription ? `Pedido #${o.id.substring(0, 6)} (${(o as any).userItemsDescription})` : `Pedido #${o.id.substring(0, 6)}`,
         amount: Number(o.userBilledAmount !== undefined ? o.userBilledAmount : (o.totalAmount || 0)),
+        commissionableAmount: o.calcCommissionableBase,
         paidAmount: o.calcPaid,
         pendingAmount: o.calcPending,
         isPaid: o.isPaidEffective,
         paymentStatus: o.calcPaymentStatus,
-        commissionAmount: Number(((o.calcPaid * (commissionPercentage || 0)) / 100).toFixed(2)),
+        commissionAmount: Number(((o.calcPaidCommissionable * (commissionPercentage || 0)) / 100).toFixed(2)),
       })),
     ].sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
 

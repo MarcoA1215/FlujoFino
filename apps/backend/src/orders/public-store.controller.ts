@@ -187,9 +187,12 @@ export class PublicStoreController {
         companyCopBank: settings?.companyCopBank || '',
         companyCopAccountNumber: settings?.companyCopAccountNumber || '',
         companyCopAccountHolder: settings?.companyCopAccountHolder || '',
+        companyCopAccountType: settings?.companyCopAccountType || 'AHORROS',
+        companyCopCedula: settings?.companyCopCedula || '',
         binancePayId: settings?.binancePayId || '',
         binanceEmail: settings?.binanceEmail || '',
         acceptCashUsd: settings?.acceptCashUsd !== false,
+        acceptCashBs: settings?.acceptCashBs !== false,
         acceptPagoMovil: settings?.acceptPagoMovil !== false,
         acceptCardPos: settings?.acceptCardPos === true,
         acceptBinance: settings?.acceptBinance === true,
@@ -381,6 +384,7 @@ export class PublicStoreController {
       employeeId: undefined,
       driverId: undefined,
       deliveryUserId: undefined,
+      strictStockCheck: !hasPreorder && !hasUnderDemand,
     };
 
     const createdOrder = await this.ordersService.createOrder(tenantId, orderPayload);
@@ -473,26 +477,31 @@ export class PublicStoreController {
     return this.formatOrderResponse(order);
   }
 
-  @Throttle({ default: { limit: 6, ttl: 60000 } })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('order/:orderId/payment')
   async reportOrderPayment(
     @Param('orderId') orderId: string,
     @Body() dto: {
-      amount: number;
+      amount?: number;
       amountBs?: number;
       amountCop?: number;
       method: string;
-      reference: string;
+      reference?: string;
       bank?: string;
       notes?: string;
       paymentProofUrl?: string;
     }
   ) {
-    if (!dto.amount || Number(dto.amount) <= 0) {
-      throw new BadRequestException('El monto reportado debe ser mayor a 0');
-    }
-    if (!dto.reference || !dto.reference.trim()) {
-      throw new BadRequestException('Por favor, ingresa el número de referencia del comprobante');
+    const cleanMethod = (dto.method || 'PAGO_MOVIL').toUpperCase();
+    const isCoordinationOrCashMethod = ['USD', 'CASH_USD', 'CASH_COP', 'WHATSAPP', 'PENDING'].includes(cleanMethod);
+
+    if (!isCoordinationOrCashMethod) {
+      if (!dto.amount || Number(dto.amount) <= 0) {
+        throw new BadRequestException('El monto reportado debe ser mayor a 0');
+      }
+      if (!dto.reference || !dto.reference.trim()) {
+        throw new BadRequestException('Por favor, ingresa el número de referencia del comprobante');
+      }
     }
 
     const order = await this.findOrderByIdOrPrefix(orderId);
@@ -504,8 +513,23 @@ export class PublicStoreController {
       throw new BadRequestException('No se pueden reportar pagos para un pedido cancelado');
     }
 
-    const cleanRef = dto.reference.trim();
-    const cleanMethod = (dto.method || 'PAGO_MOVIL').toUpperCase();
+    if (isCoordinationOrCashMethod) {
+      order.paymentMethod = cleanMethod === 'CASH_USD' ? 'USD' : cleanMethod;
+      if (dto.notes && dto.notes.trim()) {
+        const cleanNotes = dto.notes.trim();
+        if (!order.notes || !order.notes.includes(cleanNotes)) {
+          order.notes = order.notes ? `${order.notes} | ${cleanNotes}` : cleanNotes;
+        }
+      }
+      const savedOrder = await this.orderRepo.save(order);
+      return {
+        success: true,
+        message: 'Método de pago confirmado con éxito.',
+        ...this.formatOrderResponse(savedOrder),
+      };
+    }
+
+    const cleanRef = (dto.reference || '').trim();
     const cleanBank = dto.bank ? dto.bank.trim() : undefined;
 
     const paymentEntry = {
@@ -522,6 +546,7 @@ export class PublicStoreController {
       status: 'REPORTED_PENDING_APPROVAL',
     };
 
+    order.paymentMethod = cleanMethod;
     order.abonosHistory = Array.isArray(order.abonosHistory) ? order.abonosHistory : [];
     order.abonosHistory.push(paymentEntry);
     order.abonosTotal = Math.round(((Number(order.abonosTotal || 0) + Number(dto.amount)) * 100)) / 100;

@@ -8,6 +8,8 @@ export type ProductVariant = {
   cost?: number | null;
   salePrice?: number | null;
   images?: string[];
+  isTaxExempt?: boolean;
+  taxRate?: number;
 };
 
 export type Product = {
@@ -37,6 +39,8 @@ export type Product = {
   isSupplierPreorder?: boolean;
   hasVariants?: boolean;
   variants?: ProductVariant[];
+  isTaxExempt?: boolean;
+  taxRate?: number;
 };
 
 export type RawMaterial = {
@@ -74,6 +78,9 @@ export type OrderItem = {
   removedIngredients?: string[];
   addedExtras?: OrderItemExtra[];
   hasModifications?: boolean;
+  isTaxExempt?: boolean;
+  taxRate?: number;
+  taxAmount?: number;
 };
 
 export type RecipeItem = {
@@ -100,6 +107,7 @@ export type MonthlySummary = {
   monthLabel: string;
   currencySymbol?: string;
   exchangeRate?: number;
+  exchangeRateCop?: number;
   invoicedRevenue: number;
   collectedRevenue: number;
   pendingReceivable: number;
@@ -113,16 +121,24 @@ export type MonthlySummary = {
   ordersCount: number;
   paidOrdersCount: number;
   pendingOrdersCount?: number;
+  unpaidBookingsCount?: number;
+  unpaidBookingsAmount?: number;
   byMethod?: Record<string, number>;
   breakdown?: {
     cashUSD: number;
     digitalUSD: number;
+    cashBs?: number;
+    cashBsUSD?: number;
     pagoMovilBs: number;
     pagoMovilUSD: number;
     puntoBs: number;
     puntoUSD: number;
     transferBs: number;
     transferUSD: number;
+    cashCop?: number;
+    cashCopUSD?: number;
+    bankCop?: number;
+    bankCopUSD?: number;
   };
 };
 
@@ -170,15 +186,26 @@ export type TreasurySummary = {
   cashUSD: number;
   digitalUSD?: number;
   bankBs: number;
+  cashBs?: number;
+  cashCop?: number;
+  bankCop?: number;
   initialCashUSD?: number;
   initialBankBs?: number;
+  initialCashBs?: number;
   initialDigitalUSD?: number;
+  initialCashCop?: number;
+  initialBankCop?: number;
   puntoBs: number;
   pagoMovilBs: number;
   transferBs: number;
   exchangeRate: number;
+  exchangeRateCop?: number;
+  enableCopCurrency?: boolean;
   currencySymbol: string;
   bankBsEquivalentUSD: number;
+  cashBsEquivalentUSD?: number;
+  copEquivalentUSD?: number;
+  bankCopEquivalentUSD?: number;
   totalRealUSD: number;
   totalExchangedUSD: number;
   totalExchangedBs: number;

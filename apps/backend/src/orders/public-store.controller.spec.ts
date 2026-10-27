@@ -120,6 +120,71 @@ describe('PublicStoreController', () => {
       expect(passedPayload.changeRef).toBeUndefined();
       expect(passedPayload.discountAmount).toBe(0);
       expect(passedPayload.initialAbono).toBeUndefined();
+      expect(passedPayload.strictStockCheck).toBe(true);
+    });
+  });
+
+  describe('reportOrderPayment (Confirmación de pago tras apartado de stock)', () => {
+    it('debe permitir confirmar pago en efectivo USD con vuelto una vez apartados los productos sin exigir referencia bancaria', async () => {
+      const orderMock: any = {
+        id: '3a4b5c6d-1111-2222-3333-444455556666',
+        tenantId: '00000000-0000-0000-0000-000000000001',
+        status: OrderStatus.PENDING,
+        paymentStatus: PaymentStatus.PENDING,
+        paymentMethod: 'PENDING',
+        customerName: 'Cliente Diciembre',
+        customerPhone: '04141112233',
+        totalAmount: 15,
+        amountBs: 750,
+        notes: 'Cédula: V-12345678',
+        items: [],
+      };
+      mockOrderRepo.findOne.mockResolvedValue(orderMock);
+      mockOrderRepo.save.mockImplementation((o: any) => Promise.resolve(o));
+
+      const res = await controller.reportOrderPayment(orderMock.id, {
+        amount: 15,
+        method: 'USD',
+        notes: 'MÉTODO: Divisas Efectivo (USD) | Paga con: $20.00 | Vuelto a recibir: $5.00',
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.paymentMethod).toBe('USD');
+      expect(res.notes).toContain('Vuelto a recibir: $5.00');
+    });
+
+    it('debe registrar comprobante de Pago Móvil con referencia y banco sobre la orden ya apartada', async () => {
+      const orderMock: any = {
+        id: '3a4b5c6d-1111-2222-3333-444455556666',
+        tenantId: '00000000-0000-0000-0000-000000000001',
+        status: OrderStatus.PENDING,
+        paymentStatus: PaymentStatus.PENDING,
+        paymentMethod: 'PENDING',
+        customerName: 'Cliente Diciembre',
+        customerPhone: '04141112233',
+        totalAmount: 15,
+        amountBs: 750,
+        notes: '',
+        abonosTotal: 0,
+        abonosHistory: [],
+        items: [],
+      };
+      mockOrderRepo.findOne.mockResolvedValue(orderMock);
+      mockOrderRepo.save.mockImplementation((o: any) => Promise.resolve(o));
+
+      const res = await controller.reportOrderPayment(orderMock.id, {
+        amount: 15,
+        amountBs: 750,
+        method: 'PAGO_MOVIL',
+        reference: '987654',
+        bank: 'Banesco',
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.paymentMethod).toBe('PAGO_MOVIL');
+      expect(res.paymentReported).toBe(true);
+      expect(res.pagoMovilRef).toBe('987654');
+      expect(res.abonosTotal).toBe(15);
     });
   });
 

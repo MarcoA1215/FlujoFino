@@ -27,8 +27,10 @@ import { getPublicBaseUrl } from '../utils/public-url';
 import { getContrastColor, ensureReadableColor, applyThemeToDom, resetToDefaultTheme } from '../utils/colors';
 import { normalizeCedula, analyzeCedulaInput, type CedulaPrefix } from '../utils/cedula';
 import { formatTime12h } from '../utils/time';
+import { getBaseURL } from '../api/client';
+import { FinoImageCarousel } from '../components/ui';
 
-const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const apiBase = getBaseURL();
 
 export const formatDateLocal = (d: Date): string => {
   const year = d.getFullYear();
@@ -1281,15 +1283,37 @@ const PublicBooking: React.FC = () => {
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                               {svc.image ? (
-                                <img 
-                                  src={svc.image} 
-                                  alt={svc.name} 
-                                  onClick={(e) => { e.stopPropagation(); openImage(svc.image, svc.name); }}
-                                  title="Toca para ver en grande"
-                                  style={{ width: '54px', height: '54px', borderRadius: '10px', objectFit: 'cover', cursor: 'zoom-in', border: '1px solid #E2E8F0' }} 
-                                />
+                                <div style={{ position: 'relative', width: '54px', height: '54px', flexShrink: 0 }}>
+                                  <img 
+                                    src={svc.image} 
+                                    alt={svc.name} 
+                                    onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      const allImgs = Array.isArray(svc.images) && svc.images.length > 0 ? svc.images : [svc.image];
+                                      openImage(allImgs, svc.name, 0); 
+                                    }}
+                                    title="Toca para ver en grande"
+                                    style={{ width: '54px', height: '54px', borderRadius: '10px', objectFit: 'cover', cursor: 'zoom-in', border: '1px solid #E2E8F0', display: 'block' }} 
+                                  />
+                                  {Array.isArray(svc.images) && svc.images.length > 1 && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      bottom: '2px',
+                                      right: '2px',
+                                      backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                                      color: '#ffffff',
+                                      fontSize: '9px',
+                                      fontWeight: 800,
+                                      padding: '1px 4px',
+                                      borderRadius: '4px',
+                                      lineHeight: 1,
+                                    }}>
+                                      {svc.images.length}
+                                    </div>
+                                  )}
+                                </div>
                               ) : (
-                                <div style={{ width: '54px', height: '54px', borderRadius: '10px', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '20px' }}>
+                                <div style={{ width: '54px', height: '54px', borderRadius: '10px', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '20px', flexShrink: 0 }}>
                                   ✨
                                 </div>
                               )}
@@ -2815,31 +2839,30 @@ const PublicBooking: React.FC = () => {
               })
               .map(item => (
                 <IonCard key={item.id} style={{ margin: 0, padding: 0, borderRadius: '12px', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                  <div style={{ position: 'relative' }}>
-                    <img 
-                      src={item.url} 
-                      style={{ width: '100%', height: '150px', objectFit: 'cover', cursor: 'zoom-in', display: 'block' }} 
-                      alt={item.title} 
-                      onClick={() => openImage(item.url, `${item.title}${item.subtitle ? ' - ' + item.subtitle : ''}`)}
-                      title="Toca para ver en grande"
-                    />
-                    <div style={{
-                      position: 'absolute',
-                      top: '8px',
-                      left: '8px',
-                      backgroundColor: item.type === 'service' ? 'rgba(37, 99, 235, 0.92)' : 'rgba(5, 150, 105, 0.92)',
-                      color: '#ffffff',
-                      fontSize: '10px',
-                      fontWeight: '700',
-                      padding: '3px 8px',
-                      borderRadius: '6px',
-                      backdropFilter: 'blur(4px)',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                      zIndex: 2,
-                    }}>
-                      {item.type === 'service' ? '💅 Servicio Disponible' : '✨ Trabajo Realizado'}
-                    </div>
-                  </div>
+                  <FinoImageCarousel
+                    images={item.images && item.images.length > 0 ? item.images : [item.url].filter(Boolean)}
+                    alt={item.title}
+                    height="160px"
+                    borderRadius="12px 12px 0 0"
+                    onImageClick={(index) => {
+                      const allImgs = item.images && item.images.length > 0 ? item.images : [item.url].filter(Boolean);
+                      openImage(allImgs, `${item.title}${item.subtitle ? ' - ' + item.subtitle : ''}`, index);
+                    }}
+                    badge={
+                      <div style={{
+                        backgroundColor: item.type === 'service' ? 'rgba(37, 99, 235, 0.92)' : 'rgba(5, 150, 105, 0.92)',
+                        color: '#ffffff',
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        backdropFilter: 'blur(4px)',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      }}>
+                        {item.type === 'service' ? '💅 Servicio Disponible' : '✨ Trabajo Realizado'}
+                      </div>
+                    }
+                  />
                   <IonCardContent style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
                       <h3 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#1e293b', lineHeight: '1.3' }}>{item.title}</h3>

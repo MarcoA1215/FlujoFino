@@ -101,6 +101,8 @@ export interface ProductVariantDTO {
   cost?: number;
   salePrice?: number;
   images?: string[];
+  isTaxExempt?: boolean;
+  taxRate?: number;
 }
 
 export interface ProductDTO {
@@ -128,6 +130,8 @@ export interface ProductDTO {
   isSupplierPreorder?: boolean;
   hasVariants?: boolean;
   variants?: ProductVariantDTO[];
+  isTaxExempt?: boolean;
+  taxRate?: number;
 }
 
 export interface OrderItemDTO {
@@ -145,6 +149,9 @@ export interface OrderItemDTO {
   removedIngredients?: string[];
   addedExtras?: OrderItemExtra[];
   hasModifications?: boolean;
+  isTaxExempt?: boolean;
+  taxRate?: number;
+  taxAmount?: number;
 }
 
 export interface OrderDTO {
@@ -160,6 +167,9 @@ export interface OrderDTO {
   deliveryZoneId?: string;
   deliveryFee?: number;
   totalAmount: number;
+  subtotalExempt?: number;
+  taxableBase?: number;
+  taxAmount?: number;
   customerId?: string;
   identification?: string;
   requestedDeliveryDate?: string | Date;
@@ -177,6 +187,7 @@ export interface OrderDTO {
   items: OrderItemDTO[];
   paymentMethod?: string;
   usdReceived?: number;
+  bsReceived?: number;
   changeAmount?: number;
   changeAmountBs?: number;
   changeMethod?: string;
@@ -348,6 +359,15 @@ export interface SettingsDTO {
   companyPhone?: string;
   companyAccountNumber?: string;
   companyAccountHolder?: string;
+  enableCopCurrency?: boolean;
+  exchangeRateCop?: number;
+  exchangeRateCopMode?: 'AUTO' | 'MANUAL';
+  manualExchangeRateCop?: number | null;
+  companyCopBank?: string;
+  companyCopAccountNumber?: string;
+  companyCopAccountHolder?: string;
+  companyCopAccountType?: string;
+  companyCopCedula?: string;
   binancePayId?: string;
   binanceEmail?: string;
   binancePhone?: string;
@@ -356,10 +376,19 @@ export interface SettingsDTO {
   allowCashierBypassDeposit?: boolean;
   abonoDefaultDueDays?: number;
   acceptCashUsd?: boolean;
+  acceptCashBs?: boolean;
   acceptPagoMovil?: boolean;
   acceptCardPos?: boolean;
   acceptBinance?: boolean;
   acceptTransfer?: boolean;
+  acceptCashCop?: boolean;
+  acceptTransferCop?: boolean;
+  initialCashUSD?: number;
+  initialBankBs?: number;
+  initialCashBs?: number;
+  initialDigitalUSD?: number;
+  initialCashCop?: number;
+  initialBankCop?: number;
   featureCustomerSchedules?: boolean;
   featureRecipes?: boolean;
   featureBuySell?: boolean;
@@ -376,6 +405,13 @@ export interface SettingsDTO {
   themeHeaderColor?: string;
   allowNegativeStock?: boolean;
   publicToken?: string;
+  featureFiscalSupport?: boolean;
+  fiscalDefaultTaxRate?: number;
+  fiscalRif?: string;
+  fiscalCompanyName?: string;
+  fiscalAddress?: string;
+  fiscalPhone?: string;
+  fiscalMode?: 'INTERNAL' | 'UNIDIGITAL';
 }
 
 export enum TenantStatus {
@@ -414,6 +450,8 @@ export interface SaaSPaymentReportDTO {
   status: SaaSPaymentStatus;
   rejectReason?: string;
   months?: number;
+  subtotal?: number;
+  ivaAmount?: number;
   createdAt: string;
 }
 
@@ -438,6 +476,9 @@ export interface SuperAdminTenantDTO {
   trialDaysLeft: number;
   activeReferrals: number;
   discountPercentage: number;
+  subtotalFee?: number;
+  ivaPercentage?: number;
+  ivaAmount?: number;
   finalFee: number;
 }
 
@@ -459,6 +500,9 @@ export interface MySubscriptionDTO {
   activeReferrals: number;
   totalReferrals: number;
   discountPercentage: number;
+  subtotalFee?: number;
+  ivaPercentage?: number;
+  ivaAmount?: number;
   finalFee: number;
   trialDaysLeft: number;
   daysLeft?: number;
@@ -528,14 +572,27 @@ export interface PromoterCommissionDTO {
   createdAt: string;
 }
 
+export type PromoterReferralSubStatus = 'ACTIVE' | 'PAST_DUE' | 'TRIAL' | 'INACTIVE';
+
 export interface PromoterAffiliatedTenantDTO {
   tenantId: string;
   tenantName: string;
   status: TenantStatus;
+  subStatus: PromoterReferralSubStatus;
+  subStatusLabel: string;
   planType: TenantPlanType;
   createdAt: string;
+  trialEndsAt?: string | null;
   currentPeriodEndsAt?: string | null;
+  daysRemaining?: number | null;
+  daysOverdue?: number | null;
+  ownerName?: string | null;
+  ownerEmail?: string | null;
+  ownerPhone?: string | null;
   totalCommissionsUSD: number;
+  monthlyCommissionsUSD?: number;
+  paidCommissionsUSD?: number;
+  pendingCommissionsUSD?: number;
   activationCommission?: PromoterCommissionDTO | null;
   recurringCommissionsCount: number;
   recurringCommissionsUSD: number;
@@ -543,17 +600,30 @@ export interface PromoterAffiliatedTenantDTO {
 
 export interface PromoterStatsDTO {
   promoterId: string;
+  promoterName?: string;
   code: string;
   currentRank: PromoterRank;
   rankEmoji: string;
   monthlyActivations: number;
+  activeClientsCount: number;
+  pastDueClientsCount: number;
+  trialClientsCount: number;
+  inactiveClientsCount: number;
+  commissionPercentage: number;
+  termsAccepted: boolean;
+  termsAcceptedAt?: string | null;
   rankBonusUSD: number;
   nextRank?: {
     rank: PromoterRank;
     rankEmoji: string;
     activationsNeeded: number;
+    clientsNeeded?: number;
+    targetPercentage?: number;
     bonusUSD: number;
   } | null;
+  monthlyEarnedUSD?: number;
+  monthlyPaidUSD?: number;
+  monthlyPendingUSD?: number;
   totalActivationCommissionsUSD: number;
   totalRecurringCommissionsUSD: number;
   totalCommissionsEarnedUSD: number;
@@ -571,6 +641,10 @@ export interface SuperAdminPromoterDTO {
   phone?: string | null;
   code: string;
   isActive: boolean;
+  termsAccepted: boolean;
+  termsAcceptedAt?: string | null;
+  activeClientsCount: number;
+  commissionPercentage: number;
   pagoMovilPhone?: string | null;
   pagoMovilCedula?: string | null;
   pagoMovilBank?: string | null;
@@ -583,6 +657,7 @@ export interface SuperAdminPromoterDTO {
   paidBalanceUSD: number;
   totalCommissionsUSD: number;
   commissions: PromoterCommissionDTO[];
+  affiliatedTenants?: PromoterAffiliatedTenantDTO[];
   createdAt: string;
 }
 
@@ -598,7 +673,197 @@ export interface CreatePromoterDTO {
   binancePayId?: string;
 }
 
+export enum FiscalDocumentType {
+  INVOICE = 'INVOICE',
+  CREDIT_NOTE = 'CREDIT_NOTE',
+  DEBIT_NOTE = 'DEBIT_NOTE',
+}
 
+export enum FiscalInvoiceStatus {
+  DRAFT = 'DRAFT',
+  PENDING_FISCAL = 'PENDING_FISCAL',
+  ISSUED = 'ISSUED',
+  REJECTED = 'REJECTED',
+  CANCELED = 'CANCELED',
+}
 
+export enum FiscalProviderType {
+  INTERNAL = 'INTERNAL',
+  UNIDIGITAL = 'UNIDIGITAL',
+}
+
+export interface FiscalInvoiceItemDTO {
+  id?: string;
+  productId?: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  isTaxExempt: boolean;
+  isExempt?: boolean;
+  taxRate: number;
+  taxAmount: number;
+  subtotal: number;
+}
+
+export interface FiscalInvoiceDTO {
+  id: string;
+  tenantId: string;
+  orderId?: string | null;
+  documentType: FiscalDocumentType;
+  provider: FiscalProviderType;
+  status: FiscalInvoiceStatus;
+  invoiceNumber: string;
+  fiscalControlNumber?: string | null;
+  series?: string | null;
+  customerName: string;
+  customerRif: string;
+  customerAddress?: string | null;
+  customerPhone?: string | null;
+  subtotalExempt: number;
+  taxableBase: number;
+  taxRate: number;
+  taxAmount: number;
+  totalAmount: number;
+  amountBs: number;
+  exchangeRate: number;
+  externalGuid?: string | null;
+  qrCodeUrl?: string | null;
+  pdfUrl?: string | null;
+  rejectionReason?: string | null;
+  items?: FiscalInvoiceItemDTO[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IssueFiscalInvoiceDTO {
+  orderId?: string;
+  customerName?: string;
+  customerRif?: string;
+  customerAddress?: string;
+  customerPhone?: string;
+}
+
+export type AppUpdateChangeType = 'ADDED' | 'IMPLEMENTED' | 'FIXED' | 'REMOVED';
+
+export interface AppUpdateItem {
+  type: AppUpdateChangeType;
+  text: string;
+}
+
+export interface AppUpdateDTO {
+  id: string;
+  title: string;
+  version?: string | null;
+  summary?: string | null;
+  changes: AppUpdateItem[];
+  isPublished: boolean;
+  publishedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAppUpdateDTO {
+  title: string;
+  version?: string;
+  summary?: string;
+  changes: AppUpdateItem[];
+  isPublished?: boolean;
+}
+
+export interface UpdateAppUpdateDTO {
+  title?: string;
+  version?: string;
+  summary?: string;
+  changes?: AppUpdateItem[];
+  isPublished?: boolean;
+}
+
+export enum PlatformExpenseType {
+  OPERATING = 'OPERATING',             // Servidores, hosting, herramientas operativas (OPEX)
+  INVESTMENT = 'INVESTMENT',           // Publicidad, marketing, equipamiento, desarrollo (CAPEX)
+  OWNER_PAYOUT = 'OWNER_PAYOUT',       // Pago o retiro de utilidades al dueño/fundador
+  TAX_SENIAT = 'TAX_SENIAT',           // Pago de impuestos / IVA al SENIAT
+  PROMOTER_PAYOUT = 'PROMOTER_PAYOUT', // Liquidación de comisiones a promotores
+}
+
+export enum PlatformExpenseCategory {
+  SERVIDORES = 'SERVIDORES',
+  DOMINIOS_APIS = 'DOMINIOS_APIS',
+  PUBLICIDAD_MARKETING = 'PUBLICIDAD_MARKETING',
+  DESARROLLO_TECNOLOGIA = 'DESARROLLO_TECNOLOGIA',
+  EQUIPAMIENTO = 'EQUIPAMIENTO',
+  RETIRO_DUEÑO = 'RETIRO_DUEÑO',
+  SENIAT_IVA = 'SENIAT_IVA',
+  COMISION_PROMOTOR = 'COMISION_PROMOTOR',
+  OTRO = 'OTRO',
+}
+
+export interface PlatformExpenseDTO {
+  id: string;
+  type: PlatformExpenseType;
+  category: string;
+  description: string;
+  amount: number;
+  amountBs?: number | null;
+  exchangeRate?: number | null;
+  paymentMethod: string;
+  reference?: string | null;
+  expenseDate: string;
+  taxPeriod?: string | null;
+  promoterId?: string | null;
+  promoterName?: string | null;
+  createdAt: string;
+}
+
+export interface CreatePlatformExpenseDTO {
+  type: PlatformExpenseType;
+  category: string;
+  description: string;
+  amount: number;
+  amountBs?: number;
+  exchangeRate?: number;
+  paymentMethod?: string;
+  reference?: string;
+  expenseDate?: string;
+  taxPeriod?: string;
+  promoterId?: string;
+}
+
+export interface RecordSeniatTaxPaymentDTO {
+  amount: number;
+  amountBs?: number;
+  exchangeRate?: number;
+  taxPeriod: string;
+  reference: string;
+  paymentMethod?: string;
+  notes?: string;
+  paymentDate?: string;
+}
+
+export interface SuperAdminFinanceMetricsDTO {
+  // Ingresos
+  grossRevenueUSD: number;
+  totalIVACollectedUSD: number;
+  netRevenueUSD: number;
+
+  // Impuestos (SENIAT)
+  totalIVAPaidSeniatUSD: number;
+  pendingIVASeniatUSD: number;
+
+  // Deuda y pagos con promotores
+  totalPromotersDebtUSD: number;
+  totalPromotersPaidUSD: number;
+
+  // Salidas del SaaS
+  totalOperatingExpensesUSD: number;
+  totalInvestmentUSD: number;
+  totalOwnerPayoutsUSD: number;
+  totalPromoterPayoutsUSD: number;
+  totalExpensesUSD: number;
+
+  // Caja y Utilidad
+  netOperatingProfitUSD: number;
+  availableCashUSD: number;
+}
 
 export * from './banks';

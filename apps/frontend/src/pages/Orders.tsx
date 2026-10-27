@@ -31,6 +31,7 @@ import { AuthContext } from '../context/AuthContext';
 import AppHeader from '../components/AppHeader';
 import { formatWhatsAppUrl } from '../utils/whatsapp';
 import { formatTime12h } from '../utils/time';
+import { FiscalReceiptModal } from '../components/FiscalReceiptModal';
 
 type OrderItem = {
   id: string;
@@ -110,6 +111,13 @@ type Order = {
   paymentProofUrl?: string;
   paymentRejectedReason?: string;
   linkedReservationId?: string;
+  fiscalInvoiceId?: string;
+  fiscalInvoiceNumber?: string;
+  fiscalControlNumber?: string;
+  fiscalStatus?: string;
+  subtotalExempt?: number;
+  taxableBase?: number;
+  taxAmount?: number;
 };
 
 const Orders: React.FC = () => {
@@ -183,6 +191,112 @@ const Orders: React.FC = () => {
       console.error(e);
       presentToast({ message: 'Error aprobando pago: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
     }
+  };
+
+  // Estados y acciones para Facturación Fiscal SENIAT
+  const [activeFiscalReceipt, setActiveFiscalReceipt] = useState<any | null>(null);
+  const [showFiscalReceiptModal, setShowFiscalReceiptModal] = useState<boolean>(false);
+  const [isEmittingFiscal, setIsEmittingFiscal] = useState<boolean>(false);
+
+  const handleViewFiscalReceipt = async (fiscalInvoiceId: string) => {
+    try {
+      const res = await apiClient.get(`/fiscal/invoices/${fiscalInvoiceId}`);
+      if (res.data) {
+        setActiveFiscalReceipt(res.data);
+        setShowFiscalReceiptModal(true);
+      }
+    } catch (e: any) {
+      console.error(e);
+      presentToast({
+        message: 'Error al consultar la factura fiscal: ' + (e.response?.data?.message || e.message),
+        duration: 3500,
+        color: 'danger'
+      });
+    }
+  };
+
+  const handleEmitFiscalInvoice = async (order: any) => {
+    setIsEmittingFiscal(true);
+    try {
+      const res = await apiClient.post('/fiscal/invoices', {
+        orderId: order.id,
+        customerName: order.customerName,
+        customerRif: order.pagoMovilCedula || 'V-00000000-0',
+        customerPhone: order.customerPhone,
+        customerAddress: order.customerAddress,
+      });
+
+      if (res.data) {
+        presentToast({
+          message: `✓ Factura fiscal ${res.data.invoiceNumber} emitida con éxito`,
+          duration: 3500,
+          color: 'success'
+        });
+
+        // Actualizar orden en estado local
+        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, fiscalInvoiceId: res.data.id, fiscalStatus: res.data.status } : o));
+        if (selectedOrderForDetails?.id === order.id) {
+          setSelectedOrderForDetails((prev: any) => ({ ...prev, fiscalInvoiceId: res.data.id, fiscalStatus: res.data.status }));
+        }
+
+        setActiveFiscalReceipt(res.data);
+        setShowFiscalReceiptModal(true);
+      }
+    } catch (e: any) {
+      console.error(e);
+      presentToast({
+        message: 'Error al emitir factura fiscal: ' + (e.response?.data?.message || e.message),
+        duration: 4000,
+        color: 'danger'
+      });
+    } finally {
+      setIsEmittingFiscal(false);
+    }
+  };
+
+  const handleCancelFiscalInvoice = async (fiscalInvoiceId: string) => {
+    presentAlert({
+      header: '¿Anular Factura Fiscal?',
+      message: 'Se generará una Nota de Crédito fiscal conforme a los lineamientos del SENIAT.',
+      inputs: [
+        {
+          name: 'reason',
+          type: 'text',
+          placeholder: 'Motivo de anulación (ej. Error en datos)',
+          value: 'Devolución o anulación comercial'
+        }
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Emitir Nota de Crédito',
+          role: 'destructive',
+          handler: async (data) => {
+            try {
+              await apiClient.post(`/fiscal/invoices/${fiscalInvoiceId}/cancel`, {
+                reason: data.reason || 'Anulación solicitada por el cliente'
+              });
+              presentToast({
+                message: `✓ Factura anulada. Nota de crédito emitida.`,
+                duration: 3500,
+                color: 'success'
+              });
+              if (selectedOrderForDetails) {
+                setSelectedOrderForDetails((prev: any) => ({ ...prev, fiscalStatus: 'CANCELED' }));
+              }
+              setOrders(prev => prev.map(o => o.fiscalInvoiceId === fiscalInvoiceId ? { ...o, fiscalStatus: 'CANCELED' } : o));
+            } catch (err: any) {
+              console.error(err);
+              presentToast({
+                message: 'Error al anular factura: ' + (err.response?.data?.message || err.message),
+                duration: 4000,
+                color: 'danger'
+              });
+            }
+          }
+        }
+      ]
+    });
   };
 
   const handleRejectPayment = (orderId: string) => {
@@ -458,7 +572,7 @@ const Orders: React.FC = () => {
 
   const counts = useMemo(() => {
     if (!Array.isArray(orders)) return { activos: 0, porCobrar: 0, vencidos: 0, porConfirmar: 0, historial: 0 };
-    const activos = orders.filter(o => o && (o.status === OrderStatus.PENDING || o.status === OrderStatus.PREPARING)).length;
+    const activos = orders.filter(o => o && [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.PARTIALLY_DELIVERED].includes(o.status)).length;
     const porCobrarList = orders.filter(o => o && [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED && o.status !== OrderStatus.CANCELADO_PROVEEDOR && o.status !== OrderStatus.SOLICITUD_ENCARGO);
     const porCobrar = porCobrarList.length;
     const vencidos = porCobrarList.filter(o => {
@@ -474,7 +588,7 @@ const Orders: React.FC = () => {
     if (!Array.isArray(orders)) return [];
     return orders.filter(o => {
       if (!o) return false;
-      const isActivo = o.status === OrderStatus.PENDING || o.status === OrderStatus.PREPARING;
+      const isActivo = [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.PARTIALLY_DELIVERED].includes(o.status);
       const isHistorial = o.status === OrderStatus.DELIVERED || o.status === OrderStatus.CANCELED || o.status === OrderStatus.CANCELADO_PROVEEDOR;
       const isPorCobrar = [PaymentStatus.PENDING, PaymentStatus.PARTIAL].includes(o.paymentStatus) && o.status !== OrderStatus.CANCELED && o.status !== OrderStatus.CANCELADO_PROVEEDOR && o.status !== OrderStatus.SOLICITUD_ENCARGO;
       const isPorConfirmar = o.status === OrderStatus.SOLICITUD_ENCARGO || Boolean(o.paymentReported);
@@ -517,7 +631,7 @@ const Orders: React.FC = () => {
 
   return (
     <IonPage>
-      <AppHeader title="Pedidos" onRefresh={() => { fetchOrders(); fetchSettings(); fetchEmployees(); }} />
+      <AppHeader title="Pedidos" onRefresh={() => Promise.all([fetchOrders(), fetchSettings(), fetchEmployees()])} />
 
       <IonContent fullscreen className="ff-has-bottom-nav" style={{ '--background': '#F8FAFC' } as any}>
         <div style={{ maxWidth: '1050px', margin: '0 auto', padding: '16px 16px 80px 16px' }}>
@@ -545,8 +659,8 @@ const Orders: React.FC = () => {
             <div className="ff-chips-container" style={{ padding: 0, margin: 0 }}>
               <button
                 type="button"
-                className={`ff-chip ${tab === 'activos' ? 'active bg-theme-primary text-white border-theme-primary' : ''}`}
-                style={tab === 'activos' ? { backgroundColor: 'var(--theme-primary)', color: '#ffffff', borderColor: 'var(--theme-primary)' } : {}}
+                className={`ff-chip ${tab === 'activos' ? 'active bg-theme-primary border-theme-primary' : ''}`}
+                style={tab === 'activos' ? { backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast, #ffffff)', borderColor: 'var(--theme-primary)' } : {}}
                 onClick={() => { setTab('activos'); setOnlyOverdueFilter(false); }}
               >
                 Activos ({counts.activos})
@@ -763,6 +877,11 @@ const Orders: React.FC = () => {
 
                     {/* Meta Pills (Table / Delivery / Employee / Requested Date) */}
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                      {order.fiscalInvoiceId && (
+                        <span style={{ fontSize: '11px', fontWeight: '800', padding: '3px 8px', borderRadius: '6px', background: '#ECFDF5', color: '#047857', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid #A7F3D0' }}>
+                          🧾 {order.fiscalStatus === 'CANCELED' ? 'NC Anulada' : 'Factura Fiscal'}
+                        </span>
+                      )}
                       {order.linkedReservationId && (
                         <span style={{ fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: '#ECFDF5', color: '#065F46', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid #A7F3D0' }}>
                           🗓️ Cita Agendada
@@ -1235,7 +1354,7 @@ const Orders: React.FC = () => {
                       </button>
                     )}
 
-                    {isPreparing && (
+                    {(isPreparing || order.status === OrderStatus.READY || order.status === OrderStatus.PARTIALLY_DELIVERED) && (
                       <button
                         type="button"
                         onClick={() => updateStatus(order.id, OrderStatus.DELIVERED)}
@@ -1811,6 +1930,120 @@ const Orders: React.FC = () => {
                           <IonIcon icon={copyOutline} style={{ fontSize: '16px' }} />
                           <span>📋 Copiar Código y Resumen de Venta</span>
                         </button>
+
+                        {/* Sección de Facturación Fiscal SENIAT */}
+                        {systemSettings?.featureFiscalSupport && (
+                          <div style={{
+                            margin: '4px 0',
+                            padding: '14px',
+                            borderRadius: '12px',
+                            background: '#F8FAFC',
+                            border: '1px solid #E2E8F0',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '20px' }}>🏛️</span>
+                                <div>
+                                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A' }}>
+                                    Facturación Fiscal SENIAT
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: '#64748B' }}>
+                                    {selectedOrderForDetails.fiscalInvoiceId
+                                      ? `Control fiscal: ${selectedOrderForDetails.fiscalControlNumber || 'Asignado'}`
+                                      : 'Este pedido aún no tiene comprobante fiscal emitido'}
+                                  </div>
+                                </div>
+                              </div>
+                              {selectedOrderForDetails.fiscalInvoiceId ? (
+                                <span style={{
+                                  fontSize: '11px',
+                                  fontWeight: '800',
+                                  background: selectedOrderForDetails.fiscalStatus === 'CANCELED' ? '#FEF2F2' : '#ECFDF5',
+                                  color: selectedOrderForDetails.fiscalStatus === 'CANCELED' ? '#DC2626' : '#047857',
+                                  border: `1px solid ${selectedOrderForDetails.fiscalStatus === 'CANCELED' ? '#FECACA' : '#A7F3D0'}`,
+                                  padding: '2px 8px',
+                                  borderRadius: '6px'
+                                }}>
+                                  ✓ {selectedOrderForDetails.fiscalStatus === 'CANCELED' ? 'Anulada (NC)' : 'Emitida'}
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '11px', fontWeight: '700', background: '#F1F5F9', color: '#64748B', padding: '2px 8px', borderRadius: '6px' }}>
+                                  Pendiente
+                                </span>
+                              )}
+                            </div>
+
+                            {selectedOrderForDetails.fiscalInvoiceId ? (
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewFiscalReceipt(selectedOrderForDetails.fiscalInvoiceId)}
+                                  style={{
+                                    flex: 1,
+                                    padding: '11px 16px',
+                                    borderRadius: '10px',
+                                    border: 'none',
+                                    background: 'var(--theme-primary, #10B981)',
+                                    color: 'var(--theme-primary-contrast, #ffffff)',
+                                    fontWeight: '800',
+                                    fontSize: '13px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px'
+                                  }}
+                                >
+                                  🖨️ Ver / Imprimir Factura Fiscal
+                                </button>
+                                {selectedOrderForDetails.fiscalStatus !== 'CANCELED' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCancelFiscalInvoice(selectedOrderForDetails.fiscalInvoiceId)}
+                                    style={{
+                                      padding: '11px 14px',
+                                      borderRadius: '10px',
+                                      border: '1px solid #FECACA',
+                                      background: '#FEF2F2',
+                                      color: '#DC2626',
+                                      fontWeight: '700',
+                                      fontSize: '12px',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    🚫 Anular (NC)
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isEmittingFiscal}
+                                onClick={() => handleEmitFiscalInvoice(selectedOrderForDetails)}
+                                style={{
+                                  width: '100%',
+                                  padding: '11px 16px',
+                                  borderRadius: '10px',
+                                  border: '1px solid #A7F3D0',
+                                  background: '#ECFDF5',
+                                  color: '#065F46',
+                                  fontWeight: '800',
+                                  fontSize: '13px',
+                                  cursor: isEmittingFiscal ? 'not-allowed' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px'
+                                }}
+                              >
+                                {isEmittingFiscal ? 'Generando Factura...' : '🧾 Emitir Factura Fiscal SENIAT'}
+                              </button>
+                            )}
+                          </div>
+                        )}
 
                         {selectedOrderForDetails.status === OrderStatus.DELIVERED && (
                           <div style={{
@@ -2467,6 +2700,15 @@ const Orders: React.FC = () => {
           })()}
         </IonModal>
 
+        <FiscalReceiptModal
+          isOpen={showFiscalReceiptModal}
+          onClose={() => {
+            setShowFiscalReceiptModal(false);
+            setActiveFiscalReceipt(null);
+          }}
+          invoice={activeFiscalReceipt}
+          settings={systemSettings}
+        />
       </IonContent>
     </IonPage>
   );

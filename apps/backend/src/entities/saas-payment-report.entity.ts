@@ -45,6 +45,22 @@ export class SaaSPaymentReport {
   @Column({ type: 'int', default: 1, nullable: true })
   months: number;
 
+  @Column('decimal', {
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  subtotal: number | null;
+
+  @Column('decimal', {
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  iva_amount: number | null;
+
   @CreateDateColumn()
   created_at: Date;
 }

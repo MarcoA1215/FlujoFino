@@ -44,6 +44,12 @@ export class Promoter {
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  termsAccepted: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  termsAcceptedAt: Date | null;
+
   @OneToMany(() => Tenant, (tenant) => tenant.promoter)
   tenants: Tenant[];
 

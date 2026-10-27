@@ -553,7 +553,7 @@ const Users: React.FC = () => {
 
   return (
     <IonPage>
-      <AppHeader title="Gestión de Equipo y Nómina" />
+      <AppHeader title="Gestión de Equipo y Nómina" onRefresh={() => Promise.all([fetchUsers(), fetchAccessRequests(), fetchPendingAdvances(), fetchDeliverySummary()])} />
       <IonContent className="ion-padding ff-has-bottom-nav" style={{ ['--background' as any]: '#F8FAFC' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '90px' }}>
           {/* Barra Superior con Segmentos y Acción */}
@@ -1746,6 +1746,11 @@ const Users: React.FC = () => {
                                 {(payrollSummary.compensationType === 'COMISION' || payrollSummary.compensationType === 'MIXTO') && (
                                   <span style={{ fontSize: '10px', color: item.isPaid ? '#059669' : '#D97706', fontWeight: 600 }}>
                                     Comisión: ${Number(item.commissionAmount || 0).toFixed(2)}
+                                    {item.commissionableAmount !== undefined && Math.abs(Number(item.commissionableAmount) - Number(item.amount)) > 0.009 && (
+                                      <span style={{ color: '#64748B', fontWeight: 500, marginLeft: '4px' }}>
+                                        (s/ ganancia: ${Number(item.commissionableAmount).toFixed(2)})
+                                      </span>
+                                    )}
                                   </span>
                                 )}
                               </div>

@@ -1,9 +1,10 @@
-﻿import { Test, TestingModule } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { PromotersService } from './promoters.service';
 import { Promoter } from '../entities/promoter.entity';
 import { PromoterCommission } from '../entities/promoter-commission.entity';
 import { Tenant } from '../entities/tenant.entity';
+import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import {
   PromoterCommissionType,
   PromoterCommissionStatus,
@@ -17,6 +18,7 @@ describe('PromotersService', () => {
   let promoterRepo: any;
   let commissionRepo: any;
   let tenantRepo: any;
+  let userAccessRepo: any;
 
   beforeEach(async () => {
     promoterRepo = {
@@ -29,6 +31,21 @@ describe('PromotersService', () => {
     };
     tenantRepo = {
       find: jest.fn(),
+    };
+    userAccessRepo = {
+      find: jest.fn().mockResolvedValue([
+        {
+          tenantId: 't-1',
+          role: 'ADMIN',
+          user: {
+            id: 'u-admin-1',
+            name: 'Carlos Dueño',
+            username: 'carlosd',
+            email: 'carlos@tienda.com',
+            phone: '04141234567',
+          },
+        },
+      ]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -46,6 +63,10 @@ describe('PromotersService', () => {
           provide: getRepositoryToken(Tenant),
           useValue: tenantRepo,
         },
+        {
+          provide: getRepositoryToken(UserTenantAccess),
+          useValue: userAccessRepo,
+        },
       ],
     }).compile();
 
@@ -53,33 +74,43 @@ describe('PromotersService', () => {
   });
 
   describe('calculateRank', () => {
-    it('returns MADERA for < 5 activations with bonus 0', () => {
-      const rank = service.calculateRank(3);
+    it('returns MADERA for 0 active clients with 10% base commission and 0 bonus', () => {
+      const rank = service.calculateRank(0);
       expect(rank.rank).toBe(PromoterRank.MADERA);
+      expect(rank.commissionPercentage).toBe(10);
+      expect(rank.commissionRate).toBe(0.10);
       expect(rank.bonusUSD).toBe(0);
       expect(rank.nextRank?.rank).toBe(PromoterRank.BRONCE);
-      expect(rank.nextRank?.activationsNeeded).toBe(2);
+      expect(rank.nextRank?.clientsNeeded).toBe(1);
     });
 
-    it('returns BRONCE for 5 to 9 activations with bonus $10', () => {
-      const rank = service.calculateRank(7);
+    it('returns BRONCE for 1 to 49 active clients with 10% commission', () => {
+      const rank = service.calculateRank(20);
       expect(rank.rank).toBe(PromoterRank.BRONCE);
+      expect(rank.commissionPercentage).toBe(10);
+      expect(rank.commissionRate).toBe(0.10);
       expect(rank.bonusUSD).toBe(10);
       expect(rank.nextRank?.rank).toBe(PromoterRank.PLATA);
-      expect(rank.nextRank?.activationsNeeded).toBe(3);
+      expect(rank.nextRank?.clientsNeeded).toBe(30);
+      expect(rank.nextRank?.targetPercentage).toBe(15);
     });
 
-    it('returns PLATA for 10 to 19 activations with bonus $25', () => {
-      const rank = service.calculateRank(12);
+    it('returns PLATA for 50 to 99 active clients with 15% commission', () => {
+      const rank = service.calculateRank(65);
       expect(rank.rank).toBe(PromoterRank.PLATA);
+      expect(rank.commissionPercentage).toBe(15);
+      expect(rank.commissionRate).toBe(0.15);
       expect(rank.bonusUSD).toBe(25);
       expect(rank.nextRank?.rank).toBe(PromoterRank.ORO);
-      expect(rank.nextRank?.activationsNeeded).toBe(8);
+      expect(rank.nextRank?.clientsNeeded).toBe(35);
+      expect(rank.nextRank?.targetPercentage).toBe(20);
     });
 
-    it('returns ORO for >= 20 activations with bonus $50 and no next rank', () => {
-      const rank = service.calculateRank(22);
+    it('returns ORO for >= 100 active clients with 20% commission and no next rank', () => {
+      const rank = service.calculateRank(120);
       expect(rank.rank).toBe(PromoterRank.ORO);
+      expect(rank.commissionPercentage).toBe(20);
+      expect(rank.commissionRate).toBe(0.20);
       expect(rank.bonusUSD).toBe(50);
       expect(rank.nextRank).toBeNull();
     });
@@ -94,6 +125,8 @@ describe('PromotersService', () => {
         id: 'prom-1',
         userId: 'user-p1',
         code: 'PROM-JUAN',
+        termsAccepted: false,
+        termsAcceptedAt: null,
         tenants: [
           {
             id: 't-1',
@@ -110,7 +143,7 @@ describe('PromotersService', () => {
             promoterId: 'prom-1',
             tenantId: 't-1',
             type: PromoterCommissionType.ACTIVATION,
-            amountUSD: 10.00,
+            amountUSD: 2.00,
             status: PromoterCommissionStatus.PENDING,
             createdAt: thisMonthDate,
           },
@@ -132,14 +165,46 @@ describe('PromotersService', () => {
       expect(stats.promoterId).toBe('prom-1');
       expect(stats.code).toBe('PROM-JUAN');
       expect(stats.monthlyActivations).toBe(1);
-      expect(stats.currentRank).toBe(PromoterRank.MADERA);
-      expect(stats.totalActivationCommissionsUSD).toBe(10.00);
+      expect(stats.activeClientsCount).toBe(1);
+      expect(stats.pastDueClientsCount).toBe(0);
+      expect(stats.trialClientsCount).toBe(0);
+      expect(stats.inactiveClientsCount).toBe(0);
+      expect(stats.commissionPercentage).toBe(10);
+      expect(stats.termsAccepted).toBe(false);
+      expect(stats.currentRank).toBe(PromoterRank.BRONCE);
+      expect(stats.totalActivationCommissionsUSD).toBe(2.00);
       expect(stats.totalRecurringCommissionsUSD).toBe(2.00);
-      expect(stats.totalCommissionsEarnedUSD).toBe(12.00);
-      expect(stats.totalPendingBalanceUSD).toBe(12.00);
+      expect(stats.totalCommissionsEarnedUSD).toBe(4.00);
+      expect(stats.totalPendingBalanceUSD).toBe(4.00);
       expect(stats.affiliatedTenants.length).toBe(1);
-      expect(stats.affiliatedTenants[0].totalCommissionsUSD).toBe(12.00);
-      expect(stats.affiliatedTenants[0].recurringCommissionsUSD).toBe(2.00);
+      expect(stats.affiliatedTenants[0].subStatus).toBe('ACTIVE');
+      expect(stats.affiliatedTenants[0].ownerName).toBe('Carlos Dueño');
+      expect(stats.affiliatedTenants[0].ownerPhone).toBe('04141234567');
+      expect(stats.affiliatedTenants[0].ownerEmail).toBe('carlos@tienda.com');
+    });
+  });
+
+  describe('acceptTerms', () => {
+    it('sets termsAccepted to true and updates termsAcceptedAt', async () => {
+      const mockPromoter = {
+        id: 'prom-1',
+        userId: 'user-p1',
+        termsAccepted: false,
+        termsAcceptedAt: null,
+      };
+
+      promoterRepo.findOne.mockResolvedValue(mockPromoter);
+
+      const res = await service.acceptTerms('user-p1');
+      expect(res.success).toBe(true);
+      expect(res.termsAccepted).toBe(true);
+      expect(res.termsAcceptedAt).toBeDefined();
+      expect(promoterRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          termsAccepted: true,
+          termsAcceptedAt: expect.any(Date),
+        }),
+      );
     });
   });
 });

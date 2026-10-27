@@ -1,4 +1,4 @@
-﻿import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
+import { ColumnNumericTransformer } from '../common/transformers/column-numeric.transformer';
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { Tenant } from './tenant.entity';
 import { InvestmentType } from '@finowork/shared-types';
@@ -36,6 +36,9 @@ export class Investment {
 
   @Column({ type: 'text', nullable: true })
   description: string;
+
+  @Column({ nullable: true })
+  paymentMethod?: string;
 
   @Column({ type: 'date', default: () => 'CURRENT_DATE' })
   date: string;

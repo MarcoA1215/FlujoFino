@@ -45,6 +45,15 @@ export class OrderItem {
   @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
   subtotal: number;
 
+  @Column('boolean', { default: false })
+  isTaxExempt: boolean;
+
+  @Column('decimal', { precision: 5, scale: 2, default: 16.0, transformer: new ColumnNumericTransformer() })
+  taxRate: number;
+
+  @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  taxAmount: number;
+
   @Column('simple-json', { nullable: true })
   removedIngredients?: string[];
 

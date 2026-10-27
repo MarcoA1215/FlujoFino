@@ -121,6 +121,9 @@ export class Reservation {
   @Column({ nullable: true })
   orderId?: string;
 
+  @Column({ type: 'boolean', default: false })
+  isBlock: boolean;
+
   @ManyToOne(() => Tenant)
   @JoinColumn({ name: 'tenantId' })
   tenant: Tenant;

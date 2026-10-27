@@ -9,6 +9,7 @@ import { resetToDefaultTheme } from '../utils/colors';
 interface User {
   id: string;
   username: string;
+  name?: string;
   email?: string;
   identification?: string;
   phone?: string;
@@ -17,6 +18,7 @@ interface User {
   roles?: UserRole[];
   tenantId?: string;
   tenantName?: string;
+  isPromoter?: boolean;
   workspaces?: any[];
 }
 

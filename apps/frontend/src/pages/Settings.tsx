@@ -58,6 +58,7 @@ import { getContrastColor, isColorTooLight, ensureReadableColor, PRESET_THEME_CO
 import { getPublicBaseUrl } from '../utils/public-url';
 import { AuthContext } from '../context/AuthContext';
 import { ReportPaymentModal } from '../components/ReportPaymentModal';
+import { LibroVentasModal } from '../components/LibroVentasModal';
 import {
   UserRole,
   TenantPlanType,
@@ -68,6 +69,7 @@ import {
 import { BookingSettings } from '../components/BookingSettings';
 import { AppHeader } from '../components/AppHeader';
 import { BankSelect } from '../components/BankSelect';
+import { FinoColorPicker, FinoSelect } from '../components/ui';
 
 interface Settings {
   businessName?: string;
@@ -82,8 +84,13 @@ interface Settings {
   companyCopBank?: string;
   companyCopAccountNumber?: string;
   companyCopAccountHolder?: string;
+  companyCopAccountType?: 'AHORROS' | 'CORRIENTE' | 'NEQUI' | 'DAVIPLATA';
+  companyCopCedula?: string;
+  acceptCashBs?: boolean;
   acceptCashCop?: boolean;
   acceptTransferCop?: boolean;
+  initialCashBs?: number;
+  initialBankCop?: number;
   availableRates?: {
     bcv?: number;
     parallel?: number;
@@ -135,6 +142,13 @@ interface Settings {
   logoShape?: 'ROUNDED' | 'CIRCLE' | 'NATURAL';
   logoFit?: 'contain' | 'cover';
   allowNegativeStock?: boolean;
+  featureFiscalSupport?: boolean;
+  fiscalDefaultTaxRate?: number;
+  fiscalRif?: string;
+  fiscalCompanyName?: string;
+  fiscalAddress?: string;
+  fiscalPhone?: string;
+  fiscalMode?: 'INTERNAL' | 'UNIDIGITAL';
 }
 
 const SettingsPage: React.FC = () => {
@@ -152,6 +166,7 @@ const SettingsPage: React.FC = () => {
 
   // Subscription Payment Reporting Modal state
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [showLibroVentasModal, setShowLibroVentasModal] = useState<boolean>(false);
   const [exchangeRate, setExchangeRate] = useState<number>(40.0);
 
   const [notificationStatus, setNotificationStatus] = useState<NotificationPermissionState>(() => getNotificationPermission());
@@ -318,14 +333,17 @@ const SettingsPage: React.FC = () => {
 
   const handleSaveSettings = async () => {
     const isCashUsd = settings.acceptCashUsd !== false;
+    const isCashBs = settings.acceptCashBs !== false;
     const isPagoMovil = settings.acceptPagoMovil !== false;
     const isCardPos = settings.acceptCardPos === true;
     const isBinance = settings.acceptBinance === true;
     const isTransfer = settings.acceptTransfer === true;
+    const isCashCop = settings.enableCopCurrency && settings.acceptCashCop !== false;
+    const isTransferCop = settings.enableCopCurrency && settings.acceptTransferCop === true;
 
-    if (!isCashUsd && !isPagoMovil && !isCardPos && !isBinance && !isTransfer) {
+    if (!isCashUsd && !isCashBs && !isPagoMovil && !isCardPos && !isBinance && !isTransfer && !isCashCop && !isTransferCop) {
       return presentToast({
-        message: '⚠️ Debes mantener al menos un método de pago activo (Efectivo USD, Pago Móvil, Punto, Binance o Transferencia).',
+        message: '⚠️ Debes mantener al menos un método de pago activo (Efectivo USD/Bs, Pago Móvil, Punto, Binance, Transferencia o Pesos COP).',
         duration: 4500,
         color: 'warning'
       });
@@ -353,6 +371,9 @@ const SettingsPage: React.FC = () => {
         companyCopBank: settings.companyCopBank,
         companyCopAccountNumber: settings.companyCopAccountNumber,
         companyCopAccountHolder: settings.companyCopAccountHolder,
+        companyCopAccountType: settings.companyCopAccountType || 'AHORROS',
+        companyCopCedula: settings.companyCopCedula,
+        acceptCashBs: settings.acceptCashBs !== false,
         acceptCashCop: settings.acceptCashCop !== false,
         acceptTransferCop: settings.acceptTransferCop === true,
         companyBank: settings.companyBank, 
@@ -394,6 +415,13 @@ const SettingsPage: React.FC = () => {
         companyLogoUrl: settings.companyLogoUrl,
         logoShape: settings.logoShape || 'ROUNDED',
         logoFit: settings.logoFit || 'contain',
+        featureFiscalSupport: settings.featureFiscalSupport === true,
+        fiscalDefaultTaxRate: settings.fiscalDefaultTaxRate !== undefined ? Number(settings.fiscalDefaultTaxRate) : 16.0,
+        fiscalRif: settings.fiscalRif || '',
+        fiscalCompanyName: settings.fiscalCompanyName || '',
+        fiscalAddress: settings.fiscalAddress || '',
+        fiscalPhone: settings.fiscalPhone || '',
+        fiscalMode: settings.fiscalMode || 'INTERNAL',
       };
 
       const res = await apiClient.put<Settings>('/settings', payload);
@@ -523,7 +551,7 @@ const SettingsPage: React.FC = () => {
 
   return (
     <IonPage>
-      <AppHeader title="Configuración" />
+      <AppHeader title="Configuración" onRefresh={() => Promise.all([fetchSettings(), fetchSubscription()])} />
       <IonContent className="ion-padding ff-has-bottom-nav" style={{ '--background': '#F8FAFC' } as any}>
         <IonGrid style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <IonRow>
@@ -613,6 +641,9 @@ const SettingsPage: React.FC = () => {
                           ${subscription.finalFee.toFixed(2)}
                           <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 400 }}> / mes</span>
                         </div>
+                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px', fontWeight: 600 }}>
+                          {subscription.finalFee === 0 ? '🎉 100% Bonificado' : '$20 mensualidad + IVA (16%)'}
+                        </div>
                       </div>
                     </div>
 
@@ -693,7 +724,7 @@ const SettingsPage: React.FC = () => {
                       <div style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '15px' }}>💎</span>
                         <span>
-                          Planes disponibles: <strong>1 Mes</strong> (${subscription.finalFee.toFixed(2)}) • <strong>3 Meses</strong> (${(subscription.finalFee * 3).toFixed(2)}) • <strong>1 Año</strong> (${(subscription.finalFee * 10).toFixed(2)})
+                          Planes con IVA incluido: <strong>1 Mes</strong> (${subscription.finalFee.toFixed(2)}) • <strong>3 Meses</strong> (${(subscription.finalFee * 3).toFixed(2)}) • <strong>1 Año</strong> (${(subscription.finalFee * 10).toFixed(2)}) • <span style={{ color: '#059669', fontWeight: 600 }}>$20 mensualidad + IVA (16%)</span>
                         </span>
                       </div>
                       <span style={{ background: '#fef08a', color: '#854d0e', fontWeight: 800, padding: '3px 8px', borderRadius: '6px', fontSize: '11px' }}>
@@ -761,7 +792,7 @@ const SettingsPage: React.FC = () => {
                 </IonCardHeader>
                 <IonCardContent>
                   <p style={{marginBottom: '15px'}}>Estos datos se usarán para autocompletar recibos y textos copiados para WhatsApp.</p>
-                  <IonItem>
+                  <IonItem style={{ marginBottom: '8px' }}>
                     <IonLabel position="stacked">Nombre del Negocio / Comercio *</IonLabel>
                     <IonInput 
                       value={businessName} 
@@ -769,6 +800,10 @@ const SettingsPage: React.FC = () => {
                       placeholder="Ej. Mi Negocio Spa" 
                     />
                   </IonItem>
+
+                  <div style={{ marginTop: '10px', marginBottom: '4px', fontSize: '13px', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    🇻🇪 Datos Bancarios Venezuela (Bolívares / Pago Móvil)
+                  </div>
                   <IonItem lines="none" style={{ '--background': 'transparent', marginBottom: '8px' }}>
                     <BankSelect
                       label="Banco Receptor"
@@ -777,14 +812,93 @@ const SettingsPage: React.FC = () => {
                       placeholder="Selecciona banco receptor..."
                     />
                   </IonItem>
-                  <IonItem>
+                  <IonItem style={{ marginBottom: '8px' }}>
                     <IonLabel position="stacked">Cédula / RIF</IonLabel>
                     <IonInput value={settings.companyCedula || ''} onIonInput={e => setSettings({...settings, companyCedula: e.detail.value!})} placeholder="Ej. J-12345678-0" />
                   </IonItem>
-                  <IonItem>
+                  <IonItem style={{ marginBottom: '8px' }}>
                     <IonLabel position="stacked">Teléfono (Pago Móvil / WhatsApp)</IonLabel>
                     <IonInput value={settings.companyPhone || ''} onIonInput={e => setSettings({...settings, companyPhone: e.detail.value!})} placeholder="Ej. 0414-1234567" />
                   </IonItem>
+                  <IonItem style={{ marginBottom: '8px' }}>
+                    <IonLabel position="stacked">N° de Cuenta Bancaria Bs. (20 Dígitos - Opcional)</IonLabel>
+                    <IonInput value={settings.companyAccountNumber || ''} onIonInput={e => setSettings({...settings, companyAccountNumber: e.detail.value!})} placeholder="Ej. 0102-0000-00-0000000000" />
+                  </IonItem>
+                  <IonItem style={{ marginBottom: '8px' }}>
+                    <IonLabel position="stacked">Titular de la Cuenta Bs. (Opcional)</IonLabel>
+                    <IonInput value={settings.companyAccountHolder || ''} onIonInput={e => setSettings({...settings, companyAccountHolder: e.detail.value!})} placeholder="Ej. Inversiones FinoWork C.A." />
+                  </IonItem>
+
+                  {/* Sección Bancaria Colombia */}
+                  <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid #E2E8F0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        🇨🇴 Datos Bancarios Colombia (Pesos COP)
+                      </div>
+                      {settings.enableCopCurrency ? (
+                        <span style={{ fontSize: '10px', fontWeight: 800, color: '#065F46', background: '#D1FAE5', padding: '2px 8px', borderRadius: '8px' }}>
+                          COP ACTIVO
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '10px', fontWeight: 600, color: '#64748B', background: '#F1F5F9', padding: '2px 8px', borderRadius: '8px' }}>
+                          OPCIONAL
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 10px 0' }}>
+                      Datos para recibir transferencias en pesos vía Bancolombia, Nequi, Daviplata o BBVA.
+                    </p>
+
+                    <IonItem style={{ marginBottom: '8px' }}>
+                      <IonLabel position="stacked">Banco / Plataforma Colombia</IonLabel>
+                      <IonInput
+                        value={settings.companyCopBank || ''}
+                        onIonInput={e => setSettings({ ...settings, companyCopBank: e.detail.value! })}
+                        placeholder="Ej. Bancolombia / Nequi / Daviplata / BBVA"
+                      />
+                    </IonItem>
+
+                    <div style={{ marginBottom: '8px' }}>
+                      <FinoSelect
+                        label="Tipo de Cuenta (Colombia)"
+                        value={settings.companyCopAccountType || 'AHORROS'}
+                        onChange={(val) => setSettings({ ...settings, companyCopAccountType: val as any })}
+                        options={[
+                          { value: 'AHORROS', label: 'Cuenta de Ahorros' },
+                          { value: 'CORRIENTE', label: 'Cuenta Corriente' },
+                          { value: 'NEQUI', label: 'Llave Nequi / Celular' },
+                          { value: 'DAVIPLATA', label: 'Daviplata' },
+                        ]}
+                      />
+                    </div>
+
+                    <IonItem style={{ marginBottom: '8px' }}>
+                      <IonLabel position="stacked">N° Celular Nequi / Cuenta Bancaria (COP)</IonLabel>
+                      <IonInput
+                        value={settings.companyCopAccountNumber || ''}
+                        onIonInput={e => setSettings({ ...settings, companyCopAccountNumber: e.detail.value! })}
+                        placeholder="Ej. 300 123 4567 o 123-456789-01"
+                      />
+                    </IonItem>
+
+                    <IonItem style={{ marginBottom: '8px' }}>
+                      <IonLabel position="stacked">Titular de la Cuenta (Colombia)</IonLabel>
+                      <IonInput
+                        value={settings.companyCopAccountHolder || ''}
+                        onIonInput={e => setSettings({ ...settings, companyCopAccountHolder: e.detail.value! })}
+                        placeholder="Ej. Juan Pérez"
+                      />
+                    </IonItem>
+
+                    <IonItem>
+                      <IonLabel position="stacked">Cédula de Ciudadanía / NIT del Titular (Colombia)</IonLabel>
+                      <IonInput
+                        value={settings.companyCopCedula || ''}
+                        onIonInput={e => setSettings({ ...settings, companyCopCedula: e.detail.value! })}
+                        placeholder="Ej. C.C. 1.098.765.432 o NIT 900.123.456-1"
+                      />
+                    </IonItem>
+                  </div>
                 </IonCardContent>
               </IonCard>
             </IonCol>
@@ -1589,10 +1703,12 @@ const SettingsPage: React.FC = () => {
                   </p>
 
                   {settings.acceptCashUsd === false &&
+                   settings.acceptCashBs === false &&
                    settings.acceptPagoMovil === false &&
                    !settings.acceptCardPos &&
                    !settings.acceptBinance &&
-                   !settings.acceptTransfer && (
+                   !settings.acceptTransfer &&
+                   (!settings.enableCopCurrency || (settings.acceptCashCop === false && !settings.acceptTransferCop)) && (
                     <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#fef2f2', border: '1px solid #f87171', borderRadius: '8px', color: '#991b1b', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       ⚠️ No puedes desactivar todos los métodos de pago. Activa al menos uno para poder guardar tu configuración.
                     </div>
@@ -1609,6 +1725,19 @@ const SettingsPage: React.FC = () => {
                           <IonToggle 
                             checked={settings.acceptCashUsd !== false} 
                             onIonChange={e => setSettings({...settings, acceptCashUsd: e.detail.checked})} 
+                          />
+                        </IonItem>
+                      </IonCol>
+
+                      <IonCol size="12" sizeMd="6">
+                        <IonItem>
+                          <IonLabel className="ion-text-wrap">
+                            <h2>💵 Efectivo Bolívares (Bs.)</h2>
+                            <p style={{ color: '#64748b', fontSize: '13px' }}>Billetes físicos en bolívares en caja y cálculo de vuelto en Bs.</p>
+                          </IonLabel>
+                          <IonToggle 
+                            checked={settings.acceptCashBs !== false} 
+                            onIonChange={e => setSettings({...settings, acceptCashBs: e.detail.checked})} 
                           />
                         </IonItem>
                       </IonCol>
@@ -1749,81 +1878,134 @@ const SettingsPage: React.FC = () => {
                         </IonCol>
                       )}
 
-                      {settings.enableCopCurrency && (
-                        <>
-                          <IonCol size="12" sizeMd="6">
-                            <IonItem>
-                              <IonLabel className="ion-text-wrap">
-                                <h2>🇨🇴 Efectivo Pesos Colombianos (COP)</h2>
-                                <p style={{ color: '#64748b', fontSize: '13px' }}>Cobro en billetes de pesos en caja y cálculo de vuelto en COP.</p>
-                              </IonLabel>
-                              <IonToggle
-                                checked={settings.acceptCashCop !== false}
-                                onIonChange={e => setSettings({ ...settings, acceptCashCop: e.detail.checked })}
-                              />
-                            </IonItem>
-                          </IonCol>
+                      {/* Métodos de Pago en Pesos Colombianos (COP) */}
+                      <IonCol size="12" sizeMd="6">
+                        <IonItem>
+                          <IonLabel className="ion-text-wrap">
+                            <h2>🇨🇴 Efectivo Pesos Colombianos (COP)</h2>
+                            <p style={{ color: '#64748b', fontSize: '13px' }}>
+                              {settings.enableCopCurrency
+                                ? 'Cobro en billetes físicos de pesos en caja y cálculo de vuelto en COP.'
+                                : 'Activa la moneda COP para usar efectivo pesos en caja.'}
+                            </p>
+                          </IonLabel>
+                          <IonToggle
+                            checked={Boolean(settings.enableCopCurrency && settings.acceptCashCop !== false)}
+                            onIonChange={e => {
+                              const checked = e.detail.checked;
+                              setSettings(prev => ({
+                                ...prev,
+                                acceptCashCop: checked,
+                                enableCopCurrency: checked ? true : prev.enableCopCurrency,
+                              }));
+                            }}
+                          />
+                        </IonItem>
+                      </IonCol>
 
-                          <IonCol size="12" sizeMd="6">
-                            <IonItem>
-                              <IonLabel className="ion-text-wrap">
-                                <h2>📲 Nequi / Bancolombia / Daviplata (COP)</h2>
-                                <p style={{ color: '#64748b', fontSize: '13px' }}>Transferencias digitales en Pesos Colombianos.</p>
-                              </IonLabel>
-                              <IonToggle
-                                checked={settings.acceptTransferCop === true}
-                                onIonChange={e => setSettings({ ...settings, acceptTransferCop: e.detail.checked })}
-                              />
-                            </IonItem>
-                          </IonCol>
+                      <IonCol size="12" sizeMd="6">
+                        <IonItem>
+                          <IonLabel className="ion-text-wrap">
+                            <h2>📲 Banco / Digital COP (Nequi / Bancolombia / Daviplata)</h2>
+                            <p style={{ color: '#64748b', fontSize: '13px' }}>
+                              {settings.enableCopCurrency
+                                ? 'Transferencias digitales y depósitos en Pesos Colombianos.'
+                                : 'Activa la moneda COP para recibir pagos bancarios en Colombia.'}
+                            </p>
+                          </IonLabel>
+                          <IonToggle
+                            checked={Boolean(settings.enableCopCurrency && settings.acceptTransferCop === true)}
+                            onIonChange={e => {
+                              const checked = e.detail.checked;
+                              setSettings(prev => ({
+                                ...prev,
+                                acceptTransferCop: checked,
+                                enableCopCurrency: checked ? true : prev.enableCopCurrency,
+                              }));
+                            }}
+                          />
+                        </IonItem>
+                      </IonCol>
 
-                          {settings.acceptTransferCop === true && (
-                            <IonCol size="12">
-                              <div style={{ background: '#fffbeb', padding: '14px', borderRadius: '10px', border: '1px solid #fde68a', marginTop: '4px', marginBottom: '8px' }}>
-                                <h4 style={{ margin: '0 0 6px 0', fontSize: '0.95rem', fontWeight: 'bold', color: '#92400e', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  🇨🇴 Datos para Transferencias en Pesos (Nequi / Bancolombia)
-                                </h4>
-                                <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#78350f' }}>
-                                  Estos datos se mostrarán en la tienda online y caja cuando el cliente elija pagar por Nequi o transferencia en pesos.
-                                </p>
-                                <IonGrid style={{ padding: 0 }}>
-                                  <IonRow>
-                                    <IonCol size="12" sizeMd="4">
-                                      <IonItem color="light" style={{ borderRadius: '8px' }}>
-                                        <IonLabel position="stacked">Plataforma / Banco (COP) *</IonLabel>
-                                        <IonInput
-                                          value={settings.companyCopBank || ''}
-                                          onIonInput={e => setSettings({ ...settings, companyCopBank: e.detail.value! })}
-                                          placeholder="Ej. Nequi / Bancolombia / Daviplata"
-                                        />
-                                      </IonItem>
-                                    </IonCol>
-                                    <IonCol size="12" sizeMd="4">
-                                      <IonItem color="light" style={{ borderRadius: '8px' }}>
-                                        <IonLabel position="stacked">N° Celular Nequi / Cuenta *</IonLabel>
-                                        <IonInput
-                                          value={settings.companyCopAccountNumber || ''}
-                                          onIonInput={e => setSettings({ ...settings, companyCopAccountNumber: e.detail.value! })}
-                                          placeholder="Ej. 300 123 4567"
-                                        />
-                                      </IonItem>
-                                    </IonCol>
-                                    <IonCol size="12" sizeMd="4">
-                                      <IonItem color="light" style={{ borderRadius: '8px' }}>
-                                        <IonLabel position="stacked">Titular de la Cuenta *</IonLabel>
-                                        <IonInput
-                                          value={settings.companyCopAccountHolder || ''}
-                                          onIonInput={e => setSettings({ ...settings, companyCopAccountHolder: e.detail.value! })}
-                                          placeholder="Ej. Juan Pérez"
-                                        />
-                                      </IonItem>
-                                    </IonCol>
-                                  </IonRow>
-                                </IonGrid>
-                              </div>
-                            </IonCol>
-                          )}
-                        </>
+                      {settings.enableCopCurrency && settings.acceptTransferCop === true && (
+                        <IonCol size="12">
+                          <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '12px', border: '1px solid #fde68a', marginTop: '6px', marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 'bold', color: '#92400e', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                🇨🇴 Datos del Banco Colombiano (Nequi / Bancolombia / Daviplata)
+                              </h4>
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: '#92400E', background: '#FEF3C7', padding: '2px 8px', borderRadius: '8px' }}>
+                                Transferencia Digital COP
+                              </span>
+                            </div>
+                            <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: '#78350f' }}>
+                              Estos datos se mostrarán en la tienda online, citas y caja para que los clientes colombianos realicen transferencias exactas.
+                            </p>
+                            <IonGrid style={{ padding: 0 }}>
+                              <IonRow>
+                                <IonCol size="12" sizeMd="6">
+                                  <IonItem color="light" style={{ borderRadius: '8px', marginBottom: '8px' }}>
+                                    <IonLabel position="stacked">Plataforma / Banco (COP) *</IonLabel>
+                                    <IonInput
+                                      value={settings.companyCopBank || ''}
+                                      onIonInput={e => setSettings({ ...settings, companyCopBank: e.detail.value! })}
+                                      placeholder="Ej. Bancolombia / Nequi / Daviplata"
+                                    />
+                                  </IonItem>
+                                </IonCol>
+
+                                <IonCol size="12" sizeMd="6">
+                                  <div style={{ marginBottom: '8px' }}>
+                                    <FinoSelect
+                                      label="Tipo de Cuenta (Colombia) *"
+                                      value={settings.companyCopAccountType || 'AHORROS'}
+                                      onChange={(val) => setSettings({ ...settings, companyCopAccountType: val as any })}
+                                      options={[
+                                        { value: 'AHORROS', label: 'Cuenta de Ahorros' },
+                                        { value: 'CORRIENTE', label: 'Cuenta Corriente' },
+                                        { value: 'NEQUI', label: 'Llave Nequi / Celular' },
+                                        { value: 'DAVIPLATA', label: 'Daviplata' },
+                                      ]}
+                                    />
+                                  </div>
+                                </IonCol>
+
+                                <IonCol size="12" sizeMd="4">
+                                  <IonItem color="light" style={{ borderRadius: '8px', marginBottom: '8px' }}>
+                                    <IonLabel position="stacked">N° Celular Nequi / N° Cuenta *</IonLabel>
+                                    <IonInput
+                                      value={settings.companyCopAccountNumber || ''}
+                                      onIonInput={e => setSettings({ ...settings, companyCopAccountNumber: e.detail.value! })}
+                                      placeholder="Ej. 300 123 4567"
+                                    />
+                                  </IonItem>
+                                </IonCol>
+
+                                <IonCol size="12" sizeMd="4">
+                                  <IonItem color="light" style={{ borderRadius: '8px', marginBottom: '8px' }}>
+                                    <IonLabel position="stacked">Titular de la Cuenta *</IonLabel>
+                                    <IonInput
+                                      value={settings.companyCopAccountHolder || ''}
+                                      onIonInput={e => setSettings({ ...settings, companyCopAccountHolder: e.detail.value! })}
+                                      placeholder="Ej. Juan Pérez"
+                                    />
+                                  </IonItem>
+                                </IonCol>
+
+                                <IonCol size="12" sizeMd="4">
+                                  <IonItem color="light" style={{ borderRadius: '8px', marginBottom: '8px' }}>
+                                    <IonLabel position="stacked">Cédula / NIT del Titular (Colombia) *</IonLabel>
+                                    <IonInput
+                                      value={settings.companyCopCedula || ''}
+                                      onIonInput={e => setSettings({ ...settings, companyCopCedula: e.detail.value! })}
+                                      placeholder="Ej. C.C. 1.098.765.432"
+                                    />
+                                  </IonItem>
+                                </IonCol>
+                              </IonRow>
+                            </IonGrid>
+                          </div>
+                        </IonCol>
                       )}
                     </IonRow>
                   </IonGrid>
@@ -1889,6 +2071,121 @@ const SettingsPage: React.FC = () => {
                     </IonLabel>
                     <IonToggle checked={settings.allowNegativeStock === true} onIonChange={e => setSettings({...settings, allowNegativeStock: e.detail.checked})} />
                   </IonItem>
+                  <IonItem lines="none" style={{ borderTop: '1px solid #e2e8f0', marginTop: '8px', paddingTop: '8px' }}>
+                    <IonLabel className="ion-text-wrap">
+                      <h2 style={{ fontWeight: '700', color: '#0f172a' }}>🧾 Módulo Fiscal y Control de IVA (SENIAT)</h2>
+                      <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
+                        Permite indicar si cada producto o servicio está exento de IVA o gravado (16% predeterminado y editable), y preparar el registro fiscal del negocio.
+                      </p>
+                    </IonLabel>
+                    <IonToggle checked={settings.featureFiscalSupport === true} onIonChange={e => setSettings({...settings, featureFiscalSupport: e.detail.checked})} />
+                  </IonItem>
+
+                  {settings.featureFiscalSupport && (
+                    <div style={{ marginTop: '14px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                        <span style={{ fontSize: '20px' }}>🏛️</span>
+                        <div>
+                          <div style={{ fontWeight: '700', fontSize: '14px', color: '#0f172a' }}>Datos Fiscales de la Empresa</div>
+                          <div style={{ fontSize: '12px', color: '#64748b' }}>Información para membretes fiscales y reportes</div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
+                            Alícuota de IVA Predeterminada (%)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={settings.fiscalDefaultTaxRate !== undefined ? settings.fiscalDefaultTaxRate : 16}
+                            onChange={e => setSettings({ ...settings, fiscalDefaultTaxRate: parseFloat(e.target.value) || 0 })}
+                            placeholder="16.00"
+                            style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
+                            RIF de la Empresa (Ej. J-12345678-9)
+                          </label>
+                          <input
+                            type="text"
+                            value={settings.fiscalRif || ''}
+                            onChange={e => setSettings({ ...settings, fiscalRif: e.target.value })}
+                            placeholder="J-12345678-9"
+                            style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
+                            Razón Social Fiscal
+                          </label>
+                          <input
+                            type="text"
+                            value={settings.fiscalCompanyName || ''}
+                            onChange={e => setSettings({ ...settings, fiscalCompanyName: e.target.value })}
+                            placeholder="Ej. Inversiones FinoWork C.A."
+                            style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
+                            Teléfono Fiscal
+                          </label>
+                          <input
+                            type="text"
+                            value={settings.fiscalPhone || ''}
+                            onChange={e => setSettings({ ...settings, fiscalPhone: e.target.value })}
+                            placeholder="0414-1234567"
+                            style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: '12px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
+                          Domicilio / Dirección Fiscal
+                        </label>
+                        <input
+                          type="text"
+                          value={settings.fiscalAddress || ''}
+                          onChange={e => setSettings({ ...settings, fiscalAddress: e.target.value })}
+                          placeholder="Av. Principal, Edificio Central, Local 2, Ciudad..."
+                          style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+                        />
+                      </div>
+
+                      <div style={{ marginTop: '12px', padding: '10px 12px', backgroundColor: '#ecfdf5', borderRadius: '8px', border: '1px solid #a7f3d0', color: '#065f46', fontSize: '12px', lineHeight: '1.4' }}>
+                        ℹ️ <b>Soporte Fiscal Activo:</b> Al crear o editar productos y servicios podrás clasificarlos como exentos o gravados con IVA. Al cobrar en Caja o POS se calculará el desglose formal exigido en Venezuela.
+                      </div>
+
+                      <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowLibroVentasModal(true)}
+                          style={{
+                            padding: '10px 16px',
+                            borderRadius: '10px',
+                            border: '1px solid #A7F3D0',
+                            background: '#ECFDF5',
+                            color: '#065F46',
+                            fontWeight: '700',
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          📊 Consultar y Exportar Libro de Ventas SENIAT
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </IonCardContent>
               </IonCard>
             </IonCol>
@@ -2353,41 +2650,11 @@ const SettingsPage: React.FC = () => {
                         }}>
                           Color Principal (Menú, Botones y Acciones)
                         </label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <input
-                            type="color"
-                            value={/^#[0-9A-Fa-f]{6}$/.test(settings.themePrimaryColor || '') ? settings.themePrimaryColor : '#10b981'}
-                            onChange={e => setSettings({ ...settings, themePrimaryColor: e.target.value.toUpperCase() })}
-                            style={{
-                              width: '44px',
-                              height: '44px',
-                              borderRadius: '10px',
-                              border: '1px solid #cbd5e1',
-                              padding: 0,
-                              cursor: 'pointer',
-                              backgroundColor: 'transparent',
-                              flexShrink: 0
-                            }}
-                          />
-                          <input
-                            type="text"
-                            maxLength={7}
-                            value={settings.themePrimaryColor || ''}
-                            placeholder="#10B981"
-                            onChange={e => setSettings({ ...settings, themePrimaryColor: e.target.value.toUpperCase() })}
-                            style={{
-                              width: '130px',
-                              padding: '8px 12px',
-                              backgroundColor: '#f8fafc',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '10px',
-                              fontFamily: 'monospace',
-                              fontSize: '14px',
-                              fontWeight: 700,
-                              color: '#0f172a',
-                              textTransform: 'uppercase',
-                              outline: 'none'
-                            }}
+                        <div style={{ marginTop: '4px' }}>
+                          <FinoColorPicker
+                            value={settings.themePrimaryColor || '#10B981'}
+                            onChange={hex => setSettings({ ...settings, themePrimaryColor: hex })}
+                            label="Color de Marca"
                           />
                         </div>
 
@@ -2428,41 +2695,11 @@ const SettingsPage: React.FC = () => {
                         }}>
                           Color Encabezados (Barra Superior)
                         </label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <input
-                            type="color"
-                            value={/^#[0-9A-Fa-f]{6}$/.test(settings.themeHeaderColor || '') ? settings.themeHeaderColor : '#ffffff'}
-                            onChange={e => setSettings({ ...settings, themeHeaderColor: e.target.value.toUpperCase() })}
-                            style={{
-                              width: '44px',
-                              height: '44px',
-                              borderRadius: '10px',
-                              border: '1px solid #cbd5e1',
-                              padding: 0,
-                              cursor: 'pointer',
-                              backgroundColor: 'transparent',
-                              flexShrink: 0
-                            }}
-                          />
-                          <input
-                            type="text"
-                            maxLength={7}
-                            value={settings.themeHeaderColor || ''}
-                            placeholder="#FFFFFF"
-                            onChange={e => setSettings({ ...settings, themeHeaderColor: e.target.value.toUpperCase() })}
-                            style={{
-                              width: '130px',
-                              padding: '8px 12px',
-                              backgroundColor: '#f8fafc',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '10px',
-                              fontFamily: 'monospace',
-                              fontSize: '14px',
-                              fontWeight: 700,
-                              color: '#0f172a',
-                              textTransform: 'uppercase',
-                              outline: 'none'
-                            }}
+                        <div style={{ marginTop: '4px' }}>
+                          <FinoColorPicker
+                            value={settings.themeHeaderColor || '#FFFFFF'}
+                            onChange={hex => setSettings({ ...settings, themeHeaderColor: hex })}
+                            label="Color de Barra Superior"
                           />
                         </div>
                         <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
@@ -2757,6 +2994,13 @@ const SettingsPage: React.FC = () => {
           onSuccess={() => {
             fetchSubscription();
           }}
+        />
+
+        {/* MODAL: LIBRO DE VENTAS SENIAT */}
+        <LibroVentasModal
+          isOpen={showLibroVentasModal}
+          onClose={() => setShowLibroVentasModal(false)}
+          settings={settings}
         />
       </IonContent>
     </IonPage>

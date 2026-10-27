@@ -1,13 +1,13 @@
-# Sistema de Diseño FlujoFino (Design System & UI Guidelines)
+# Sistema de Diseño FinoWork (Design System & UI Guidelines)
 
-Este documento contiene la guía oficial de estilo, tokens de diseño y reglas de desarrollo visual para el frontend de FlujoFino. **Todo desarrollador y modelo de IA debe seguir estas reglas estrictamente.**
+Este documento contiene la guía oficial de estilo, tokens de diseño y reglas de desarrollo visual para el frontend de **FinoWork** (anteriormente FlujoFino). **Todo desarrollador y modelo de IA debe seguir estas reglas estrictamente.**
 
 ---
 
 ## 🚨 Regla de Oro #1: NUNCA USAR CLASES DE TAILWIND CSS
 - **En este proyecto NO está instalado ni configurado Tailwind CSS.**
 - Utilizar clases como `flex`, `grid`, `gap-4`, `p-4`, `rounded-xl`, `bg-slate-50`, `text-slate-800`, `space-y-4` **NO funcionará**. El navegador las ignorará y la interfaz se romperá por completo (los textos y botones se pegarán entre sí y los inputs perderán su alineación).
-- **Cómo estilar en FlujoFino:**
+- **Cómo estilar en FinoWork:**
   1. Utilizar las clases utilitarias del sistema de diseño `.ff-*` definidas en `theme.css`.
   2. Utilizar componentes oficiales de Ionic (`IonCard`, `IonButton`, `IonItem`, `IonToggle`, `IonBadge`, etc.).
   3. Utilizar estilos directos `style={{ display: 'flex', gap: '8px', ... }}` con las variables CSS del sistema o valores hexadecimales oficiales.
@@ -16,21 +16,30 @@ Este documento contiene la guía oficial de estilo, tokens de diseño y reglas d
 
 ## 🎨 Paleta de Colores y Tokens Oficiales
 
-FlujoFino sigue un diseño moderno inspirado en interfaces POS de Figma con base en **Esmeralda (Emerald), Pizarra (Slate) y Blanco Puro**.
+FinoWork sigue un diseño moderno inspirado en interfaces POS de Figma con base en **Esmeralda (Emerald), Pizarra (Slate) y Blanco Puro**, complementado con **Theming Multi-Tenant Dinámico**.
 
-### Colores de Marca y Tema
+### 1. Variables Dinámicas de Marca del Cliente (Multi-Tenant Theming)
+Los clientes configuran su color primario y cabecera en Configuración (`themePrimaryColor`, `themeHeaderColor`). Se inyectan en `:root`:
+
+| Token / Variable CSS | Valor por Defecto | Uso Obligatorio |
+| :--- | :--- | :--- |
+| `var(--theme-primary)` | `#10B981` | Botones de acción principales (`.ff-btn-primary`), pestañas/chips activos (`.ff-chip.active`), menú activo (`ion-item.selected`), bordes activos. |
+| `var(--theme-primary-contrast, #ffffff)` | `#ffffff` | **Texto o icono sobre fondo primario**. Nunca hardcodear `#ffffff` directo: si el cliente escoge un color claro, este token pasa a `#0f172a`. |
+| `var(--theme-primary-readable, #065F46)` | `#065F46` | **Textos de marca sobre fondo blanco (`#ffffff`)** o bordes en botones outline. Protegido contra colores claros. |
+| `var(--theme-primary-soft)` | `#ECFDF5` / `#10B98118` | Fondos suaves de badges de marca o resaltados sutiles. |
+| `var(--theme-header)` | `#FFFFFF` | Fondo de la barra superior del sistema en `AppHeader`. |
+| `var(--theme-header-contrast)` | `#0F172A` | Iconos y textos dentro de la barra superior `AppHeader`. |
+
+### 2. Clases Utilitarias para Theming Dinámico
+- `.bg-theme-primary`: Aplica automáticamente `background-color: var(--theme-primary)` y `color: var(--theme-primary-contrast)`.
+- `.text-theme-primary`: Aplica `color: var(--theme-primary)`.
+- `.border-theme-primary`: Aplica `border-color: var(--theme-primary)`.
+- `.ff-btn-primary`: Botón primario estilizado vinculado automáticamente a la marca del cliente.
+
+### 3. Neutros y Superficies (Fijos)
 | Token / Variable | Hex | Uso |
 | :--- | :--- | :--- |
-| `--ff-emerald` / `--ion-color-primary` | `#10B981` | Color primario de acción, botones destacados, activos |
-| `--ff-emerald-dark` | `#059669` / `#047857` | Hover / estados activos de botones primarios |
-| `--ff-emerald-light` | `#ECFDF5` | Fondos de badges de éxito, pill online, estados aprobados |
-| Texto Éxito | `#065F46` | Texto legible sobre fondo `#ECFDF5` |
-| `--theme-header` | `#FFFFFF` | Barra superior del sistema (configurable por usuario) |
-
-### Neutros y Superficies
-| Token / Variable | Hex | Uso |
-| :--- | :--- | :--- |
-| `--ff-slate-50` / `--ion-background-color` | `#F8FAFC` | Fondo general de páginas y pantallas |
+| `--ff-slate-50` / `--ion-background-color` | `#F8FAFC` | Fondo general de páginas y pantallas (nunca cambiarlo por el color del cliente) |
 | Card Background | `#FFFFFF` | Fondo de tarjetas, modales y diálogos |
 | `--ff-slate-100` | `#F1F5F9` | Fondos de chips inactivos, divisores sutiles |
 | `--ff-slate-200` | `#E2E8F0` | Bordes oficiales de tarjetas y contenedores |
@@ -39,7 +48,7 @@ FlujoFino sigue un diseño moderno inspirado en interfaces POS de Figma con base
 | `--ff-slate-800` | `#1E293B` | Encabezados de tarjetas, títulos secundarios |
 | `--ff-slate-900` | `#0F172A` | Título principal, valores monetarios y textos clave |
 
-### Colores de Estado y Acentos
+### 4. Colores de Estado y Acentos Semánticos (Fijos - NO Tematizar)
 | Estado | Color | Fondo Suave | Borde | Uso |
 | :--- | :--- | :--- | :--- | :--- |
 | **Atención / Sincronización / Turno 2** | `#B45309` / `#F59E0B` | `#FFFBEB` | `#FDE68A` | Avisos, pendientes, turnos de receso |
@@ -113,6 +122,13 @@ Para estados como Abierto/Cerrado, En Línea, Pagado, etc.:
 - Altura táctil mínima de `38px` a `44px`.
 - Relleno `8px 12px`, fondo `#ffffff` o `#f8fafc`, borde `1px solid #CBD5E1`, radio `8px` a `10px`.
 - Etiquetas claras arriba del input con tamaño `11px - 12px`, `fontWeight: 600`, color `#64748B`.
+
+### 5. 🚫 PROHIBIDO EL USO DE SELECTORES NATIVOS DEL DISPOSITIVO
+NUNCA utilices selectores nativos del sistema operativo como `<input type="color">`, `<input type="date">`, `<input type="time">`, `<input type="datetime-local">` o `<select>`. En su lugar, es obligatorio usar los componentes oficiales de `components/ui`:
+- **`FinoColorPicker`**: Paleta recomendada, selector visual y entrada hex con vista previa dinámica en tiempo real.
+- **`FinoDatePicker`**: Calendario mensual interactivo con botones rápidos ("Hoy", "Ayer", etc.) y estilo FinoWork.
+- **`FinoTimePicker`**: Selector táctil 12h/24h con selección rápida de turnos y am/pm.
+- **`FinoSelect`**: Selector modal bottom sheet con buscador integrado, cards y checks activos.
 
 ---
 

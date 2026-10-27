@@ -29,8 +29,11 @@ export const InitialTreasuryModal: React.FC<InitialTreasuryModalProps> = ({
   onSuccess,
 }) => {
   const [initialCashUSD, setInitialCashUSD] = useState('');
+  const [initialCashBs, setInitialCashBs] = useState('');
   const [initialBankBs, setInitialBankBs] = useState('');
   const [initialDigitalUSD, setInitialDigitalUSD] = useState('');
+  const [initialCashCop, setInitialCashCop] = useState('');
+  const [initialBankCop, setInitialBankCop] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [presentToast] = useIonToast();
 
@@ -39,18 +42,24 @@ export const InitialTreasuryModal: React.FC<InitialTreasuryModalProps> = ({
   useEffect(() => {
     if (treasury) {
       setInitialCashUSD(treasury.initialCashUSD ? String(treasury.initialCashUSD) : '0');
+      setInitialCashBs(treasury.initialCashBs ? String(treasury.initialCashBs) : '0');
       setInitialBankBs(treasury.initialBankBs ? String(treasury.initialBankBs) : '0');
       setInitialDigitalUSD(treasury.initialDigitalUSD ? String(treasury.initialDigitalUSD) : '0');
+      setInitialCashCop(treasury.initialCashCop ? String(treasury.initialCashCop) : '0');
+      setInitialBankCop(treasury.initialBankCop ? String(treasury.initialBankCop) : '0');
     }
   }, [treasury, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cash = parseFloat(initialCashUSD) || 0;
+    const cashBs = parseFloat(initialCashBs) || 0;
     const bank = parseFloat(initialBankBs) || 0;
     const digital = parseFloat(initialDigitalUSD) || 0;
+    const copCash = parseFloat(initialCashCop) || 0;
+    const copBank = parseFloat(initialBankCop) || 0;
 
-    if (cash < 0 || bank < 0 || digital < 0) {
+    if (cash < 0 || cashBs < 0 || bank < 0 || digital < 0 || copCash < 0 || copBank < 0) {
       presentToast({
         message: 'Los saldos iniciales no pueden ser negativos',
         duration: 2500,
@@ -63,8 +72,11 @@ export const InitialTreasuryModal: React.FC<InitialTreasuryModalProps> = ({
       setIsSubmitting(true);
       await apiClient.post('/dashboard/initial-treasury', {
         initialCashUSD: cash,
+        initialCashBs: cashBs,
         initialBankBs: bank,
         initialDigitalUSD: digital,
+        initialCashCop: copCash,
+        initialBankCop: copBank,
       });
 
       presentToast({
@@ -161,14 +173,48 @@ export const InitialTreasuryModal: React.FC<InitialTreasuryModalProps> = ({
                 />
               </div>
               <span style={{ fontSize: '11px', color: '#64748B', marginTop: '4px', display: 'block' }}>
-                Billetes iniciales que tenías en caja o caja fuerte al empezar.
+                Billetes iniciales en dólares que tenías en caja o gaveta al empezar.
               </span>
             </div>
 
-            {/* 2. Bancos en Bolívares */}
+            {/* 2. Efectivo Físico Bolívares (Gaveta Bs.) */}
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px' }}>
-                🏦 Saldo Inicial en Bancos ({currencySymbol})
+                💵 Efectivo Inicial en Gaveta Física (Bolívares - Bs.)
+              </label>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '13px', fontWeight: '800', color: '#64748B' }}>{currencySymbol}</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={initialCashBs}
+                  onChange={(e) => setInitialCashBs(e.target.value)}
+                  placeholder="0.00"
+                  style={{
+                    width: '100%',
+                    height: '42px',
+                    borderRadius: '10px',
+                    border: '1px solid #CBD5E1',
+                    padding: `0 12px 0 ${currencySymbol.length * 10 + 20}px`,
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    color: '#047857',
+                    backgroundColor: '#ffffff',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+              <span style={{ fontSize: '11px', color: '#64748B', marginTop: '4px', display: 'block' }}>
+                Billetes físicos en bolívares en gaveta para dar vuelto al abrir el negocio.
+              </span>
+            </div>
+
+            {/* 3. Bancos en Bolívares */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px' }}>
+                🏦 Saldo Inicial en Bancos Venezuela ({currencySymbol})
               </label>
               <div style={{ position: 'relative' }}>
                 <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '13px', fontWeight: '800', color: '#64748B' }}>{currencySymbol}</span>
@@ -196,11 +242,11 @@ export const InitialTreasuryModal: React.FC<InitialTreasuryModalProps> = ({
                 />
               </div>
               <span style={{ fontSize: '11px', color: '#64748B', marginTop: '4px', display: 'block' }}>
-                Saldo en tus cuentas de banco (Mercantil, Banesco, BDV, etc.) al empezar.
+                Saldo en cuentas de banco venezolanas (Mercantil, Banesco, BDV, etc.) al empezar.
               </span>
             </div>
 
-            {/* 3. Billetera Digital USDT / Binance */}
+            {/* 4. Billetera Digital USDT / Binance */}
             <div style={{ marginBottom: '22px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px' }}>
                 🟡 Saldo Inicial Digital / Binance Pay (USDT / $)
@@ -234,6 +280,85 @@ export const InitialTreasuryModal: React.FC<InitialTreasuryModalProps> = ({
               </span>
             </div>
 
+            {/* 5 y 6. Pesos Colombianos (COP) */}
+            {treasury?.enableCopCurrency && (
+              <>
+                <div style={{ marginBottom: '16px', padding: '12px', borderRadius: '12px', background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#92400E', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    🇨🇴 Saldos Iniciales en Pesos Colombianos (COP)
+                  </div>
+
+                  {/* Efectivo Pesos */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#78350F', marginBottom: '4px' }}>
+                      💵 Efectivo Inicial en Gaveta (Billetes COP)
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '13px', fontWeight: '800', color: '#92400E' }}>$ COP</span>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={initialCashCop}
+                        onChange={(e) => setInitialCashCop(e.target.value)}
+                        placeholder="0"
+                        style={{
+                          width: '100%',
+                          height: '40px',
+                          borderRadius: '8px',
+                          border: '1px solid #CBD5E1',
+                          padding: '0 12px 0 65px',
+                          fontSize: '15px',
+                          fontWeight: '700',
+                          color: '#B45309',
+                          backgroundColor: '#ffffff',
+                          boxSizing: 'border-box',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#92400E', marginTop: '3px', display: 'block' }}>
+                      Billetes de pesos físicos en caja para vuelto.
+                    </span>
+                  </div>
+
+                  {/* Bancos Colombia */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#78350F', marginBottom: '4px' }}>
+                      📲 Saldo Inicial en Bancos Colombia (Nequi / Bancolombia / Daviplata)
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '13px', fontWeight: '800', color: '#92400E' }}>$ COP</span>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={initialBankCop}
+                        onChange={(e) => setInitialBankCop(e.target.value)}
+                        placeholder="0"
+                        style={{
+                          width: '100%',
+                          height: '40px',
+                          borderRadius: '8px',
+                          border: '1px solid #CBD5E1',
+                          padding: '0 12px 0 65px',
+                          fontSize: '15px',
+                          fontWeight: '700',
+                          color: '#B45309',
+                          backgroundColor: '#ffffff',
+                          boxSizing: 'border-box',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#92400E', marginTop: '3px', display: 'block' }}>
+                      Saldo disponible en tus cuentas colombianas (Nequi, Bancolombia, etc.).
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* Botón de Guardar */}
             <button
               type="submit"
@@ -242,8 +367,8 @@ export const InitialTreasuryModal: React.FC<InitialTreasuryModalProps> = ({
                 width: '100%',
                 height: '46px',
                 borderRadius: '12px',
-                backgroundColor: '#10B981',
-                color: '#ffffff',
+                backgroundColor: 'var(--theme-primary, #10B981)',
+                color: 'var(--theme-primary-contrast, #ffffff)',
                 border: 'none',
                 fontWeight: '800',
                 fontSize: '14px',

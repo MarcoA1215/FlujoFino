@@ -12,7 +12,6 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ defaultMessage =
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs"
       style={{
         position: 'fixed',
         top: 0,
@@ -56,7 +55,7 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ defaultMessage =
             width: '42px',
             height: '42px',
             border: '4px solid #E2E8F0',
-            borderTopColor: '#10B981',
+            borderTopColor: 'var(--theme-primary, #10B981)',
             borderRadius: '50%',
             animation: 'ff-spin 0.8s linear infinite',
           }}

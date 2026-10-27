@@ -308,5 +308,112 @@ describe('DashboardService', () => {
       expect(monthly.byMethod.USD).toBe(35);
       expect(monthly.collectedRevenue).toBe(35);
     });
+
+    it('no debe incluir en el mes actual reservas o pedidos de otros meses ni computar reservas no pagadas como dinero cobrado', async () => {
+      const tenantId = 'tenant-fechas';
+      settingsRepo.findOne.mockResolvedValue({
+        id: tenantId,
+        exchangeRateBs: 50,
+        initialBankBs: 0,
+        initialCashUSD: 0,
+        currencySymbol: 'Bs.',
+      });
+
+      expenseRepo.find.mockResolvedValue([]);
+      cashExchangeRepo.find.mockResolvedValue([]);
+
+      // 1. Cita agendada hoy (octubre) para NOVIEMBRE de $75, PENDING y sin pagar (abonosTotal: 0)
+      const resNoviembre = {
+        id: 'res-nov-1',
+        tenantId,
+        date: '2026-11-17',
+        time: '10:30',
+        status: 'CONFIRMED',
+        paymentStatus: 'PENDING',
+        totalAmount: 75,
+        abonosTotal: 0,
+        orderId: 'ord-nov-1',
+        createdAt: new Date('2026-10-21T18:36:58.000Z'),
+      };
+
+      const orderNoviembre = {
+        id: 'ord-nov-1',
+        tenantId,
+        linkedReservationId: 'res-nov-1',
+        requestedDeliveryDate: new Date('2026-11-17T14:30:00.000Z'),
+        status: 'PENDING',
+        paymentStatus: 'PENDING',
+        totalAmount: 75,
+        abonosTotal: 0,
+        createdAt: new Date('2026-10-21T18:36:58.000Z'),
+        splitPayments: null,
+        abonosHistory: [],
+      };
+
+      // 2. Cita de OCTUBRE de $30 que AÚN NO se ha pagado (PENDING, abonosTotal: 0)
+      const resOctubreNoPagada = {
+        id: 'res-oct-unpaid',
+        tenantId,
+        date: '2026-10-26',
+        time: '09:30',
+        status: 'CONFIRMED',
+        paymentStatus: 'PENDING',
+        totalAmount: 30,
+        abonosTotal: 0,
+        orderId: 'ord-oct-unpaid',
+        createdAt: new Date('2026-10-24T10:00:00.000Z'),
+      };
+
+      const orderOctubreNoPagada = {
+        id: 'ord-oct-unpaid',
+        tenantId,
+        linkedReservationId: 'res-oct-unpaid',
+        requestedDeliveryDate: new Date('2026-10-26T13:30:00.000Z'),
+        status: 'PENDING',
+        paymentStatus: 'PENDING',
+        totalAmount: 30,
+        abonosTotal: 0,
+        createdAt: new Date('2026-10-24T10:00:00.000Z'),
+        splitPayments: null,
+        abonosHistory: [],
+      };
+
+      // 3. Venta pagada en OCTUBRE de $50 en efectivo USD
+      const orderOctubrePagada = {
+        id: 'ord-oct-paid',
+        tenantId,
+        linkedReservationId: null,
+        status: 'DELIVERED',
+        paymentStatus: 'PAID',
+        paymentMethod: 'USD',
+        totalAmount: 50,
+        totalCost: 10,
+        abonosTotal: 0,
+        createdAt: new Date('2026-10-15T15:00:00.000Z'),
+        splitPayments: null,
+        abonosHistory: [],
+      };
+
+      orderRepo.find.mockResolvedValue([orderNoviembre, orderOctubreNoPagada, orderOctubrePagada]);
+      reservationRepo.find.mockResolvedValue([resNoviembre, resOctubreNoPagada]);
+
+      // Consultar resumen de OCTUBRE (2026-10)
+      const octSummary = await service.getMonthlySummary(tenantId, '2026-10');
+
+      // En octubre NO debe figurar la orden de noviembre ($75)
+      // La cita de octubre no pagada ($30) debe registrarse en unpaidBookingsCount, NO en collectedRevenue ni byMethod
+      expect(octSummary.invoicedRevenue).toBe(50); // Solo la venta pagada real
+      expect(octSummary.collectedRevenue).toBe(50); // Solo los $50 cobrados
+      expect(octSummary.byMethod.USD).toBe(50); // Exactamente $50 en gaveta USD
+      expect(octSummary.unpaidBookingsCount).toBe(1); // 1 cita pendiente por cobrar en octubre
+      expect(octSummary.unpaidBookingsAmount).toBe(30); // $30 estimados pero no en caja
+
+      // Consultar resumen de NOVIEMBRE (2026-11)
+      const novSummary = await service.getMonthlySummary(tenantId, '2026-11');
+      // En noviembre, la cita de noviembre debe registrarse en noviembre (no en octubre)
+      expect(novSummary.unpaidBookingsCount).toBe(1);
+      expect(novSummary.unpaidBookingsAmount).toBe(75);
+      expect(novSummary.collectedRevenue).toBe(0); // $0 cobrados aún
+    });
   });
 });

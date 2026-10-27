@@ -72,6 +72,12 @@ export class Settings {
   @Column({ nullable: true })
   companyCopAccountHolder: string;
 
+  @Column({ nullable: true })
+  companyCopAccountType: string; // 'AHORROS' | 'CORRIENTE' | 'NEQUI' | 'DAVIPLATA'
+
+  @Column({ nullable: true })
+  companyCopCedula: string; // C.C., C.E. o NIT
+
   // --- Binance Pay Config ---
   @Column({ nullable: true })
   binancePayId: string;
@@ -85,6 +91,9 @@ export class Settings {
   // --- Métodos de pago aceptados ---
   @Column('boolean', { default: true })
   acceptCashUsd: boolean;
+
+  @Column('boolean', { default: true })
+  acceptCashBs: boolean;
 
   @Column('boolean', { default: true })
   acceptPagoMovil: boolean;
@@ -142,6 +151,28 @@ export class Settings {
   @Column('boolean', { default: true })
   featureShowCatalog: boolean;
 
+  // --- Soporte Fiscal / SENIAT / Facturación ---
+  @Column('boolean', { default: false })
+  featureFiscalSupport: boolean;
+
+  @Column('decimal', { precision: 5, scale: 2, default: 16.0, transformer: new ColumnNumericTransformer() })
+  fiscalDefaultTaxRate: number;
+
+  @Column({ nullable: true })
+  fiscalRif: string;
+
+  @Column({ nullable: true })
+  fiscalCompanyName: string;
+
+  @Column({ nullable: true })
+  fiscalAddress: string;
+
+  @Column({ nullable: true })
+  fiscalPhone: string;
+
+  @Column({ type: 'varchar', default: 'INTERNAL' })
+  fiscalMode: 'INTERNAL' | 'UNIDIGITAL';
+
   @Column('boolean', { default: true })
   bookingRequireService: boolean;
 
@@ -193,7 +224,16 @@ export class Settings {
   initialBankBs: number;
 
   @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  initialCashBs: number;
+
+  @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
   initialDigitalUSD: number;
+
+  @Column('decimal', { precision: 14, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  initialCashCop: number;
+
+  @Column('decimal', { precision: 14, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  initialBankCop: number;
 
   @ManyToOne(() => Tenant)
   @JoinColumn({ name: 'tenantId' })

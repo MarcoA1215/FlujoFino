@@ -31,6 +31,16 @@ describe('Public Routes Protection on 401 Interceptor', () => {
 });
 
 describe('Dynamic BaseURL Resolution (getBaseURL)', () => {
+  it('debe identificar correctamente direcciones locales y remotas', async () => {
+    const { isLocalAddress } = await import('./client');
+    expect(isLocalAddress('http://localhost:3001')).toBe(true);
+    expect(isLocalAddress('http://127.0.0.1:3001')).toBe(true);
+    expect(isLocalAddress('http://192.168.1.50:5173')).toBe(true);
+    expect(isLocalAddress('https://flujofino.onrender.com')).toBe(false);
+    expect(isLocalAddress('https://finowork.com')).toBe(false);
+    expect(isLocalAddress('https://finowork.vercel.app')).toBe(false);
+  });
+
   it('debe usar el backend oficial de produccion en dominios reales o cuando VITE_API_URL esta definido', async () => {
     const { getBaseURL, PROD_API_FALLBACK } = await import('./client');
     const url = getBaseURL();
