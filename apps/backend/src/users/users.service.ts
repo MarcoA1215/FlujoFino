@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not } from 'typeorm';
+import { Repository, Not, Like } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Tenant } from '../entities/tenant.entity';
@@ -78,7 +78,17 @@ export class UsersService implements OnModuleInit {
           ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "salaryPeriod" character varying;
           ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "compensation_type" character varying DEFAULT 'FIJO';
           ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "commission_percentage" numeric(5,2);
+          ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "last_payroll_date" character varying;
+          ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "last_payroll_period_start" character varying;
+          ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "last_payroll_period_end" character varying;
+          ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "last_payroll_amount" numeric(12,2);
+          ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "commissionPaid" boolean DEFAULT false;
+          ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "commissionPaidAt" timestamp;
+          ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "payrollExpenseId" character varying;
           ALTER TABLE "reservation" ADD COLUMN IF NOT EXISTS "serviceSpecialists" jsonb;
+          ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "commissionPaid" boolean DEFAULT false;
+          ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "commissionPaidAt" timestamp;
+          ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "payrollExpenseId" character varying;
           ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "employeeId" character varying;
         `);
 
@@ -204,6 +214,10 @@ export class UsersService implements OnModuleInit {
         (user as any).commissionPercentage = (access.commissionPercentage !== null && access.commissionPercentage !== undefined)
           ? Number(access.commissionPercentage)
           : null;
+        (user as any).lastPayrollDate = access.lastPayrollDate;
+        (user as any).lastPayrollPeriodStart = access.lastPayrollPeriodStart;
+        (user as any).lastPayrollPeriodEnd = access.lastPayrollPeriodEnd;
+        (user as any).lastPayrollAmount = access.lastPayrollAmount;
         delete (user as any).passwordHash;
         tenantUsers.push(user);
       }
@@ -547,7 +561,127 @@ export class UsersService implements OnModuleInit {
             .execute();
         }
       }
+
+      // 3. Marcar reservas incluidas en la liquidación como comisiones pagadas
+      const reservationIds: string[] = Array.isArray(data.reservationIds) ? data.reservationIds : [];
+      if (reservationIds.length > 0) {
+        await manager.createQueryBuilder()
+          .update(Reservation)
+          .set({
+            commissionPaid: true,
+            commissionPaidAt: new Date(),
+            payrollExpenseId: expense.id,
+          })
+          .where('id IN (:...reservationIds) AND "tenantId" = :tenantId', {
+            reservationIds,
+            tenantId,
+          })
+          .execute();
+      } else if (data.periodStart && data.periodEnd) {
+        const userSearch = `%"employeeId":"${userId}"%`;
+        await manager.createQueryBuilder()
+          .update(Reservation)
+          .set({
+            commissionPaid: true,
+            commissionPaidAt: new Date(),
+            payrollExpenseId: expense.id,
+          })
+          .where('"tenantId" = :tenantId', { tenantId })
+          .andWhere('(CAST("employeeId" AS text) = :userId OR ("serviceSpecialists" IS NOT NULL AND CAST("serviceSpecialists" AS text) LIKE :userSearch))', { userId, userSearch })
+          .andWhere('date >= :periodStart AND date <= :periodEnd', { periodStart: data.periodStart, periodEnd: data.periodEnd })
+          .andWhere('"commissionPaid" = false')
+          .execute();
+      }
+
+      // 4. Marcar órdenes incluidas en la liquidación como comisiones pagadas
+      const orderIds: string[] = Array.isArray(data.orderIds) ? data.orderIds : [];
+      if (orderIds.length > 0) {
+        await manager.createQueryBuilder()
+          .update(Order)
+          .set({
+            commissionPaid: true,
+            commissionPaidAt: new Date(),
+            payrollExpenseId: expense.id,
+          })
+          .where('id IN (:...orderIds) AND "tenantId" = :tenantId', {
+            orderIds,
+            tenantId,
+          })
+          .execute();
+      } else if (data.periodStart && data.periodEnd) {
+        await manager.createQueryBuilder()
+          .update(Order)
+          .set({
+            commissionPaid: true,
+            commissionPaidAt: new Date(),
+            payrollExpenseId: expense.id,
+          })
+          .where('"tenantId" = :tenantId', { tenantId })
+          .andWhere('(CAST("employeeId" AS text) = :userId OR EXISTS (SELECT 1 FROM "order_item" oi WHERE oi."orderId" = "order".id AND oi."employeeId" = :userId))', { userId })
+          .andWhere('"createdAt" >= :startDateTime AND "createdAt" <= :endDateTime', {
+            startDateTime: new Date(`${data.periodStart}T00:00:00.000-04:00`),
+            endDateTime: new Date(`${data.periodEnd}T23:59:59.999-04:00`),
+          })
+          .andWhere('"commissionPaid" = false')
+          .execute();
+      }
+
+      // 5. Registrar fecha y período de última nómina liquidada en UserTenantAccess
+      const effectivePayDate = data.date || new Date().toISOString().split('T')[0];
+      await manager.createQueryBuilder()
+        .update(UserTenantAccess)
+        .set({
+          lastPayrollDate: effectivePayDate,
+          lastPayrollPeriodStart: data.periodStart || null,
+          lastPayrollPeriodEnd: data.periodEnd || null,
+          lastPayrollAmount: Number(data.amount),
+        })
+        .where('"userId" = :userId AND "tenantId" = :tenantId', {
+          userId,
+          tenantId,
+        })
+        .execute();
     });
+  }
+
+  async settleWorkItems(
+    tenantId: string,
+    userId: string,
+    data: { reservationIds?: string[]; orderIds?: string[]; settled: boolean }
+  ): Promise<{ success: boolean; settled: boolean }> {
+    if (!tenantId) throw new Error('Tenant ID required');
+    const settled = Boolean(data.settled);
+    const now = settled ? new Date() : null;
+
+    if (Array.isArray(data.reservationIds) && data.reservationIds.length > 0) {
+      await this.usersRepo.manager.createQueryBuilder()
+        .update(Reservation)
+        .set({
+          commissionPaid: settled,
+          commissionPaidAt: now,
+        })
+        .where('id IN (:...ids) AND "tenantId" = :tenantId', {
+          ids: data.reservationIds,
+          tenantId,
+        })
+        .execute();
+    }
+
+    if (Array.isArray(data.orderIds) && data.orderIds.length > 0) {
+      await this.usersRepo.manager.createQueryBuilder()
+        .update(Order)
+        .set({
+          commissionPaid: settled,
+          commissionPaidAt: now,
+        })
+        .where('id IN (:...ids) AND "tenantId" = :tenantId', {
+          ids: data.orderIds,
+          tenantId,
+        })
+        .execute();
+    }
+
+    return { success: true, settled };
   }
 
   async getPayrollSummary(
@@ -555,6 +689,7 @@ export class UsersService implements OnModuleInit {
     userId: string,
     startDate?: string,
     endDate?: string,
+    includeBaseSalary?: boolean,
   ) {
     if (!tenantId) throw new Error('Tenant ID required');
 
@@ -579,6 +714,30 @@ export class UsersService implements OnModuleInit {
       ? Number(access.salaryAmount)
       : 0;
     const salaryPeriod = access?.salaryPeriod || null;
+
+    let lastPayrollDate = access?.lastPayrollDate || null;
+    let lastPayrollPeriodStart = access?.lastPayrollPeriodStart || null;
+    let lastPayrollPeriodEnd = access?.lastPayrollPeriodEnd || null;
+    let lastPayrollAmount = access?.lastPayrollAmount !== null && access?.lastPayrollAmount !== undefined
+      ? Number(access.lastPayrollAmount)
+      : null;
+
+    if (!lastPayrollDate) {
+      try {
+        const prevExpense = await this.usersRepo.manager.findOne(OperatingExpense, {
+          where: {
+            tenantId,
+            category: 'PAYROLL',
+            description: Like(`%${userObj.name || userObj.username || userId}%`),
+          },
+          order: { createdAt: 'DESC' },
+        });
+        if (prevExpense) {
+          lastPayrollDate = prevExpense.createdAt ? new Date(prevExpense.createdAt).toISOString().split('T')[0] : null;
+          lastPayrollAmount = Number(prevExpense.amount || 0);
+        }
+      } catch (e) {}
+    }
 
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -877,6 +1036,9 @@ export class UsersService implements OnModuleInit {
     let totalPendingBilled = 0;
     let totalPaidCommissionableBase = 0;
     let totalPendingCommissionableBase = 0;
+    let totalSettledCommissionableBase = 0;
+    let settledServicesCount = 0;
+    let pendingServicesCount = 0;
 
     const processedReservations = reservations.map(r => {
       const fullAmt = Number(r.totalAmount || 0);
@@ -898,10 +1060,20 @@ export class UsersService implements OnModuleInit {
         }
       }
       const pending = Math.max(0, amt - paid);
+      const isAlreadySettled = Boolean(r.commissionPaid);
+
       totalPaidBilled += paid;
       totalPendingBilled += pending;
-      totalPaidCommissionableBase += paid;
-      totalPendingCommissionableBase += pending;
+
+      if (isAlreadySettled) {
+        settledServicesCount++;
+        totalSettledCommissionableBase += paid;
+      } else {
+        pendingServicesCount++;
+        totalPaidCommissionableBase += paid;
+        totalPendingCommissionableBase += pending;
+      }
+
       return {
         ...r,
         userBilledAmount: amt,
@@ -909,8 +1081,12 @@ export class UsersService implements OnModuleInit {
         calcPending: pending,
         isPaidEffective: isPaid,
         calcPaymentStatus: isPaid ? 'PAID' : (paid > 0 ? 'PARTIAL' : 'PENDING'),
+        isAlreadySettled,
       };
     });
+
+    let settledOrdersCount = 0;
+    let pendingOrdersCount = 0;
 
     const processedOrders = relevantStandaloneOrders.map(o => {
       const fullAmt = Number(o.totalAmount || 0);
@@ -944,10 +1120,18 @@ export class UsersService implements OnModuleInit {
       }
       const pendingCommBase = Math.max(0, Number((commBase - paidCommBase).toFixed(2)));
 
+      const isAlreadySettled = Boolean(o.commissionPaid);
       totalPaidBilled += paid;
       totalPendingBilled += pending;
-      totalPaidCommissionableBase += paidCommBase;
-      totalPendingCommissionableBase += pendingCommBase;
+
+      if (isAlreadySettled) {
+        settledOrdersCount++;
+        totalSettledCommissionableBase += paidCommBase;
+      } else {
+        pendingOrdersCount++;
+        totalPaidCommissionableBase += paidCommBase;
+        totalPendingCommissionableBase += pendingCommBase;
+      }
 
       return {
         ...o,
@@ -959,6 +1143,7 @@ export class UsersService implements OnModuleInit {
         calcPendingCommissionable: pendingCommBase,
         isPaidEffective: isPaid,
         calcPaymentStatus: isPaid ? 'PAID' : (paid > 0 ? 'PARTIAL' : 'PENDING'),
+        isAlreadySettled,
       };
     });
 
@@ -969,19 +1154,31 @@ export class UsersService implements OnModuleInit {
     totalPendingBilled = Number(totalPendingBilled.toFixed(2));
     const totalBilled = Number((totalPaidBilled + totalPendingBilled).toFixed(2));
 
-    // Comisión liquidable a pagar: SOLO sobre trabajos cobrados (en Compra-Venta sobre ganancia neta; en Servicios sobre monto cobrado)
+    // Comisión liquidable a pagar: SOLO sobre trabajos cobrados no liquidados previamente
     let commissionEarned = 0;
     // Comisión por cobrar: trabajos completados pero aún no pagados por el cliente
     let pendingCommission = 0;
+    // Comisión histórica ya liquidada previamente en este período
+    let settledCommission = 0;
 
     if (compensationType === 'COMISION' || compensationType === 'MIXTO') {
       commissionEarned = Number(((totalPaidCommissionableBase * (commissionPercentage || 0)) / 100).toFixed(2));
       pendingCommission = Number(((totalPendingCommissionableBase * (commissionPercentage || 0)) / 100).toFixed(2));
+      settledCommission = Number(((totalSettledCommissionableBase * (commissionPercentage || 0)) / 100).toFixed(2));
     }
+
+    // Sueldo Base: verificar si el período ya fue cubierto en una nómina previa
+    const baseSalaryAlreadySettled = Boolean(
+      lastPayrollPeriodEnd && endDate && lastPayrollPeriodEnd >= endDate
+    );
+
+    const includeBaseSalaryEffective = includeBaseSalary !== undefined
+      ? includeBaseSalary
+      : !baseSalaryAlreadySettled;
 
     let baseSalary = 0;
     if (compensationType === 'FIJO' || compensationType === 'MIXTO') {
-      baseSalary = Number(salaryAmount.toFixed(2));
+      baseSalary = includeBaseSalaryEffective ? Number(salaryAmount.toFixed(2)) : 0;
     }
 
     const grossTotal = Number((baseSalary + commissionEarned).toFixed(2));
@@ -1003,35 +1200,47 @@ export class UsersService implements OnModuleInit {
     const netPayableUSD = Math.max(0, Number((grossTotal - advancesDeduction).toFixed(2)));
 
     const workItems = [
-      ...processedReservations.map(r => ({
-        type: 'RESERVATION' as const,
-        id: r.id,
-        date: r.date,
-        time: r.time,
-        client: r.customerName || 'Cliente',
-        description: (r as any).userServicesDescription || r.serviceName || 'Servicio realizado',
-        amount: Number(r.userBilledAmount !== undefined ? r.userBilledAmount : (r.totalAmount || 0)),
-        paidAmount: r.calcPaid,
-        pendingAmount: r.calcPending,
-        isPaid: r.isPaidEffective,
-        paymentStatus: r.calcPaymentStatus,
-        commissionAmount: Number(((r.calcPaid * (commissionPercentage || 0)) / 100).toFixed(2)),
-      })),
-      ...processedOrders.map(o => ({
-        type: 'ORDER' as const,
-        id: o.id,
-        date: o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '',
-        time: o.createdAt ? new Date(o.createdAt).toISOString().split('T')[1]?.substring(0, 5) : '',
-        client: o.customerName || 'Cliente',
-        description: (o as any).userItemsDescription ? `Pedido #${o.id.substring(0, 6)} (${(o as any).userItemsDescription})` : `Pedido #${o.id.substring(0, 6)}`,
-        amount: Number(o.userBilledAmount !== undefined ? o.userBilledAmount : (o.totalAmount || 0)),
-        commissionableAmount: o.calcCommissionableBase,
-        paidAmount: o.calcPaid,
-        pendingAmount: o.calcPending,
-        isPaid: o.isPaidEffective,
-        paymentStatus: o.calcPaymentStatus,
-        commissionAmount: Number(((o.calcPaidCommissionable * (commissionPercentage || 0)) / 100).toFixed(2)),
-      })),
+      ...processedReservations.map(r => {
+        const calcComm = Number(((r.calcPaid * (commissionPercentage || 0)) / 100).toFixed(2));
+        return {
+          type: 'RESERVATION' as const,
+          id: r.id,
+          date: r.date,
+          time: r.time,
+          client: r.customerName || 'Cliente',
+          description: (r as any).userServicesDescription || r.serviceName || 'Servicio realizado',
+          amount: Number(r.userBilledAmount !== undefined ? r.userBilledAmount : (r.totalAmount || 0)),
+          paidAmount: r.calcPaid,
+          pendingAmount: r.calcPending,
+          isPaid: r.isPaidEffective,
+          paymentStatus: r.calcPaymentStatus,
+          commissionPaid: Boolean(r.commissionPaid),
+          commissionPaidAt: r.commissionPaidAt ? new Date(r.commissionPaidAt).toISOString() : null,
+          commissionAmount: r.commissionPaid ? 0 : calcComm,
+          historicalCommission: calcComm,
+        };
+      }),
+      ...processedOrders.map(o => {
+        const calcComm = Number(((o.calcPaidCommissionable * (commissionPercentage || 0)) / 100).toFixed(2));
+        return {
+          type: 'ORDER' as const,
+          id: o.id,
+          date: o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '',
+          time: o.createdAt ? new Date(o.createdAt).toISOString().split('T')[1]?.substring(0, 5) : '',
+          client: o.customerName || 'Cliente',
+          description: (o as any).userItemsDescription ? `Pedido #${o.id.substring(0, 6)} (${(o as any).userItemsDescription})` : `Pedido #${o.id.substring(0, 6)}`,
+          amount: Number(o.userBilledAmount !== undefined ? o.userBilledAmount : (o.totalAmount || 0)),
+          commissionableAmount: o.calcCommissionableBase,
+          paidAmount: o.calcPaid,
+          pendingAmount: o.calcPending,
+          isPaid: o.isPaidEffective,
+          paymentStatus: o.calcPaymentStatus,
+          commissionPaid: Boolean(o.commissionPaid),
+          commissionPaidAt: o.commissionPaidAt ? new Date(o.commissionPaidAt).toISOString() : null,
+          commissionAmount: o.commissionPaid ? 0 : calcComm,
+          historicalCommission: calcComm,
+        };
+      }),
     ].sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
 
     return {
@@ -1045,15 +1254,27 @@ export class UsersService implements OnModuleInit {
       salaryPeriod,
       commissionPercentage,
       servicesCount: processedReservations.length,
+      pendingServicesCount,
+      settledServicesCount,
       servicesTotalBilled: Number(servicesTotalBilled.toFixed(2)),
       ordersCount: processedOrders.length,
+      pendingOrdersCount,
+      settledOrdersCount,
       ordersTotalBilled: Number(ordersTotalBilled.toFixed(2)),
       totalBilled,
       totalPaidBilled,
       totalPendingBilled,
       commissionEarned,
       pendingCommission,
+      settledCommission,
       baseSalary,
+      baseSalaryConfigured: salaryAmount,
+      baseSalaryAlreadySettled,
+      includeBaseSalary: includeBaseSalaryEffective,
+      lastPayrollDate,
+      lastPayrollPeriodStart,
+      lastPayrollPeriodEnd,
+      lastPayrollAmount,
       grossTotal,
       pendingAdvancesTotalUSD,
       pendingAdvancesTotalBS,

@@ -124,6 +124,15 @@ export class Reservation {
   @Column({ type: 'boolean', default: false })
   isBlock: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  commissionPaid: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  commissionPaidAt: Date | null;
+
+  @Column({ nullable: true })
+  payrollExpenseId: string | null;
+
   @ManyToOne(() => Tenant)
   @JoinColumn({ name: 'tenantId' })
   tenant: Tenant;

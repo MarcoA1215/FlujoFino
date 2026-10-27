@@ -675,18 +675,124 @@ describe('UsersService', () => {
       // Ganancia del Shampoo = $50 - $30 = $20 -> 10% de $20 = $2 USD
       expect(summary.commissionEarned).toBe(2);
     });
+
+    it('no debe volver a calcular comisión de reservas u órdenes con commissionPaid = true', async () => {
+      const mockAccess = {
+        userId: 'claudia-1',
+        tenantId: 'tenant-1',
+        compensationType: 'COMISION',
+        commissionPercentage: 35, // 35%
+        user: { id: 'claudia-1', username: 'claudia', name: 'Claudia Fisioterapeuta' },
+      };
+
+      const mockReservations = [
+        {
+          id: 'res-already-paid',
+          date: '2026-10-26',
+          time: '10:00',
+          customerName: 'Cliente Antiguo',
+          serviceName: 'Masaje Terapéutico',
+          totalAmount: 28,
+          status: ReservationStatus.COMPLETED,
+          paymentStatus: PaymentStatus.PAID,
+          commissionPaid: true, // Ya fue liquidada en la nómina anterior!
+        },
+        {
+          id: 'res-new-unpaid',
+          date: '2026-10-27',
+          time: '14:00',
+          customerName: 'Cliente Nuevo',
+          serviceName: 'Terapia Manual',
+          totalAmount: 40,
+          status: ReservationStatus.COMPLETED,
+          paymentStatus: PaymentStatus.PAID,
+          commissionPaid: false, // Nueva, pendiente por liquidar
+        },
+      ];
+
+      mockUsersRepo.manager.findOne.mockResolvedValue(mockAccess);
+      mockUsersRepo.manager.createQueryBuilder.mockImplementation((entity: any) => {
+        if (entity === Reservation) {
+          return {
+            where: jest.fn().mockReturnThis(),
+            andWhere: jest.fn().mockReturnThis(),
+            orderBy: jest.fn().mockReturnThis(),
+            addOrderBy: jest.fn().mockReturnThis(),
+            getMany: jest.fn().mockResolvedValue(mockReservations),
+          };
+        }
+        return {
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          orderBy: jest.fn().mockReturnThis(),
+          getMany: jest.fn().mockResolvedValue([]),
+        };
+      });
+      mockUsersRepo.manager.find.mockResolvedValue([]);
+
+      const summary = await service.getPayrollSummary('tenant-1', 'claudia-1', '2026-10-20', '2026-10-27');
+
+      expect(summary.servicesCount).toBe(2);
+      expect(summary.settledServicesCount).toBe(1);
+      expect(summary.pendingServicesCount).toBe(1);
+      // Solo debe comisionar la nueva: 35% de $40 = $14 USD
+      // La de $28 ya liquidada ($9.80) NO debe estar en commissionEarned!
+      expect(summary.commissionEarned).toBe(14);
+      expect(summary.settledCommission).toBe(9.8);
+      expect(summary.netPayableUSD).toBe(14);
+    });
+
+    it('debe reconocer si el sueldo base ya fue liquidado para el período seleccionado', async () => {
+      const mockAccess = {
+        userId: 'claudia-2',
+        tenantId: 'tenant-1',
+        compensationType: 'MIXTO',
+        salaryAmount: 40,
+        salaryPeriod: 'SEMANAL',
+        commissionPercentage: 35,
+        lastPayrollDate: '2026-10-27',
+        lastPayrollPeriodStart: '2026-10-20',
+        lastPayrollPeriodEnd: '2026-10-27', // Período liquidado hasta el 27
+        user: { id: 'claudia-2', username: 'claudia', name: 'Claudia Fisioterapeuta' },
+      };
+
+      mockUsersRepo.manager.findOne.mockResolvedValue(mockAccess);
+      mockUsersRepo.manager.createQueryBuilder.mockImplementation(() => ({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      }));
+      mockUsersRepo.manager.find.mockResolvedValue([]);
+
+      // Si se consulta el mismo período ya liquidado
+      const summary = await service.getPayrollSummary('tenant-1', 'claudia-2', '2026-10-20', '2026-10-27');
+
+      expect(summary.baseSalaryAlreadySettled).toBe(true);
+      expect(summary.baseSalary).toBe(0); // No cobra sueldo base repetido por defecto!
+      expect(summary.baseSalaryConfigured).toBe(40);
+      expect(summary.netPayableUSD).toBe(0);
+
+      // Si el usuario fuerza la inclusión del sueldo base (includeBaseSalary: true)
+      const summaryForced = await service.getPayrollSummary('tenant-1', 'claudia-2', '2026-10-20', '2026-10-27', true);
+      expect(summaryForced.baseSalaryAlreadySettled).toBe(true);
+      expect(summaryForced.baseSalary).toBe(40);
+      expect(summaryForced.netPayableUSD).toBe(40);
+    });
   });
 
   describe('paySalary', () => {
-    it('debe registrar el egreso y descontar vales pendientes cuando deductAdvances sea true', async () => {
+    it('debe registrar el egreso, descontar vales y marcar reservas y UserTenantAccess como liquidados', async () => {
       const updateQb = {
         set: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({ affected: 2 }),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
       };
 
       const mockManager = {
-        create: jest.fn((entityClass, data) => ({ ...data })),
+        create: jest.fn((entityClass, data) => ({ ...data, id: 'expense-123' })),
         save: jest.fn((entity) => Promise.resolve(entity)),
         createQueryBuilder: jest.fn().mockReturnValue({
           update: jest.fn().mockReturnValue(updateQb),
@@ -695,11 +801,14 @@ describe('UsersService', () => {
 
       mockUsersRepo.manager.transaction.mockImplementation(async (cb: any) => cb(mockManager));
 
-      await service.paySalary('tenant-1', 'user-1', {
-        username: 'juan_barbero',
-        amount: 80,
+      await service.paySalary('tenant-1', 'claudia-1', {
+        username: 'claudia',
+        amount: 49.8,
         method: 'CASH',
-        date: '2026-10-12',
+        date: '2026-10-27',
+        periodStart: '2026-10-20',
+        periodEnd: '2026-10-27',
+        reservationIds: ['res-1'],
         deductAdvances: true,
       });
 
@@ -708,11 +817,54 @@ describe('UsersService', () => {
         expect.objectContaining({
           tenantId: 'tenant-1',
           category: 'PAYROLL',
-          amount: 80,
+          amount: 49.8,
         }),
       );
       expect(mockManager.createQueryBuilder).toHaveBeenCalled();
-      expect(updateQb.set).toHaveBeenCalledWith({ status: SalaryAdvanceStatus.DESCONTADO });
+      // Debe actualizar UserTenantAccess con la fecha y período
+      expect(updateQb.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lastPayrollDate: '2026-10-27',
+          lastPayrollPeriodStart: '2026-10-20',
+          lastPayrollPeriodEnd: '2026-10-27',
+          lastPayrollAmount: 49.8,
+        }),
+      );
+      // Debe marcar las reservas como liquidadas
+      expect(updateQb.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          commissionPaid: true,
+          payrollExpenseId: 'expense-123',
+        }),
+      );
+    });
+  });
+
+  describe('settleWorkItems', () => {
+    it('debe actualizar el estado commissionPaid de reservas y órdenes', async () => {
+      const updateQb = {
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      };
+
+      mockUsersRepo.manager.createQueryBuilder = jest.fn().mockReturnValue({
+        update: jest.fn().mockReturnValue(updateQb),
+      });
+
+      const res = await service.settleWorkItems('tenant-1', 'user-1', {
+        reservationIds: ['res-abc'],
+        orderIds: ['ord-xyz'],
+        settled: true,
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.settled).toBe(true);
+      expect(updateQb.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          commissionPaid: true,
+        }),
+      );
     });
   });
 });

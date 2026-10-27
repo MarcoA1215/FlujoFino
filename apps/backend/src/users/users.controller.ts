@@ -58,8 +58,15 @@ export class UsersController {
     @Param('id') id: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('includeBaseSalary') includeBaseSalary?: string,
   ) {
-    return this.usersService.getPayrollSummary(req.user.tenantId, id, startDate, endDate);
+    return this.usersService.getPayrollSummary(
+      req.user.tenantId,
+      id,
+      startDate,
+      endDate,
+      includeBaseSalary !== undefined ? includeBaseSalary === 'true' : undefined,
+    );
   }
 
   @Post()
@@ -78,6 +85,12 @@ export class UsersController {
   @Roles(UserRole.ADMIN)
   patch(@Request() req, @Param('id') id: string, @Body() data: any) {
     return this.usersService.update(req.user.tenantId, id, data);
+  }
+
+  @Patch(':id/settle-work-items')
+  @Roles(UserRole.ADMIN)
+  settleWorkItems(@Request() req, @Param('id') id: string, @Body() data: any) {
+    return this.usersService.settleWorkItems(req.user.tenantId, id, data);
   }
 
   @Post(':id/pay')

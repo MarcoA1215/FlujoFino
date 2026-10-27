@@ -260,6 +260,15 @@ export class Order {
   @Column({ nullable: true })
   offlineId?: string;
 
+  @Column({ type: 'boolean', default: false })
+  commissionPaid: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  commissionPaidAt: Date | null;
+
+  @Column({ nullable: true })
+  payrollExpenseId: string | null;
+
   @BeforeInsert()
   @BeforeUpdate()
   syncDriverAssignment() {
