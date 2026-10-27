@@ -266,7 +266,7 @@ export class Order {
   @Column({ type: 'timestamp', nullable: true })
   commissionPaidAt: Date | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   payrollExpenseId: string | null;
 
   @BeforeInsert()

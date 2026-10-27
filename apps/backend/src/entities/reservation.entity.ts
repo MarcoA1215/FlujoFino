@@ -130,7 +130,7 @@ export class Reservation {
   @Column({ type: 'timestamp', nullable: true })
   commissionPaidAt: Date | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   payrollExpenseId: string | null;
 
   @ManyToOne(() => Tenant)
