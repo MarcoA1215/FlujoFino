@@ -33,7 +33,7 @@ import { SaaSPaymentReport } from '../../entities/saas-payment-report.entity';
 import { PlatformConfig } from '../../entities/platform-config.entity';
 import { Promoter } from '../../entities/promoter.entity';
 import { PromoterCommission } from '../../entities/promoter-commission.entity';
-import { SalaryAdvance } from '../../entities/salary-advance.entity';
+import { SalaryAdvance, SalaryAdvanceStatus } from '../../entities/salary-advance.entity';
 import { CashExchange } from '../../entities/cash-exchange.entity';
 import { Investment } from '../../entities/investment.entity';
 import { PushSubscription } from '../../entities/push-subscription.entity';
@@ -99,6 +99,14 @@ async function runSeed() {
     `ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "durationMinutes" integer;`,
     `ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "roles" text DEFAULT '';`,
     `ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "job_title" character varying;`,
+    `ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "compensation_type" character varying DEFAULT 'FIJO';`,
+    `ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "commission_percentage" numeric(5,2);`,
+    `ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "salaryAmount" numeric(12,2);`,
+    `ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "salaryPeriod" character varying;`,
+    `ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "entry_time" character varying;`,
+    `ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "exit_time" character varying;`,
+    `ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "lunch_start" character varying;`,
+    `ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "lunch_end" character varying;`,
     `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "initialCashCop" numeric(14,2) DEFAULT 0;`,
     `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "featureFiscalSupport" boolean DEFAULT false;`,
     `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "fiscalDefaultTaxRate" numeric(5,2) DEFAULT 16.00;`,
@@ -142,6 +150,7 @@ async function runSeed() {
   const expenseRepo = dataSource.getRepository(OperatingExpense);
   const variantRepo = dataSource.getRepository(ProductVariant);
   const fiscalInvoiceRepo = dataSource.getRepository(FiscalInvoice);
+  const salaryAdvanceRepo = dataSource.getRepository(SalaryAdvance);
 
   try {
     const passwordHash = await bcrypt.hash('123456', 10);
@@ -178,8 +187,28 @@ async function runSeed() {
       return user;
     }
 
-    async function linkAccess(userId: string, tenantId: string, role: UserRole, jobTitle: string) {
+    interface CompensationConfig {
+      compensationType?: 'FIJO' | 'COMISION' | 'MIXTO';
+      commissionPercentage?: number;
+      salaryAmount?: number;
+      salaryPeriod?: 'SEMANAL' | 'QUINCENAL' | 'MENSUAL';
+      entryTime?: string;
+      exitTime?: string;
+    }
+
+    async function linkAccess(
+      userId: string,
+      tenantId: string,
+      role: UserRole,
+      jobTitle: string,
+      compensation?: CompensationConfig,
+    ) {
       let access = await accessRepo.findOne({ where: { userId, tenantId } });
+      const compType = compensation?.compensationType || 'FIJO';
+      const commPct = compensation?.commissionPercentage ?? null;
+      const salary = compensation?.salaryAmount ?? null;
+      const period = compensation?.salaryPeriod ?? (compType === 'COMISION' ? null : 'SEMANAL');
+
       if (!access) {
         access = accessRepo.create({
           userId,
@@ -189,11 +218,80 @@ async function runSeed() {
           isActive: true,
           status: 'ACCEPTED',
           jobTitle,
+          compensationType: compType,
+          commissionPercentage: commPct !== null ? commPct : undefined,
+          salaryAmount: salary !== null ? salary : undefined,
+          salaryPeriod: period || undefined,
+          entryTime: compensation?.entryTime || undefined,
+          exitTime: compensation?.exitTime || undefined,
         });
         access = await accessRepo.save(access);
-        console.log(`   ✅ [ACCESO] ${jobTitle}: usuario vinculado a negocio`);
+        console.log(`   ✅ [ACCESO] ${jobTitle}: vinculado (${compType})`);
+      } else {
+        let updated = false;
+        if (access.jobTitle !== jobTitle) {
+          access.jobTitle = jobTitle;
+          updated = true;
+        }
+        if (access.role !== role) {
+          access.role = role;
+          updated = true;
+        }
+        if (!access.roles || access.roles.length === 0) {
+          access.roles = [role];
+          updated = true;
+        }
+        if (compensation) {
+          if (access.compensationType !== compType) {
+            access.compensationType = compType;
+            updated = true;
+          }
+          if (commPct !== null && Number(access.commissionPercentage) !== commPct) {
+            access.commissionPercentage = commPct as any;
+            updated = true;
+          }
+          if (salary !== null && Number(access.salaryAmount) !== salary) {
+            access.salaryAmount = salary as any;
+            updated = true;
+          }
+          if (period && access.salaryPeriod !== period) {
+            access.salaryPeriod = period;
+            updated = true;
+          }
+          if (compensation.entryTime && access.entryTime !== compensation.entryTime) {
+            access.entryTime = compensation.entryTime;
+            updated = true;
+          }
+          if (compensation.exitTime && access.exitTime !== compensation.exitTime) {
+            access.exitTime = compensation.exitTime;
+            updated = true;
+          }
+        }
+        if (updated) {
+          access = await accessRepo.save(access);
+          console.log(`   🔄 [ACCESO ACTUALIZADO] ${jobTitle}: compensación ${compType}`);
+        }
       }
       return access;
+    }
+
+    async function getOrCreateSalaryAdvance(tenantId: string, data: Partial<SalaryAdvance>) {
+      let adv = await salaryAdvanceRepo.findOne({ 
+        where: { negocioId: tenantId, userId: data.userId, reason: data.reason } 
+      });
+      if (!adv) {
+        adv = salaryAdvanceRepo.create({ 
+          ...data, 
+          negocioId: tenantId,
+          exchangeRate: data.exchangeRate || tasaActual,
+          amountBS: data.amountBS || (data.amountUSD ? Number((data.amountUSD * tasaActual).toFixed(2)) : 0),
+          status: data.status || SalaryAdvanceStatus.PENDIENTE,
+          date: data.date || todayIso,
+        });
+        adv = await salaryAdvanceRepo.save(adv);
+        console.log(`   💸 [VALE] ${data.reason}: $${adv.amountUSD} USD (${adv.status})`);
+      }
+      return adv;
     }
 
     async function getOrCreateCustomer(tenantId: string, data: Partial<Customer>) {
@@ -599,11 +697,11 @@ async function runSeed() {
       }));
     }
     // Accesos del equipo Boutique
-    await linkAccess(promoter.id, tenantRetail.id, UserRole.ADMIN, 'Gerente General');
-    await linkAccess(demoAdmin.id, tenantRetail.id, UserRole.ADMIN, 'Administrador');
-    await linkAccess(cashierUser.id, tenantRetail.id, UserRole.POS, 'Cajera Principal');
-    await linkAccess(asesorBoutiqueUser.id, tenantRetail.id, UserRole.POS, 'Asesora de Moda & Ventas');
-    await linkAccess(almacenBoutiqueUser.id, tenantRetail.id, UserRole.OPERATIVO, 'Control de Stock & Almacén');
+    await linkAccess(promoter.id, tenantRetail.id, UserRole.ADMIN, 'Gerente General', { compensationType: 'FIJO', salaryAmount: 120.0, salaryPeriod: 'SEMANAL', entryTime: '08:30', exitTime: '17:30' });
+    await linkAccess(demoAdmin.id, tenantRetail.id, UserRole.ADMIN, 'Administrador', { compensationType: 'FIJO', salaryAmount: 100.0, salaryPeriod: 'SEMANAL', entryTime: '08:30', exitTime: '17:30' });
+    await linkAccess(cashierUser.id, tenantRetail.id, UserRole.POS, 'Cajera Principal', { compensationType: 'FIJO', salaryAmount: 50.0, salaryPeriod: 'SEMANAL', entryTime: '08:30', exitTime: '17:30' });
+    await linkAccess(asesorBoutiqueUser.id, tenantRetail.id, UserRole.POS, 'Asesora de Moda & Ventas', { compensationType: 'MIXTO', salaryAmount: 35.0, salaryPeriod: 'SEMANAL', commissionPercentage: 5.0, entryTime: '09:00', exitTime: '18:00' });
+    await linkAccess(almacenBoutiqueUser.id, tenantRetail.id, UserRole.OPERATIVO, 'Control de Stock & Almacén', { compensationType: 'FIJO', salaryAmount: 45.0, salaryPeriod: 'SEMANAL', entryTime: '08:00', exitTime: '17:00' });
 
     let settingsRetail = await settingsRepo.findOne({ where: { tenantId: tenantRetail.id } });
     if (!settingsRetail) {
@@ -707,6 +805,13 @@ async function runSeed() {
     await getOrCreateExpense(tenantRetail.id, { description: 'Servicio de Internet Fibra Óptica', amount: 30.00, category: 'UTILITIES', paymentMethod: 'PAGO_MOVIL' });
     await getOrCreateExpense(tenantRetail.id, { description: 'Bolsas y Empaques Ecológicos', amount: 25.00, category: 'SUPPLIES', paymentMethod: 'CASH_USD' });
     await getOrCreateExpense(tenantRetail.id, { description: 'Quincena Nómina Asesora Valentina', amount: 70.00, category: 'PAYROLL', paymentMethod: 'PAGO_MOVIL' });
+    await getOrCreateSalaryAdvance(tenantRetail.id, {
+      userId: asesorBoutiqueUser.id,
+      amountUSD: 15.00,
+      reason: 'Anticipo de nómina solicitado para transporte',
+      status: SalaryAdvanceStatus.PENDIENTE,
+      paymentMethod: 'CASH',
+    });
 
     // Ventas de Boutique
     await getOrCreateOrder(tenantRetail.id, {
@@ -950,11 +1055,11 @@ async function runSeed() {
       }));
     }
     // Accesos Panadería
-    await linkAccess(promoter.id, tenantPan.id, UserRole.ADMIN, 'Gerente');
-    await linkAccess(demoAdmin.id, tenantPan.id, UserRole.ADMIN, 'Administrador');
-    await linkAccess(panaderoUser.id, tenantPan.id, UserRole.OPERATIVO, 'Jefe de Producción & Panadero');
-    await linkAccess(pasteleroUser.id, tenantPan.id, UserRole.OPERATIVO, 'Maestro Pastelero');
-    await linkAccess(despachoPanUser.id, tenantPan.id, UserRole.POS, 'Atención Mostrador & Despacho');
+    await linkAccess(promoter.id, tenantPan.id, UserRole.ADMIN, 'Gerente', { compensationType: 'FIJO', salaryAmount: 100.0, salaryPeriod: 'SEMANAL' });
+    await linkAccess(demoAdmin.id, tenantPan.id, UserRole.ADMIN, 'Administrador', { compensationType: 'FIJO', salaryAmount: 90.0, salaryPeriod: 'SEMANAL' });
+    await linkAccess(panaderoUser.id, tenantPan.id, UserRole.OPERATIVO, 'Jefe de Producción & Panadero', { compensationType: 'FIJO', salaryAmount: 75.0, salaryPeriod: 'SEMANAL', entryTime: '05:00', exitTime: '13:00' });
+    await linkAccess(pasteleroUser.id, tenantPan.id, UserRole.OPERATIVO, 'Maestro Pastelero', { compensationType: 'FIJO', salaryAmount: 70.0, salaryPeriod: 'SEMANAL', entryTime: '06:00', exitTime: '14:00' });
+    await linkAccess(despachoPanUser.id, tenantPan.id, UserRole.POS, 'Atención Mostrador & Despacho', { compensationType: 'MIXTO', salaryAmount: 35.0, salaryPeriod: 'SEMANAL', commissionPercentage: 3.0, entryTime: '06:30', exitTime: '15:00' });
 
     let settingsPan = await settingsRepo.findOne({ where: { tenantId: tenantPan.id } });
     if (!settingsPan) {
@@ -1033,6 +1138,13 @@ async function runSeed() {
     await getOrCreateExpense(tenantPan.id, { description: 'Servicio de Gas Industrial Hornos', amount: 20.00, category: 'UTILITIES', paymentMethod: 'CASH_USD' });
     await getOrCreateExpense(tenantPan.id, { description: 'Mantenimiento Preventivo Horno Convector', amount: 35.00, category: 'MAINTENANCE', paymentMethod: 'PAGO_MOVIL' });
     await getOrCreateExpense(tenantPan.id, { description: 'Quincena Nómina Ayudante de Panadería', amount: 60.00, category: 'PAYROLL', paymentMethod: 'PAGO_MOVIL' });
+    await getOrCreateSalaryAdvance(tenantPan.id, {
+      userId: despachoPanUser.id,
+      amountUSD: 10.00,
+      reason: 'Adelanto en efectivo para compra de medicinas',
+      status: SalaryAdvanceStatus.PENDIENTE,
+      paymentMethod: 'CASH',
+    });
 
     // Ventas Panadería
     await getOrCreateOrder(tenantPan.id, {
@@ -1267,11 +1379,11 @@ async function runSeed() {
       }));
     }
     // Accesos Barbería & Spa
-    await linkAccess(promoter.id, tenantSpa.id, UserRole.ADMIN, 'Gerente');
-    await linkAccess(demoAdmin.id, tenantSpa.id, UserRole.ADMIN, 'Administrador');
-    await linkAccess(barberoUser.id, tenantSpa.id, UserRole.OPERATIVO, 'Master Barber');
-    await linkAccess(barbero2User.id, tenantSpa.id, UserRole.OPERATIVO, 'Especialista Fades & Barbas');
-    await linkAccess(manicuristaUser.id, tenantSpa.id, UserRole.OPERATIVO, 'Especialista Manicura & Spa');
+    await linkAccess(promoter.id, tenantSpa.id, UserRole.ADMIN, 'Gerente', { compensationType: 'FIJO', salaryAmount: 100.0, salaryPeriod: 'SEMANAL' });
+    await linkAccess(demoAdmin.id, tenantSpa.id, UserRole.ADMIN, 'Administrador', { compensationType: 'FIJO', salaryAmount: 90.0, salaryPeriod: 'SEMANAL' });
+    await linkAccess(barberoUser.id, tenantSpa.id, UserRole.OPERATIVO, 'Master Barber', { compensationType: 'COMISION', commissionPercentage: 50.0, entryTime: '09:00', exitTime: '19:00' });
+    await linkAccess(barbero2User.id, tenantSpa.id, UserRole.OPERATIVO, 'Especialista Fades & Barbas', { compensationType: 'COMISION', commissionPercentage: 45.0, entryTime: '09:00', exitTime: '19:00' });
+    await linkAccess(manicuristaUser.id, tenantSpa.id, UserRole.OPERATIVO, 'Especialista Manicura & Spa', { compensationType: 'MIXTO', salaryAmount: 30.0, salaryPeriod: 'SEMANAL', commissionPercentage: 35.0, entryTime: '10:00', exitTime: '19:00' });
 
     let settingsSpa = await settingsRepo.findOne({ where: { tenantId: tenantSpa.id } });
     if (!settingsSpa) {
@@ -1344,6 +1456,13 @@ async function runSeed() {
     await getOrCreateExpense(tenantSpa.id, { description: 'Base de Apertura en Barbería', amount: 30.00, category: 'FONDO_CAJA', paymentMethod: 'CASH_USD' });
     await getOrCreateExpense(tenantSpa.id, { description: 'Cuchillas, Toallas Desechables y Aftershave', amount: 20.00, category: 'SUPPLIES', paymentMethod: 'CASH_USD' });
     await getOrCreateExpense(tenantSpa.id, { description: 'Comisión / Nómina Semanal Barbero Daniel', amount: 40.00, category: 'PAYROLL', paymentMethod: 'PAGO_MOVIL' });
+    await getOrCreateSalaryAdvance(tenantSpa.id, {
+      userId: barberoUser.id,
+      amountUSD: 10.00,
+      reason: 'Adelanto para compra de cuchillas y desinfectante de máquina',
+      status: SalaryAdvanceStatus.PENDIENTE,
+      paymentMethod: 'CASH',
+    });
 
     // Citas Agendadas Barbería
     await getOrCreateReservation(tenantSpa.id, {
@@ -1391,10 +1510,26 @@ async function runSeed() {
       serviceName: sCorte.name,
       employeeId: barbero2User.id,
       employeeName: 'Daniel Fades & Barbas',
-      status: ReservationStatus.CONFIRMED,
+      status: ReservationStatus.COMPLETED,
       paymentStatus: PaymentStatus.PAID,
       totalAmount: 10.00,
-      notes: 'Cita con Daniel programada por catálogo online.',
+      notes: 'Cita con Daniel completada y cobrada.',
+    });
+
+    await getOrCreateReservation(tenantSpa.id, {
+      customerName: 'Mariana Castillo',
+      customerPhone: '0412-5544332',
+      date: todayIso,
+      time: '12:00',
+      durationMinutes: 50,
+      serviceId: sManicura.id,
+      serviceName: sManicura.name,
+      employeeId: manicuristaUser.id,
+      employeeName: 'Sofía Especialista Nails',
+      status: ReservationStatus.COMPLETED,
+      paymentStatus: PaymentStatus.PAID,
+      totalAmount: 14.00,
+      notes: 'Manicura rusa completada y cobrada.',
     });
 
     await getOrCreateReservation(tenantSpa.id, {
@@ -1532,11 +1667,11 @@ async function runSeed() {
       }));
     }
     // Accesos Auto Lavado
-    await linkAccess(promoter.id, tenantLavado.id, UserRole.ADMIN, 'Gerente');
-    await linkAccess(demoAdmin.id, tenantLavado.id, UserRole.ADMIN, 'Administrador');
-    await linkAccess(lavadorUser.id, tenantLavado.id, UserRole.OPERATIVO, 'Lavador Principal');
-    await linkAccess(lavador2User.id, tenantLavado.id, UserRole.OPERATIVO, 'Detailing & Pulitura');
-    await linkAccess(supervisorLavadoUser.id, tenantLavado.id, UserRole.OPERATIVO, 'Supervisor de Bahías');
+    await linkAccess(promoter.id, tenantLavado.id, UserRole.ADMIN, 'Gerente', { compensationType: 'FIJO', salaryAmount: 100.0, salaryPeriod: 'SEMANAL' });
+    await linkAccess(demoAdmin.id, tenantLavado.id, UserRole.ADMIN, 'Administrador', { compensationType: 'FIJO', salaryAmount: 85.0, salaryPeriod: 'SEMANAL' });
+    await linkAccess(lavadorUser.id, tenantLavado.id, UserRole.OPERATIVO, 'Lavador Principal', { compensationType: 'COMISION', commissionPercentage: 40.0, entryTime: '08:00', exitTime: '18:00' });
+    await linkAccess(lavador2User.id, tenantLavado.id, UserRole.OPERATIVO, 'Detailing & Pulitura', { compensationType: 'MIXTO', salaryAmount: 30.0, salaryPeriod: 'SEMANAL', commissionPercentage: 30.0, entryTime: '08:00', exitTime: '18:00' });
+    await linkAccess(supervisorLavadoUser.id, tenantLavado.id, UserRole.OPERATIVO, 'Supervisor de Bahías', { compensationType: 'FIJO', salaryAmount: 70.0, salaryPeriod: 'SEMANAL', entryTime: '07:30', exitTime: '18:30' });
 
     let settingsLavado = await settingsRepo.findOne({ where: { tenantId: tenantLavado.id } });
     if (!settingsLavado) {
@@ -1595,6 +1730,13 @@ async function runSeed() {
     await getOrCreateExpense(tenantLavado.id, { description: 'Base de Apertura en Patio', amount: 35.00, category: 'FONDO_CAJA', paymentMethod: 'CASH_USD' });
     await getOrCreateExpense(tenantLavado.id, { description: 'Detergente Espumógeno y Desengrasante Motor', amount: 25.00, category: 'SUPPLIES', paymentMethod: 'CASH_USD' });
     await getOrCreateExpense(tenantLavado.id, { description: 'Quincena Nómina Lavador Miguel', amount: 50.00, category: 'PAYROLL', paymentMethod: 'PAGO_MOVIL' });
+    await getOrCreateSalaryAdvance(tenantLavado.id, {
+      userId: lavadorUser.id,
+      amountUSD: 12.00,
+      reason: 'Vale de caja para gastos personales de fin de semana',
+      status: SalaryAdvanceStatus.PENDIENTE,
+      paymentMethod: 'CASH',
+    });
 
     // Ventas Auto Lavado
     await getOrCreateOrder(tenantLavado.id, {
@@ -1799,14 +1941,14 @@ async function runSeed() {
       }));
     }
     // Accesos Burger House
-    await linkAccess(promoter.id, tenantBurger.id, UserRole.ADMIN, 'Gerente General');
-    await linkAccess(demoAdmin.id, tenantBurger.id, UserRole.ADMIN, 'Administrador');
-    await linkAccess(kitchenUser.id, tenantBurger.id, UserRole.KITCHEN, 'Jefe de Cocina');
-    await linkAccess(parrilleroUser.id, tenantBurger.id, UserRole.OPERATIVO, 'Maestro Parrillero');
-    await linkAccess(meseroUser.id, tenantBurger.id, UserRole.POS, 'Capitán de Mesoneros');
-    await linkAccess(mesera2User.id, tenantBurger.id, UserRole.POS, 'Mesonera de Salón');
-    await linkAccess(deliveryUser.id, tenantBurger.id, UserRole.DELIVERY, 'Repartidor Principal Moto');
-    await linkAccess(delivery2User.id, tenantBurger.id, UserRole.DELIVERY, 'Repartidor Express');
+    await linkAccess(promoter.id, tenantBurger.id, UserRole.ADMIN, 'Gerente General', { compensationType: 'FIJO', salaryAmount: 120.0, salaryPeriod: 'SEMANAL' });
+    await linkAccess(demoAdmin.id, tenantBurger.id, UserRole.ADMIN, 'Administrador', { compensationType: 'FIJO', salaryAmount: 100.0, salaryPeriod: 'SEMANAL' });
+    await linkAccess(kitchenUser.id, tenantBurger.id, UserRole.KITCHEN, 'Jefe de Cocina', { compensationType: 'FIJO', salaryAmount: 85.0, salaryPeriod: 'SEMANAL', entryTime: '11:00', exitTime: '23:00' });
+    await linkAccess(parrilleroUser.id, tenantBurger.id, UserRole.OPERATIVO, 'Maestro Parrillero', { compensationType: 'FIJO', salaryAmount: 65.0, salaryPeriod: 'SEMANAL', entryTime: '11:00', exitTime: '23:00' });
+    await linkAccess(meseroUser.id, tenantBurger.id, UserRole.POS, 'Capitán de Mesoneros', { compensationType: 'MIXTO', salaryAmount: 30.0, salaryPeriod: 'SEMANAL', commissionPercentage: 4.0, entryTime: '12:00', exitTime: '23:30' });
+    await linkAccess(mesera2User.id, tenantBurger.id, UserRole.POS, 'Mesonera de Salón', { compensationType: 'MIXTO', salaryAmount: 25.0, salaryPeriod: 'SEMANAL', commissionPercentage: 4.0, entryTime: '12:00', exitTime: '23:30' });
+    await linkAccess(deliveryUser.id, tenantBurger.id, UserRole.DELIVERY, 'Repartidor Principal Moto', { compensationType: 'MIXTO', salaryAmount: 30.0, salaryPeriod: 'SEMANAL', commissionPercentage: 10.0, entryTime: '12:00', exitTime: '23:30' });
+    await linkAccess(delivery2User.id, tenantBurger.id, UserRole.DELIVERY, 'Repartidor Express', { compensationType: 'COMISION', commissionPercentage: 15.0, entryTime: '13:00', exitTime: '23:30' });
 
     let settingsBurger = await settingsRepo.findOne({ where: { tenantId: tenantBurger.id } });
     if (!settingsBurger) {
@@ -1893,6 +2035,13 @@ async function runSeed() {
     await getOrCreateExpense(tenantBurger.id, { description: 'Carbón Vegetal y Gas para Parrilla', amount: 28.00, category: 'UTILITIES', paymentMethod: 'CASH_USD' });
     await getOrCreateExpense(tenantBurger.id, { description: 'Cajas Térmicas y Papel Antigrasa Delivery', amount: 22.00, category: 'SUPPLIES', paymentMethod: 'PAGO_MOVIL' });
     await getOrCreateExpense(tenantBurger.id, { description: 'Nómina Semanal Reparto y Cocina', amount: 80.00, category: 'PAYROLL', paymentMethod: 'PAGO_MOVIL' });
+    await getOrCreateSalaryAdvance(tenantBurger.id, {
+      userId: deliveryUser.id,
+      amountUSD: 10.00,
+      reason: 'Adelanto para gasolina de la moto de reparto',
+      status: SalaryAdvanceStatus.PENDIENTE,
+      paymentMethod: 'CASH',
+    });
 
     // Comandas Gastronomía (Cocina + Reparto + Entregados)
     // 1. Comanda Cocina (PREPARING) en Mesa 4
@@ -2115,11 +2264,11 @@ async function runSeed() {
       }));
     }
     // Accesos Centro Glow
-    await linkAccess(promoter.id, tenantGlow.id, UserRole.ADMIN, 'Directora Estética');
-    await linkAccess(demoAdmin.id, tenantGlow.id, UserRole.ADMIN, 'Administrador');
-    await linkAccess(specialistUser.id, tenantGlow.id, UserRole.OPERATIVO, 'Dra. Ana Cosmiatra & Médico Estético');
-    await linkAccess(terapeutaUser.id, tenantGlow.id, UserRole.OPERATIVO, 'Claudia Fisioterapeuta & Drenaje');
-    await linkAccess(recepcionGlowUser.id, tenantGlow.id, UserRole.POS, 'Camila Recepcionista & Atención');
+    await linkAccess(promoter.id, tenantGlow.id, UserRole.ADMIN, 'Directora Estética', { compensationType: 'FIJO', salaryAmount: 120.0, salaryPeriod: 'SEMANAL' });
+    await linkAccess(demoAdmin.id, tenantGlow.id, UserRole.ADMIN, 'Administrador', { compensationType: 'FIJO', salaryAmount: 100.0, salaryPeriod: 'SEMANAL' });
+    await linkAccess(specialistUser.id, tenantGlow.id, UserRole.OPERATIVO, 'Dra. Ana Cosmiatra & Médico Estético', { compensationType: 'COMISION', commissionPercentage: 45.0, entryTime: '10:00', exitTime: '18:00' });
+    await linkAccess(terapeutaUser.id, tenantGlow.id, UserRole.OPERATIVO, 'Claudia Fisioterapeuta & Drenaje', { compensationType: 'MIXTO', salaryAmount: 40.0, salaryPeriod: 'SEMANAL', commissionPercentage: 35.0, entryTime: '09:00', exitTime: '17:00' });
+    await linkAccess(recepcionGlowUser.id, tenantGlow.id, UserRole.POS, 'Camila Recepcionista & Atención', { compensationType: 'FIJO', salaryAmount: 60.0, salaryPeriod: 'QUINCENAL', entryTime: '08:30', exitTime: '18:30' });
 
     let settingsGlow = await settingsRepo.findOne({ where: { tenantId: tenantGlow.id } });
     if (!settingsGlow) {
@@ -2181,6 +2330,13 @@ async function runSeed() {
     await getOrCreateExpense(tenantGlow.id, { description: 'Aceites Esenciales, Mascarillas e Insumos Spa', amount: 35.00, category: 'SUPPLIES', paymentMethod: 'CASH_USD' });
     await getOrCreateExpense(tenantGlow.id, { description: 'Servicio de Internet Fibra Óptica', amount: 35.00, category: 'UTILITIES', paymentMethod: 'PAGO_MOVIL' });
     await getOrCreateExpense(tenantGlow.id, { description: 'Honorarios Médicos Quincenales Dra. Ana', amount: 90.00, category: 'PAYROLL', paymentMethod: 'PAGO_MOVIL' });
+    await getOrCreateSalaryAdvance(tenantGlow.id, {
+      userId: terapeutaUser.id,
+      amountUSD: 20.00,
+      reason: 'Anticipo para compra de uniforme y calzado clínico',
+      status: SalaryAdvanceStatus.PENDIENTE,
+      paymentMethod: 'CASH',
+    });
 
     // Citas Agendadas Glow
     await getOrCreateReservation(tenantGlow.id, {
@@ -2198,6 +2354,23 @@ async function runSeed() {
       paymentStatus: PaymentStatus.PAID,
       totalAmount: 30.00,
       notes: 'Sesión de hidrafacial realizada con éxito.',
+    });
+
+    await getOrCreateReservation(tenantGlow.id, {
+      customerName: gSalas.name,
+      customerPhone: gSalas.phone,
+      customerId: gSalas.id,
+      date: todayIso,
+      time: '09:30',
+      durationMinutes: 45,
+      serviceId: gDrenaje.id,
+      serviceName: gDrenaje.name,
+      employeeId: terapeutaUser.id,
+      employeeName: 'Claudia Fisioterapeuta',
+      status: ReservationStatus.COMPLETED,
+      paymentStatus: PaymentStatus.PAID,
+      totalAmount: 28.00,
+      notes: 'Sesión de drenaje post-operatorio completada y pagada.',
     });
 
     await getOrCreateReservation(tenantGlow.id, {
@@ -2261,7 +2434,7 @@ async function runSeed() {
       customerName: gSalas.name,
       customerPhone: gSalas.phone,
       customerId: gSalas.id,
-      employeeId: recepcionGlowUser.id,
+      employeeId: specialistUser.id,
       status: OrderStatus.DELIVERED,
       paymentStatus: PaymentStatus.PAID,
       paymentMethod: 'USD',
@@ -2302,7 +2475,7 @@ async function runSeed() {
       customerName: gColmenares.name,
       customerPhone: gColmenares.phone,
       customerId: gColmenares.id,
-      employeeId: recepcionGlowUser.id,
+      employeeId: terapeutaUser.id,
       status: OrderStatus.DELIVERED,
       paymentStatus: PaymentStatus.PAID,
       paymentMethod: 'PAGO_MOVIL',
@@ -2324,7 +2497,7 @@ async function runSeed() {
       customerName: gSalas.name,
       customerPhone: gSalas.phone,
       customerId: gSalas.id,
-      employeeId: recepcionGlowUser.id,
+      employeeId: specialistUser.id,
       status: OrderStatus.DELIVERED,
       paymentStatus: PaymentStatus.PAID,
       paymentMethod: 'PAGO_MOVIL',
@@ -2346,7 +2519,7 @@ async function runSeed() {
       customerName: gMendoza.name,
       customerPhone: gMendoza.phone,
       customerId: gMendoza.id,
-      employeeId: recepcionGlowUser.id,
+      employeeId: terapeutaUser.id,
       status: OrderStatus.DELIVERED,
       paymentStatus: PaymentStatus.PAID,
       paymentMethod: 'USD',
