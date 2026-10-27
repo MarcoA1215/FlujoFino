@@ -25,6 +25,11 @@ El proyecto ahora se llama **FinoWork** (anteriormente conocido como Flujo Fino)
    - **Margen inferior**: Las páginas deben tener `padding-bottom: 80px-90px` o `className="ff-has-bottom-nav"` para no quedar tapadas por la barra de navegación inferior en móviles.
    - Ver guía detallada en `DESIGN_SYSTEM.md` y `.agents/skills/fino-design-guardian/SKILL.md`.
 
+3. **GESTOR DE PAQUETES OFICIAL: YARN EXCLUSIVAMENTE**:
+   - Este monorepo está administrado con **Yarn 4 Berry**.
+   - **ESTRICTAMENTE PROHIBIDO EL USO DE NPM**: NUNCA ejecutes `npm run`, `npm test`, `npm install`, etc.
+   - Usa siempre `yarn workspace <nombre> <comando>` o ejecuta comandos en el subdirectorio con `yarn`.
+
 <!-- # REGLA CAVEMAN (AHORRO ESTRICTO DE TOKENS)
 - Sé extremadamente conciso y directo (habla como cavernícola: frases telegráficas cortas).
 - Elimina saludos, introducciones amables, conclusiones y cortesías ("¡Claro!", "Con gusto te ayudo", etc.).
