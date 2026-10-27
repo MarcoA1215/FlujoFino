@@ -190,7 +190,7 @@ describe('ProductFormModal & Service Feature Flag Control Suite', () => {
     renderModalWithSettings(fiscalSettings);
 
     // Debe mostrar el módulo fiscal
-    expect(screen.getByText(/Régimen Fiscal \(IVA \/ SENIAT\)/i)).toBeDefined();
+    expect(screen.getByText(/Régimen de IVA \(Exento \/ Gravado\)/i)).toBeDefined();
     expect(screen.getByText(/¿Está exento de IVA\?/i)).toBeDefined();
 
     // Debe mostrar el 16% predeterminado

@@ -601,8 +601,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '18px' }}>🧾</span>
                     <div>
-                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>Régimen Fiscal (IVA / SENIAT)</span>
-                      <div style={{ fontSize: '11px', color: '#64748b' }}>Configuración de impuesto para facturación y ventas</div>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>Régimen de IVA (Exento / Gravado)</span>
+                      <div style={{ fontSize: '11px', color: '#64748b' }}>Configuración de impuesto para cálculos comerciales y ventas</div>
                     </div>
                   </div>
                 </div>
@@ -623,7 +623,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       ¿Está exento de IVA?
                     </div>
                     <div style={{ fontSize: '11px', color: isTaxExempt ? '#047857' : '#64748b' }}>
-                      {isTaxExempt ? 'Marcado como exento (Alícuota 0% - Art. 18/19 Ley IVA)' : 'Gravado con IVA (Aplica porcentaje de impuesto)'}
+                      {isTaxExempt ? 'Marcado como exento (Alícuota 0%)' : 'Gravado con IVA (Aplica porcentaje de impuesto)'}
                     </div>
                   </div>
                   <IonToggle

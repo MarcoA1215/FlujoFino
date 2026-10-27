@@ -111,18 +111,18 @@ describe('FiscalReceiptModal - Comprobante Fiscal SENIAT', () => {
     fireEvent.click(copyBtn);
 
     expect(writeTextSpy).toHaveBeenCalled();
-    expect(writeTextSpy.mock.calls[0][0]).toContain('FACTURA FISCAL DIGITAL');
+    expect(writeTextSpy.mock.calls[0][0]).toContain('COMPROBANTE DE VENTA CON IVA');
     expect(writeTextSpy.mock.calls[0][0]).toContain('FAC-00000042');
   });
 
-  it('Debe ejecutar window.print() al hacer clic en Imprimir Ticket', () => {
+  it('Debe ejecutar window.print() al hacer clic en Imprimir Comprobante', () => {
     const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
 
     render(
       <FiscalReceiptModal isOpen={true} onClose={vi.fn()} invoice={mockInvoice} settings={mockSettings} />
     );
 
-    const printBtn = screen.getByText(/Imprimir Ticket SENIAT/i);
+    const printBtn = screen.getByText(/Imprimir Comprobante/i);
     fireEvent.click(printBtn);
 
     expect(printSpy).toHaveBeenCalled();

@@ -228,7 +228,7 @@ const Orders: React.FC = () => {
 
       if (res.data) {
         presentToast({
-          message: `✓ Factura fiscal ${res.data.invoiceNumber} emitida con éxito`,
+          message: `✓ Comprobante con IVA #${res.data.invoiceNumber} generado con éxito`,
           duration: 3500,
           color: 'success'
         });
@@ -245,7 +245,7 @@ const Orders: React.FC = () => {
     } catch (e: any) {
       console.error(e);
       presentToast({
-        message: 'Error al emitir factura fiscal: ' + (e.response?.data?.message || e.message),
+        message: 'Error al generar comprobante con IVA: ' + (e.response?.data?.message || e.message),
         duration: 4000,
         color: 'danger'
       });
@@ -256,8 +256,8 @@ const Orders: React.FC = () => {
 
   const handleCancelFiscalInvoice = async (fiscalInvoiceId: string) => {
     presentAlert({
-      header: '¿Anular Factura Fiscal?',
-      message: 'Se generará una Nota de Crédito fiscal conforme a los lineamientos del SENIAT.',
+      header: '¿Anular Comprobante con IVA?',
+      message: 'Se generará una nota de ajuste/anulación en el control interno.',
       inputs: [
         {
           name: 'reason',
@@ -269,7 +269,7 @@ const Orders: React.FC = () => {
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         {
-          text: 'Emitir Nota de Crédito',
+          text: 'Confirmar Anulación',
           role: 'destructive',
           handler: async (data) => {
             try {
@@ -277,7 +277,7 @@ const Orders: React.FC = () => {
                 reason: data.reason || 'Anulación solicitada por el cliente'
               });
               presentToast({
-                message: `✓ Factura anulada. Nota de crédito emitida.`,
+                message: `✓ Comprobante anulado en el control interno.`,
                 duration: 3500,
                 color: 'success'
               });
@@ -879,7 +879,7 @@ const Orders: React.FC = () => {
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
                       {order.fiscalInvoiceId && (
                         <span style={{ fontSize: '11px', fontWeight: '800', padding: '3px 8px', borderRadius: '6px', background: '#ECFDF5', color: '#047857', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid #A7F3D0' }}>
-                          🧾 {order.fiscalStatus === 'CANCELED' ? 'NC Anulada' : 'Factura Fiscal'}
+                          🧾 {order.fiscalStatus === 'CANCELED' ? 'NC Anulada' : 'Comprobante con IVA'}
                         </span>
                       )}
                       {order.linkedReservationId && (
@@ -1945,15 +1945,15 @@ const Orders: React.FC = () => {
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '20px' }}>🏛️</span>
+                                <span style={{ fontSize: '20px' }}>🧾</span>
                                 <div>
                                   <div style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A' }}>
-                                    Facturación Fiscal SENIAT
+                                    Desglose y Control de IVA
                                   </div>
                                   <div style={{ fontSize: '11px', color: '#64748B' }}>
                                     {selectedOrderForDetails.fiscalInvoiceId
-                                      ? `Control fiscal: ${selectedOrderForDetails.fiscalControlNumber || 'Asignado'}`
-                                      : 'Este pedido aún no tiene comprobante fiscal emitido'}
+                                      ? `Control interno: ${selectedOrderForDetails.fiscalControlNumber || 'Generado'}`
+                                      : 'Este pedido aún no tiene comprobante con IVA generado'}
                                   </div>
                                 </div>
                               </div>
@@ -1967,7 +1967,7 @@ const Orders: React.FC = () => {
                                   padding: '2px 8px',
                                   borderRadius: '6px'
                                 }}>
-                                  ✓ {selectedOrderForDetails.fiscalStatus === 'CANCELED' ? 'Anulada (NC)' : 'Emitida'}
+                                  ✓ {selectedOrderForDetails.fiscalStatus === 'CANCELED' ? 'Anulado' : 'Generado'}
                                 </span>
                               ) : (
                                 <span style={{ fontSize: '11px', fontWeight: '700', background: '#F1F5F9', color: '#64748B', padding: '2px 8px', borderRadius: '6px' }}>
@@ -1997,7 +1997,7 @@ const Orders: React.FC = () => {
                                     gap: '6px'
                                   }}
                                 >
-                                  🖨️ Ver / Imprimir Factura Fiscal
+                                  🖨️ Ver / Imprimir Comprobante
                                 </button>
                                 {selectedOrderForDetails.fiscalStatus !== 'CANCELED' && (
                                   <button
@@ -2014,7 +2014,7 @@ const Orders: React.FC = () => {
                                       cursor: 'pointer'
                                     }}
                                   >
-                                    🚫 Anular (NC)
+                                    🚫 Anular (Ajuste)
                                   </button>
                                 )}
                               </div>
@@ -2039,7 +2039,7 @@ const Orders: React.FC = () => {
                                   gap: '6px'
                                 }}
                               >
-                                {isEmittingFiscal ? 'Generando Factura...' : '🧾 Emitir Factura Fiscal SENIAT'}
+                                {isEmittingFiscal ? 'Generando Comprobante...' : '🧾 Generar Comprobante con IVA'}
                               </button>
                             )}
                           </div>

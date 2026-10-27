@@ -48,10 +48,10 @@ export const FiscalReceiptModal: React.FC<FiscalReceiptModalProps> = ({
 
   const handleCopyText = () => {
     const lines = [
-      `🧾 FACTURA FISCAL DIGITAL - ${companyName}`,
+      `🧾 COMPROBANTE DE VENTA CON IVA - ${companyName}`,
       `RIF: ${companyRif}`,
-      `N° Factura: ${invoice.invoiceNumber}`,
-      `N° Control: ${invoice.fiscalControlNumber || 'N/A'}`,
+      `N° Comprobante: ${invoice.invoiceNumber}`,
+      `N° Control Int.: ${invoice.fiscalControlNumber || 'N/A'}`,
       `Fecha: ${new Date(invoice.createdAt).toLocaleString('es-VE')}`,
       `Cliente: ${invoice.customerName} (${invoice.customerRif})`,
       '--------------------------------',
@@ -66,11 +66,11 @@ export const FiscalReceiptModal: React.FC<FiscalReceiptModalProps> = ({
       `TOTAL BS (BCV): Bs. ${totalBs}`,
       `Tasa BCV: Bs. ${rate.toFixed(2)}`,
       '--------------------------------',
-      'Documento emitido conforme a las providencias del SENIAT'
+      'Comprobante para control administrativo interno (cálculo referencial de IVA)'
     ];
     navigator.clipboard?.writeText(lines.join('\n'));
     presentToast({
-      message: 'Comprobante fiscal copiado al portapapeles',
+      message: 'Comprobante copiado al portapapeles',
       duration: 2500,
       color: 'success'
     });
@@ -113,8 +113,8 @@ export const FiscalReceiptModal: React.FC<FiscalReceiptModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '20px' }}>🧾</span>
             <div>
-              <div style={{ fontWeight: '700', fontSize: '16px', color: '#0F172A' }}>Factura Fiscal SENIAT</div>
-              <div style={{ fontSize: '12px', color: '#64748B' }}>Comprobante de emisión oficial</div>
+              <div style={{ fontWeight: '700', fontSize: '16px', color: '#0F172A' }}>Comprobante de Venta con IVA</div>
+              <div style={{ fontSize: '12px', color: '#64748B' }}>Control administrativo interno y desglose tributario</div>
             </div>
           </div>
           <button
@@ -184,14 +184,17 @@ export const FiscalReceiptModal: React.FC<FiscalReceiptModalProps> = ({
             {/* Datos del Documento */}
             <div style={{ marginBottom: '12px' }}>
               <div style={{ textAlign: 'center', fontWeight: '800', fontSize: '14px', letterSpacing: '0.5px' }}>
-                {invoice.documentType === 'CREDIT_NOTE' ? 'NOTA DE CRÉDITO' : 'FACTURA FISCAL'}
+                {invoice.documentType === 'CREDIT_NOTE' ? 'NOTA DE AJUSTE / CRÉDITO' : 'COMPROBANTE DE VENTA'}
+              </div>
+              <div style={{ textAlign: 'center', fontSize: '10px', color: '#64748B', marginTop: '2px', fontWeight: '600' }}>
+                (CONTROL ADMINISTRATIVO INTERNO)
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-                <span style={{ fontWeight: '700' }}>N° FACTURA:</span>
+                <span style={{ fontWeight: '700' }}>N° COMPROBANTE:</span>
                 <span style={{ fontWeight: '800', color: '#047857' }}>{invoice.invoiceNumber}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
-                <span style={{ fontWeight: '700' }}>N° CONTROL:</span>
+                <span style={{ fontWeight: '700' }}>N° CONTROL INT.:</span>
                 <span style={{ fontWeight: '800' }}>{invoice.fiscalControlNumber || '00-00000000'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
@@ -289,23 +292,26 @@ export const FiscalReceiptModal: React.FC<FiscalReceiptModalProps> = ({
               </div>
             </div>
 
-            {/* QR Code SENIAT */}
+            {/* QR Code */}
             <div style={{ textAlign: 'center', margin: '14px 0 10px 0' }}>
               <img
                 src={qrImageSrc}
-                alt="QR SENIAT"
+                alt="QR Comprobante"
                 style={{ width: '130px', height: '130px', margin: '0 auto', display: 'block', border: '1px solid #E2E8F0', padding: '4px', borderRadius: '6px' }}
               />
               <div style={{ fontSize: '10px', color: '#64748B', marginTop: '4px' }}>
-                Verificación Fiscal SENIAT
+                Verificación de Datos del Comprobante
               </div>
             </div>
 
             {/* Pie Legal */}
             <div style={{ textAlign: 'center', fontSize: '10px', color: '#64748B', borderTop: '1px dashed #CBD5E1', paddingTop: '10px' }}>
-              <div>DOCUMENTO EMITIDO CONFORME A PROVIDENCIAS DEL SENIAT</div>
-              <div>PROVEEDOR: {invoice.provider === 'UNIDIGITAL' ? 'UNIDIGITAL 1220 C.A.' : 'SISTEMA AUTÓNOMO FINOWORK'}</div>
-              <div style={{ marginTop: '4px', fontWeight: '700', color: '#0F172A' }}>¡GRACIAS POR SU COMPRA!</div>
+              <div style={{ fontWeight: '700', color: '#334155' }}>COMPROBANTE PARA CONTROL ADMINISTRATIVO INTERNO</div>
+              <div>Cálculo referencial de IVA según alícuotas vigentes.</div>
+              <div style={{ fontSize: '9px', color: '#94A3B8', marginTop: '3px', lineHeight: '1.3' }}>
+                Este documento es para control y conciliación comercial interna. No sustituye la factura fiscal emitida mediante máquina fiscal o imprenta digital autorizada por el SENIAT.
+              </div>
+              <div style={{ marginTop: '6px', fontWeight: '700', color: '#0F172A' }}>¡GRACIAS POR SU COMPRA!</div>
             </div>
           </div>
         </div>
@@ -349,7 +355,7 @@ export const FiscalReceiptModal: React.FC<FiscalReceiptModalProps> = ({
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}
           >
-            🖨️ Imprimir Ticket SENIAT
+            🖨️ Imprimir Comprobante
           </button>
         </div>
       </div>

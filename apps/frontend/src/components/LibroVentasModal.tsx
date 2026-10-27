@@ -116,8 +116,8 @@ export const LibroVentasModal: React.FC<LibroVentasModalProps> = ({
           .tot { background-color: #ECFDF5; font-weight: bold; border-top: 2px solid #047857; }
         </style>
       </head>
-      <body>
-        <h2>LIBRO DE VENTAS - SENIAT (Art. 75 al 78 Reglamento Ley IVA)</h2>
+        <h2>LIBRO DE VENTAS - CONTROL ADMINISTRATIVO INTERNO (Borrador de Conciliación)</h2>
+        <p style="font-size: 10px; color: #555;">Documento de apoyo para conciliación contable interna. No sustituye la declaración formal ni los libros fiscales timbrados.</p>
         <p><b>Razón Social:</b> ${escapeHtml(companyName)} | <b>RIF:</b> ${escapeHtml(companyRif)} | <b>Período:</b> ${escapeHtml(reportData.periodo)}</p>
         <table>
           <thead>
@@ -277,8 +277,8 @@ export const LibroVentasModal: React.FC<LibroVentasModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '22px' }}>📊</span>
             <div>
-              <div style={{ fontWeight: '800', fontSize: '16px', color: '#0F172A' }}>Libro de Ventas SENIAT</div>
-              <div style={{ fontSize: '12px', color: '#64748B' }}>Reporte y exportación tributaria mensual</div>
+              <div style={{ fontWeight: '800', fontSize: '16px', color: '#0F172A' }}>Libro de Ventas (Control de IVA)</div>
+              <div style={{ fontSize: '12px', color: '#64748B' }}>Reporte y borrador de apoyo para conciliación contable</div>
             </div>
           </div>
           <button
@@ -304,6 +304,11 @@ export const LibroVentasModal: React.FC<LibroVentasModalProps> = ({
 
         {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+          {/* Disclaimer / Aviso de Apoyo Contable (no-print) */}
+          <div className="no-print" style={{ padding: '10px 14px', background: '#EFF6FF', borderRadius: '10px', border: '1px solid #BFDBFE', color: '#1E40AF', fontSize: '12px', marginBottom: '14px', lineHeight: '1.4' }}>
+            💡 <b>Control Administrativo y Apoyo Contable:</b> Este módulo calcula y totaliza las ventas exentas, bases gravadas e IVA para facilitar la labor de su contador. Es un borrador de apoyo interno y no sustituye los libros fiscales oficiales ni la facturación por imprenta o máquina autorizada por el SENIAT.
+          </div>
+
           <div id="libro-ventas-print-area">
             {/* Membrete del Reporte */}
             <div style={{ background: '#FFFFFF', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0', marginBottom: '16px' }}>
@@ -312,7 +317,7 @@ export const LibroVentasModal: React.FC<LibroVentasModalProps> = ({
                   <div style={{ fontWeight: '800', fontSize: '16px', color: '#0F172A' }}>{companyName}</div>
                   <div style={{ fontSize: '13px', color: '#475569' }}>RIF: <b>{companyRif}</b></div>
                   <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
-                    Registro Tributario de Ventas e Ingresos (IVA)
+                    Registro Administrativo de Ventas e Ingresos (Borrador de IVA)
                   </div>
                 </div>
 

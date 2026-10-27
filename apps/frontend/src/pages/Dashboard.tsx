@@ -476,7 +476,7 @@ const Dashboard: React.FC = () => {
                 }}
               >
                 <IonIcon icon={documentTextOutline} style={{ fontSize: '18px', color: '#2563EB' }} />
-                Libro de Ventas SENIAT
+                Libro de Ventas (IVA)
               </button>
             )}
           </div>

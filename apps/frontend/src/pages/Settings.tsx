@@ -2073,9 +2073,9 @@ const SettingsPage: React.FC = () => {
                   </IonItem>
                   <IonItem lines="none" style={{ borderTop: '1px solid #e2e8f0', marginTop: '8px', paddingTop: '8px' }}>
                     <IonLabel className="ion-text-wrap">
-                      <h2 style={{ fontWeight: '700', color: '#0f172a' }}>🧾 Módulo Fiscal y Control de IVA (SENIAT)</h2>
+                      <h2 style={{ fontWeight: '700', color: '#0f172a' }}>🧾 Módulo de Desglose de IVA y Apoyo Contable</h2>
                       <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
-                        Permite indicar si cada producto o servicio está exento de IVA o gravado (16% predeterminado y editable), y preparar el registro fiscal del negocio.
+                        Permite indicar si cada producto o servicio está exento de IVA o gravado (16% predeterminado y editable), desglosar impuestos en las ventas y preparar el borrador del Libro de Ventas para tu contador.
                       </p>
                     </IonLabel>
                     <IonToggle checked={settings.featureFiscalSupport === true} onIonChange={e => setSettings({...settings, featureFiscalSupport: e.detail.checked})} />
@@ -2086,8 +2086,8 @@ const SettingsPage: React.FC = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
                         <span style={{ fontSize: '20px' }}>🏛️</span>
                         <div>
-                          <div style={{ fontWeight: '700', fontSize: '14px', color: '#0f172a' }}>Datos Fiscales de la Empresa</div>
-                          <div style={{ fontSize: '12px', color: '#64748b' }}>Información para membretes fiscales y reportes</div>
+                          <div style={{ fontWeight: '700', fontSize: '14px', color: '#0f172a' }}>Datos del Negocio para Comprobantes y Libro de Ventas</div>
+                          <div style={{ fontSize: '12px', color: '#64748b' }}>Información para membretes de comprobantes y conciliación de IVA</div>
                         </div>
                       </div>
 
@@ -2121,7 +2121,7 @@ const SettingsPage: React.FC = () => {
 
                         <div>
                           <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
-                            Razón Social Fiscal
+                            Razón Social / Nombre Comercial
                           </label>
                           <input
                             type="text"
@@ -2134,7 +2134,7 @@ const SettingsPage: React.FC = () => {
 
                         <div>
                           <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
-                            Teléfono Fiscal
+                            Teléfono de Contacto
                           </label>
                           <input
                             type="text"
@@ -2148,7 +2148,7 @@ const SettingsPage: React.FC = () => {
 
                       <div style={{ marginTop: '12px' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
-                          Domicilio / Dirección Fiscal
+                          Dirección Comercial / Domicilio
                         </label>
                         <input
                           type="text"
@@ -2160,7 +2160,7 @@ const SettingsPage: React.FC = () => {
                       </div>
 
                       <div style={{ marginTop: '12px', padding: '10px 12px', backgroundColor: '#ecfdf5', borderRadius: '8px', border: '1px solid #a7f3d0', color: '#065f46', fontSize: '12px', lineHeight: '1.4' }}>
-                        ℹ️ <b>Soporte Fiscal Activo:</b> Al crear o editar productos y servicios podrás clasificarlos como exentos o gravados con IVA. Al cobrar en Caja o POS se calculará el desglose formal exigido en Venezuela.
+                        ℹ️ <b>Control de IVA Activo:</b> Al crear o editar productos y servicios podrás clasificarlos como exentos o gravados con IVA. Al cobrar en Caja o POS se calculará el desglose comercial de base imponible e impuestos. <i>(Nota: Este módulo es de uso administrativo y no sustituye una máquina fiscal o imprenta digital autorizada por el SENIAT).</i>
                       </div>
 
                       <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'flex-end' }}>
@@ -2181,7 +2181,7 @@ const SettingsPage: React.FC = () => {
                             gap: '6px'
                           }}
                         >
-                          📊 Consultar y Exportar Libro de Ventas SENIAT
+                          📊 Consultar y Exportar Libro de Ventas (IVA)
                         </button>
                       </div>
                     </div>

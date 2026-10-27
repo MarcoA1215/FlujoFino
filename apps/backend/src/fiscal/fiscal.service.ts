@@ -32,7 +32,8 @@ export class FiscalService {
   ) {}
 
   private getProvider(fiscalMode?: string) {
-    if (fiscalMode === FiscalProviderType.UNIDIGITAL) {
+    // UniDigital en pausa hasta disponer de homologación y credenciales oficiales
+    if (fiscalMode === FiscalProviderType.UNIDIGITAL && process.env.ENABLE_UNIDIGITAL_GATEWAY === 'true') {
       return this.unidigitalProvider;
     }
     return this.internalProvider;
