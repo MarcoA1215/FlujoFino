@@ -34,6 +34,11 @@ export default defineConfig({
       '^/(auth|users|products|orders|raw-materials|production|delivery-zones|deliveries|dashboard|settings|reservations|storage|feedback|customers|superadmin|notifications|salary-advances|investments|promoters|public)': {
         target: 'http://localhost:3001',
         changeOrigin: true,
+        bypass: (req) => {
+          if (req.headers.accept && req.headers.accept.includes('text/html')) {
+            return '/index.html';
+          }
+        },
       },
     },
   },
