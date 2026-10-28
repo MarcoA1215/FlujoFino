@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Guía Oficial de Campo y Flujos de Trabajo - FinoWork Promotores</title>
+  <title>Manual Oficial del Promotor FinoWork - Estrategias de Venta, Comisiones y Flujos de Trabajo</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
@@ -22,6 +22,8 @@
       --white: #FFFFFF;
       --amber-500: #F59E0B;
       --amber-50: #FFFBEB;
+      --blue-500: #3B82F6;
+      --blue-50: #EFF6FF;
     }
 
     * {
@@ -72,7 +74,7 @@
     }
 
     .document-container {
-      max-width: 860px;
+      max-width: 900px;
       margin: 32px auto;
       background: var(--white);
       box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
@@ -90,12 +92,11 @@
       margin: 40px 0;
     }
 
-    /* Portada */
     .cover-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
 
     .logo-badge {
@@ -118,7 +119,7 @@
     }
 
     .logo-text {
-      font-size: 22px;
+      font-size: 24px;
       font-weight: 800;
       color: var(--slate-900);
       letter-spacing: -0.5px;
@@ -136,18 +137,18 @@
     }
 
     .cover-title {
-      font-size: 36px;
+      font-size: 34px;
       font-weight: 800;
       color: var(--slate-900);
-      line-height: 1.2;
+      line-height: 1.25;
       margin-bottom: 12px;
       letter-spacing: -0.8px;
     }
 
     .cover-subtitle {
-      font-size: 18px;
+      font-size: 17px;
       color: var(--slate-600);
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
 
     .cover-image {
@@ -155,7 +156,7 @@
       height: auto;
       border-radius: 14px;
       box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
 
     .cover-meta-grid {
@@ -163,16 +164,17 @@
       grid-template-columns: repeat(3, 1fr);
       gap: 16px;
       background: var(--slate-50);
-      padding: 20px;
+      padding: 18px;
       border-radius: 12px;
       border: 1px solid var(--slate-200);
     }
 
     .meta-item h4 {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--slate-500);
       text-transform: uppercase;
       margin-bottom: 4px;
+      letter-spacing: 0.5px;
     }
 
     .meta-item p {
@@ -181,7 +183,6 @@
       color: var(--slate-900);
     }
 
-    /* Secciones */
     h2 {
       font-size: 24px;
       font-weight: 800;
@@ -197,7 +198,7 @@
       font-size: 18px;
       font-weight: 700;
       color: var(--slate-800);
-      margin: 20px 0 10px 0;
+      margin: 22px 0 10px 0;
     }
 
     p {
@@ -206,7 +207,6 @@
       color: var(--slate-700);
     }
 
-    /* Cajas destacadas */
     .alert-box {
       background: var(--slate-50);
       border-left: 4px solid var(--primary);
@@ -220,6 +220,11 @@
       border-left-color: var(--amber-500);
     }
 
+    .alert-box.blue {
+      background: var(--blue-50);
+      border-left-color: var(--blue-500);
+    }
+
     .alert-box h4 {
       font-size: 15px;
       font-weight: 700;
@@ -227,7 +232,6 @@
       color: var(--slate-900);
     }
 
-    /* Tablas */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -241,7 +245,7 @@
       background: var(--slate-900);
       color: white;
       text-align: left;
-      padding: 12px 16px;
+      padding: 12px 14px;
       font-size: 13px;
       font-weight: 700;
       text-transform: uppercase;
@@ -249,7 +253,7 @@
     }
 
     td {
-      padding: 12px 16px;
+      padding: 12px 14px;
       border-bottom: 1px solid var(--slate-200);
       font-size: 14px;
     }
@@ -258,7 +262,21 @@
       background: var(--slate-50);
     }
 
-    /* Steps / Grid */
+    .badge-rank {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+    }
+
+    .badge-wood { background: #E2E8F0; color: #475569; }
+    .badge-bronze { background: #FED7AA; color: #9A3412; }
+    .badge-silver { background: #E2E8F0; color: #334155; }
+    .badge-gold { background: #FEF08A; color: #854D0E; }
+
     .steps-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -272,20 +290,6 @@
       padding: 18px;
       border-radius: 12px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.03);
-    }
-
-    .step-num {
-      width: 28px;
-      height: 28px;
-      background: var(--primary);
-      color: white;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 13px;
-      margin-bottom: 10px;
     }
 
     .step-card h4 {
@@ -313,7 +317,7 @@
     }
 
     .script-box::before {
-      content: "💬 QUÉ DECIR:";
+      content: "💬 QUÉ DECIRLE AL CLIENTE:";
       font-style: normal;
       font-weight: 800;
       font-size: 11px;
@@ -323,23 +327,42 @@
       letter-spacing: 0.5px;
     }
 
-    /* Impresión */
+    /* Galería de capturas */
+    .flow-screenshot {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--slate-200);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+      margin: 14px 0 20px 0;
+      display: block;
+    }
+
+    .flow-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .caption {
+      font-size: 12px;
+      color: var(--slate-500);
+      text-align: center;
+      margin-top: -12px;
+      margin-bottom: 16px;
+      font-weight: 500;
+    }
+
     @media print {
-      body {
-        background: white;
-      }
-      .no-print-bar {
-        display: none !important;
-      }
+      body { background: white; }
+      .no-print-bar { display: none !important; }
       .document-container {
         box-shadow: none;
         margin: 0;
         max-width: 100%;
         border-radius: 0;
       }
-      .page {
-        padding: 32px 24px;
-      }
+      .page { padding: 28px 20px; }
       .page-break {
         border-bottom: none;
         page-break-after: always;
@@ -351,12 +374,12 @@
 </head>
 <body>
 
-  <!-- Barra superior no imprimible -->
+  <!-- Barra de control no imprimible -->
   <div class="no-print-bar">
     <div style="font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px;">
       <span>🟢 FinoWork</span>
       <span style="opacity: 0.5;">|</span>
-      <span style="font-weight: 500; font-size: 14px;">Material de Capacitación para Promotores Oficiales</span>
+      <span style="font-weight: 500; font-size: 14px;">Manual de Campo Oficial para Promotores y Afiliados</span>
     </div>
     <button class="btn-print" onclick="window.print()">
       🖨️ Imprimir / Guardar como PDF
@@ -372,216 +395,324 @@
           <div class="logo-icon">F</div>
           <div class="logo-text">FinoWork</div>
         </div>
-        <div class="doc-pill">Guía de Campo Oficial v1.0</div>
+        <div class="doc-pill">Guía de Campo Oficial &bull; Cuota $20 USD</div>
       </div>
 
-      <h1 class="cover-title">Manual del Promotor: Estrategias de Venta y Flujos de Trabajo</h1>
-      <p class="cover-subtitle">El sistema definitivo para transformar el comercio en Venezuela y construir ingresos mensuales recurrentes en dólares.</p>
+      <h1 class="cover-title">Manual Maestro del Promotor FinoWork</h1>
+      <p class="cover-subtitle">Estrategias de Venta, Escalera de Comisiones Reales y Guía Ilustrada de Flujos Operativos para el Comercio en Venezuela.</p>
 
       <img src="/assets/promoter_field_guide.jpg" alt="Promotor FinoWork en comercio" class="cover-image">
 
       <div class="cover-meta-grid">
         <div class="meta-item">
-          <h4>Plataforma</h4>
-          <p>FinoWork Cloud & App</p>
+          <h4>Cuota Mensual Base</h4>
+          <p>$20.00 USD / mes</p>
         </div>
         <div class="meta-item">
-          <h4>Público Objetivo</h4>
-          <p>Comercios y Servicios</p>
+          <h4>Comisión Base</h4>
+          <p>10% con Escalera a 20%</p>
         </div>
         <div class="meta-item">
-          <h4>Modelo de Ingresos</h4>
-          <p>Comisiones Recurrentes</p>
+          <h4>Métodos de Liquidación</h4>
+          <p>Pago Móvil / Binance Pay</p>
         </div>
       </div>
     </div>
 
     <div class="page-break"></div>
 
-    <!-- PÁGINA 2: EL NEGOCIO DEL PROMOTOR -->
+    <!-- PÁGINA 2: EL SISTEMA DE COMISIONES Y ESCALERA -->
     <div class="page">
-      <h2>💰 1. El Negocio del Promotor FinoWork</h2>
-      <p>Como promotor de FinoWork, <strong>tú no eres un vendedor tradicional que gana una comisión una sola vez y se va con las manos vacías</strong>. Tú eres un socio estratégico que construye una <strong>cartera de ingresos mensuales recurrentes en dólares</strong>.</p>
+      <h2>💰 1. El Sistema de Comisiones y Escalera de Rangos</h2>
+      <p>El modelo de FinoWork está diseñado para que construyas un **ingreso mensual recurrente en dólares**. Cada comercio que afilies con tu enlace paga una cuota oficial de **$20.00 USD al mes**.</p>
 
       <div class="alert-box gold">
-        <h4>⚡ El Poder de la Recurrencia</h4>
-        <p>Cada negocio que afilies con tu enlace de promotor paga una suscripción oficial base de <strong>$20 USD mensuales</strong>. Con un esquema de comisión del 25% ($5 USD por negocio al mes): <strong>mientras ese negocio siga activo usando FinoWork para cobrar, tú recibes tus $5 USD todos los meses directamente a tu cuenta.</strong></p>
+        <h4>⚡ Comisión de Activación vs. Comisión Recurrente</h4>
+        <p><strong>1. Activación:</strong> La primera vez que el negocio paga su suscripción tras el periodo de prueba, se te liquida tu comisión de activación de inmediato.<br>
+        <strong>2. Recurrente:</strong> Todos los meses subsiguientes en los que el comercio renueva su cuota de $20 USD, tú vuelves a cobrar automáticamente.</p>
       </div>
 
-      <h3>Escalera de Ingresos Mensuales Estimada (a $5 USD por comercio/mes):</h3>
+      <h3>Escalera Oficial de Rangos (Según clientes activos en el mes):</h3>
       <table>
         <thead>
           <tr>
-            <th>Comercios Afiliados</th>
-            <th>Esfuerzo de Campo</th>
-            <th>Ganancia Mensual Recurrente</th>
+            <th>Rango Oficial</th>
+            <th>Comercios Activos</th>
+            <th>% Comisión</th>
+            <th>Tu Ganancia por Comercio</th>
+            <th>Bono de Rango</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td><strong>5 comercios</strong></td>
-            <td>1 semana de trabajo (amigos/conocidos)</td>
-            <td><strong>$25 USD / mes</strong></td>
+            <td><span class="badge-rank badge-wood">🪵 Madera</span></td>
+            <td>0 comercios</td>
+            <td><strong>10%</strong></td>
+            <td>$2.00 USD</td>
+            <td>$0.00 USD</td>
           </tr>
           <tr>
-            <td><strong>15 comercios</strong></td>
-            <td>1 mes (1 comercio cada dos días)</td>
-            <td><strong>$75 USD / mes</strong></td>
+            <td><span class="badge-rank badge-bronze">🥉 Bronce</span></td>
+            <td>1 a 49 comercios</td>
+            <td><strong>10%</strong></td>
+            <td>$2.00 USD / mes</td>
+            <td><strong>+$10.00 USD</strong></td>
           </tr>
           <tr>
-            <td><strong>30 comercios</strong></td>
-            <td>2 meses (tu zona o centro comercial)</td>
-            <td><strong>$150 USD / mes</strong></td>
+            <td><span class="badge-rank badge-silver">🥈 Plata</span></td>
+            <td>50 a 99 comercios</td>
+            <td><strong>15%</strong></td>
+            <td>$3.00 USD / mes</td>
+            <td><strong>+$25.00 USD</strong></td>
           </tr>
           <tr>
-            <td><strong>60 comercios</strong></td>
-            <td>4 meses (red de recomendaciones)</td>
-            <td><strong>$300 USD / mes</strong></td>
-          </tr>
-          <tr>
-            <td><strong>100 comercios</strong></td>
-            <td>6 meses (red de comercios consolidados)</td>
-            <td><strong>$500 USD / mes</strong></td>
+            <td><span class="badge-rank badge-gold">🥇 Oro</span></td>
+            <td>100+ comercios</td>
+            <td><strong>20%</strong></td>
+            <td>$4.00 USD / mes</td>
+            <td><strong>+$50.00 USD</strong></td>
           </tr>
         </tbody>
       </table>
 
-      <h3>Cómo Funciona tu Enlace de Promotor:</h3>
-      <div class="steps-grid">
-        <div class="step-card">
-          <div class="step-num">1</div>
-          <h4>Tu Enlace Exclusivo</h4>
-          <p>El administrador de FinoWork te da de alta como promotor. Recibirás tu enlace de referido (ej: <code>finowork.com/register?ref=TU_CODIGO</code>).</p>
+      <h3>Tabla de Proyección Real de Ingresos para el Promotor:</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Comercios Activos</th>
+            <th>Rango Alcanzado</th>
+            <th>Cálculo Mensual</th>
+            <th>Ingreso Mensual Recurrente</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>10 comercios</strong></td>
+            <td>🥉 Bronce (10%)</td>
+            <td>10 x $2.00 USD</td>
+            <td><strong>$20.00 USD / mes</strong></td>
+          </tr>
+          <tr>
+            <td><strong>25 comercios</strong></td>
+            <td>🥉 Bronce (10%)</td>
+            <td>25 x $2.00 USD</td>
+            <td><strong>$50.00 USD / mes</strong></td>
+          </tr>
+          <tr>
+            <td><strong>50 comercios</strong></td>
+            <td>🥈 Plata (15%)</td>
+            <td>50 x $3.00 USD + $25 bono</td>
+            <td><strong>$175.00 USD / mes</strong></td>
+          </tr>
+          <tr>
+            <td><strong>80 comercios</strong></td>
+            <td>🥈 Plata (15%)</td>
+            <td>80 x $3.00 USD</td>
+            <td><strong>$240.00 USD / mes</strong></td>
+          </tr>
+          <tr>
+            <td><strong>100 comercios</strong></td>
+            <td>🥇 Oro (20%)</td>
+            <td>100 x $4.00 USD + $50 bono</td>
+            <td><strong>$450.00 USD / mes</strong></td>
+          </tr>
+          <tr>
+            <td><strong>150 comercios</strong></td>
+            <td>🥇 Oro (20%)</td>
+            <td>150 x $4.00 USD</td>
+            <td><strong>$600.00 USD / mes</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="alert-box blue">
+        <h4>🏦 ¿Cómo cobras tus comisiones?</h4>
+        <p>En tu panel de promotor (`/promoter`), configuras tus datos de cobro: <strong>Pago Móvil</strong> (Teléfono, Cédula y Banco) para recibir bolívares a tasa oficial, o <strong>Binance Pay ID</strong> para recibir USDT directamente.</p>
+      </div>
+    </div>
+
+    <div class="page-break"></div>
+
+    <!-- PÁGINA 3: FLUJO 1 - PUNTO DE VENTA (POS) -->
+    <div class="page">
+      <h2>🛒 2. Flujo Operativo: Punto de Venta (POS) y Caja</h2>
+      <p>El POS de FinoWork es el corazón del comercio físico. Resuelve el dolor de la tasa de cambio diaria y el enredo al cobrar en bolívares y dólares simultáneamente.</p>
+
+      <h3>Paso 1: Selección Táctil de Productos y Carrito Lateral</h3>
+      <p>El cajero o dueño ve fotos, precios en dólares y bolívares a la tasa oficial del día (ej. BCV). Toca los productos y se acumulan en el carrito flotante.</p>
+      <img src="/assets/pos-catalog-desktop.png" alt="Catálogo POS Desktop" class="flow-screenshot">
+      <div class="caption">Pantalla principal de POS / Caja con cálculo en vivo a tasa oficial BCV.</div>
+
+      <h3>Paso 2: Resumen, Descuentos y Entrega Inmediata</h3>
+      <div class="flow-grid-2">
+        <div>
+          <img src="/assets/pos-order-summary.png" alt="Resumen de Pedido" class="flow-screenshot">
+          <div class="caption">Resumen con opción de Entrega Inmediata (no estorba en comanda).</div>
         </div>
-        <div class="step-card">
-          <div class="step-num">2</div>
-          <h4>Registro del Cliente</h4>
-          <p>Cuando visites al dueño del negocio, regístralo desde tu enlace en su propio teléfono o pásale el link por WhatsApp para que quede vinculado a ti para siempre.</p>
+        <div>
+          <img src="/assets/pos-customer-discount.png" alt="Buscador de Cliente" class="flow-screenshot">
+          <div class="caption">Búsqueda rápida de cliente por cédula y descuento ($ o %).</div>
+        </div>
+      </div>
+
+      <h3>Paso 3: Cobro Multimoneda (Efectivo $, Efectivo Bs, Pago Móvil o Cuenta Abierta)</h3>
+      <p>El modal de pago permite registrar pagos mixtos y calcula el **vuelto exacto en bolívares o dólares**. Si el cliente es de confianza, se puede marcar como **Cuenta Abierta (Abono / Por Pagar)**.</p>
+      <img src="/assets/pos-payment-methods.png" alt="Métodos de Pago POS" class="flow-screenshot">
+      <div class="caption">Selección de métodos de pago: Pago Móvil con Banco y Referencia, Efectivo y Cuenta Abierta.</div>
+    </div>
+
+    <div class="page-break"></div>
+
+    <!-- PÁGINA 4: FLUJO 2 - TIENDA ONLINE Y CATÁLOGO WHATSAPP -->
+    <div class="page">
+      <h2>🌐 3. Flujo Operativo: Tienda Online Pública y Pedidos Web</h2>
+      <p>Cada negocio afiliado recibe su propio enlace web (`/public/store`) para colocarlo en su perfil de Instagram, bio o estados de WhatsApp. **0% comisiones a terceros.**</p>
+
+      <h3>Paso 1: Menú Digital con Filtro por Categorías</h3>
+      <img src="/assets/store-catalog-public.png" alt="Tienda Online Pública" class="flow-screenshot">
+      <div class="caption">Catálogo público responsive: fotos, buscador y precios actualizados en bolívares y dólares.</div>
+
+      <h3>Paso 2: Carrito con Retiro en Tienda o Delivery</h3>
+      <div class="flow-grid-2">
+        <div>
+          <img src="/assets/store-cart-checkout.png" alt="Carrito de Tienda" class="flow-screenshot">
+          <div class="caption">Carrito de compras: Retiro en tienda (gratis) o envío a domicilio.</div>
+        </div>
+        <div>
+          <img src="/assets/store-customer-form.png" alt="Datos de Cliente" class="flow-screenshot">
+          <div class="caption">Apartado Inmediato de stock al pagar para proteger el inventario.</div>
+        </div>
+      </div>
+
+      <h3>Paso 3: Pago Móvil Directo con Monto Exacto en Bolívares</h3>
+      <p>El cliente ve los datos del negocio (teléfono, cédula, banco), copia el monto exacto en bolívares y coloca los últimos dígitos de su comprobante.</p>
+      <img src="/assets/store-pagomovil-modal.png" alt="Reporte Pago Móvil Web" class="flow-screenshot">
+      <div class="caption">Modal de pago del cliente con botón "Copiar todo" para su app bancaria.</div>
+    </div>
+
+    <div class="page-break"></div>
+
+    <!-- PÁGINA 5: FLUJO 3 - AGENDAMIENTO DE CITAS ONLINE -->
+    <div class="page">
+      <h2>📅 4. Flujo Operativo: Citas y Reservaciones para Servicios</h2>
+      <p>Ideal para barberías, peluquerías, salones de estética, spas y consultorios. El cliente agenda su cita desde su teléfono sin necesidad de llamar.</p>
+
+      <h3>Paso 1: Selección Multi-Servicio y Duración Acumulada</h3>
+      <img src="/assets/booking-service-selection.png" alt="Selección de Servicios" class="flow-screenshot">
+      <div class="caption">El cliente puede elegir varios servicios (ej. Masaje + Limpieza Facial) sumando tiempo y precio automáticamente.</div>
+
+      <h3>Paso 2: Calendario y Horas Disponibles en Tiempo Real</h3>
+      <div class="flow-grid-2">
+        <div>
+          <img src="/assets/booking-calendar-date.png" alt="Calendario de Citas" class="flow-screenshot">
+          <div class="caption">Calendario con bloqueo automático de días no laborables o llenos.</div>
+        </div>
+        <div>
+          <img src="/assets/booking-time-slots.png" alt="Horarios Disponibles" class="flow-screenshot">
+          <div class="caption">Horarios disponibles según el tiempo acumulado de los servicios.</div>
+        </div>
+      </div>
+
+      <h3>Paso 3: Reserva con Cuenta Abierta ("Pagar al Asistir") y Panel Privado</h3>
+      <p>El cliente puede pagar por adelantado con Pago Móvil o elegir **"Por pagar al asistir"**. Al confirmar, recibe un **enlace privado único** con botones directos para autogestionar su cita y recibir avisos Web Push.</p>
+      <div class="flow-grid-2">
+        <div>
+          <img src="/assets/booking-open-tab-confirm.png" alt="Confirmación Cuenta Abierta" class="flow-screenshot">
+          <div class="caption">Confirmación con opción de pagar en efectivo al asistir.</div>
+        </div>
+        <div>
+          <img src="/assets/booking-client-portal.png" alt="Portal Privado de Cita" class="flow-screenshot">
+          <div class="caption">Panel privado del cliente con botón directo de WhatsApp y reprogramación.</div>
         </div>
       </div>
     </div>
 
     <div class="page-break"></div>
 
-    <!-- PÁGINA 3: LOS 4 PILARES TÉCNICOS -->
+    <!-- PÁGINA 6: FLUJO 4 - CONTROL FINANCIERO Y ARQUEO -->
     <div class="page">
-      <h2>🛡️ 2. Los 4 Pilares Técnicos: Por Qué FinoWork Arrasa</h2>
-      <p>Para convencer a un comerciante, no necesitas hablar de código. Solo necesitas mostrarle cómo FinoWork resuelve los 4 mayores dolores de cabeza en Venezuela:</p>
+      <h2>📊 5. Control Financiero: Tesorería, Arqueo y Libro de Ventas</h2>
+      <p>Esta es la sección que convence de inmediato a los dueños y contadores: **transparencia total del dinero físico y digital**.</p>
 
-      <img src="/assets/finowork_features_flow.jpg" alt="Los 4 Pilares de FinoWork" class="cover-image" style="margin: 16px 0 24px 0;">
+      <h3>1. Tesorería y Fondos Reales (Separación de Gaveta y Bancos)</h3>
+      <p>Muestra exactamente cuánto dinero físico hay en la gaveta en dólares y cuánto hay en cuentas bancarias nacionales en bolívares, sin distorsión por la tasa de cambio.</p>
+      <img src="/assets/treasury-real-funds.png" alt="Tesorería y Fondos Reales" class="flow-screenshot">
+      <div class="caption">Patrimonio Líquido Total desglosado en Gaveta Física USD y Bancos Nacionales en Bs.</div>
 
-      <div class="steps-grid">
-        <div class="step-card">
-          <h4>1. Modo Offline (Dexie.js)</h4>
-          <p><strong>¿Se fue la luz o CANTV?</strong> El teléfono o tablet sigue cobrando normalmente. Cuando regrese la señal, las ventas se sincronizan solas sin perder nada.</p>
+      <h3>2. Arqueo Mensual Detallado y Libro de Ventas (Control de IVA)</h3>
+      <div class="flow-grid-2">
+        <div>
+          <img src="/assets/monthly-arqueo-kpis.png" alt="Arqueo Mensual" class="flow-screenshot">
+          <div class="caption">Arqueo mensual: Facturado, Cobrado (DEBE), Gastos (HABER) y Ganancia Neta.</div>
         </div>
-        <div class="step-card">
-          <h4>2. Trimoneda en Vivo</h4>
-          <p>Precios en <strong>Dólares (USD)</strong> con conversión instantánea a <strong>Bolívares (VES con tasa BCV, Paralelo o USDT)</strong> y <strong>Pesos Colombianos (COP)</strong>. Cero calculadoras.</p>
+        <div>
+          <img src="/assets/fiscal-sales-book-table.png" alt="Libro de Ventas Fiscal" class="flow-screenshot">
+          <div class="caption">Libro de Ventas SENIAT con Nº de Factura, Nº Control, Base e IVA 16% exportable a Excel.</div>
         </div>
-        <div class="step-card">
-          <h4>3. POS con Vuelto Exacto</h4>
-          <p>El cliente paga con $20 en efectivo y el resto en Pago Móvil. El sistema te dice al centavo cuánto debes darle de vuelto en bolívares o en dólares.</p>
+      </div>
+
+      <h3>3. Arqueo y Cierre Diario de Caja con Reporte para WhatsApp</h3>
+      <p>Al final de la noche, el cajero declara su base inicial y el sistema cuadra las ventas en efectivo, punto y pago móvil. Con un solo clic, se genera el resumen listo para enviar por WhatsApp al dueño del negocio.</p>
+      <div class="flow-grid-2">
+        <div>
+          <img src="/assets/cash-close-drawer-modal.png" alt="Modal de Arqueo Diario" class="flow-screenshot">
+          <div class="caption">Arqueo diario con base de gaveta y cálculo de vueltos entregados.</div>
         </div>
-        <div class="step-card">
-          <h4>4. Tienda Online por WhatsApp</h4>
-          <p>El negocio recibe un enlace con su catálogo y carrito. El cliente pide desde su casa y el pedido llega formateado a WhatsApp sin pagar comisión a terceros.</p>
+        <div>
+          <img src="/assets/cash-close-whatsapp-report.png" alt="Reporte para WhatsApp" class="flow-screenshot">
+          <div class="caption">Botón verde "Copiar Reporte para WhatsApp" para enviar el cuadre al dueño.</div>
         </div>
       </div>
     </div>
 
     <div class="page-break"></div>
 
-    <!-- PÁGINA 4: EL PITCH DE 2 MINUTOS Y MANEJO DE OBJECIONES -->
+    <!-- PÁGINA 7: GUION DE CALLE Y HERRAMIENTAS DEL PROMOTOR -->
     <div class="page">
-      <h2>🗣️ 3. El Pitch de Venta en la Calle (Paso a Paso)</h2>
+      <h2>🗣️ 6. Guion de Calle (El Pitch de 2 Minutos)</h2>
 
-      <h3>Paso 1: La Entrada y el Dolor Principal</h3>
+      <h3>⏱️ Minuto 0: La Entrada al Negocio</h3>
       <div class="script-box">
-        "Buenas tardes, amigo. Qué tal las ventas hoy. Una pregunta rápida: ¿cuánto tiempo pierdes tú o tu cajero calculando el vuelto en bolívares con la tasa del BCV o cuando te pagan mitad en dólares y mitad en pago móvil?"
+        "Buenas tardes, amigo. Una pregunta rápida: ¿cuánto tiempo pierden tú o tus cajeros calculando el vuelto en bolívares con la tasa del BCV o cuando un cliente te paga mitad en dólares y mitad en pago móvil?"
       </div>
 
-      <h3>Paso 2: La Demostración en Vivo (30 Segundos)</h3>
-      <p>Saca tu teléfono con la app <strong>FinoWork</strong> abierta en el Punto de Venta:</p>
+      <h3>⏱️ Minuto 1: La Demostración en tu Teléfono</h3>
       <div class="script-box">
-        "Mira esto. Toco dos empanadas y una malta. Total: $4.50. El cliente me da $10 en efectivo. Le doy a cobrar y la app me dice de inmediato: 'Dar vuelto: $5.50 o 245.30 Bs a tasa oficial'. Todo en un segundo y sin equivocarse. Y si se te va la luz ahorita mismo, la app sigue cobrando sin internet."
+        "Mira mi pantalla un segundo. Selecciono dos productos de $18 y $25. Total: $43. El cliente me da $50 en efectivo. Le doy a cobrar y mira esto: la app me dice de inmediato: 'Vuelto: $7.00 o Bs. 6,216.84 a tasa BCV'. Todo al centavo. Y si ahorita mismo se nos corta la luz, la app sigue cobrando sin internet gracias a su base de datos offline."
       </div>
 
-      <h3>Paso 3: El Cierre Sin Riesgo (Prueba de 15 Días)</h3>
+      <h3>⏱️ Minuto 2: El Cierre Sin Riesgo (Prueba Gratuita de 15 Días)</h3>
       <div class="script-box">
-        "No me creas a mí. Te la instalo ahorita en 3 minutos en tu teléfono o en tu computadora. Te doy 15 días gratis para que la pruebes en tu mostrador. Si al final de la semana no te ahorró dolores de cabeza, la borras y listo. ¿Cuál es tu correo para crearte el acceso?"
+        "Te la instalo ahorita en tu propio teléfono o en tu computadora en 3 minutos. Te doy 15 días gratis para que la pruebes en tu mostrador con la cuota oficial base de $20 al mes. Si al final de la semana no te ahorró dolores de cabeza, la desinstalas y listo. ¿Cuál es tu correo para vincularte?"
       </div>
 
       <hr style="border: none; border-top: 1px solid var(--slate-200); margin: 28px 0;">
 
-      <h2>🥊 4. Manejo Maestro de Objeciones</h2>
+      <h2>📱 7. Las 4 Plantillas de WhatsApp en tu Panel de Promotor</h2>
+      <p>Dentro de tu panel de promotor (`/promoter`), tienes un generador automático de mensajes para dar seguimiento a tus comercios con un clic:</p>
 
-      <div class="alert-box">
-        <h4>Objeción 1: "Yo estoy bien con mi cuaderno de notas."</h4>
-        <p><strong>Respuesta:</strong> <em>"El cuaderno no te avisa cuando un empleado se equivoca con la tasa del dólar ni te cuadra la caja en 10 segundos al cerrar la noche. Además, si se te moja o pierde el cuaderno, perdiste todas tus cuentas por cobrar."</em></p>
-      </div>
-
-      <div class="alert-box">
-        <h4>Objeción 2: "¿El sistema me va a reportar al SENIAT?"</h4>
-        <p><strong>Respuesta:</strong> <em>"Para nada. FinoWork es tu escudo de control interno administrativo. Tú decides qué cobros registrar administrativamente y qué facturar. Es para que tú sepas si estás ganando o perdiendo plata, no para fiscalizarte."</em></p>
-      </div>
-
-      <div class="alert-box">
-        <h4>Objeción 3: "¿Tengo que comprar una computadora o máquina cara?"</h4>
-        <p><strong>Respuesta:</strong> <em>"No gastas ni un centavo en equipos. Funciona en cualquier teléfono Android, tablet Canaima o laptop vieja que ya tengas en el mostrador."</em></p>
-      </div>
-    </div>
-
-    <div class="page-break"></div>
-
-    <!-- PÁGINA 5: TIPOS DE CLIENTES Y CHECKLIST -->
-    <div class="page">
-      <h2>🎯 5. Tus 4 Clientes Ideales en Barinas y Venezuela</h2>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Tipo de Negocio</th>
-            <th>Lo que más les duele</th>
-            <th>La función que les vende FinoWork</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Comida Rápida y Panaderías</strong></td>
-            <td>Colas para pagar y pedidos desordenados</td>
-            <td>POS rápido + Comanda a cocina + Catálogo por WhatsApp</td>
-          </tr>
-          <tr>
-            <td><strong>Barberías, Peluquerías y Spas</strong></td>
-            <td>Choques de citas y cuadre de comisiones</td>
-            <td>Agendamiento web con especialista + Vales de sueldo</td>
-          </tr>
-          <tr>
-            <td><strong>Tiendas de Ropa, Calzado y Repuestos</strong></td>
-            <td>No saben qué talla o color les queda en stock</td>
-            <td>Variantes por talla, color, SKU y alerta de stock bajo</td>
-          </tr>
-          <tr>
-            <td><strong>Bodegones y Minimarkets</strong></td>
-            <td>El desastre de la tasa del dólar diaria</td>
-            <td>Trimoneda instantánea + Cuadre de caja (Debe/Haber/Saldo)</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h3>✅ Checklist Diario del Promotor Exitoso</h3>
-      <div style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 12px; padding: 20px;">
-        <p style="margin-bottom: 8px;">✔️ <strong>Ten la app abierta en tu teléfono</strong> antes de entrar al local con 3 productos de prueba cargados.</p>
-        <p style="margin-bottom: 8px;">✔️ <strong>Llega en horas tranquilas:</strong> Entre 9:30 AM y 11:30 AM, o entre 2:30 PM y 4:30 PM (nunca en hora pico de almuerzo).</p>
-        <p style="margin-bottom: 8px;">✔️ <strong>Pide hablar con el dueño o encargado:</strong> Los empleados no tienen poder de decisión.</p>
-        <p style="margin-bottom: 8px;">✔️ <strong>Ayúdale a cargar sus primeros 5 productos:</strong> No lo dejes solo en la instalación; si ve sus propios productos en la pantalla, ya el negocio es tuyo.</p>
-        <p style="margin-bottom: 0;">✔️ <strong>Visítalo al día siguiente:</strong> Pasa 5 minutos: <em>"¿Cómo te fue anoche cerrando caja?"</em>. Ese seguimiento sella la venta.</p>
+      <div class="steps-grid">
+        <div class="step-card">
+          <h4>1. Satisfacción</h4>
+          <p>Para preguntar cómo ha sido la experiencia tras los primeros 3 días y ayudarlos a cargar más productos.</p>
+        </div>
+        <div class="step-card">
+          <h4>2. Acompañamiento en Prueba (Trial)</h4>
+          <p>Les recuerda cuántos días de prueba les quedan y les ofrece ayuda para dejar el catálogo listo al 100%.</p>
+        </div>
+        <div class="step-card">
+          <h4>3. Cobro y Renovación Amigable</h4>
+          <p>Avisa cuando su cuota de $20 USD está por vencer y les ofrece los datos de Pago Móvil o Binance Pay.</p>
+        </div>
+        <div class="step-card">
+          <h4>4. Recuperación de Inactivos</h4>
+          <p>Reactiva comercios que dejaron de usar la app con ofertas o soporte personalizado.</p>
+        </div>
       </div>
 
       <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--slate-200);">
         <p style="font-size: 13px; color: var(--slate-500); font-weight: 600;">
-          FinoWork &copy; 2026 &bull; Plataforma Multi-Tenant para Comercio Moderno &bull; Soporte Oficial
+          FinoWork &copy; 2026 &bull; Plataforma Oficial Multi-Tenant &bull; Sistema de Promotores y Afiliados
         </p>
       </div>
     </div>

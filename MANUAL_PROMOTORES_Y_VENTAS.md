@@ -1,97 +1,134 @@
-# 📗 GUÍA DE CAMPO Y FLUJOS DE TRABAJO PARA PROMOTORES FINOWORK
+# 📗 GUÍA MAESTRA DE CAMPO Y FLUJOS OPERATIVOS: PROMOTORES FINOWORK
 
-Este documento es el manual oficial de formación comercial y técnica para el equipo de promotores de **FinoWork**. 
+Este documento es el manual oficial de formación comercial, técnica y operativa para el equipo de promotores de **FinoWork**.
 
-> 💡 **Versión imprimible en PDF:** Puedes abrir en tu navegador el archivo `manual-promotores.html` (o acceder a `https://tu-dominio/manual-promotores.html`) y presionar **Ctrl + P (Imprimir -> Guardar como PDF)** para obtener el folleto maquetado a color con portada e imágenes.
-
----
-
-## 1. 💰 EL MODELO DE NEGOCIO: ¿CÓMO GANA DINERO EL PROMOTOR?
-
-A diferencia de las ventas tradicionales donde cobras una sola vez y debes empezar de cero cada mes, en FinoWork trabajas bajo el modelo de **Comisiones Recurrentes en Dólares (SaaS)**.
-
-### La Regla de Oro:
-* Por cada negocio que se afilie a través de tu **enlace o código de promotor**, el negocio paga la suscripción oficial base de **$20 USD mensuales**.
-* Tú recibes una comisión recurrente mensual (por ejemplo, **$5 USD todos los meses por cada negocio activo**, equivalente al 25%).
-* Si un comercio dura 1 año usando FinoWork, **tú cobras 12 veces $5 USD = $60 USD por un solo trabajo de venta inicial**.
-
-### Proyección de Ingresos Recurrentes (a $5 USD por comercio/mes):
-| Negocios Activos | Tiempo Estimado de Campo | Ingreso Mensual Recurrente |
-| :--- | :--- | :--- |
-| **5 comercios** | 1 semana (amigos, familiares o vecinos) | **$25 USD / mes** |
-| **15 comercios** | 1 mes (1 negocio cada dos días) | **$75 USD / mes** |
-| **30 comercios** | 2 meses (un centro comercial o calle principal) | **$150 USD / mes** |
-| **60 comercios** | 4 meses (recomendaciones boca a boca) | **$300 USD / mes** |
-| **100 comercios** | 6 meses (red consolidada en tu ciudad) | **$500 USD / mes** |
+> 💡 **Versión imprimible y gráfica en PDF:** Puedes abrir en cualquier navegador el archivo `manual-promotores.html` (o en `https://tu-dominio/manual-promotores.html`) y presionar **Ctrl + P (Imprimir -> Guardar como PDF)** para obtener el folleto completo a todo color con todas las capturas de pantalla reales maquetadas editorialmente.
 
 ---
 
-## 2. 🛡️ LOS 4 PILARES TÉCNICOS QUE VENDEN FINOWORK
+## 1. 💰 EL MODELO DE NEGOCIO: ESCALERA DE RANGOS Y COMISIONES REALES
 
-Cuando entres a un negocio en Venezuela, no hables de programación. Muestra estos **4 superpoderes en vivo en tu teléfono**:
+En FinoWork el promotor no cobra una comisión aislada de una sola vez. Construye una **cartera de ingresos mensuales recurrentes en dólares**.
 
-1. **Modo Offline Blindado (Dexie.js / IndexedDB):**
-   * *El Dolor:* En Venezuela la luz y el internet fallan constantemente. Los puntos de venta tradicionales o sistemas web se caen y el negocio no puede cobrar.
-   * *La Solución FinoWork:* Si se cae el WiFi o la red móvil, la app sigue cobrando sin internet. Al volver la señal, todas las ventas se suben automáticamente a la nube.
-2. **Trimoneda en Tiempo Real (USD / VES / COP):**
-   * *El Dolor:* El comerciante pierde hasta 1 hora al día calculando precios a tasa BCV o Paralelo con calculadora y cometiendo errores de vuelto.
-   * *La Solución FinoWork:* Todo se maneja en dólares base y se convierte en vivo a bolívares (tasa BCV oficial) y pesos colombianos.
-3. **Punto de Venta (POS) con Vuelto Exacto:**
-   * *El Dolor:* Un cliente paga mitad en efectivo en dólares ($10) y mitad en Pago Móvil. ¿Cuánto le doy de vuelto en bolívares?
-   * *La Solución FinoWork:* En 1 segundo el cajero ingresa los montos y el sistema le dice: *"Dar vuelto: 184.20 Bs a tasa oficial"*.
-4. **Catálogo Digital y Pedidos por WhatsApp (0% Comisiones):**
-   * *El Dolor:* Las apps de delivery cobran del 15% al 30% de comisión por cada venta.
-   * *La Solución FinoWork:* El comercio recibe un enlace web propio con carrito de compras. El cliente pide desde su casa y el pedido llega formateado directo al WhatsApp del negocio sin pagar comisiones a nadie.
+* **Cuota Oficial Base del Comercio:** **$20.00 USD / mes**.
+* **Comisión de Activación:** Se genera la primera vez que el negocio referido paga su suscripción tras el periodo de prueba.
+* **Comisión Recurrente:** Se genera todos los meses siguientes en los que el comercio renueva su cuota de $20 USD.
 
----
+### 🧗 Escalera Oficial de Rangos (Según clientes activos en el mes):
+| Rango Oficial | Comercios Activos | % Comisión | Ganancia por Comercio | Bono Extra de Rango |
+| :--- | :--- | :--- | :--- | :--- |
+| **🪵 Madera** | 0 comercios | **10%** | $2.00 USD | $0.00 USD |
+| **🥉 Bronce** | 1 a 49 comercios | **10%** | **$2.00 USD / mes** | **+$10.00 USD** |
+| **🥈 Plata** | 50 a 99 comercios | **15%** | **$3.00 USD / mes** | **+$25.00 USD** |
+| **🥇 Oro** | 100+ comercios | **20%** | **$4.00 USD / mes** | **+$50.00 USD** |
 
-## 3. 🗣️ EL PITCH DE VENTA EN LA CALLE (GUION DE 2 MINUTOS)
+### 📈 Tabla de Proyección de Ganancias Reales del Promotor:
+| Comercios Activos | Rango | Cálculo Mensual | Ingreso Mensual Recurrente |
+| :--- | :--- | :--- | :--- |
+| **10 comercios** | 🥉 Bronce (10%) | 10 x $2.00 USD | **$20.00 USD / mes** |
+| **25 comercios** | 🥉 Bronce (10%) | 25 x $2.00 USD | **$50.00 USD / mes** |
+| **50 comercios** | 🥈 Plata (15%) | 50 x $3.00 USD + $25 bono | **$175.00 USD / mes** |
+| **80 comercios** | 🥈 Plata (15%) | 80 x $3.00 USD | **$240.00 USD / mes** |
+| **100 comercios** | 🥇 Oro (20%) | 100 x $4.00 USD + $50 bono | **$450.00 USD / mes** |
+| **150 comercios** | 🥇 Oro (20%) | 150 x $4.00 USD | **$600.00 USD / mes** |
 
-### ⏱️ Minuto 0: La Entrada Amigable (Identificar el Dolor)
-> *"Buenas tardes, amigo. ¿Cómo van las ventas hoy? Una pregunta rápida: ¿cuánto tiempo pierdes tú o tu cajero calculando el vuelto en bolívares con la tasa del BCV o cuando te pagan mitad en dólares y mitad en pago móvil?"*
-
-### ⏱️ Minuto 1: La Demostración en Vivo (El "Momento WOW")
-Saca tu teléfono con la app abierta:
-> *"Mira mi teléfono un segundo. Toco dos empanadas y una malta. Total: $4.50. El cliente me paga con un billete de $10. Toco 'Cobrar' y mira lo que hace la app: me dice de inmediato: 'Vuelto a entregar: $5.50 o 250 Bs a tasa BCV'. Todo al instante. Y si ahorita mismo se nos va la luz, la app sigue cobrando sin internet."*
-
-### ⏱️ Minuto 2: El Cierre Sin Riesgo (Prueba Gratuita)
-> *"No me creas a mí. Te la instalo ahorita mismo en tu teléfono o en tu computadora en 3 minutos. Te doy 15 días gratis para que la uses en tu mostrador. Si al final de la semana no te ahorró tiempo y plata, la borras y no pasó nada. ¿Cuál es tu correo para abrirte la cuenta ya mismo?"*
-
----
-
-## 4. 🥊 CÓMO DESTRUIR LAS OBJECIONES TÍPICAS
-
-### Objeción 1: *"Yo estoy bien con mi cuaderno de notas / Excel."*
-* **Tu Respuesta:** *"El cuaderno no te calcula la tasa del BCV en vivo ni te avisa si un empleado se equivocó dando vuelto. Además, si se moja o se extravía el cuaderno, perdiste todas tus cuentas por cobrar. Con FinoWork todo está respaldado en la nube."*
-
-### Objeción 2: *"¿El sistema me va a reportar al SENIAT?"*
-* **Tu Respuesta:** *"Para nada. FinoWork es tu herramienta de control administrativo interno. Tú decides qué ventas registrar para tu cuadre y qué facturar. Es para que tú sepas si estás ganando o perdiendo plata, no para fiscalizarte."*
-
-### Objeción 3: *"¿Tengo que comprar una computadora o máquina costosa?"*
-* **Tu Respuesta:** *"No gastas ni medio dólar en equipos. Funciona en cualquier teléfono Android que ya tengas, en una tablet o en cualquier laptop."*
-
-### Objeción 4: *"¿Y si se me descarga el teléfono?"*
-* **Tu Respuesta:** *"Puedes abrir tu cuenta en cualquier otro teléfono o computadora al instante. Tus productos y ventas están guardados de forma segura."*
+### 🏦 Liquidación y Métodos de Cobro:
+En el panel del promotor (`/promoter`), configuras tus datos de retiro:
+* **Pago Móvil:** Teléfono, Cédula y Banco (recibes bolívares a la tasa oficial del día).
+* **Binance Pay:** Recibes USDT directo a tu Binance Pay ID.
 
 ---
 
-## 5. 🎯 LOS 4 CLIENTES IDEALES EN TU CIUDAD
+## 2. 🛒 FLUJO 1: PUNTO DE VENTA (POS) Y CAJA FÍSICA
 
-1. **Comida Rápida, Panaderías y Cafeterías:**
-   * *Qué venderles:* La velocidad del POS, la comanda a cocina y el catálogo por WhatsApp para que los clientes pidan desde casa.
-2. **Barberías, Salones de Belleza y Spas:**
-   * *Qué venderles:* El agendamiento web de citas (el cliente reserva el día y la hora desde su teléfono) y el cálculo automático de comisiones por especialista.
-3. **Tiendas de Ropa, Calzado y Repuestos:**
-   * *Qué venderles:* El inventario por tallas, colores y códigos SKU, para que sepan exactamente qué mercancía les queda sin desordenar el almacén.
-4. **Bodegones y Minimarkets:**
-   * *Qué venderles:* El manejo trimoneda (USD, VES, COP), el vuelto exacto y el cierre de caja diario (Debe / Haber / Saldo exportable a Excel).
+1. **Pantalla Principal de POS (`pos-catalog-desktop.png`):**
+   * Visualización táctil de productos con fotos, precios en **Dólares ($)** y conversión en vivo a **Bolívares (Bs a tasa oficial BCV)**.
+   * Barra superior con indicador de conectividad (*"En línea"* o modo offline de contingencia) y tasa BCV activa.
+   * Carrito flotante con resumen acumulado: *"3 items • $65.00 (Bs. 57.727,69) -> Cobrar"*.
+2. **Resumen y Entrega Inmediata (`pos-order-summary.png`):**
+   * Desglose de productos seleccionados con cantidades (+/-) y papelera de eliminación rápida.
+   * Switch de **Entrega Inmediata**: al pagar, la orden se marca directamente como entregada sin saturar la comanda de cocina.
+3. **Buscador de Clientes y Descuentos (`pos-customer-discount.png`):**
+   * Buscador predictivo por número de cédula o teléfono para autocompletar clientes frecuentes.
+   * Asignación a empleado (*"Atendido por"*) para el cálculo automático de comisiones de nómina.
+   * Descuento especial en monto fijo ($) o porcentaje (%).
+4. **Cobro Multimoneda y Métodos de Pago (`pos-payment-methods.png`):**
+   * **Pago Móvil:** Registro con número de referencia y banco emisor (selector con buscador).
+   * **Efectivo USD:** Registro de billetes entregados y cálculo de vuelto en dólares o bolívares.
+   * **Efectivo Bs:** Cobro en moneda nacional.
+   * **Cuenta Abierta (Abono / Por Pagar):** Permite registrar ventas a crédito o abonos parciales.
 
 ---
 
-## 6. ✅ CHECKLIST DIARIO DEL PROMOTOR EXITOSO
+## 3. 🌐 FLUJO 2: TIENDA ONLINE PÚBLICA Y PEDIDOS POR WHATSAPP
 
-1. [ ] **Batería al 100%:** Lleva tu teléfono con carga completa y la app abierta con 3 productos de prueba.
-2. [ ] **Horarios clave:** Visita negocios entre **9:30 AM y 11:30 AM**, o entre **2:30 PM y 4:30 PM** (nunca en horas pico de clientes).
-3. [ ] **Habla siempre con el dueño o encargado:** Los empleados no toman decisiones de compra.
-4. [ ] **Ayúdalo a cargar sus primeros 5 productos:** Cuando el dueño ve sus propias fotos y precios en la pantalla, el sistema ya es de él.
-5. [ ] **Seguimiento al día siguiente:** Pasa 5 minutos al día siguiente a preguntarle: *"¿Cómo te fue anoche cerrando caja?"*. Ese pequeño gesto asegura que pague la suscripción.
+Cada comercio afiliado cuenta con su propio enlace web (`/public/store`):
+
+1. **Catálogo Digital Responsive (`store-catalog-public.png`):**
+   * Menú digital con filtro interactivo por categorías (ej. Cosméticos, Comida, Bebidas).
+   * Buscador en tiempo real de productos.
+2. **Carrito de Compras y Tipo de Entrega (`store-cart-checkout.png`):**
+   * Selector entre **Retiro en Tienda (Gratis)** o **Envío a Domicilio (Delivery)**.
+3. **Protección de Stock en Tiempo Real (`store-customer-form.png`):**
+   * Formulario de contacto con autocompletado por Cédula / RIF.
+   * **Apartado Inmediato al Pagar:** Al pulsar pagar, el inventario se descuenta y se reserva para el cliente durante su proceso de pago.
+4. **Reporte de Pago Móvil para el Cliente (`store-pagomovil-modal.png`):**
+   * El cliente visualiza los datos bancarios del comercio, copia el monto exacto en bolívares con un clic y reporta los últimos dígitos de su transferencia.
+
+---
+
+## 4. 📅 FLUJO 3: CITAS Y RESERVAS ONLINE (PARA SERVICIOS)
+
+Diseñado para barberías, peluquerías, salones de estética, spas y consultorios (`/public/reservations`):
+
+1. **Selección Multi-Servicio (`booking-service-selection.png`):**
+   * El cliente selecciona uno o varios tratamientos (ej. Drenaje Linfático + Limpieza Facial). El sistema acumula duración (105 min) y monto total ($58.00).
+2. **Calendario y Turnos Disponibles (`booking-calendar-date.png`, `booking-time-slots.png`):**
+   * Vista interactiva mensual de días hábiles.
+   * Despliegue de bloques de horas disponibles basadas en la duración real de los servicios y especialistas calificados.
+3. **Reserva Flexible con Cuenta Abierta (`booking-open-tab-confirm.png`):**
+   * El cliente puede elegir **"Por pagar al asistir (Cuenta abierta)"**, eliminando la fricción de exigir pagos adelantados.
+4. **Portal Privado de Autogestión (`booking-client-portal.png`):**
+   * El cliente recibe un enlace privado con botones directos para **compartir en WhatsApp**, **reprogramar fecha** o **registrar abonos**.
+
+---
+
+## 5. 📊 FLUJO 4: CONTROL FINANCIERO, ARQUEO Y LIBRO DE VENTAS (SENIAT)
+
+1. **Tesorería y Fondos Reales (`treasury-real-funds.png`):**
+   * Muestra el **Patrimonio Líquido Total en Caja y Bancos**.
+   * Separa con claridad:
+     * **Gaveta Física USD:** Billetes reales en caja para vueltos.
+     * **Bancos Venezuela (Cuentas Nacionales en Bs):** Dinero digital en cuentas bancarias por Pago Móvil o Punto.
+2. **Arqueo Mensual y Ganancia Neta (`monthly-arqueo-kpis.png`):**
+   * Desglose mensual: Facturado, Cobrado Real (DEBE), Por Cobrar, Gastos y Costos (HABER), y **Ganancia Neta (Utilidad libre del mes)**.
+   * Exportación instantánea a Excel del libro contable.
+3. **Libro de Ventas Fiscal (`fiscal-sales-book-summary.png`, `fiscal-sales-book-table.png`):**
+   * Reporte administrativo oficial de control de IVA.
+   * Tabla con: Nº Factura, Nº Control, RIF, Razón Social, Base Imponible y Débito Fiscal (IVA 16%).
+   * Exportable a Excel (.xls) y CSV para el contador del negocio.
+4. **Arqueo Diario de Gaveta y Cuadre por WhatsApp (`cash-close-drawer-modal.png`, `cash-close-whatsapp-report.png`):**
+   * Declaración de base inicial de caja.
+   * Cuadre de efectivo cobrado menos vueltos y egresos.
+   * Botón **"Copiar Reporte para WhatsApp"**: envía un resumen profesional formateado al WhatsApp del dueño en 1 segundo.
+
+---
+
+## 6. 🗣️ EL PITCH DE VENTA DE 2 MINUTOS (GUION DE CALLE)
+
+* **Minuto 0 (La Pregunta de Dolor):**
+  > *"Buenas tardes, amigo. Una pregunta rápida: ¿cuánto tiempo pierden tú o tus cajeros calculando el vuelto en bolívares con la tasa del BCV o cuando un cliente te paga mitad en dólares y mitad en pago móvil?"*
+* **Minuto 1 (La Demostración en el Teléfono):**
+  > *"Mira mi teléfono un segundo. Toco dos productos de $18 y $25. Total: $43. El cliente me da $50 en efectivo. Le doy a cobrar y mira esto: la app me dice de inmediato: 'Vuelto: $7.00 o Bs. 6,216.84 a tasa BCV'. Todo al centavo. Y si ahorita mismo se nos corta la luz, la app sigue cobrando sin internet gracias a su base de datos offline."*
+* **Minuto 2 (El Cierre Sin Riesgo):**
+  > *"Te la instalo ahorita en tu propio teléfono o en tu computadora en 3 minutos. Te doy 15 días gratis para que la pruebes en tu mostrador con la cuota oficial base de $20 al mes. Si al final de la semana no te ahorró dolores de cabeza, la desinstalas y listo. ¿Cuál es tu correo para vincularte?"*
+
+---
+
+## 7. 📱 HERRAMIENTAS Y PLANTILLAS DE WHATSAPP DEL PROMOTOR
+
+Dentro de tu panel (`/promoter`), cuentas con 4 plantillas automáticas de WhatsApp:
+1. **Satisfacción:** Seguimiento a los 3 días de uso para resolver dudas y apoyar con el catálogo.
+2. **Acompañamiento en Prueba (Trial):** Recordatorio de días restantes de prueba con oferta de asesoría.
+3. **Cobro y Renovación Amigable:** Notificación preventiva cuando su cuota de $20 USD está por vencer con opciones de Pago Móvil y Binance.
+4. **Recuperación de Inactivos:** Reactivación de comercios que pausaron sus operaciones.
