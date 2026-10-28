@@ -499,6 +499,113 @@ export class SuperAdminService implements OnModuleInit {
   }
 
   /**
+   * Delete a tenant and all its associated data (SuperAdmin direct action)
+   */
+  async deleteTenant(tenantId: string): Promise<{ success: boolean; message: string }> {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) {
+      throw new NotFoundException(`Negocio con ID ${tenantId} no encontrado`);
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      // 1. Quitar referencia de referidos
+      await manager.query(`UPDATE "tenant" SET "referred_by_tenant_id" = NULL WHERE "referred_by_tenant_id" = $1`, [tenantId]);
+
+      // 2. Reportes de pago SaaS y comisiones de promotores
+      await manager.query(`DELETE FROM "saas_payment_reports" WHERE "tenant_id" = $1`, [tenantId]);
+      await manager.query(`DELETE FROM "promoter_commissions" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+
+      // 3. Facturación fiscal y comprobantes
+      await manager.query(`DELETE FROM "fiscal_invoices" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+
+      // 4. Medios de items de ordenes
+      await manager.query(`DELETE FROM "order_item_media" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+
+      // 5. Items de órdenes
+      await manager.query(`
+        DELETE FROM "order_item" WHERE "orderId" IN (
+          SELECT id FROM "order" WHERE "tenantId" = $1
+        )
+      `, [tenantId]).catch(() => null);
+
+      // 6. Órdenes de venta
+      await manager.query(`DELETE FROM "order" WHERE "tenantId" = $1`, [tenantId]);
+
+      // 7. Recetas y combos de productos
+      await manager.query(`
+        DELETE FROM "recipe_item" WHERE "productId" IN (
+          SELECT id FROM "product" WHERE "tenantId" = $1
+        )
+      `, [tenantId]).catch(() => null);
+
+      await manager.query(`
+        DELETE FROM "combo_item" WHERE "comboId" IN (
+          SELECT id FROM "product" WHERE "tenantId" = $1
+        )
+      `, [tenantId]).catch(() => null);
+
+      // 8. Variantes de producto
+      await manager.query(`
+        DELETE FROM "product_variant" WHERE "productId" IN (
+          SELECT id FROM "product" WHERE "tenantId" = $1
+        )
+      `, [tenantId]).catch(() => null);
+
+      // 9. Movimientos de stock y producción
+      await manager.query(`DELETE FROM "stock_movement" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+      await manager.query(`DELETE FROM "production_batch" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+
+      // 10. Productos y Materia Prima
+      await manager.query(`DELETE FROM "product" WHERE "tenantId" = $1`, [tenantId]);
+      await manager.query(`DELETE FROM "raw_material" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+
+      // 11. Reservas y Citas
+      await manager.query(`DELETE FROM "reservation" WHERE "tenantId" = $1`, [tenantId]);
+
+      // 12. Clientes
+      await manager.query(`DELETE FROM "customers" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+
+      // 13. Operaciones de Tesorería, Inversiones, Gastos y Adelantos de Sueldo
+      await manager.query(`DELETE FROM "cash_exchanges" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+      await manager.query(`DELETE FROM "operating_expenses" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+      await manager.query(`DELETE FROM "investments" WHERE "negocioId" = $1`, [tenantId]).catch(() => null);
+      await manager.query(`DELETE FROM "salary_advances" WHERE "negocioId" = $1`, [tenantId]).catch(() => null);
+
+      // 14. Ajustes adicionales
+      await manager.query(`DELETE FROM "delivery_zone" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+      await manager.query(`DELETE FROM "feedback" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+      await manager.query(`DELETE FROM "access_request" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+      await manager.query(`DELETE FROM "work_schedule" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+      await manager.query(`DELETE FROM "push_subscriptions" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+
+      // 15. Configuración de negocio (Settings)
+      await manager.query(`DELETE FROM "settings" WHERE "tenantId" = $1`, [tenantId]);
+
+      // 16. Identificar y eliminar usuarios huérfanos que solo pertenecían a este negocio
+      const userRows = await manager.query(`SELECT "userId" FROM "user_tenant_access" WHERE "tenantId" = $1`, [tenantId]);
+      await manager.query(`DELETE FROM "user_tenant_access" WHERE "tenantId" = $1`, [tenantId]);
+
+      for (const row of userRows) {
+        if (!row.userId) continue;
+        const otherAccess = await manager.query(`SELECT COUNT(*) as count FROM "user_tenant_access" WHERE "userId" = $1`, [row.userId]);
+        const otherCount = Number(otherAccess[0]?.count || 0);
+        if (otherCount === 0) {
+          await manager.query(`DELETE FROM "users" WHERE id = $1 AND role != 'SUPERADMIN'`, [row.userId]);
+        }
+      }
+
+      // 17. Finalmente eliminar el negocio
+      await manager.query(`DELETE FROM "tenant" WHERE id = $1`, [tenantId]);
+    });
+
+    this.logger.log(`[SuperAdmin] Negocio "${tenant.name}" (${tenantId}) eliminado exitosamente.`);
+    return {
+      success: true,
+      message: `El negocio "${tenant.name}" y todos sus datos fueron eliminados de forma definitiva.`,
+    };
+  }
+
+  /**
    * List all pending SaaS payment reports
    */
   async getPendingPayments(): Promise<SaaSPaymentReportDTO[]> {

@@ -608,6 +608,41 @@ const SuperAdminDashboard: React.FC = () => {
     }
   };
 
+  const handleDeleteTenant = (t: SuperAdminTenantDTO) => {
+    presentAlert({
+      header: '¿Eliminar Negocio?',
+      subHeader: t.name,
+      message: `¿Estás seguro de que deseas eliminar permanentemente el negocio "${t.name}"? Esta acción borrará inmediatamente todas sus ventas, productos, reservas, clientes y accesos asociados sin necesidad de su contraseña.`,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Sí, Eliminar Definitivamente',
+          role: 'destructive',
+          handler: async () => {
+            try {
+              await apiClient.delete(`/superadmin/tenants/${t.id}`);
+              presentToast({
+                message: `Negocio "${t.name}" eliminado definitivamente.`,
+                duration: 3000,
+                color: 'success',
+              });
+              if (selectedTenant?.id === t.id) {
+                setSelectedTenant(null);
+              }
+              loadData();
+            } catch (err: any) {
+              presentToast({
+                message: err?.response?.data?.message || 'Error al eliminar el negocio.',
+                duration: 3500,
+                color: 'danger',
+              });
+            }
+          },
+        },
+      ],
+    });
+  };
+
   const handleApprovePayment = async (payment: SaaSPaymentReportDTO) => {
     const months = payment.months || 1;
     const days = months === 12 ? 365 : months * 30;
@@ -2143,16 +2178,37 @@ const SuperAdminDashboard: React.FC = () => {
 
                           {/* Acciones */}
                           <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                            <IonButton
-                              size="small"
-                              fill="outline"
-                              color="primary"
-                              onClick={() => openEditModal(t)}
-                              style={{ fontWeight: 600 }}
-                            >
-                              <IonIcon icon={createOutline} slot="start" />
-                              Gestionar Plan
-                            </IonButton>
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                              <IonButton
+                                size="small"
+                                fill="outline"
+                                color="primary"
+                                onClick={() => openEditModal(t)}
+                                style={{ fontWeight: 600 }}
+                              >
+                                <IonIcon icon={createOutline} slot="start" />
+                                Gestionar Plan
+                              </IonButton>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTenant(t)}
+                                title={`Eliminar ${t.name}`}
+                                style={{
+                                  background: '#fef2f2',
+                                  border: '1px solid #fecaca',
+                                  color: '#dc2626',
+                                  borderRadius: '8px',
+                                  width: '32px',
+                                  height: '32px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <IonIcon icon={trashOutline} style={{ fontSize: '15px' }} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -3471,6 +3527,19 @@ const SuperAdminDashboard: React.FC = () => {
                     >
                       {isSavingPlan ? <IonSpinner name="dots" /> : 'Guardar Cambios del Negocio'}
                     </IonButton>
+
+                    <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px dashed #e2e8f0' }}>
+                      <IonButton
+                        expand="block"
+                        fill="outline"
+                        color="danger"
+                        onClick={() => handleDeleteTenant(selectedTenant)}
+                        style={{ fontWeight: 700 }}
+                      >
+                        <IonIcon icon={trashOutline} slot="start" />
+                        Eliminar este Negocio Definitivamente
+                      </IonButton>
+                    </div>
                   </IonCardContent>
                 </IonCard>
               </div>

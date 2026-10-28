@@ -84,6 +84,12 @@ export class SuperAdminController {
     return await this.superadminService.updateTenantPlan(id, body);
   }
 
+  @Delete('tenants/:id')
+  @UseGuards(SuperAdminGuard)
+  async deleteTenant(@Param('id') id: string) {
+    return await this.superadminService.deleteTenant(id);
+  }
+
   @Get('payments')
   @UseGuards(SuperAdminGuard)
   async getPendingPayments() {
