@@ -452,6 +452,7 @@ export interface SaaSPaymentReportDTO {
   months?: number;
   subtotal?: number;
   ivaAmount?: number;
+  isTest?: boolean;
   createdAt: string;
 }
 
@@ -480,6 +481,7 @@ export interface SuperAdminTenantDTO {
   ivaPercentage?: number;
   ivaAmount?: number;
   finalFee: number;
+  isTest?: boolean;
 }
 
 export interface UpdateTenantPlanDTO {
@@ -488,6 +490,7 @@ export interface UpdateTenantPlanDTO {
   extendDays?: number;
   basePrice?: number;
   referredByTenantId?: string | null;
+  isTest?: boolean;
 }
 
 export interface MySubscriptionDTO {

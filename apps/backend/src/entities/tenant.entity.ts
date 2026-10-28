@@ -46,6 +46,9 @@ export class Tenant {
   @Column({ type: 'uuid', nullable: true })
   promoterId: string | null;
 
+  @Column({ name: 'is_test', type: 'boolean', default: false })
+  isTest: boolean;
+
   @ManyToOne(() => Promoter, (promoter) => promoter.tenants, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'promoterId' })
   promoter: Promoter | null;

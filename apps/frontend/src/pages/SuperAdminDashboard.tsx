@@ -198,6 +198,8 @@ const SuperAdminDashboard: React.FC = () => {
   const [editBasePrice, setEditBasePrice] = useState<number>(20);
   const [extendDaysToAdd, setExtendDaysToAdd] = useState<number>(0);
   const [editReferredByTenantId, setEditReferredByTenantId] = useState<string | null>(null);
+  const [editIsTest, setEditIsTest] = useState<boolean>(false);
+  const [tenantFilterType, setTenantFilterType] = useState<'all' | 'real' | 'test'>('all');
   const [isSavingPlan, setIsSavingPlan] = useState(false);
 
   // Reject payment modal
@@ -573,6 +575,7 @@ const SuperAdminDashboard: React.FC = () => {
     setEditBasePrice(t.basePrice);
     setExtendDaysToAdd(0);
     setEditReferredByTenantId(t.referredByTenantId || null);
+    setEditIsTest(Boolean(t.isTest));
   };
 
   const handleSavePlan = async () => {
@@ -585,6 +588,7 @@ const SuperAdminDashboard: React.FC = () => {
         basePrice: Number(editBasePrice) || 20,
         extendDays: Number(extendDaysToAdd) || undefined,
         referredByTenantId: editReferredByTenantId,
+        isTest: editIsTest,
       };
 
       await apiClient.patch(`/superadmin/tenants/${selectedTenant.id}/plan`, payload);
@@ -888,15 +892,19 @@ const SuperAdminDashboard: React.FC = () => {
   });
 
   const totalTenants = safeTenants.length;
-  const activeTenants = safeTenants.filter((t) => t.status === TenantStatus.ACTIVE).length;
-  const trialTenants = safeTenants.filter((t) => t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) > 0).length;
+  const activeTenants = safeTenants.filter((t) => !t.isTest && t.status === TenantStatus.ACTIVE).length;
+  const trialTenants = safeTenants.filter((t) => !t.isTest && t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) > 0).length;
+  const testTenantsCount = safeTenants.filter((t) => t.isTest).length;
   const pendingCount = safePendingPayments.length;
   const estimatedRevenue = safeTenants
-    .filter((t) => t.status === TenantStatus.ACTIVE || (t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) > 0))
+    .filter((t) => !t.isTest && (t.status === TenantStatus.ACTIVE || (t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) > 0)))
     .reduce((sum, t) => sum + (t.finalFee || 0), 0);
 
   // Filtered tenants
   const filteredTenants = safeTenants.filter((t) => {
+    if (tenantFilterType === 'real' && t.isTest) return false;
+    if (tenantFilterType === 'test' && !t.isTest) return false;
+
     const q = searchTerm.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -2014,6 +2022,59 @@ const SuperAdminDashboard: React.FC = () => {
                 onIonInput={(e) => setSearchTerm(e.detail.value || '')}
                 style={{ padding: 0 }}
               />
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setTenantFilterType('all')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid',
+                    borderColor: tenantFilterType === 'all' ? 'var(--theme-primary, #059669)' : '#cbd5e1',
+                    background: tenantFilterType === 'all' ? 'var(--theme-primary, #059669)' : '#ffffff',
+                    color: tenantFilterType === 'all' ? 'var(--theme-primary-contrast, #ffffff)' : '#475569',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Todos ({totalTenants})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTenantFilterType('real')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid',
+                    borderColor: tenantFilterType === 'real' ? 'var(--theme-primary, #059669)' : '#cbd5e1',
+                    background: tenantFilterType === 'real' ? 'var(--theme-primary, #059669)' : '#ffffff',
+                    color: tenantFilterType === 'real' ? 'var(--theme-primary-contrast, #ffffff)' : '#475569',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  🏢 Clientes Reales ({Math.max(0, totalTenants - testTenantsCount)})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTenantFilterType('test')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid',
+                    borderColor: tenantFilterType === 'test' ? '#d97706' : '#cbd5e1',
+                    background: tenantFilterType === 'test' ? '#fef3c7' : '#ffffff',
+                    color: tenantFilterType === 'test' ? '#92400e' : '#475569',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  🧪 Negocios de Prueba ({testTenantsCount})
+                </button>
+              </div>
             </div>
 
             {loading && (
@@ -2052,7 +2113,27 @@ const SuperAdminDashboard: React.FC = () => {
                         <tr key={t.id} style={{ borderBottom: '1px solid #f1f5f9', fontSize: '13px' }}>
                           {/* Negocio y Dueño */}
                           <td style={{ padding: '14px 16px' }}>
-                            <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>{t.name}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>{t.name}</div>
+                              {t.isTest && (
+                                <span
+                                  style={{
+                                    background: '#fef3c7',
+                                    color: '#92400e',
+                                    border: '1px solid #fde68a',
+                                    borderRadius: '6px',
+                                    padding: '2px 8px',
+                                    fontSize: '11px',
+                                    fontWeight: 800,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                  }}
+                                >
+                                  🧪 PRUEBA
+                                </span>
+                              )}
+                            </div>
                             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
                               👤 {t.owner ? `${t.owner.name} (${t.owner.email})` : 'Sin dueño asignado'}
                             </div>
@@ -2253,8 +2334,13 @@ const SuperAdminDashboard: React.FC = () => {
                       <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderTop: '4px solid #f59e0b' }}>
                         <IonCardHeader style={{ paddingBottom: '8px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                            <IonCardTitle style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', textTransform: 'capitalize' }}>
-                              {p.tenantName || 'Negocio Registrado'}
+                            <IonCardTitle style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', textTransform: 'capitalize', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span>{p.tenantName || 'Negocio Registrado'}</span>
+                              {p.isTest && (
+                                <span style={{ fontSize: '11px', fontWeight: 800, background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '6px', border: '1px solid #fde68a' }}>
+                                  🧪 PRUEBA
+                                </span>
+                              )}
                             </IonCardTitle>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               {p.months === 12 && (
@@ -3519,6 +3605,35 @@ const SuperAdminDashboard: React.FC = () => {
                     <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '12px', color: '#64748b' }}>
                       💡 <strong>Motor de Referidos:</strong> Este negocio tiene actualmente <strong>{selectedTenant.activeReferrals} referidos activos</strong>.
                       Al asignar el plan {editPlanType === TenantPlanType.PIONEER ? 'PIONERA' : 'REGULAR'}, la cuota calculada se actualizará automáticamente.
+                    </div>
+
+                    <div
+                      style={{
+                        background: editIsTest ? '#fffbeb' : '#f8fafc',
+                        border: `1px solid ${editIsTest ? '#fde68a' : '#e2e8f0'}`,
+                        borderRadius: '12px',
+                        padding: '14px',
+                        marginBottom: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '14px', color: editIsTest ? '#92400e' : '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>¿Es Negocio de Prueba?</span>
+                          {editIsTest && <span style={{ fontSize: '11px', background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: '4px', fontWeight: 800 }}>TEST</span>}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                          Los negocios de prueba funcionan 100% igual pero sus pagos e ingresos no afectan tus finanzas ni métricas reales de SuperAdmin.
+                        </div>
+                      </div>
+                      <IonToggle
+                        checked={editIsTest}
+                        onIonChange={(e) => setEditIsTest(e.detail.checked)}
+                        color="warning"
+                      />
                     </div>
 
                     <IonButton

@@ -438,6 +438,7 @@ export class SuperAdminService implements OnModuleInit {
         ivaPercentage: feeCalc.ivaPercentage,
         ivaAmount: feeCalc.ivaAmount,
         finalFee: feeCalc.finalFee,
+        isTest: Boolean(currentT.isTest),
       });
     }
 
@@ -467,6 +468,10 @@ export class SuperAdminService implements OnModuleInit {
 
     if (dto.referredByTenantId !== undefined) {
       tenant.referred_by_tenant_id = dto.referredByTenantId ? dto.referredByTenantId : (null as any);
+    }
+
+    if (dto.isTest !== undefined) {
+      tenant.isTest = Boolean(dto.isTest);
     }
 
     if (dto.extendDays && dto.extendDays > 0) {
@@ -663,6 +668,7 @@ export class SuperAdminService implements OnModuleInit {
       months: r.months || 1,
       subtotal: r.subtotal ? Number(r.subtotal) : Math.round((Number(r.amount) / 1.16) * 100) / 100,
       ivaAmount: r.iva_amount ? Number(r.iva_amount) : Math.round((Number(r.amount) - (Number(r.amount) / 1.16)) * 100) / 100,
+      isTest: Boolean(r.tenant?.isTest),
       createdAt: new Date(r.created_at).toISOString(),
     }));
   }
@@ -1525,10 +1531,13 @@ export class SuperAdminService implements OnModuleInit {
    * SuperAdmin: Retorna métricas financieras completas de la plataforma SaaS (Flujo de caja, IVA, promotores, OPEX, CAPEX, utilidades).
    */
   async getFinanceMetrics(): Promise<SuperAdminFinanceMetricsDTO> {
-    // 1. Ingresos e IVA por suscripciones aprobadas
-    const approvedPayments = await this.paymentReportRepo.find({
-      where: { status: SaaSPaymentStatus.APPROVED },
-    });
+    // 1. Ingresos e IVA por suscripciones aprobadas (excluyendo negocios de prueba)
+    const approvedPayments = await this.paymentReportRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.tenant', 't')
+      .where('p.status = :status', { status: SaaSPaymentStatus.APPROVED })
+      .andWhere('t.is_test = false')
+      .getMany();
 
     let grossRevenueUSD = 0;
     let totalIVACollectedUSD = 0;
@@ -1549,8 +1558,12 @@ export class SuperAdminService implements OnModuleInit {
     totalIVACollectedUSD = Math.round(totalIVACollectedUSD * 100) / 100;
     const netRevenueUSD = Math.round((grossRevenueUSD - totalIVACollectedUSD) * 100) / 100;
 
-    // 2. Comisiones a promotores (deuda pendiente vs pagadas)
-    const commissions = await this.commissionRepo.find();
+    // 2. Comisiones a promotores (deuda pendiente vs pagadas, excluyendo tenants de prueba)
+    const commissions = await this.commissionRepo
+      .createQueryBuilder('c')
+      .leftJoin(Tenant, 't', 't.id = c.tenantId')
+      .where('(t.is_test = false OR t.id IS NULL)')
+      .getMany();
     let totalPromotersDebtUSD = 0;
     let totalPromotersPaidUSD = 0;
 
