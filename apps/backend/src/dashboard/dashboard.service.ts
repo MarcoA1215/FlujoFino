@@ -764,7 +764,7 @@ export class DashboardService {
     const startDate = fromDateStr ? new Date(`${fromDateStr}T00:00:00`) : startOfMonth;
     const endDate = toDateStr ? new Date(`${toDateStr}T23:59:59.999`) : endOfToday;
 
-    const orders = (await this.orderRepo.find({ where: { tenantId }, relations: { items: true } })) || [];
+    const orders = (await this.orderRepo.find({ where: { tenantId }, relations: { items: { product: true } } })) || [];
     const expenses = (await this.expenseRepo.find({ where: { tenantId } })) || [];
     const movements = (await this.movementRepo.find({ where: { tenantId }, relations: { rawMaterial: true } })) || [];
     const investments = (await this.investmentRepo.find({ where: { negocioId: tenantId } })) || [];
@@ -1021,23 +1021,75 @@ export class DashboardService {
           ? o.items.map(i => `${i.quantity}x ${i.productName || 'Producto'} ($${Number(i.unitPrice || 0).toFixed(2)})`).join(', ')
           : 'Venta de mostrador';
 
+        let calculatedTaxableBase = 0;
+        let calculatedExempt = 0;
+        let calculatedTaxAmount = 0;
+
+        const detailedItems = Array.isArray(o.items) ? o.items.map(it => {
+          const qty = Number(it.quantity) || 1;
+          const uPrice = Number(it.unitPrice) || 0;
+          const uCost = Number(it.unitCost) || 0;
+          const lineSubtotal = Number(it.subtotal !== undefined && it.subtotal !== null ? it.subtotal : (uPrice * qty));
+          const lineCost = Number((uCost * qty).toFixed(2));
+          const isExempt = Boolean(it.isTaxExempt || (it.product && it.product.isTaxExempt));
+          const rate = isExempt ? 0 : Number(it.taxRate !== undefined && it.taxRate !== null ? it.taxRate : ((it.product && it.product.taxRate) || 16.0));
+          const lineTaxAmt = isExempt ? 0 : Number(((lineSubtotal * rate) / 100).toFixed(2));
+          const lineTotal = Number((lineSubtotal + lineTaxAmt).toFixed(2));
+          const lineProfit = Number((lineSubtotal - lineCost).toFixed(2));
+
+          if (isExempt) {
+            calculatedExempt += lineSubtotal;
+          } else {
+            calculatedTaxableBase += lineSubtotal;
+            calculatedTaxAmount += lineTaxAmt;
+          }
+
+          return {
+            id: it.id,
+            productId: it.productId,
+            productName: it.productName || (it.product && it.product.name) || 'Producto',
+            quantity: qty,
+            unitPrice: Number(uPrice.toFixed(2)),
+            unitCost: Number(uCost.toFixed(2)),
+            subtotal: Number(lineSubtotal.toFixed(2)),
+            isTaxExempt: isExempt,
+            taxRate: rate,
+            taxAmount: lineTaxAmt,
+            lineTotal,
+            lineCost,
+            lineProfit,
+          };
+        }) : [];
+
+        const subtotalExempt = Number(o.subtotalExempt) || Number(calculatedExempt.toFixed(2));
+        const taxableBase = Number(o.taxableBase) || Number(calculatedTaxableBase.toFixed(2));
+        const taxAmount = Number(o.taxAmount) || Number(calculatedTaxAmount.toFixed(2));
+        const exchangeRate = Number(o.exchangeRate || 40.0);
+
         return {
           orderId: o.id,
           orderCode: `ORD-${(o.id || '').slice(0, 8).toUpperCase()}`,
           date: o.createdAt ? new Date(o.createdAt).toISOString() : new Date().toISOString(),
           customerName: o.customerName || 'Cliente General',
           customerPhone: o.customerPhone || '',
+          customerIdentification: o.identification || o.pagoMovilCedula || '',
+          customerAddress: o.customerAddress || '',
           status: o.status,
           paymentStatus: o.paymentStatus,
           paymentMethod: o.paymentMethod || 'USD',
           totalAmount: Number(totalAmount.toFixed(2)),
+          subtotalExempt,
+          taxableBase,
+          taxAmount,
+          exchangeRate,
           collectedUsd: Number(collectedUsd.toFixed(2)),
           pendingUsd: Number(pendingUsd.toFixed(2)),
           totalCost: Number(totalCost.toFixed(2)),
           netProfit: Number(netProfit.toFixed(2)),
-          amountBs: Number(Number(o.amountBs || 0).toFixed(2)),
+          amountBs: Number(Number(o.amountBs || (totalAmount * exchangeRate)).toFixed(2)),
           amountCop: Number(Number(o.amountCop || 0).toFixed(2)),
           itemsSummary: itemsList,
+          items: detailedItems,
         };
       });
 

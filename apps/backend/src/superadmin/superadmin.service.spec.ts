@@ -673,4 +673,75 @@ describe('SuperAdminService', () => {
       );
     });
   });
+
+  describe('getTenants', () => {
+    it('automatically transitions an expired TRIAL tenant to PAST_DUE and persists to database', async () => {
+      const pastDate = new Date(Date.now() - 5 * 86400000); // 5 days ago
+      const expiredTenant = {
+        id: 'tenant-expired-trial',
+        name: 'Techno',
+        status: TenantStatus.TRIAL,
+        plan_type: TenantPlanType.REGULAR,
+        base_price: 20,
+        trial_ends_at: pastDate,
+        current_period_ends_at: null,
+        createdAt: new Date(Date.now() - 20 * 86400000),
+      };
+
+      tenantRepo.find.mockResolvedValue([expiredTenant]);
+      tenantRepo.findOne.mockResolvedValue(expiredTenant);
+      tenantRepo.save.mockImplementation((t: any) => Promise.resolve(t));
+      userAccessRepo.find.mockResolvedValue([]);
+
+      const mockQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(0),
+      };
+      tenantRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const tenants = await service.getTenants();
+
+      expect(tenants).toHaveLength(1);
+      expect(tenants[0].status).toBe(TenantStatus.PAST_DUE);
+      expect(tenants[0].trialDaysLeft).toBe(0);
+      expect(tenantRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'tenant-expired-trial',
+          status: TenantStatus.PAST_DUE,
+        })
+      );
+    });
+
+    it('preserves TRIAL status if trial period is still active', async () => {
+      const futureDate = new Date(Date.now() + 4 * 86400000); // 4 days remaining
+      const activeTrialTenant = {
+        id: 'tenant-active-trial',
+        name: 'Inversiones Lineira',
+        status: TenantStatus.TRIAL,
+        plan_type: TenantPlanType.REGULAR,
+        base_price: 20,
+        trial_ends_at: futureDate,
+        current_period_ends_at: null,
+        createdAt: new Date(),
+      };
+
+      tenantRepo.find.mockResolvedValue([activeTrialTenant]);
+      tenantRepo.findOne.mockResolvedValue(activeTrialTenant);
+      userAccessRepo.find.mockResolvedValue([]);
+
+      const mockQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(0),
+      };
+      tenantRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const tenants = await service.getTenants();
+
+      expect(tenants).toHaveLength(1);
+      expect(tenants[0].status).toBe(TenantStatus.TRIAL);
+      expect(tenants[0].trialDaysLeft).toBeGreaterThan(0);
+    });
+  });
 });

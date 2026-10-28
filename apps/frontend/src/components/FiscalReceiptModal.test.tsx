@@ -111,7 +111,8 @@ describe('FiscalReceiptModal - Comprobante Fiscal SENIAT', () => {
     fireEvent.click(copyBtn);
 
     expect(writeTextSpy).toHaveBeenCalled();
-    expect(writeTextSpy.mock.calls[0][0]).toContain('COMPROBANTE DE VENTA CON IVA');
+    expect(writeTextSpy.mock.calls[0][0]).toContain('TICKET DE VENTA Y ENTREGA');
+    expect(writeTextSpy.mock.calls[0][0]).toContain('NO VÁLIDO COMO FACTURA FISCAL');
     expect(writeTextSpy.mock.calls[0][0]).toContain('FAC-00000042');
   });
 

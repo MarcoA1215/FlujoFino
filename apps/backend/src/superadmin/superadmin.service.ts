@@ -84,27 +84,29 @@ export class SuperAdminService implements OnModuleInit {
       this.logger.warn(`Nota de auto-healing para saas_payment_reports / platform_expenses: ${err?.message || err}`);
     }
 
-    try {
-      // Auto-healing defensivo: Si 'compraventa' existe y no tiene referidor asignado, vincular a 'negocio prueba'
-      const compraventa = await this.tenantRepo.createQueryBuilder('t')
-        .where('LOWER(t.name) LIKE :name', { name: '%compraventa%' })
-        .andWhere('t.referred_by_tenant_id IS NULL')
-        .getOne();
-
-      if (compraventa) {
-        const negocioPrueba = await this.tenantRepo.createQueryBuilder('t')
-          .where('LOWER(t.name) LIKE :name', { name: '%negocio prueba%' })
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        // Auto-healing para desarrollo local / demo: vincular 'compraventa' a 'negocio prueba' si aplica
+        const compraventa = await this.tenantRepo.createQueryBuilder('t')
+          .where('LOWER(t.name) LIKE :name', { name: '%compraventa%' })
+          .andWhere('t.referred_by_tenant_id IS NULL')
           .getOne();
 
-        if (negocioPrueba) {
-          compraventa.referred_by_tenant_id = negocioPrueba.id;
-          await this.tenantRepo.save(compraventa);
-          this.logger.log(`[Auto-healing] Negocio 'compraventa' (${compraventa.id}) vinculado con éxito a su referidor 'negocio prueba' (${negocioPrueba.id}).`);
-          await this.calculateMonthlyFee(negocioPrueba.id);
+        if (compraventa) {
+          const negocioPrueba = await this.tenantRepo.createQueryBuilder('t')
+            .where('LOWER(t.name) LIKE :name', { name: '%negocio prueba%' })
+            .getOne();
+
+          if (negocioPrueba) {
+            compraventa.referred_by_tenant_id = negocioPrueba.id;
+            await this.tenantRepo.save(compraventa);
+            this.logger.log(`[Auto-healing Dev] Negocio 'compraventa' (${compraventa.id}) vinculado a 'negocio prueba' (${negocioPrueba.id}).`);
+            await this.calculateMonthlyFee(negocioPrueba.id);
+          }
         }
+      } catch (err: any) {
+        this.logger.warn(`Nota de auto-healing dev al iniciar SuperAdminService: ${err?.message || err}`);
       }
-    } catch (err: any) {
-      this.logger.warn(`Nota de auto-healing al iniciar SuperAdminService: ${err?.message || err}`);
     }
   }
 
@@ -271,12 +273,26 @@ export class SuperAdminService implements OnModuleInit {
 
     const now = Date.now();
     let trialDaysLeft = 0;
+    const isPioneerFree = updatedTenant.plan_type === TenantPlanType.PIONEER && feeCalc.activeReferrals >= 2;
+
     if (updatedTenant.status === TenantStatus.TRIAL) {
       const trialEnd = updatedTenant.trial_ends_at
         ? new Date(updatedTenant.trial_ends_at).getTime()
         : new Date(updatedTenant.createdAt).getTime() + 15 * 86400000;
       const diff = Math.ceil((trialEnd - now) / 86400000);
       trialDaysLeft = Math.max(0, diff);
+
+      // Auto-transición persistente si el período de prueba llegó a 0
+      if (trialDaysLeft <= 0 && !isPioneerFree) {
+        updatedTenant.status = TenantStatus.PAST_DUE;
+        await this.tenantRepo.save(updatedTenant);
+      }
+    } else if (updatedTenant.status === TenantStatus.ACTIVE) {
+      // Auto-transición persistente si el período mensual concluyó
+      if (updatedTenant.current_period_ends_at && new Date(updatedTenant.current_period_ends_at).getTime() < now && !isPioneerFree) {
+        updatedTenant.status = TenantStatus.PAST_DUE;
+        await this.tenantRepo.save(updatedTenant);
+      }
     }
 
     let daysLeft = trialDaysLeft;
@@ -291,12 +307,10 @@ export class SuperAdminService implements OnModuleInit {
       daysLeft = 0;
     }
 
-    const isPioneerFree = updatedTenant.plan_type === TenantPlanType.PIONEER && feeCalc.activeReferrals >= 2;
-    // Solo SUSPENDIDO, inactivo o prueba finalizada bloquean totalmente (isExpired).
-    // PAST_DUE (Vencido) tiene días de gracia y NO bloquea la navegación de la app.
+    // Solo SUSPENDIDO o inactivo bloquean totalmente (isExpired).
+    // PAST_DUE (Vencido) mantiene acceso a la app con alerta y días de gracia.
     const isSuspended = !updatedTenant.isActive || updatedTenant.status === TenantStatus.SUSPENDED;
-    const isTrialExpired = !isPioneerFree && updatedTenant.status === TenantStatus.TRIAL && trialDaysLeft <= 0;
-    const isExpired = isSuspended || isTrialExpired;
+    const isExpired = isSuspended;
 
     return {
       tenantId: updatedTenant.id,
@@ -380,12 +394,26 @@ export class SuperAdminService implements OnModuleInit {
       const currentT = (await this.tenantRepo.findOne({ where: { id: t.id } })) || t;
 
       let trialDaysLeft = 0;
+      const isPioneerFree = currentT.plan_type === TenantPlanType.PIONEER && feeCalc.activeReferrals >= 2;
+
       if (currentT.status === TenantStatus.TRIAL) {
         const trialEnd = currentT.trial_ends_at
           ? new Date(currentT.trial_ends_at).getTime()
           : new Date(currentT.createdAt).getTime() + 15 * 86400000;
         const diff = Math.ceil((trialEnd - now) / 86400000);
         trialDaysLeft = Math.max(0, diff);
+
+        // Auto-transición persistente: Si la prueba llegó a 0 y no es Pionero bonificado, marcar como PAST_DUE (Vencido)
+        if (trialDaysLeft <= 0 && !isPioneerFree) {
+          currentT.status = TenantStatus.PAST_DUE;
+          await this.tenantRepo.save(currentT);
+        }
+      } else if (currentT.status === TenantStatus.ACTIVE) {
+        // Auto-transición persistente: Si el período mensual pagado venció y no es Pionero bonificado, marcar como PAST_DUE (Vencido)
+        if (currentT.current_period_ends_at && new Date(currentT.current_period_ends_at).getTime() < now && !isPioneerFree) {
+          currentT.status = TenantStatus.PAST_DUE;
+          await this.tenantRepo.save(currentT);
+        }
       }
 
       result.push({

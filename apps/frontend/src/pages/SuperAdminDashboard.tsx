@@ -565,7 +565,11 @@ const SuperAdminDashboard: React.FC = () => {
   const openEditModal = (t: SuperAdminTenantDTO) => {
     setSelectedTenant(t);
     setEditPlanType(t.planType);
-    setEditStatus(t.status);
+    setEditStatus(
+      (t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) <= 0)
+        ? TenantStatus.PAST_DUE
+        : t.status
+    );
     setEditBasePrice(t.basePrice);
     setExtendDaysToAdd(0);
     setEditReferredByTenantId(t.referredByTenantId || null);
@@ -847,10 +851,10 @@ const SuperAdminDashboard: React.FC = () => {
 
   const totalTenants = safeTenants.length;
   const activeTenants = safeTenants.filter((t) => t.status === TenantStatus.ACTIVE).length;
-  const trialTenants = safeTenants.filter((t) => t.status === TenantStatus.TRIAL).length;
+  const trialTenants = safeTenants.filter((t) => t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) > 0).length;
   const pendingCount = safePendingPayments.length;
   const estimatedRevenue = safeTenants
-    .filter((t) => t.status === TenantStatus.ACTIVE || t.status === TenantStatus.TRIAL)
+    .filter((t) => t.status === TenantStatus.ACTIVE || (t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) > 0))
     .reduce((sum, t) => sum + (t.finalFee || 0), 0);
 
   // Filtered tenants
@@ -2086,7 +2090,7 @@ const SuperAdminDashboard: React.FC = () => {
 
                           {/* Vencimiento */}
                           <td style={{ padding: '14px 16px' }}>
-                            {t.status === TenantStatus.TRIAL ? (
+                            {t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) > 0 ? (
                               <div>
                                 <span style={{ color: '#d97706', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                   <IonIcon icon={timeOutline} /> {t.trialDaysLeft} días prueba
@@ -2094,6 +2098,22 @@ const SuperAdminDashboard: React.FC = () => {
                                 {t.trialEndsAt && (
                                   <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
                                     Hasta: {new Date(t.trialEndsAt).toLocaleDateString('es-VE')}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (t.status === TenantStatus.PAST_DUE || (t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) <= 0)) ? (
+                              <div>
+                                <span style={{ color: '#dc2626', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <IonIcon icon={timeOutline} /> {t.currentPeriodEndsAt ? 'Suscripción vencida' : 'Prueba vencida'}
+                                </span>
+                                {t.trialEndsAt && !t.currentPeriodEndsAt && (
+                                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                                    Venció: {new Date(t.trialEndsAt).toLocaleDateString('es-VE')}
+                                  </div>
+                                )}
+                                {t.currentPeriodEndsAt && (
+                                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                                    Venció: {new Date(t.currentPeriodEndsAt).toLocaleDateString('es-VE')}
                                   </div>
                                 )}
                               </div>
@@ -2114,8 +2134,10 @@ const SuperAdminDashboard: React.FC = () => {
                           {/* Estado */}
                           <td style={{ padding: '14px 16px' }}>
                             {t.status === TenantStatus.ACTIVE && <IonBadge color="success">ACTIVO</IonBadge>}
-                            {t.status === TenantStatus.TRIAL && <IonBadge color="warning">PRUEBA</IonBadge>}
-                            {t.status === TenantStatus.PAST_DUE && <IonBadge color="danger">VENCIDO</IonBadge>}
+                            {t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) > 0 && <IonBadge color="warning">PRUEBA</IonBadge>}
+                            {(t.status === TenantStatus.PAST_DUE || (t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) <= 0)) && (
+                              <IonBadge color="danger">VENCIDO</IonBadge>
+                            )}
                             {t.status === TenantStatus.SUSPENDED && <IonBadge color="medium">SUSPENDIDO</IonBadge>}
                           </td>
 

@@ -299,6 +299,59 @@ const Orders: React.FC = () => {
     });
   };
 
+  const handleOpenTicket = async (order: any) => {
+    if (!order) return;
+    if (order.fiscalInvoiceId) {
+      await handleViewFiscalReceipt(order.fiscalInvoiceId);
+      return;
+    }
+
+    const rate = Number(order.exchangeRate || systemSettings?.exchangeRateBs || 40.0);
+    const total = Number(order.totalAmount || 0);
+    const subExempt = Number(order.subtotalExempt || 0);
+    const taxBase = Number(order.taxableBase || 0);
+    const taxAmt = Number(order.taxAmount || 0);
+
+    const items = (order.items || []).map((it: any) => ({
+      productId: it.productId,
+      name: it.productName || it.product?.name || 'Producto',
+      quantity: Number(it.quantity) || 1,
+      unitPrice: Number(it.unitPrice) || 0,
+      isTaxExempt: Boolean(it.isTaxExempt || it.product?.isTaxExempt),
+      taxRate: Number(it.taxRate !== undefined && it.taxRate !== null ? it.taxRate : 16.0),
+      taxAmount: Number(it.taxAmount || 0),
+      subtotal: Number(it.subtotal || (Number(it.unitPrice || 0) * (Number(it.quantity) || 1))),
+    }));
+
+    const syntheticInvoice: any = {
+      id: order.id,
+      tenantId: order.tenantId,
+      orderId: order.id,
+      documentType: 'INVOICE',
+      provider: 'INTERNAL',
+      status: 'ISSUED',
+      invoiceNumber: `ORD-${(order.id || '').slice(0, 8).toUpperCase()}`,
+      fiscalControlNumber: order.offlineId || null,
+      series: 'T',
+      customerName: order.customerName || 'Cliente General',
+      customerRif: order.identification || order.pagoMovilCedula || 'V-00000000-0',
+      customerAddress: order.customerAddress || '',
+      customerPhone: order.customerPhone || '',
+      subtotalExempt: subExempt,
+      taxableBase: taxBase > 0 ? taxBase : (subExempt > 0 ? 0 : total),
+      taxRate: 16.0,
+      taxAmount: taxAmt,
+      totalAmount: total,
+      amountBs: Number(order.amountBs || (total * rate)),
+      exchangeRate: rate,
+      items,
+      createdAt: order.createdAt || new Date().toISOString(),
+    };
+
+    setActiveFiscalReceipt(syntheticInvoice);
+    setShowFiscalReceiptModal(true);
+  };
+
   const handleRejectPayment = (orderId: string) => {
     presentAlert({
       header: 'Rechazar Comprobante',
@@ -1376,6 +1429,27 @@ const Orders: React.FC = () => {
 
                     <button
                       type="button"
+                      onClick={() => handleOpenTicket(order)}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid #A7F3D0',
+                        background: '#ECFDF5',
+                        color: '#065F46',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title="Ver resumen y ticket de venta imprimible"
+                    >
+                      🧾 Ticket
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => setSelectedOrderForDetails(order)}
                       style={{
                         padding: '8px 12px',
@@ -1414,9 +1488,31 @@ const Orders: React.FC = () => {
         <IonModal isOpen={!!selectedOrderForDetails} onDidDismiss={() => setSelectedOrderForDetails(null)} style={{ '--border-radius': '20px' } as any}>
           <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-              <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
-                Detalles del Pedido
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
+                  Detalles del Pedido
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => handleOpenTicket(selectedOrderForDetails)}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #A7F3D0',
+                    background: '#ECFDF5',
+                    color: '#065F46',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Ver resumen y ticket imprimible"
+                >
+                  🧾 Ver Ticket
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setSelectedOrderForDetails(null)}

@@ -216,43 +216,47 @@ const Dashboard: React.FC = () => {
             </tbody>
           </table>
 
-          <!-- SECCIÓN 2: DESGLOSE DETALLADO DE VENTAS -->
-          <div class="section-title">🛍️ 2. DESGLOSE DETALLADO DE VENTAS (${sales.length} registros)</div>
+          <!-- SECCIÓN 2: RESUMEN DE VENTAS POR PEDIDO / FACTURA -->
+          <div class="section-title">🛍️ 2. RESUMEN DE VENTAS POR PEDIDO / COMPROBANTE (${sales.length} registros)</div>
           <table>
             <thead>
               <tr style="background-color: #10B981;">
                 <th>Fecha y Hora</th>
                 <th># Orden</th>
                 <th>Cliente</th>
+                <th>C.I. / RIF</th>
                 <th>Teléfono</th>
-                <th>Detalle de Productos / Servicios (Cant. x Precio)</th>
-                <th>Método de Pago</th>
-                <th style="text-align: right;">Facturado (USD)</th>
+                <th>Método Pago</th>
+                <th style="text-align: right;">Base Gravada (USD)</th>
+                <th style="text-align: right;">Exento (USD)</th>
+                <th style="text-align: right;">IVA 16% (USD)</th>
+                <th style="text-align: right;">Total Facturado (USD)</th>
                 <th style="text-align: right;">Cobrado (USD)</th>
                 <th style="text-align: right;">Por Cobrar (USD)</th>
                 <th style="text-align: right;">Monto Bs.</th>
-                <th style="text-align: right;">Monto COP</th>
                 <th style="text-align: right;">Costo (USD)</th>
                 <th style="text-align: right;">Utilidad (USD)</th>
                 <th>Estado</th>
               </tr>
             </thead>
             <tbody>
-              ${sales.length === 0 ? `<tr><td colspan="14" style="text-align: center; padding: 14px; color: #64748B;">No se registraron ventas en este rango de fechas.</td></tr>` : sales.map((s: any) => {
+              ${sales.length === 0 ? `<tr><td colspan="16" style="text-align: center; padding: 14px; color: #64748B;">No se registraron ventas en este rango de fechas.</td></tr>` : sales.map((s: any) => {
                 const sDate = s.date ? new Date(s.date).toLocaleString('es-ES') : '';
                 return `
                   <tr>
                     <td>${escapeHtml(sDate)}</td>
                     <td><b>${escapeHtml(s.orderCode || s.orderId)}</b></td>
                     <td>${escapeHtml(s.customerName)}</td>
+                    <td>${escapeHtml(s.customerIdentification || '-')}</td>
                     <td>${escapeHtml(s.customerPhone || '-')}</td>
-                    <td>${escapeHtml(s.itemsSummary)}</td>
                     <td>${escapeHtml(s.paymentMethod)}</td>
+                    <td class="num">$${Number(s.taxableBase || 0).toFixed(2)}</td>
+                    <td class="num">$${Number(s.subtotalExempt || 0).toFixed(2)}</td>
+                    <td class="num" style="color: #047857;">$${Number(s.taxAmount || 0).toFixed(2)}</td>
                     <td class="debe">$${Number(s.totalAmount || 0).toFixed(2)}</td>
                     <td class="num">$${Number(s.collectedUsd || 0).toFixed(2)}</td>
                     <td class="num" style="color: ${Number(s.pendingUsd || 0) > 0 ? '#D97706' : '#64748B'};">$${Number(s.pendingUsd || 0).toFixed(2)}</td>
                     <td class="num">${Number(s.amountBs || 0) > 0 ? `Bs. ${Number(s.amountBs).toLocaleString('es-VE', { minimumFractionDigits: 2 })}` : '-'}</td>
-                    <td class="num">${Number(s.amountCop || 0) > 0 ? `$${Number(s.amountCop).toLocaleString('es-CO')} COP` : '-'}</td>
                     <td class="cost">$${Number(s.totalCost || 0).toFixed(2)}</td>
                     <td class="profit">$${Number(s.netProfit || 0).toFixed(2)}</td>
                     <td>${escapeHtml(s.paymentStatus || s.status)}</td>
@@ -261,10 +265,13 @@ const Dashboard: React.FC = () => {
               }).join('')}
               <tr class="tot">
                 <td colspan="6" class="tot-text">TOTALES VENTAS (${sales.length} órdenes)</td>
+                <td class="num">$${Number(sales.reduce((acc: number, s: any) => acc + (Number(s.taxableBase) || 0), 0)).toFixed(2)}</td>
+                <td class="num">$${Number(sales.reduce((acc: number, s: any) => acc + (Number(s.subtotalExempt) || 0), 0)).toFixed(2)}</td>
+                <td class="num" style="color: #047857;">$${Number(sales.reduce((acc: number, s: any) => acc + (Number(s.taxAmount) || 0), 0)).toFixed(2)}</td>
                 <td class="debe">$${Number(sSum.totalInvoiced || 0).toFixed(2)}</td>
                 <td class="num">$${Number(sSum.totalCollected || 0).toFixed(2)}</td>
                 <td class="num" style="color: #D97706;">$${Number(sSum.totalPending || 0).toFixed(2)}</td>
-                <td colspan="2"></td>
+                <td></td>
                 <td class="cost">$${Number(sSum.totalCostOfSales || 0).toFixed(2)}</td>
                 <td class="profit">$${Number(sSum.totalSalesProfit || 0).toFixed(2)}</td>
                 <td></td>
@@ -272,8 +279,113 @@ const Dashboard: React.FC = () => {
             </tbody>
           </table>
 
-          <!-- SECCIÓN 3: LIBRO MAYOR CONTABLE DE MOVIMIENTOS -->
-          <div class="section-title">🏛️ 3. LIBRO MAYOR CONTABLE DE MOVIMIENTOS DE CAJA (${rows.length} movimientos)</div>
+          <!-- SECCIÓN 3: DESGLOSE INDIVIDUAL DE PRODUCTOS Y SERVICIOS VENDIDOS (ÍTEM POR ÍTEM) -->
+          ${(() => {
+            const allItems: any[] = [];
+            sales.forEach((s: any) => {
+              if (Array.isArray(s.items) && s.items.length > 0) {
+                s.items.forEach((it: any) => {
+                  allItems.push({ ...it, sale: s });
+                });
+              } else {
+                allItems.push({
+                  productName: s.itemsSummary || 'Venta de mostrador',
+                  quantity: 1,
+                  unitPrice: s.totalAmount,
+                  unitCost: s.totalCost,
+                  subtotal: s.totalAmount,
+                  isTaxExempt: Number(s.taxAmount || 0) === 0,
+                  taxRate: Number(s.taxAmount || 0) > 0 ? 16 : 0,
+                  taxAmount: s.taxAmount || 0,
+                  lineTotal: s.totalAmount,
+                  lineCost: s.totalCost,
+                  lineProfit: s.netProfit,
+                  sale: s,
+                });
+              }
+            });
+
+            const totalQty = allItems.reduce((acc, it) => acc + (Number(it.quantity) || 0), 0);
+            const totalSub = allItems.reduce((acc, it) => acc + (Number(it.subtotal) || 0), 0);
+            const totalTax = allItems.reduce((acc, it) => acc + (Number(it.taxAmount) || 0), 0);
+            const totalLines = allItems.reduce((acc, it) => acc + (Number(it.lineTotal) || 0), 0);
+            const totalCosts = allItems.reduce((acc, it) => acc + (Number(it.lineCost) || 0), 0);
+            const totalProfits = allItems.reduce((acc, it) => acc + (Number(it.lineProfit) || 0), 0);
+
+            return `
+              <div class="section-title">📦 3. DESGLOSE INDIVIDUAL DE PRODUCTOS VENDIDOS (${allItems.length} líneas / ${totalQty} unidades)</div>
+              <table>
+                <thead>
+                  <tr style="background-color: #0369A1; color: #FFFFFF;">
+                    <th>Fecha</th>
+                    <th># Orden</th>
+                    <th>Cliente</th>
+                    <th>C.I. / RIF</th>
+                    <th>Producto / Ítem Vendido</th>
+                    <th style="text-align: right;">Cant.</th>
+                    <th style="text-align: right;">P. Unit ($)</th>
+                    <th style="text-align: right;">Subtotal ($)</th>
+                    <th style="text-align: center;">Condición Fiscal</th>
+                    <th style="text-align: right;">Base Gravada ($)</th>
+                    <th style="text-align: center;">% IVA</th>
+                    <th style="text-align: right;">IVA ($)</th>
+                    <th style="text-align: right;">Total Línea ($)</th>
+                    <th style="text-align: right;">Costo ($)</th>
+                    <th style="text-align: right;">Utilidad ($)</th>
+                    <th>Método Pago</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${allItems.length === 0 ? `<tr><td colspan="16" style="text-align: center; padding: 14px; color: #64748B;">No hay ítems registrados en este período.</td></tr>` : allItems.map((it: any) => {
+                    const s = it.sale || {};
+                    const sDate = s.date ? new Date(s.date).toLocaleDateString('es-ES') : '';
+                    const isEx = Boolean(it.isTaxExempt);
+                    const baseGrav = isEx ? 0 : Number(it.subtotal || 0);
+
+                    return `
+                      <tr>
+                        <td>${escapeHtml(sDate)}</td>
+                        <td><b>${escapeHtml(s.orderCode || s.orderId)}</b></td>
+                        <td>${escapeHtml(s.customerName)}</td>
+                        <td>${escapeHtml(s.customerIdentification || '-')}</td>
+                        <td><b>${escapeHtml(it.productName)}</b></td>
+                        <td class="num" style="font-weight: bold;">${it.quantity}</td>
+                        <td class="num">$${Number(it.unitPrice || 0).toFixed(2)}</td>
+                        <td class="num">$${Number(it.subtotal || 0).toFixed(2)}</td>
+                        <td style="text-align: center; font-weight: bold; color: ${isEx ? '#475569' : '#065F46'}; background-color: ${isEx ? '#F1F5F9' : '#ECFDF5'};">
+                          ${isEx ? 'EXENTO' : 'GRAVADO (16%)'}
+                        </td>
+                        <td class="num">${baseGrav > 0 ? `$${baseGrav.toFixed(2)}` : '-'}</td>
+                        <td style="text-align: center;">${it.taxRate}%</td>
+                        <td class="num" style="color: #047857;">${Number(it.taxAmount || 0) > 0 ? `$${Number(it.taxAmount).toFixed(2)}` : '-'}</td>
+                        <td class="debe">$${Number(it.lineTotal || 0).toFixed(2)}</td>
+                        <td class="cost">$${Number(it.lineCost || 0).toFixed(2)}</td>
+                        <td class="profit">$${Number(it.lineProfit || 0).toFixed(2)}</td>
+                        <td>${escapeHtml(s.paymentMethod)}</td>
+                      </tr>
+                    `;
+                  }).join('')}
+                  <tr class="tot">
+                    <td colspan="5" class="tot-text">TOTALES POR PRODUCTOS (${allItems.length} líneas)</td>
+                    <td class="num">${totalQty}</td>
+                    <td></td>
+                    <td class="num">$${totalSub.toFixed(2)}</td>
+                    <td></td>
+                    <td class="num">$${Number(allItems.reduce((acc, it) => acc + (it.isTaxExempt ? 0 : Number(it.subtotal || 0)), 0)).toFixed(2)}</td>
+                    <td></td>
+                    <td class="num" style="color: #047857;">$${totalTax.toFixed(2)}</td>
+                    <td class="debe">$${totalLines.toFixed(2)}</td>
+                    <td class="cost">$${totalCosts.toFixed(2)}</td>
+                    <td class="profit">$${totalProfits.toFixed(2)}</td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            `;
+          })()}
+
+          <!-- SECCIÓN 4: LIBRO MAYOR CONTABLE DE MOVIMIENTOS -->
+          <div class="section-title">🏛️ 4. LIBRO MAYOR CONTABLE DE MOVIMIENTOS DE CAJA (${rows.length} movimientos)</div>
           <table>
             <thead>
               <tr>
