@@ -10,17 +10,24 @@ Este documento es el manual oficial de formación comercial, técnica y operativ
 
 En FinoWork el promotor no cobra una comisión aislada de una sola vez. Construye una **cartera de ingresos mensuales recurrentes en dólares**.
 
-* **Cuota Oficial Base del Comercio:** **$20.00 USD / mes**.
-* **Comisión de Activación:** Se genera la primera vez que el negocio referido paga su suscripción tras el periodo de prueba.
-* **Comisión Recurrente:** Se genera todos los meses siguientes en los que el comercio renueva su cuota de $20 USD.
+* **Cuota Oficial Base del Comercio:** **$20.00 USD / mes** (o **$200.00 USD / año** con descuento de 2 meses gratis).
+* **⚡ Comisión de Activación (Tu primer cobro por cada negocio):**
+  * Se genera en el momento en que tu comercio referido termina sus 15 días de prueba y realiza su primer pago de suscripción oficial.
+  * Si paga la mensualidad de **$20 USD**, cobras de inmediato el **10% ($2.00 USD)** en Bronce.
+  * Si el negocio aprovecha la anualidad de **$200 USD**, cobras de golpe **$20.00 USD** (10% en Bronce) o hasta **$40.00 USD** (20% en Oro).
+  * *🎁 Bono de Bienvenida:* Tu primera activación desbloquea el Rango Bronce y te otorga un **Bono de $10.00 USD**, ganando **$12.00 USD en tu primer cliente**.
+* **🔄 Comisión Recurrente (Tu sueldo pasivo mensual):**
+  * Todos los meses subsiguientes en los que el comercio renueva su cuota de $20 USD, tú vuelves a cobrar automáticamente el **10% ($2.00 USD/mes)** en Bronce.
+  * Al alcanzar 50 comercios subes a Plata cobrando el **15% ($3.00 USD/mes)**.
+  * Con 100 comercios activos subes a Oro cobrando el **20% ($4.00 USD/mes)** por cada negocio.
 
-### 🧗 Escalera Oficial de Rangos (Según clientes activos en el mes):
-| Rango Oficial | Comercios Activos | % Comisión | Ganancia por Comercio | Bono Extra de Rango |
-| :--- | :--- | :--- | :--- | :--- |
-| **🪵 Madera** | 0 comercios | **10%** | $2.00 USD | $0.00 USD |
-| **🥉 Bronce** | 1 a 49 comercios | **10%** | **$2.00 USD / mes** | **+$10.00 USD** |
-| **🥈 Plata** | 50 a 99 comercios | **15%** | **$3.00 USD / mes** | **+$25.00 USD** |
-| **🥇 Oro** | 100+ comercios | **20%** | **$4.00 USD / mes** | **+$50.00 USD** |
+### 🧗 Escalera Oficial de Rangos y Ganancias por Comercio:
+| Rango Oficial | Comercios Activos | % Comisión | Comisión Pago Mensual ($20) | Comisión Pago Anual ($200) | Bono Extra de Rango |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **🪵 Madera** | 0 comercios | **10%** | $2.00 USD | $20.00 USD | $0.00 USD |
+| **🥉 Bronce** | 1 a 49 comercios | **10%** | **$2.00 USD / mes** | **$20.00 USD** | **+$10.00 USD** |
+| **🥈 Plata** | 50 a 99 comercios | **15%** | **$3.00 USD / mes** | **$30.00 USD** | **+$25.00 USD** |
+| **🥇 Oro** | 100+ comercios | **20%** | **$4.00 USD / mes** | **$40.00 USD** | **+$50.00 USD** |
 
 ### 📈 Tabla de Proyección de Ganancias Reales del Promotor:
 | Comercios Activos | Rango | Cálculo Mensual | Ingreso Mensual Recurrente |
@@ -73,7 +80,7 @@ Cada comercio afiliado cuenta con su propio enlace web (`/public/store`):
    * Formulario de contacto con autocompletado por Cédula / RIF.
    * **Apartado Inmediato al Pagar:** Al pulsar pagar, el inventario se descuenta y se reserva para el cliente durante su proceso de pago.
 4. **Reporte de Pago Móvil para el Cliente (`store-pagomovil-modal.png`):**
-   * El cliente visualiza los datos bancarios del comercio, copia el monto exacto en bolívares con un clic y reporta los últimos dígitos de su transferencia.
+   * El cliente visualiza los datos bancarios del comercio, copia el monto exacto en bolívares con un clic y reporta los últimos dígitos de su comprobante.
 
 ---
 
