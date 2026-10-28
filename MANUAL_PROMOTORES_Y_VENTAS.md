@@ -11,16 +11,18 @@ Este documento es el manual oficial de formación comercial y técnica para el e
 A diferencia de las ventas tradicionales donde cobras una sola vez y debes empezar de cero cada mes, en FinoWork trabajas bajo el modelo de **Comisiones Recurrentes en Dólares (SaaS)**.
 
 ### La Regla de Oro:
-* Por cada negocio que se afilie a través de tu **enlace o código de promotor**, tú recibes una comisión mensual fija o porcentual (por ejemplo: **$3 a $5 USD todos los meses por cada negocio activo**).
-* Si un comercio dura 1 año usando FinoWork, **tú cobras 12 veces por un solo trabajo de venta**.
+* Por cada negocio que se afilie a través de tu **enlace o código de promotor**, el negocio paga la suscripción oficial base de **$20 USD mensuales**.
+* Tú recibes una comisión recurrente mensual (por ejemplo, **$5 USD todos los meses por cada negocio activo**, equivalente al 25%).
+* Si un comercio dura 1 año usando FinoWork, **tú cobras 12 veces $5 USD = $60 USD por un solo trabajo de venta inicial**.
 
-### Proyección de Ingresos Recurrentes:
+### Proyección de Ingresos Recurrentes (a $5 USD por comercio/mes):
 | Negocios Activos | Tiempo Estimado de Campo | Ingreso Mensual Recurrente |
 | :--- | :--- | :--- |
-| **5 comercios** | 1 semana (amigos, familiares o vecinos) | **$20 - $30 / mes** |
-| **15 comercios** | 1 mes (1 negocio cada dos días) | **$70 - $100 / mes** |
-| **30 comercios** | 2 meses (un centro comercial o calle principal) | **$150 - $220 / mes** |
-| **60 comercios** | 4 meses (recomendaciones boca a boca) | **$300 - $450 / mes** |
+| **5 comercios** | 1 semana (amigos, familiares o vecinos) | **$25 USD / mes** |
+| **15 comercios** | 1 mes (1 negocio cada dos días) | **$75 USD / mes** |
+| **30 comercios** | 2 meses (un centro comercial o calle principal) | **$150 USD / mes** |
+| **60 comercios** | 4 meses (recomendaciones boca a boca) | **$300 USD / mes** |
+| **100 comercios** | 6 meses (red consolidada en tu ciudad) | **$500 USD / mes** |
 
 ---
 
