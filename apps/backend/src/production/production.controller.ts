@@ -4,8 +4,15 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@finowork/shared-types';
 
+import { IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
+
 export class CreateBatchDto {
+  @IsString()
+  @IsNotEmpty()
   productId: string;
+
+  @IsNumber()
+  @Min(1)
   quantity: number;
 }
 

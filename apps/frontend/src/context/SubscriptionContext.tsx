@@ -1,4 +1,4 @@
-﻿import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { apiClient } from '../api/client';
 import { AuthContext } from './AuthContext';
@@ -36,6 +36,8 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   const refreshSubscription = useCallback(async () => {
     if (!isAuthenticated || !user?.tenantId) {
+      setSubscription(null);
+      setPlatformConfig(null);
       setIsLoading(false);
       return;
     }

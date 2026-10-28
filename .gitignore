@@ -47,9 +47,12 @@ build/
 # Repomix dumps
 repomix-backend.xml
 repomix-frontend.xml
+repomix-output.xml
 
 # Root APK duplicate (served from apps/frontend/public/FinoWork.apk)
 /FinoWork.apk
+/app-debug.apk
+app-debug.apk
 
 # Keystores y certificados Android
 *.keystore

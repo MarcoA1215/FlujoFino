@@ -153,7 +153,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       const allOrders = user?.tenantId
         ? await offlineDb.getOfflineOrdersByTenant(user.tenantId)
         : [];
-      const count = allOrders.filter(o => o.status !== 'failed').length;
+      const count = allOrders.filter(o => o.status !== 'synced').length;
       setPendingOfflineCount(count);
     } catch (err) {
       console.error('Error counting offline orders:', err);
@@ -613,7 +613,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       {pendingOfflineCount > 0 && (
         <div
           className="ff-pill ff-pill-interactive ff-pill-sync"
-          onClick={() => syncPendingOrders(false)}
+          onClick={() => syncPendingOrders(false, true)}
           title="Sincronizar ventas con el servidor"
         >
           {isSyncing ? (

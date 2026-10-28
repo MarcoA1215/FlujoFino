@@ -47,16 +47,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { value: storedUser } = await Preferences.get({ key: 'user' });
 
       if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-        apiClient.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setToken(storedToken);
+          setUser(parsedUser);
+          apiClient.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
 
-        // Verificación proactiva de sesión con el servidor en segundo plano:
-        // Si el usuario fue eliminado o revocado, el backend responderá 401 y el interceptor
-        // de apiClient limpiará automáticamente las credenciales y redirigirá al login.
-        apiClient.get('/auth/me').catch(() => {
-          // Si no hay conexión (offline), no hacemos nada para permitir uso sin conexión.
-        });
+          // Verificación proactiva de sesión con el servidor en segundo plano:
+          apiClient.get('/auth/me').catch(() => {
+            // Si no hay conexión (offline), no hacemos nada para permitir uso sin conexión.
+          });
+        } catch (e) {
+          console.error('Error parseando sesión guardada:', e);
+          await Preferences.remove({ key: 'token' });
+          await Preferences.remove({ key: 'user' });
+          setToken(null);
+          setUser(null);
+        }
       }
       setIsLoading(false);
     };

@@ -21,6 +21,8 @@ import { UpdateSuperAdminProfileDto } from './dto/update-superadmin-profile.dto'
 import { CreatePlatformExpenseDto } from './dto/create-platform-expense.dto';
 import { RecordSeniatPaymentDto } from './dto/record-seniat-payment.dto';
 import { SettingsService } from '../settings/settings.service';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '@finowork/shared-types';
 
 @Controller('superadmin')
 export class SuperAdminController {
@@ -33,6 +35,7 @@ export class SuperAdminController {
    * Endpoint for tenants to view their own subscription & referral discount calculations
    */
   @Get('my-subscription')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   async getMySubscription(@Req() req: any) {
     const tenantId = req.user.tenantId;
     return await this.superadminService.getMySubscription(tenantId);
@@ -42,6 +45,7 @@ export class SuperAdminController {
    * Endpoint for tenants to report a payment
    */
   @Post('payments/report')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   async reportPayment(
     @Req() req: any,
     @Body() body: ReportPaymentDto,

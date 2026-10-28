@@ -26,7 +26,7 @@ const SelectWorkspace: React.FC = () => {
         await logout();
         return;
       }
-      login(res.data.access_token, res.data.user, res.data.workspaces);
+      await login(res.data.access_token, res.data.user, res.data.workspaces);
       router.push('/', 'root', 'replace');
     } catch (e: any) {
       presentToast({ message: 'Error: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });

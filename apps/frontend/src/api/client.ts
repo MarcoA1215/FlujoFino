@@ -96,7 +96,7 @@ let activeRequestsCount = 0;
 
 export const getActiveRequestsCount = () => activeRequestsCount;
 
-export const PUBLIC_AUTH_EXEMPT_ROUTES = ['/login', '/public', '/store', '/tienda', '/book', '/appointment', '/landing', '/terms', '/privacy', '/delete-account', '/solicitud-eliminacion'];
+export const PUBLIC_AUTH_EXEMPT_ROUTES = ['/login', '/register', '/promoter/terms', '/public', '/store', '/tienda', '/book', '/appointment', '/landing', '/terms', '/privacy', '/delete-account', '/solicitud-eliminacion'];
 
 export function isExemptFromLoginRedirect(pathname: string): boolean {
   return PUBLIC_AUTH_EXEMPT_ROUTES.some((route) => pathname.startsWith(route));

@@ -31,7 +31,7 @@ export default defineConfig({
     port: 5173,
     headers: securityHeaders,
     proxy: {
-      '^/(auth|users|products|orders|raw-materials|production|delivery-zones|deliveries|dashboard|settings|reservations|storage|feedback|customers|superadmin|notifications|salary-advances|investments|promoters|public)': {
+      '^/(auth|users|products|orders|raw-materials|production|delivery-zones|deliveries|dashboard|settings|reservations|storage|feedback|customers|superadmin|notifications|salary-advances|investments|promoters|fiscal|app-updates|public)': {
         target: 'http://localhost:3001',
         changeOrigin: true,
         bypass: (req) => {

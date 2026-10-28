@@ -1,0 +1,18 @@
+# FinoWork — Windsurf AI Rules
+
+Refer to `AGENTS.md`, `DESIGN_SYSTEM.md`, and `DATABASE_SCHEMA.md` in the repository root for complete documentation.
+
+## Core Rules
+1. **Brand Name**: **FinoWork** (formerly Flujo Fino).
+2. **Package Manager**: **Yarn 4 Berry (`yarn`) ONLY**. Never run `npm` commands.
+3. **NO Tailwind CSS**: Tailwind CSS is NOT installed. Use `.ff-*` classes from `apps/frontend/src/theme.css`, `@ionic/react` components, and React inline styles (`style={{ ... }}`).
+4. **Dynamic Multi-Tenant Theming**:
+   - Primary actions/active states: `var(--theme-primary)` with text color `var(--theme-primary-contrast, #ffffff)` or `.ff-btn-primary` / `.bg-theme-primary`. Never hardcode `#10B981`.
+   - Brand text on white backgrounds: `var(--theme-primary-readable, #065F46)`.
+5. **No Native OS Pickers**:
+   - Never use `<select>`, `<input type="date">`, `<input type="time">`, `<input type="datetime-local">`, or `<input type="color">`.
+   - Always use `<FinoSelect />`, `<FinoDatePicker />`, `<FinoTimePicker />`, and `<FinoColorPicker />` from `apps/frontend/src/components/ui/`.
+6. **Backend & Database (NestJS 11 + TypeORM + PostgreSQL)**:
+   - Enforce strict multi-tenant isolation by filtering every query by `tenantId` (note: in `investments`, `salary_advances`, and `push_subscriptions` the column is named `negocioId`).
+   - Always use `decimal` with `ColumnNumericTransformer` for money/stock, never `float`.
+   - Apply `@UseGuards(JwtAuthGuard, RolesGuard)` whenever `@Roles(...)` is used, and add `class-validator` decorators to all DTO properties.

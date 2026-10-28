@@ -1,5 +1,6 @@
 import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, IsArray } from 'class-validator';
 import { Controller, Post, Body, Param, Get, NotFoundException, BadRequestException, Put, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ReservationsService } from './reservations.service';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -119,6 +120,7 @@ export class PublicReservationsController {
     @InjectRepository(Tenant) private tenantRepo: Repository<Tenant>
   ) {}
 
+  @Throttle({ default: { limit: 6, ttl: 60000 } })
   @Post('appointment/upload-proof')
   @UseInterceptors(FileInterceptor('file', safeImageUploadOptions))
   async uploadProof(@UploadedFile() file: Express.Multer.File) {

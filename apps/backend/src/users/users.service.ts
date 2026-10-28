@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
+import { Injectable, OnModuleInit, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not, Like } from 'typeorm';
 import { User } from '../entities/user.entity';
@@ -276,19 +276,10 @@ export class UsersService implements OnModuleInit {
   }
 
   async create(tenantId: string, data: any): Promise<User> {
-    if (!tenantId) throw new Error('Se requiere tenantId para crear un usuario');
-
-    let effectiveTenantId = tenantId;
-    if (!isValidUUID(effectiveTenantId)) {
-      try {
-        const accessRepo = this.usersRepo.manager.getRepository(UserTenantAccess);
-        const userAccess = await accessRepo.findOne({
-          where: { role: UserRole.ADMIN, isActive: true },
-          order: { id: 'DESC' },
-        });
-        if (userAccess?.tenantId) effectiveTenantId = userAccess.tenantId;
-      } catch (err) {}
+    if (!tenantId || typeof tenantId !== 'string' || !tenantId.trim() || tenantId === 'default-tenant') {
+      throw new BadRequestException('Se requiere un identificador de negocio (tenantId) válido');
     }
+    const effectiveTenantId = tenantId.trim();
     
     return await this.usersRepo.manager.transaction(async transactionalEntityManager => {
       if (data.role === UserRole.OPERATIVO) {
@@ -413,19 +404,10 @@ export class UsersService implements OnModuleInit {
   }
 
   async update(tenantId: string, userId: string, data: any): Promise<any> {
-    if (!tenantId) throw new Error('Tenant ID required');
-
-    let effectiveTenantId = tenantId;
-    if (!isValidUUID(effectiveTenantId)) {
-      try {
-        const accessRepo = this.usersRepo.manager.getRepository(UserTenantAccess);
-        const userAccess = await accessRepo.findOne({
-          where: { role: UserRole.ADMIN, isActive: true },
-          order: { id: 'DESC' },
-        });
-        if (userAccess?.tenantId) effectiveTenantId = userAccess.tenantId;
-      } catch (err) {}
+    if (!tenantId || typeof tenantId !== 'string' || !tenantId.trim() || tenantId === 'default-tenant') {
+      throw new BadRequestException('Se requiere un identificador de negocio (tenantId) válido');
     }
+    const effectiveTenantId = tenantId.trim();
 
     let access = await this.usersRepo.manager.findOne(UserTenantAccess, {
       where: { userId, tenantId: effectiveTenantId }
@@ -1304,14 +1286,8 @@ export class UsersService implements OnModuleInit {
   }
 
   async getAccessRequests(tenantId: string): Promise<AccessRequest[]> {
-    if (!tenantId) return [];
+    if (!tenantId || !isValidUUID(tenantId)) return [];
     const accessReqRepo = this.usersRepo.manager.getRepository(AccessRequest);
-    if (!isValidUUID(tenantId)) {
-      return accessReqRepo.find({
-        where: { status: AccessRequestStatus.PENDING },
-        order: { createdAt: 'DESC' },
-      });
-    }
     return accessReqRepo.find({
       where: { tenantId, status: AccessRequestStatus.PENDING },
       order: { createdAt: 'DESC' },

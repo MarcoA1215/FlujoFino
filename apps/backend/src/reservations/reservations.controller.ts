@@ -4,6 +4,7 @@ import { ReservationsService } from './reservations.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@finowork/shared-types';
+import { safeImageUploadOptions } from '../common/utils/multer-options';
 
 @UseGuards(JwtAuthGuard)
 @Controller('reservations')
@@ -74,7 +75,7 @@ export class ReservationsController {
 
   @Post(':id/media')
   @Roles(UserRole.ADMIN, UserRole.POS, UserRole.KITCHEN)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', safeImageUploadOptions))
   uploadMedia(@Request() req, @Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
     return this.service.uploadMedia(req.user.tenantId, id, file);
   }

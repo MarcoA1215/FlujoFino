@@ -5,7 +5,7 @@ Write-Host "==========================================" -ForegroundColor Cyan
 # 1. Compilar Frontend
 Write-Host "`n1. Compilando Frontend de FinoWork..." -ForegroundColor Yellow
 Set-Location "apps/frontend"
-npm run build
+yarn build
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Error al compilar el frontend" -ForegroundColor Red
     Set-Location "../.."
@@ -14,7 +14,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # 2. Sincronizar Capacitor con Android
 Write-Host "`n2. Sincronizando con Android nativo..." -ForegroundColor Yellow
-npx cap sync android
+yarn cap sync android
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Error al sincronizar con Capacitor" -ForegroundColor Red
     Set-Location "../.."

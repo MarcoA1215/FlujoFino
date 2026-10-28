@@ -1,2 +1,2 @@
 cd packages/shared-types
-npm run build
+yarn build

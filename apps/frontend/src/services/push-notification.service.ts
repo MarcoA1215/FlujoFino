@@ -139,7 +139,6 @@ export async function subscribeWebPush(
         negocioId,
         role,
       }, { headers });
-      console.log(`[Web Push] Dispositivo suscrito con éxito (${role}):`, identifier);
       return { success: true };
     }
   } catch (error: any) {
@@ -187,7 +186,6 @@ export async function registerPushNotifications(
             negocioId,
             role,
           }, { headers });
-          console.log(`[Capacitor Native] Token push registrado (${role}):`, token.value);
         } catch (err) {
           console.error('[Capacitor Native] Error registrando push token con backend:', err);
         }
