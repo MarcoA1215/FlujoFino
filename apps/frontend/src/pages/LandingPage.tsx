@@ -634,8 +634,14 @@ const LandingPage: React.FC = () => {
                   </h3>
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '4px' }}>
                     <span style={{ fontSize: '38px', fontWeight: '900', color: '#0F172A' }}>$20</span>
-                    <span style={{ fontSize: '14px', color: '#64748B', fontWeight: '600' }}>USD / mes</span>
+                    <span style={{ fontSize: '15px', color: '#64748B', fontWeight: '700' }}>USD / mes + IVA</span>
                   </div>
+                  <div style={{ marginTop: '6px', display: 'inline-block', background: '#ECFDF5', border: '1px solid #A7F3D0', padding: '4px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '800', color: '#065F46' }}>
+                    $23.20 USD final al mes (IVA 16% incluido)
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#64748B', margin: '6px 0 0 0' }}>
+                    $20.00 mensualidad + $3.20 IVA (16%). Pagadero en Bs a tasa oficial o en USDT.
+                  </p>
                   <p style={{ fontSize: '13px', color: '#10B981', fontWeight: '600', margin: '6px 0 0 0' }}>
                     15 días totalmente gratis al registrar tu negocio
                   </p>

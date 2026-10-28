@@ -34,6 +34,8 @@ import {
   refreshOutline,
   checkmarkDoneOutline,
   searchOutline,
+  chevronBackOutline,
+  chevronForwardOutline,
 } from 'ionicons/icons';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
@@ -46,8 +48,9 @@ import { BankSelect } from '../components/BankSelect';
 import { getContrastColor, ensureReadableColor, applyThemeToDom, resetToDefaultTheme } from '../utils/colors';
 import { normalizeCedula, analyzeCedulaInput, type CedulaPrefix } from '../utils/cedula';
 import { formatTime12h } from '../utils/time';
+import { getBaseURL } from '../api/client';
 
-const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const apiBase = getBaseURL();
 
 interface StoreProductVariant {
   id: string;
@@ -151,6 +154,7 @@ const PublicStore: React.FC = () => {
   // Submission & Tracking state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false);
+  const [reservedPaymentOrder, setReservedPaymentOrder] = useState<any | null>(null);
   const [orderResult, setOrderResult] = useState<any | null>(null);
   const [activeOrderMini, setActiveOrderMini] = useState<any | null>(null);
   const [liveOrderStatus, setLiveOrderStatus] = useState<string | null>(null);
@@ -622,9 +626,16 @@ const PublicStore: React.FC = () => {
     return zone ? Number(zone.feePrice) : 0;
   }, [deliveryMethod, deliveryZones, selectedZoneId]);
 
-  const grandTotalUSD = cartSubtotalUSD + deliveryFeeUSD;
-  const grandTotalBs = grandTotalUSD * exchangeRate;
-  const grandTotalCop = Math.round(grandTotalUSD * exchangeRateCop);
+  const rawCartTotalUSD = cartSubtotalUSD + deliveryFeeUSD;
+  const grandTotalUSD = reservedPaymentOrder
+    ? Number(reservedPaymentOrder.grandTotalUSD || reservedPaymentOrder.totalAmount || 0)
+    : rawCartTotalUSD;
+  const grandTotalBs = reservedPaymentOrder
+    ? Number(reservedPaymentOrder.grandTotalBs || reservedPaymentOrder.totalAmountBs || grandTotalUSD * exchangeRate)
+    : grandTotalUSD * exchangeRate;
+  const grandTotalCop = reservedPaymentOrder
+    ? Number(reservedPaymentOrder.totalAmountCop || Math.round(grandTotalUSD * exchangeRateCop))
+    : Math.round(grandTotalUSD * exchangeRateCop);
 
   const hasBajoEncargo = useMemo(() => cart.some((i) => i.product.availabilityType === 'BAJO_ENCARGO'), [cart]);
   const hasSupplierPreorder = useMemo(() => cart.some((i) => i.product.isSupplierPreorder), [cart]);
@@ -710,7 +721,7 @@ const PublicStore: React.FC = () => {
     setCart(cart.filter((i) => i.cartKey !== cartKey));
   };
 
-  // Submit Order
+  // Paso 1: Al darle al botón de Pagar, apartar condicionalmente los productos del carrito en inventario
   const handleCheckout = async () => {
     if (submittingRef.current || isSubmitting) return;
 
@@ -748,47 +759,9 @@ const PublicStore: React.FC = () => {
       }
     }
 
-    if (!hasSupplierPreorder) {
-      if ((paymentOption === 'TRANSFER' || paymentOption === 'TRANSFER_COP') && !transferRef.trim()) {
-        presentToast({ message: 'Por favor ingresa la referencia o comprobante de transferencia', duration: 2500, color: 'warning' });
-        return;
-      }
-      if (paymentOption === 'BINANCE' && !binanceRef.trim()) {
-        presentToast({ message: 'Por favor ingresa el ID de transacción / Binance Pay', duration: 2500, color: 'warning' });
-        return;
-      }
-    }
-
     submittingRef.current = true;
     setIsSubmitting(true);
     try {
-      let usdNote = 'MÉTODO: Divisas Efectivo (USD)';
-      if (paymentOption === 'USD' && cashReceivedAmount) {
-        const cashNum = parseFloat(cashReceivedAmount);
-        if (!isNaN(cashNum) && cashNum >= grandTotalUSD) {
-          const change = cashNum - grandTotalUSD;
-          usdNote = `MÉTODO: Divisas Efectivo (USD) | Paga con: $${cashNum.toFixed(2)} | Vuelto a recibir: $${change.toFixed(2)}`;
-        }
-      }
-
-      let copCashNote = `MÉTODO: Efectivo Pesos (COP: $${grandTotalCop.toLocaleString('es-CO')})`;
-      if (paymentOption === 'CASH_COP' && cashReceivedAmount) {
-        const cashNumCop = parseFloat(cashReceivedAmount);
-        if (!isNaN(cashNumCop) && cashNumCop >= grandTotalCop) {
-          const changeCop = Math.round(cashNumCop - grandTotalCop);
-          copCashNote = `MÉTODO: Efectivo Pesos (COP) | Paga con: $${Math.round(cashNumCop).toLocaleString('es-CO')} COP | Vuelto: $${changeCop.toLocaleString('es-CO')} COP`;
-        }
-      }
-
-      const paymentNote = hasSupplierPreorder ? 'MÉTODO: Solicitud de Encargo (Pago tras confirmación de proveedor)' :
-                          paymentOption === 'TRANSFER' ? `MÉTODO: Transferencia Bancaria | Ref: ${transferRef.trim()}` :
-                          paymentOption === 'TRANSFER_COP' ? `MÉTODO: ${storeData?.settings?.companyCopBank || 'Nequi / Bancolombia'} (COP: $${grandTotalCop.toLocaleString('es-CO')}) | Ref: ${transferRef.trim()}` :
-                          paymentOption === 'CASH_COP' ? copCashNote :
-                          paymentOption === 'BINANCE' ? `MÉTODO: Binance Pay | ID: ${binanceRef.trim()}` :
-                          paymentOption === 'USD' ? usdNote :
-                          paymentOption === 'PENDING' ? 'MÉTODO: Cuenta Abierta / Pagar Después' :
-                          paymentOption === 'WHATSAPP' ? 'MÉTODO: A convenir por WhatsApp' : '';
-
       const normalizedCustomerCedula = customerCedula.trim() ? normalizeCedula(customerCedula) : '';
       if (normalizedCustomerCedula && normalizedCustomerCedula !== customerCedula) {
         setCustomerCedula(normalizedCustomerCedula);
@@ -803,7 +776,8 @@ const PublicStore: React.FC = () => {
         })()
       ) : '';
       const cedulaNote = normalizedCustomerCedula ? `Cédula: ${normalizedCustomerCedula}` : '';
-      const finalNotes = [notes.trim(), deliveryDateNote, cedulaNote, paymentNote].filter(Boolean).join(' | ');
+      const preorderNote = hasSupplierPreorder ? 'MÉTODO: Solicitud de Encargo (Pago tras confirmación de proveedor)' : '';
+      const initialNotes = [notes.trim(), deliveryDateNote, cedulaNote, preorderNote].filter(Boolean).join(' | ');
 
       const payload = {
         customerName: customerName.trim(),
@@ -816,14 +790,8 @@ const PublicStore: React.FC = () => {
         customerAddress: deliveryMethod === 'DELIVERY' ? customerAddress.trim() : undefined,
         requestedDeliveryDate: requestedDeliveryDate.trim() ? new Date(requestedDeliveryDate).toISOString() : undefined,
         status: hasSupplierPreorder ? 'SOLICITUD_ENCARGO' : undefined,
-        notes: finalNotes,
-        pagoMovilRef: hasSupplierPreorder ? undefined : (
-                      paymentOption === 'PAGO_MOVIL' ? pagoMovilRef.trim() : 
-                      (paymentOption === 'TRANSFER' || paymentOption === 'TRANSFER_COP') ? transferRef.trim() : 
-                      paymentOption === 'BINANCE' ? binanceRef.trim() : undefined),
-        pagoMovilBank: originBank || undefined,
-        transferBank: (paymentOption === 'TRANSFER' && originBank) ? originBank : undefined,
-        paymentMethod: paymentOption,
+        notes: initialNotes,
+        paymentMethod: 'PENDING',
         exchangeRate,
         amountBs: grandTotalBs,
         exchangeRateCop: enableCopCurrency ? exchangeRateCop : undefined,
@@ -855,14 +823,14 @@ const PublicStore: React.FC = () => {
         deliveryFeeUSD,
         grandTotalUSD,
         grandTotalBs,
-        notes: finalNotes,
+        totalAmountCop: enableCopCurrency ? grandTotalCop : undefined,
+        notes: initialNotes,
         customerAddress: deliveryMethod === 'DELIVERY' ? customerAddress.trim() : '',
         customerCedula: normalizedCustomerCedula || '',
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
       };
 
-      setOrderResult(createdOrderData);
       setActiveOrderMini(createdOrderData);
 
       try {
@@ -886,9 +854,9 @@ const PublicStore: React.FC = () => {
         );
       } catch (e) {}
 
-      // Clear cart
+      // Clear cart and refresh catalog stock immediately
       setCart([]);
-      setIsCartOpen(false);
+      fetchStore();
 
       // Prompt and subscribe Web Push notifications linked to customer phone or cédula
       const pushIdentifier = customerPhone.trim() || customerCedula.trim();
@@ -897,9 +865,119 @@ const PublicStore: React.FC = () => {
           console.warn('Web push subscription failed:', e),
         );
       }
+
+      if (hasSupplierPreorder) {
+        setOrderResult(createdOrderData);
+        setIsCartOpen(false);
+      } else {
+        // Solo ahora que ya se apartaron los productos se le muestran los métodos de pago
+        setReservedPaymentOrder(createdOrderData);
+        presentToast({
+          message: '🔒 ¡Productos apartados con éxito! Ahora selecciona tu método de pago.',
+          duration: 3000,
+          color: 'success',
+        });
+      }
     } catch (err: any) {
       console.error(err);
-      const msg = err.response?.data?.message || 'Error al procesar el pedido. Intenta de nuevo.';
+      const msg = err.response?.data?.message || 'Error al apartar los productos. Intenta de nuevo.';
+      presentToast({ message: msg, duration: 4000, color: 'danger' });
+      fetchStore();
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
+  };
+
+  // Paso 2: Confirmar método de pago o comprobante una vez que los productos ya fueron apartados
+  const handleConfirmReservedPayment = async () => {
+    if (!reservedPaymentOrder || submittingRef.current || isSubmitting) return;
+
+    if (paymentOption === 'PAGO_MOVIL' && !pagoMovilRef.trim()) {
+      presentToast({ message: 'Por favor ingresa la referencia de tu Pago Móvil', duration: 2500, color: 'warning' });
+      return;
+    }
+    if ((paymentOption === 'TRANSFER' || paymentOption === 'TRANSFER_COP') && !transferRef.trim()) {
+      presentToast({ message: 'Por favor ingresa la referencia o comprobante de transferencia', duration: 2500, color: 'warning' });
+      return;
+    }
+    if (paymentOption === 'BINANCE' && !binanceRef.trim()) {
+      presentToast({ message: 'Por favor ingresa el ID de transacción / Binance Pay', duration: 2500, color: 'warning' });
+      return;
+    }
+
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      let usdNote = 'MÉTODO: Divisas Efectivo (USD)';
+      if (paymentOption === 'USD' && cashReceivedAmount) {
+        const cashNum = parseFloat(cashReceivedAmount);
+        if (!isNaN(cashNum) && cashNum >= grandTotalUSD) {
+          const change = cashNum - grandTotalUSD;
+          usdNote = `MÉTODO: Divisas Efectivo (USD) | Paga con: $${cashNum.toFixed(2)} | Vuelto a recibir: $${change.toFixed(2)}`;
+        }
+      }
+
+      let copCashNote = `MÉTODO: Efectivo Pesos (COP: $${grandTotalCop.toLocaleString('es-CO')})`;
+      if (paymentOption === 'CASH_COP' && cashReceivedAmount) {
+        const cashNumCop = parseFloat(cashReceivedAmount);
+        if (!isNaN(cashNumCop) && cashNumCop >= grandTotalCop) {
+          const changeCop = Math.round(cashNumCop - grandTotalCop);
+          copCashNote = `MÉTODO: Efectivo Pesos (COP) | Paga con: $${Math.round(cashNumCop).toLocaleString('es-CO')} COP | Vuelto: $${changeCop.toLocaleString('es-CO')} COP`;
+        }
+      }
+
+      const paymentNote =
+        paymentOption === 'PAGO_MOVIL' ? `MÉTODO: Pago Móvil | Ref: ${pagoMovilRef.trim()}` :
+        paymentOption === 'TRANSFER' ? `MÉTODO: Transferencia Bancaria | Ref: ${transferRef.trim()}` :
+        paymentOption === 'TRANSFER_COP' ? `MÉTODO: ${storeData?.settings?.companyCopBank || 'Nequi / Bancolombia'} (COP: $${grandTotalCop.toLocaleString('es-CO')}) | Ref: ${transferRef.trim()}` :
+        paymentOption === 'CASH_COP' ? copCashNote :
+        paymentOption === 'BINANCE' ? `MÉTODO: Binance Pay | ID: ${binanceRef.trim()}` :
+        paymentOption === 'USD' ? usdNote :
+        paymentOption === 'PENDING' ? 'MÉTODO: Cuenta Abierta / Pagar Después' :
+        paymentOption === 'WHATSAPP' ? 'MÉTODO: A convenir por WhatsApp' : '';
+
+      const refValue =
+        paymentOption === 'PAGO_MOVIL' ? pagoMovilRef.trim() :
+        (paymentOption === 'TRANSFER' || paymentOption === 'TRANSFER_COP') ? transferRef.trim() :
+        paymentOption === 'BINANCE' ? binanceRef.trim() : undefined;
+
+      const res = await axios.post(`${apiBase}/public/store/order/${reservedPaymentOrder.orderId}/payment`, {
+        amount: grandTotalUSD,
+        amountBs: grandTotalBs,
+        amountCop: enableCopCurrency ? grandTotalCop : undefined,
+        method: paymentOption,
+        reference: refValue,
+        bank: originBank || undefined,
+        notes: paymentNote,
+      });
+
+      const updatedOrderData = {
+        ...reservedPaymentOrder,
+        ...res.data,
+        items: reservedPaymentOrder.items,
+        deliveryMethod: reservedPaymentOrder.deliveryMethod,
+        deliveryFeeUSD: reservedPaymentOrder.deliveryFeeUSD,
+        grandTotalUSD: reservedPaymentOrder.grandTotalUSD,
+        grandTotalBs: reservedPaymentOrder.grandTotalBs,
+        customerAddress: reservedPaymentOrder.customerAddress,
+        customerCedula: reservedPaymentOrder.customerCedula,
+        customerName: reservedPaymentOrder.customerName,
+        customerPhone: reservedPaymentOrder.customerPhone,
+        notes: res.data?.notes || [reservedPaymentOrder.notes, paymentNote].filter(Boolean).join(' | '),
+      };
+
+      setOrderResult(updatedOrderData);
+      setActiveOrderMini(updatedOrderData);
+      try {
+        localStorage.setItem(getOrderStorageKey(), JSON.stringify(updatedOrderData));
+      } catch (e) {}
+
+      setReservedPaymentOrder(null);
+      setIsCartOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      const msg = err.response?.data?.message || 'Error al registrar el método de pago. Intenta de nuevo.';
       presentToast({ message: msg, duration: 4000, color: 'danger' });
     } finally {
       submittingRef.current = false;
@@ -2181,7 +2259,10 @@ const PublicStore: React.FC = () => {
                         src={imageUrl}
                         alt={product.name}
                         loading="lazy"
-                        onClick={() => openImage(imageUrl, activeVariant ? `${product.name} - ${activeVariant.name}` : product.name)}
+                        onClick={() => {
+                          const curIdx = galleryImages.indexOf(imageUrl);
+                          openImage(galleryImages, activeVariant ? `${product.name} - ${activeVariant.name}` : product.name, curIdx >= 0 ? curIdx : 0);
+                        }}
                         title="Toca para ampliar imagen"
                         style={{
                           width: '100%',
@@ -2191,6 +2272,100 @@ const PublicStore: React.FC = () => {
                           display: 'block',
                         }}
                       />
+                      {/* Counter Pill */}
+                      {galleryImages.length > 1 && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: product.isSupplierPreorder || product.availabilityType === 'BAJO_ENCARGO' || isOptionOutOfStock ? '38px' : '8px',
+                            right: '8px',
+                            backgroundColor: 'rgba(15, 23, 42, 0.72)',
+                            backdropFilter: 'blur(4px)',
+                            WebkitBackdropFilter: 'blur(4px)',
+                            color: '#FFFFFF',
+                            fontSize: '10px',
+                            fontWeight: 800,
+                            padding: '2px 7px',
+                            borderRadius: '12px',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
+                            zIndex: 3,
+                          }}
+                        >
+                          {(galleryImages.indexOf(imageUrl) >= 0 ? galleryImages.indexOf(imageUrl) : 0) + 1}/{galleryImages.length}
+                        </div>
+                      )}
+
+                      {/* Navigation Arrows for Card */}
+                      {galleryImages.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const cur = galleryImages.indexOf(imageUrl);
+                              const prev = cur > 0 ? cur - 1 : galleryImages.length - 1;
+                              setActiveImageByProduct((p) => ({ ...p, [product.id]: galleryImages[prev] }));
+                            }}
+                            title="Foto anterior"
+                            style={{
+                              position: 'absolute',
+                              top: '50%',
+                              left: '6px',
+                              transform: 'translateY(-50%)',
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '50%',
+                              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                              backdropFilter: 'blur(4px)',
+                              WebkitBackdropFilter: 'blur(4px)',
+                              border: 'none',
+                              color: '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              zIndex: 3,
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                              padding: 0,
+                            }}
+                          >
+                            <IonIcon icon={chevronBackOutline} style={{ fontSize: '18px' }} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const cur = galleryImages.indexOf(imageUrl);
+                              const next = cur < galleryImages.length - 1 ? cur + 1 : 0;
+                              setActiveImageByProduct((p) => ({ ...p, [product.id]: galleryImages[next] }));
+                            }}
+                            title="Foto siguiente"
+                            style={{
+                              position: 'absolute',
+                              top: '50%',
+                              right: '6px',
+                              transform: 'translateY(-50%)',
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '50%',
+                              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                              backdropFilter: 'blur(4px)',
+                              WebkitBackdropFilter: 'blur(4px)',
+                              border: 'none',
+                              color: '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              zIndex: 3,
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                              padding: 0,
+                            }}
+                          >
+                            <IonIcon icon={chevronForwardOutline} style={{ fontSize: '18px' }} />
+                          </button>
+                        </>
+                      )}
                       {product.code && (
                         <div
                           style={{
@@ -2545,12 +2720,34 @@ const PublicStore: React.FC = () => {
         )}
 
         {/* Cart and Checkout Modal */}
-        <IonModal isOpen={isCartOpen} onDidDismiss={() => setIsCartOpen(false)}>
+        <IonModal
+          isOpen={isCartOpen}
+          onDidDismiss={() => {
+            if (reservedPaymentOrder) {
+              setOrderResult(reservedPaymentOrder);
+              setReservedPaymentOrder(null);
+            }
+            setIsCartOpen(false);
+          }}
+        >
           <IonHeader>
             <IonToolbar style={{ ['--background' as any]: headerColor, color: headerContrast }}>
-              <IonTitle style={{ color: headerContrast }}>Mi Carrito ({cartTotalItems})</IonTitle>
+              <IonTitle style={{ color: headerContrast }}>
+                {reservedPaymentOrder
+                  ? `💳 Métodos de Pago (#${reservedPaymentOrder.orderNumber})`
+                  : `Mi Carrito (${cartTotalItems})`}
+              </IonTitle>
               <IonButtons slot="end">
-                <IonButton onClick={() => setIsCartOpen(false)} style={{ color: headerContrast }}>
+                <IonButton
+                  onClick={() => {
+                    if (reservedPaymentOrder) {
+                      setOrderResult(reservedPaymentOrder);
+                      setReservedPaymentOrder(null);
+                    }
+                    setIsCartOpen(false);
+                  }}
+                  style={{ color: headerContrast }}
+                >
                   <IonIcon slot="icon-only" icon={closeOutline} />
                 </IonButton>
               </IonButtons>
@@ -2558,7 +2755,7 @@ const PublicStore: React.FC = () => {
           </IonHeader>
 
           <IonContent className="ion-padding" style={{ maxWidth: '650px', margin: '0 auto' }}>
-            {cart.length === 0 ? (
+            {!reservedPaymentOrder && cart.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '50px 20px', color: '#94a3b8' }}>
                 <IonIcon icon={cartOutline} style={{ fontSize: '64px', marginBottom: '10px' }} />
                 <h3>Tu carrito está vacío</h3>
@@ -2567,7 +2764,7 @@ const PublicStore: React.FC = () => {
                   Volver al Catálogo
                 </IonButton>
               </div>
-            ) : (
+            ) : !reservedPaymentOrder ? (
               <div>
                 {/* Cart Items List */}
                 <h4 style={{ fontWeight: 'bold', margin: '0 0 10px 0' }}>Productos Seleccionados</h4>
@@ -2889,7 +3086,7 @@ const PublicStore: React.FC = () => {
                   </div>
                 )}
 
-                {/* Payment Option / Preorder Notice */}
+                {/* Preorder Notice or Stock Reservation Notice before Payment */}
                 {hasSupplierPreorder ? (
                   <div style={{ background: '#faf5ff', border: '1.5px solid #d8b4fe', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
@@ -2906,12 +3103,97 @@ const PublicStore: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <>
-                    <h4 style={{ fontWeight: 'bold', margin: '0 0 10px 0' }}>Forma de Pago</h4>
-                    <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#fff', marginBottom: '20px' }}>
-                      <IonItem lines="none">
-                        <IonLabel>Método</IonLabel>
-                        <IonSelect value={paymentOption} onIonChange={(e) => setPaymentOption(e.detail.value)}>
+                  <div style={{ background: primarySoftBg, border: `1.5px solid ${primaryColor}40`, borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '18px' }}>🔒</span>
+                      <h4 style={{ fontWeight: 'bold', margin: 0, color: primaryReadable, fontSize: '14px' }}>
+                        Apartado Inmediato al Pagar
+                      </h4>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '12.5px', color: '#334155', lineHeight: '1.4' }}>
+                      Al darle al botón de <b>Pagar</b> se descontarán y apartarán tus productos inmediatamente del inventario. Solo una vez apartados se te mostrarán los métodos de pago para que nadie más tome tu stock.
+                    </p>
+                  </div>
+                )}
+
+                {/* Totals Summary (Step 1) */}
+                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ color: '#64748b' }}>Subtotal:</span>
+                    <span>${cartSubtotalUSD.toFixed(2)}</span>
+                  </div>
+                  {deliveryFeeUSD > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <span style={{ color: '#64748b' }}>Costo Delivery:</span>
+                      <span>+${deliveryFeeUSD.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #cbd5e1', paddingTop: '8px', marginTop: '6px' }}>
+                    <div>
+                      <b style={{ fontSize: '1.1rem' }}>Total General:</b>
+                      <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Tasa: Bs. {exchangeRate.toFixed(2)}</div>
+                      {enableCopCurrency && (
+                        <div style={{ fontSize: '0.78rem', color: '#92400e', fontWeight: 700 }}>
+                          Tasa COP: ${exchangeRateCop.toLocaleString('es-CO')}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#16a34a' }}>
+                        ${grandTotalUSD.toFixed(2)}
+                      </div>
+                      <div style={{ fontSize: '0.9rem', color: '#475569' }}>
+                        Bs. {grandTotalBs.toFixed(2)}
+                      </div>
+                      {enableCopCurrency && (
+                        <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#92400e', marginTop: '2px' }}>
+                          🇨🇴 ${grandTotalCop.toLocaleString('es-CO')} COP
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 1 Button: Apartar y Proceder al Pago */}
+                <IonButton
+                  expand="block"
+                  color={hasSupplierPreorder ? 'tertiary' : 'success'}
+                  disabled={isSubmitting}
+                  onClick={handleCheckout}
+                  style={{ height: '52px', fontWeight: 'bold', fontSize: '1rem', borderRadius: '10px' }}
+                >
+                  {isSubmitting ? (
+                    <IonSpinner name="crescent" />
+                  ) : (
+                    <>
+                      <IonIcon slot="start" icon={checkmarkCircleOutline} />
+                      {hasSupplierPreorder
+                        ? `Enviar Solicitud de Encargo ($${grandTotalUSD.toFixed(2)})`
+                        : `💳 Pagar ($${grandTotalUSD.toFixed(2)})`}
+                    </>
+                  )}
+                </IonButton>
+              </div>
+            ) : (
+              <div>
+                {/* Paso 2: Solo cuando ya se apartaron los productos se muestran los métodos de pago */}
+                <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '14px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '20px' }}>🔒</span>
+                    <div style={{ fontWeight: 800, color: '#166534', fontSize: '15px' }}>
+                      ¡Productos Apartados! (Pedido #{reservedPaymentOrder.orderNumber})
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#15803d', lineHeight: '1.4' }}>
+                    Tus productos ya fueron descontados del inventario y están reservados para ti. Selecciona tu método de pago para finalizar:
+                  </div>
+                </div>
+
+                <h4 style={{ fontWeight: 'bold', margin: '0 0 10px 0' }}>Forma de Pago</h4>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#fff', marginBottom: '20px' }}>
+                  <IonItem lines="none">
+                    <IonLabel>Método</IonLabel>
+                    <IonSelect value={paymentOption} onIonChange={(e) => setPaymentOption(e.detail.value)}>
                       {storeData?.settings?.acceptPagoMovil !== false && (
                         <IonSelectOption value="PAGO_MOVIL">📱 Pago Móvil (Bolívares)</IonSelectOption>
                       )}
@@ -3284,24 +3566,22 @@ const PublicStore: React.FC = () => {
                     </div>
                   )}
                 </div>
-              </>
-            )}
 
-                {/* Totals Summary */}
+                {/* Totals Summary (Step 2) */}
                 <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span style={{ color: '#64748b' }}>Subtotal:</span>
-                    <span>${cartSubtotalUSD.toFixed(2)}</span>
+                    <span>${Math.max(0, grandTotalUSD - Number(reservedPaymentOrder.deliveryFeeUSD || 0)).toFixed(2)}</span>
                   </div>
-                  {deliveryFeeUSD > 0 && (
+                  {Number(reservedPaymentOrder.deliveryFeeUSD || 0) > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                       <span style={{ color: '#64748b' }}>Costo Delivery:</span>
-                      <span>+${deliveryFeeUSD.toFixed(2)}</span>
+                      <span>+${Number(reservedPaymentOrder.deliveryFeeUSD || 0).toFixed(2)}</span>
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #cbd5e1', paddingTop: '8px', marginTop: '6px' }}>
                     <div>
-                      <b style={{ fontSize: '1.1rem' }}>Total General:</b>
+                      <b style={{ fontSize: '1.1rem' }}>Total a Pagar:</b>
                       <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Tasa: Bs. {exchangeRate.toFixed(2)}</div>
                       {enableCopCurrency && (
                         <div style={{ fontSize: '0.78rem', color: '#92400e', fontWeight: 700 }}>
@@ -3325,12 +3605,12 @@ const PublicStore: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Confirm Button */}
+                {/* Confirm Payment Button (Step 2) */}
                 <IonButton
                   expand="block"
-                  color={hasSupplierPreorder ? 'tertiary' : 'success'}
+                  color="success"
                   disabled={isSubmitting}
-                  onClick={handleCheckout}
+                  onClick={handleConfirmReservedPayment}
                   style={{ height: '52px', fontWeight: 'bold', fontSize: '1rem', borderRadius: '10px' }}
                 >
                   {isSubmitting ? (
@@ -3338,9 +3618,7 @@ const PublicStore: React.FC = () => {
                   ) : (
                     <>
                       <IonIcon slot="start" icon={checkmarkCircleOutline} />
-                      {hasSupplierPreorder
-                        ? `Enviar Solicitud de Encargo ($${grandTotalUSD.toFixed(2)})`
-                        : `Confirmar Pedido ($${grandTotalUSD.toFixed(2)})`}
+                      {`Confirmar Pago ($${grandTotalUSD.toFixed(2)})`}
                     </>
                   )}
                 </IonButton>

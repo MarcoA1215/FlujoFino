@@ -50,8 +50,21 @@ export class SettingsService implements OnModuleInit {
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "companyCopBank" character varying;`,
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "companyCopAccountNumber" character varying;`,
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "companyCopAccountHolder" character varying;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "companyCopAccountType" character varying;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "companyCopCedula" character varying;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "acceptCashBs" boolean DEFAULT true;`,
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "acceptCashCop" boolean DEFAULT true;`,
       `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "acceptTransferCop" boolean DEFAULT false;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "featureFiscalSupport" boolean DEFAULT false;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "fiscalDefaultTaxRate" numeric(5,2) DEFAULT 16.00;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "fiscalRif" character varying;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "fiscalCompanyName" character varying;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "fiscalAddress" character varying;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "fiscalPhone" character varying;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "fiscalMode" character varying DEFAULT 'INTERNAL';`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "initialCashBs" numeric(12,4) DEFAULT 0;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "initialCashCop" numeric(14,2) DEFAULT 0;`,
+      `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "initialBankCop" numeric(14,2) DEFAULT 0;`,
     ];
 
     for (const sql of settingsColumns) {
@@ -102,6 +115,7 @@ export class SettingsService implements OnModuleInit {
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "changeAmountCop" numeric(14,2);
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "copRef" character varying;
         ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "copBank" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "bsReceived" numeric(12,4);
         CREATE INDEX IF NOT EXISTS "IDX_8bde46c5c57a69f2cb02d02b17" ON "order" ("linkedReservationId");
       `,
       `
@@ -109,6 +123,54 @@ export class SettingsService implements OnModuleInit {
       `,
       `
         ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "durationMinutes" integer;
+        ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "isTaxExempt" boolean DEFAULT false;
+        ALTER TABLE "product" ADD COLUMN IF NOT EXISTS "taxRate" numeric(5,2) DEFAULT 16.00;
+        ALTER TABLE "product_variant" ADD COLUMN IF NOT EXISTS "isTaxExempt" boolean DEFAULT false;
+        ALTER TABLE "product_variant" ADD COLUMN IF NOT EXISTS "taxRate" numeric(5,2) DEFAULT 16.00;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "subtotalExempt" numeric(12,4) DEFAULT 0;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "taxableBase" numeric(12,4) DEFAULT 0;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "taxAmount" numeric(12,4) DEFAULT 0;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "fiscalInvoiceId" character varying;
+        ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "fiscalStatus" character varying;
+        ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "isTaxExempt" boolean DEFAULT false;
+        ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "taxRate" numeric(5,2) DEFAULT 16.00;
+        ALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "taxAmount" numeric(12,2) DEFAULT 0;
+      `,
+      `
+        CREATE TABLE IF NOT EXISTS "fiscal_invoices" (
+          "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+          "tenantId" character varying NOT NULL,
+          "orderId" uuid,
+          "documentType" character varying NOT NULL DEFAULT 'INVOICE',
+          "provider" character varying NOT NULL DEFAULT 'INTERNAL',
+          "status" character varying NOT NULL DEFAULT 'DRAFT',
+          "invoiceNumber" character varying NOT NULL,
+          "fiscalControlNumber" character varying,
+          "series" character varying DEFAULT 'A',
+          "customerName" character varying NOT NULL,
+          "customerRif" character varying NOT NULL,
+          "customerAddress" character varying,
+          "customerPhone" character varying,
+          "subtotalExempt" numeric(12,4) NOT NULL DEFAULT 0,
+          "taxableBase" numeric(12,4) NOT NULL DEFAULT 0,
+          "taxRate" numeric(5,2) NOT NULL DEFAULT 16.00,
+          "taxAmount" numeric(12,4) NOT NULL DEFAULT 0,
+          "totalAmount" numeric(12,4) NOT NULL DEFAULT 0,
+          "amountBs" numeric(12,4) NOT NULL DEFAULT 0,
+          "exchangeRate" numeric(12,4) NOT NULL DEFAULT 1,
+          "externalGuid" character varying,
+          "qrCodeUrl" text,
+          "pdfUrl" text,
+          "rejectionReason" text,
+          "items" jsonb,
+          "metadata" jsonb,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+          "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+          "deletedAt" TIMESTAMP,
+          CONSTRAINT "PK_fiscal_invoices_id" PRIMARY KEY ("id")
+        );
+        CREATE INDEX IF NOT EXISTS "idx_fiscal_invoices_tenant_inv" ON "fiscal_invoices" ("tenantId", "invoiceNumber");
+        CREATE INDEX IF NOT EXISTS "idx_fiscal_invoices_tenant_created" ON "fiscal_invoices" ("tenantId", "createdAt");
       `,
       `
         ALTER TABLE "user_tenant_access" ADD COLUMN IF NOT EXISTS "roles" text DEFAULT '';
@@ -497,8 +559,11 @@ export class SettingsService implements OnModuleInit {
     if (payload.companyCopBank !== undefined) settings.companyCopBank = payload.companyCopBank;
     if (payload.companyCopAccountNumber !== undefined) settings.companyCopAccountNumber = payload.companyCopAccountNumber;
     if (payload.companyCopAccountHolder !== undefined) settings.companyCopAccountHolder = payload.companyCopAccountHolder;
+    if (payload.companyCopAccountType !== undefined) settings.companyCopAccountType = payload.companyCopAccountType;
+    if (payload.companyCopCedula !== undefined) settings.companyCopCedula = payload.companyCopCedula;
     if (payload.acceptCashCop !== undefined) settings.acceptCashCop = payload.acceptCashCop;
     if (payload.acceptTransferCop !== undefined) settings.acceptTransferCop = payload.acceptTransferCop;
+    if (payload.acceptCashBs !== undefined) settings.acceptCashBs = payload.acceptCashBs;
 
     if (payload.companyBank !== undefined) settings.companyBank = payload.companyBank;
     if (payload.companyCedula !== undefined) settings.companyCedula = payload.companyCedula;
@@ -515,24 +580,31 @@ export class SettingsService implements OnModuleInit {
       settings.abonoDefaultDueDays = Math.max(1, Math.min(365, Number(payload.abonoDefaultDueDays) || 7));
     }
     const nextCashUsd = payload.acceptCashUsd !== undefined ? payload.acceptCashUsd : settings.acceptCashUsd;
+    const nextCashBs = payload.acceptCashBs !== undefined ? payload.acceptCashBs : (settings.acceptCashBs !== false);
     const nextPagoMovil = payload.acceptPagoMovil !== undefined ? payload.acceptPagoMovil : settings.acceptPagoMovil;
     const nextCardPos = payload.acceptCardPos !== undefined ? payload.acceptCardPos : settings.acceptCardPos;
     const nextBinance = payload.acceptBinance !== undefined ? payload.acceptBinance : settings.acceptBinance;
     const nextTransfer = payload.acceptTransfer !== undefined ? payload.acceptTransfer : settings.acceptTransfer;
+    const nextCashCop = payload.acceptCashCop !== undefined ? payload.acceptCashCop : settings.acceptCashCop;
+    const nextTransferCop = payload.acceptTransferCop !== undefined ? payload.acceptTransferCop : settings.acceptTransferCop;
 
     if (
       payload.acceptCashUsd !== undefined ||
+      payload.acceptCashBs !== undefined ||
       payload.acceptPagoMovil !== undefined ||
       payload.acceptCardPos !== undefined ||
       payload.acceptBinance !== undefined ||
-      payload.acceptTransfer !== undefined
+      payload.acceptTransfer !== undefined ||
+      payload.acceptCashCop !== undefined ||
+      payload.acceptTransferCop !== undefined
     ) {
-      if (!nextCashUsd && !nextPagoMovil && !nextCardPos && !nextBinance && !nextTransfer) {
+      if (!nextCashUsd && !nextCashBs && !nextPagoMovil && !nextCardPos && !nextBinance && !nextTransfer && !nextCashCop && !nextTransferCop) {
         throw new BadRequestException('Debes mantener al menos un método de pago activo');
       }
     }
 
     if (payload.acceptCashUsd !== undefined) settings.acceptCashUsd = payload.acceptCashUsd;
+    if (payload.acceptCashBs !== undefined) settings.acceptCashBs = payload.acceptCashBs;
     if (payload.acceptPagoMovil !== undefined) settings.acceptPagoMovil = payload.acceptPagoMovil;
     if (payload.acceptCardPos !== undefined) settings.acceptCardPos = payload.acceptCardPos;
     if (payload.acceptBinance !== undefined) settings.acceptBinance = payload.acceptBinance;
@@ -548,6 +620,14 @@ export class SettingsService implements OnModuleInit {
     if (payload.bookingRequireService !== undefined) settings.bookingRequireService = payload.bookingRequireService;
     if (payload.bookingAllowStaffSelection !== undefined) settings.bookingAllowStaffSelection = payload.bookingAllowStaffSelection;
     if (payload.requireApprovalAlways !== undefined) settings.requireApprovalAlways = payload.requireApprovalAlways;
+
+    if (payload.featureFiscalSupport !== undefined) settings.featureFiscalSupport = payload.featureFiscalSupport;
+    if (payload.fiscalDefaultTaxRate !== undefined) settings.fiscalDefaultTaxRate = Number(payload.fiscalDefaultTaxRate) || 16.0;
+    if (payload.fiscalRif !== undefined) settings.fiscalRif = payload.fiscalRif;
+    if (payload.fiscalCompanyName !== undefined) settings.fiscalCompanyName = payload.fiscalCompanyName;
+    if (payload.fiscalAddress !== undefined) settings.fiscalAddress = payload.fiscalAddress;
+    if (payload.fiscalPhone !== undefined) settings.fiscalPhone = payload.fiscalPhone;
+    if (payload.fiscalMode !== undefined) settings.fiscalMode = payload.fiscalMode;
 
     if (payload.businessHours !== undefined) settings.businessHours = payload.businessHours;
     if (payload.services !== undefined && Array.isArray(payload.services)) {
@@ -580,6 +660,7 @@ export class SettingsService implements OnModuleInit {
     if (payload.initialCashUSD !== undefined) settings.initialCashUSD = Number(payload.initialCashUSD) || 0;
     if (payload.initialBankBs !== undefined) settings.initialBankBs = Number(payload.initialBankBs) || 0;
     if (payload.initialDigitalUSD !== undefined) settings.initialDigitalUSD = Number(payload.initialDigitalUSD) || 0;
+    if (payload.initialCashCop !== undefined) settings.initialCashCop = Number(payload.initialCashCop) || 0;
 
     if (payload.bookingRequireDeposit !== undefined) settings.bookingRequireDeposit = payload.bookingRequireDeposit;
     if (payload.bookingDepositPercentage !== undefined) {

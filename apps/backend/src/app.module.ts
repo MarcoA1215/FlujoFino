@@ -24,6 +24,7 @@ import { SettingsModule } from './settings/settings.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { StorageModule } from './storage/storage.module';
 import { FeedbackModule } from './feedback/feedback.module';
+import { FiscalModule } from './fiscal/fiscal.module';
 
 import { RawMaterial } from './entities/raw-material.entity';
 import { StockMovement } from './entities/stock-movement.entity';
@@ -51,6 +52,10 @@ import { Promoter } from './entities/promoter.entity';
 import { PromoterCommission } from './entities/promoter-commission.entity';
 import { CashExchange } from './entities/cash-exchange.entity';
 import { ProductVariant } from './entities/product-variant.entity';
+import { FiscalInvoice } from './entities/fiscal-invoice.entity';
+import { AppUpdate } from './entities/app-update.entity';
+import { PlatformExpense } from './entities/platform-expense.entity';
+import { AppUpdatesModule } from './app-updates/app-updates.module';
 import { SuperAdminModule } from './superadmin/superadmin.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SalaryAdvancesModule } from './salary-advances/salary-advances.module';
@@ -78,7 +83,7 @@ import { SentryModule } from '@sentry/nestjs/setup';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
-        entities: [RawMaterial, StockMovement, RecipeItem, Product, ProductVariant, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription, SalaryAdvance, Investment, Promoter, PromoterCommission, CashExchange],
+        entities: [RawMaterial, StockMovement, RecipeItem, Product, ProductVariant, ComboItem, ProductionBatch, Order, OrderItem, Settings, DeliveryZone, User, Tenant, UserTenantAccess, WorkSchedule, Reservation, OperatingExpense, AccessRequest, Feedback, OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig, PushSubscription, SalaryAdvance, Investment, Promoter, PromoterCommission, CashExchange, FiscalInvoice, AppUpdate, PlatformExpense],
         migrations: [path.join(__dirname, './database/migrations/*{.ts,.js}')],
         migrationsRun: true,
         synchronize: configService.get<string>('DB_SYNCHRONIZE') === 'true',
@@ -95,12 +100,14 @@ import { SentryModule } from '@sentry/nestjs/setup';
     StorageModule,
     FeedbackModule,
     CustomersModule,
+    FiscalModule,
     SuperAdminModule,
     NotificationsModule,
     SalaryAdvancesModule,
     DeliveriesModule,
     InvestmentsModule,
     PromotersModule,
+    AppUpdatesModule,
   ],
   controllers: [AppController],
   providers: [

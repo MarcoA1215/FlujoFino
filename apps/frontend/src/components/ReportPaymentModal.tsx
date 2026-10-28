@@ -38,7 +38,20 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
   const { platformConfig, exchangeRate, subscription, refreshSubscription } =
     useContext(SubscriptionContext);
 
-  const defaultFee = initialAmountUsd || subscription?.finalFee || 20;
+  const calculateAmountForMonths = (m: number) => {
+    // La mensualidad base es de $20 (o el subtotal con descuento de referidos)
+    const monthlyBase = initialAmountUsd
+      ? Math.round((initialAmountUsd / 1.16) * 100) / 100
+      : (subscription?.subtotalFee ?? (subscription?.finalFee ? Math.round((subscription.finalFee / 1.16) * 100) / 100 : 20));
+    const paidMonths = m === 12 ? 10 : m;
+    const subtotal = Math.round(monthlyBase * paidMonths * 100) / 100;
+    const iva = subtotal > 0 ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
+    const total = Math.round((subtotal + iva) * 100) / 100;
+    return { paidMonths, subtotal, iva, total };
+  };
+
+  const initialCalc = calculateAmountForMonths(1);
+  const defaultFee = initialAmountUsd || subscription?.finalFee || initialCalc.total;
 
   const [selectedMonths, setSelectedMonths] = useState<number>(1);
   const [reportAmountUsd, setReportAmountUsd] = useState<number>(defaultFee);
@@ -50,31 +63,23 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
   const [reportBank, setReportBank] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const calculateAmountForMonths = (m: number) => {
-    const fee = initialAmountUsd || subscription?.finalFee || 20;
-    if (m === 12) {
-      // 1 Año: 2 meses gratis (paga 10 meses)
-      return Math.round(fee * 10 * 100) / 100;
-    }
-    return Math.round(fee * m * 100) / 100;
-  };
-
   useEffect(() => {
     if (isOpen) {
       setSelectedMonths(1);
-      const fee = initialAmountUsd || subscription?.finalFee || 20;
+      const calc = calculateAmountForMonths(1);
+      const fee = initialAmountUsd || subscription?.finalFee || calc.total;
       setReportAmountUsd(fee);
       setReportAmountBs(Math.round(fee * exchangeRate * 100) / 100);
       setReportReference('');
       setReportBank('');
     }
-  }, [isOpen, initialAmountUsd, subscription?.finalFee, exchangeRate]);
+  }, [isOpen, initialAmountUsd, subscription?.finalFee, subscription?.subtotalFee, exchangeRate]);
 
   useEffect(() => {
-    const calculatedUsd = calculateAmountForMonths(selectedMonths);
-    setReportAmountUsd(calculatedUsd);
-    setReportAmountBs(Math.round(calculatedUsd * exchangeRate * 100) / 100);
-  }, [selectedMonths, initialAmountUsd, subscription?.finalFee, exchangeRate]);
+    const calc = calculateAmountForMonths(selectedMonths);
+    setReportAmountUsd(calc.total);
+    setReportAmountBs(Math.round(calc.total * exchangeRate * 100) / 100);
+  }, [selectedMonths, initialAmountUsd, subscription?.finalFee, subscription?.subtotalFee, exchangeRate]);
 
   const copyField = (text?: string, label?: string) => {
     if (!text) return;
@@ -144,7 +149,7 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
 
       <IonContent className="ion-padding" style={{ backgroundColor: '#f8fafc' }}>
         <div style={{ maxWidth: '650px', margin: '0 auto' }}>
-          {/* Header Info con Tasa Cambiaria Oficial */}
+          {/* Header Info con Tasa Cambiaria Oficial y Desglose IVA */}
           <div
             style={{
               background: '#eff6ff',
@@ -164,9 +169,24 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                 marginBottom: '10px',
               }}
             >
-              <span style={{ fontSize: '13px', color: '#1e40af', fontWeight: 700 }}>
-                Cuota Mensual FinoWork:
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '13px', color: '#1e40af', fontWeight: 800 }}>
+                  Cuota FinoWork:
+                </span>
+                <span
+                  style={{
+                    background: '#dcfce7',
+                    color: '#15803d',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    border: '1px solid #bbf7d0',
+                  }}
+                >
+                  $20 mensualidad + IVA (16%)
+                </span>
+              </div>
               <span
                 style={{
                   background: '#dbeafe',
@@ -194,20 +214,56 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
             >
               <div>
                 <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, display: 'block' }}>
-                  MONTO EN BOLÍVARES (BS)
+                  MONTO EN BOLÍVARES (BS) CON IVA
                 </span>
                 <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e3a8a' }}>
-                  Bs. {reportAmountBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                  Bs. {reportAmountBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div>
                 <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, display: 'block' }}>
-                  EQUIVALENTE EN USD
+                  TOTAL EN USD (CON IVA INCLUIDO)
                 </span>
                 <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#16a34a' }}>
                   ${Number(reportAmountUsd).toFixed(2)} USD
                 </span>
               </div>
+            </div>
+
+            {/* Desglose Transparente: Mensualidad + IVA 16% */}
+            <div
+              style={{
+                marginTop: '12px',
+                padding: '10px 14px',
+                background: '#ffffff',
+                borderRadius: '10px',
+                border: '1px solid #dbeafe',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '8px',
+                fontSize: '12px',
+              }}
+            >
+              <div style={{ color: '#334155', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '15px' }}>🧾</span>
+                <span>
+                  Desglose: <strong>Mensualidad ({selectedMonths === 12 ? '10 meses pagados / 2 gratis' : `${selectedMonths} mes${selectedMonths > 1 ? 'es' : ''}`}):</strong> ${calculateAmountForMonths(selectedMonths).subtotal.toFixed(2)} USD + <strong>IVA (16%):</strong> ${calculateAmountForMonths(selectedMonths).iva.toFixed(2)} USD
+                </span>
+              </div>
+              <span
+                style={{
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  fontWeight: 700,
+                  fontSize: '11px',
+                }}
+              >
+                Total: ${Number(reportAmountUsd).toFixed(2)} USD
+              </span>
             </div>
           </div>
 
@@ -402,7 +458,7 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                   style={{
                     padding: '10px 12px',
                     borderRadius: '10px',
-                    border: selectedMonths === 1 ? '2px solid #10b981' : '1px solid #cbd5e1',
+                    border: selectedMonths === 1 ? '2px solid var(--theme-primary, #10b981)' : '1px solid #cbd5e1',
                     background: selectedMonths === 1 ? '#ecfdf5' : '#ffffff',
                     cursor: 'pointer',
                     boxSizing: 'border-box',
@@ -411,8 +467,11 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                   <div style={{ fontWeight: 800, fontSize: '13px', color: selectedMonths === 1 ? '#065f46' : '#1e293b' }}>
                     1 Mes (Mensual)
                   </div>
-                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                    ${calculateAmountForMonths(1).toFixed(2)} USD
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
+                    ${calculateAmountForMonths(1).total.toFixed(2)} USD
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                    $20.00 base + $3.20 IVA (16%)
                   </div>
                 </div>
 
@@ -421,7 +480,7 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                   style={{
                     padding: '10px 12px',
                     borderRadius: '10px',
-                    border: selectedMonths === 3 ? '2px solid #10b981' : '1px solid #cbd5e1',
+                    border: selectedMonths === 3 ? '2px solid var(--theme-primary, #10b981)' : '1px solid #cbd5e1',
                     background: selectedMonths === 3 ? '#ecfdf5' : '#ffffff',
                     cursor: 'pointer',
                     boxSizing: 'border-box',
@@ -430,8 +489,11 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                   <div style={{ fontWeight: 800, fontSize: '13px', color: selectedMonths === 3 ? '#065f46' : '#1e293b' }}>
                     3 Meses (Trimestral)
                   </div>
-                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                    ${calculateAmountForMonths(3).toFixed(2)} USD
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
+                    ${calculateAmountForMonths(3).total.toFixed(2)} USD
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                    $60.00 base + $9.60 IVA (16%)
                   </div>
                 </div>
 
@@ -440,7 +502,7 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                   style={{
                     padding: '10px 12px',
                     borderRadius: '10px',
-                    border: selectedMonths === 12 ? '2px solid #10b981' : '1px solid #cbd5e1',
+                    border: selectedMonths === 12 ? '2px solid var(--theme-primary, #10b981)' : '1px solid #cbd5e1',
                     background: selectedMonths === 12 ? '#ecfdf5' : '#ffffff',
                     cursor: 'pointer',
                     boxSizing: 'border-box',
@@ -454,11 +516,14 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                       🎁 2 Meses Gratis
                     </span>
                   </div>
-                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                    ${calculateAmountForMonths(12).toFixed(2)} USD{' '}
-                    <span style={{ textDecoration: 'line-through', color: '#94a3b8', fontSize: '11px' }}>
-                      ${((initialAmountUsd || subscription?.finalFee || 20) * 12).toFixed(2)}
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
+                    ${calculateAmountForMonths(12).total.toFixed(2)} USD{' '}
+                    <span style={{ textDecoration: 'line-through', color: '#94a3b8', fontSize: '11px', fontWeight: 500 }}>
+                      ${(calculateAmountForMonths(1).total * 12).toFixed(2)}
                     </span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                    $200.00 base + $32.00 IVA (16%)
                   </div>
                 </div>
               </div>
@@ -500,11 +565,11 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                     Bs. {reportAmountBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   <span style={{ fontSize: '12px', fontWeight: 700, color: '#059669', backgroundColor: '#ecfdf5', padding: '3px 8px', borderRadius: '6px' }}>
-                    ${reportAmountUsd.toFixed(2)} USD
+                    ${reportAmountUsd.toFixed(2)} USD con IVA
                   </span>
                 </div>
                 <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-                  💡 Monto fijo calculado a Tasa Oficial de <strong>Bs. {exchangeRate.toFixed(2)}</strong>.
+                  💡 Cuota con IVA (16%) incluido. Mensualidad base $20.00 + IVA $3.20 = $23.20 USD calculados a Tasa Oficial de <strong>Bs. {exchangeRate.toFixed(2)}</strong>.
                 </div>
               </div>
             ) : (
@@ -527,8 +592,11 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                     ${reportAmountUsd.toFixed(2)} USDT
                   </span>
                   <span style={{ fontSize: '12px', fontWeight: 700, color: '#854d0e', backgroundColor: '#fef9c3', padding: '3px 8px', borderRadius: '6px' }}>
-                    Cuota Fija
+                    IVA 16% Incluido
                   </span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                  💡 Cuota con IVA (16%) incluido. Mensualidad base $20.00 + IVA $3.20 = $23.20 USDT cuota fija.
                 </div>
               </div>
             )}

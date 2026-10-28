@@ -64,6 +64,18 @@ export class UserTenantAccess {
   @Column({ name: 'lunch_end', type: 'varchar', nullable: true })
   lunchEnd: string | null;
 
+  @Column({ name: 'last_payroll_date', type: 'varchar', nullable: true })
+  lastPayrollDate: string | null;
+
+  @Column({ name: 'last_payroll_period_start', type: 'varchar', nullable: true })
+  lastPayrollPeriodStart: string | null;
+
+  @Column({ name: 'last_payroll_period_end', type: 'varchar', nullable: true })
+  lastPayrollPeriodEnd: string | null;
+
+  @Column({ name: 'last_payroll_amount', type: 'decimal', nullable: true, precision: 12, scale: 2, transformer: new ColumnNumericTransformer() })
+  lastPayrollAmount: number | null;
+
   @OneToMany(() => WorkSchedule, ws => ws.userTenantAccess)
   workSchedules: WorkSchedule[];
 }

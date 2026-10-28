@@ -9,47 +9,65 @@ import {
 
 describe('SaaS Subscription & Currency Exchange Engine (Frontend Logic)', () => {
   describe('Referral Discount Calculations (calculateSubscriptionFee)', () => {
-    it('PIONEER account with < 2 referrals pays full base price', () => {
+    it('PIONEER account with < 2 referrals pays full base price + 16% IVA ($20 + $3.20 = $23.20)', () => {
       const res0 = calculateSubscriptionFee(TenantPlanType.PIONEER, 20.0, 0);
       expect(res0.discountPercentage).toBe(0);
-      expect(res0.finalFee).toBe(20.0);
+      expect(res0.subtotal).toBe(20.0);
+      expect(res0.ivaAmount).toBe(3.20);
+      expect(res0.finalFee).toBe(23.20);
 
       const res1 = calculateSubscriptionFee(TenantPlanType.PIONEER, 20.0, 1);
       expect(res1.discountPercentage).toBe(0);
-      expect(res1.finalFee).toBe(20.0);
+      expect(res1.subtotal).toBe(20.0);
+      expect(res1.ivaAmount).toBe(3.20);
+      expect(res1.finalFee).toBe(23.20);
     });
 
-    it('PIONEER account with >= 2 referrals gets 100% discount ($0 fee)', () => {
+    it('PIONEER account with >= 2 referrals gets 100% discount ($0 fee and $0 IVA)', () => {
       const res2 = calculateSubscriptionFee(TenantPlanType.PIONEER, 20.0, 2);
       expect(res2.discountPercentage).toBe(100);
+      expect(res2.subtotal).toBe(0);
+      expect(res2.ivaAmount).toBe(0);
       expect(res2.finalFee).toBe(0);
 
       const res5 = calculateSubscriptionFee(TenantPlanType.PIONEER, 20.0, 5);
       expect(res5.discountPercentage).toBe(100);
+      expect(res5.subtotal).toBe(0);
+      expect(res5.ivaAmount).toBe(0);
       expect(res5.finalFee).toBe(0);
     });
 
-    it('REGULAR account receives 10% per referral up to 50%', () => {
+    it('REGULAR account receives 10% per referral up to 50% plus 16% IVA', () => {
       const res1 = calculateSubscriptionFee(TenantPlanType.REGULAR, 20.0, 1);
       expect(res1.discountPercentage).toBe(10);
-      expect(res1.finalFee).toBe(18.0);
+      expect(res1.subtotal).toBe(18.0);
+      expect(res1.ivaAmount).toBe(2.88);
+      expect(res1.finalFee).toBe(20.88);
 
       const res3 = calculateSubscriptionFee(TenantPlanType.REGULAR, 20.0, 3);
       expect(res3.discountPercentage).toBe(30);
-      expect(res3.finalFee).toBe(14.0);
+      expect(res3.subtotal).toBe(14.0);
+      expect(res3.ivaAmount).toBe(2.24);
+      expect(res3.finalFee).toBe(16.24);
 
       const res5 = calculateSubscriptionFee(TenantPlanType.REGULAR, 20.0, 5);
       expect(res5.discountPercentage).toBe(50);
-      expect(res5.finalFee).toBe(10.0);
+      expect(res5.subtotal).toBe(10.0);
+      expect(res5.ivaAmount).toBe(1.60);
+      expect(res5.finalFee).toBe(11.60);
 
       const res9 = calculateSubscriptionFee(TenantPlanType.REGULAR, 20.0, 9);
       expect(res9.discountPercentage).toBe(50);
-      expect(res9.finalFee).toBe(10.0);
+      expect(res9.subtotal).toBe(10.0);
+      expect(res9.ivaAmount).toBe(1.60);
+      expect(res9.finalFee).toBe(11.60);
 
-      // Dynamic floor with custom base price
+      // Dynamic floor with custom base price ($30 -> $15 subtotal + 16% IVA $2.40 = $17.40)
       const resCustom = calculateSubscriptionFee(TenantPlanType.REGULAR, 30.0, 8);
       expect(resCustom.discountPercentage).toBe(50);
-      expect(resCustom.finalFee).toBe(15.0);
+      expect(resCustom.subtotal).toBe(15.0);
+      expect(resCustom.ivaAmount).toBe(2.40);
+      expect(resCustom.finalFee).toBe(17.40);
     });
   });
 

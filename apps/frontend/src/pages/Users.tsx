@@ -55,6 +55,10 @@ interface UserData {
   salaryPeriod?: string;
   compensationType?: string; // 'FIJO' | 'COMISION' | 'MIXTO'
   commissionPercentage?: number;
+  lastPayrollDate?: string;
+  lastPayrollPeriodStart?: string;
+  lastPayrollPeriodEnd?: string;
+  lastPayrollAmount?: number;
   status?: string;
   createdAt: string;
 }
@@ -161,6 +165,7 @@ const Users: React.FC = () => {
   const [payrollSummary, setPayrollSummary] = useState<any>(null);
   const [loadingPayrollSummary, setLoadingPayrollSummary] = useState(false);
   const [showWorkDetails, setShowWorkDetails] = useState(false);
+  const [includeBaseSalary, setIncludeBaseSalary] = useState(true);
 
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserData | null>(null);
   const [editName, setEditName] = useState('');
@@ -303,14 +308,20 @@ const Users: React.FC = () => {
     }
   };
 
-  const fetchPayrollSummary = async (userId: string, start?: string, end?: string) => {
+  const fetchPayrollSummary = async (userId: string, start?: string, end?: string, forceIncludeBaseSalary?: boolean) => {
     setLoadingPayrollSummary(true);
     try {
       const params: any = {};
       if (start) params.startDate = start;
       if (end) params.endDate = end;
+      if (forceIncludeBaseSalary !== undefined) {
+        params.includeBaseSalary = String(forceIncludeBaseSalary);
+      }
       const res = await apiClient.get(`/users/${userId}/payroll-summary`, { params });
       setPayrollSummary(res.data);
+      if (forceIncludeBaseSalary === undefined && res.data?.includeBaseSalary !== undefined) {
+        setIncludeBaseSalary(res.data.includeBaseSalary);
+      }
       if (res.data?.netPayableUSD !== undefined) {
         setPayAmount(String(res.data.netPayableUSD));
       }
@@ -414,15 +425,63 @@ const Users: React.FC = () => {
     setSelectedUserForPay(u);
     setShowWorkDetails(false);
     const end = formatDateLocal(new Date());
-    const startObj = new Date();
-    startObj.setDate(startObj.getDate() - 7);
-    const start = formatDateLocal(startObj);
+    let start = '';
+
+    if (u.lastPayrollPeriodEnd) {
+      try {
+        const lastEndDate = new Date(`${u.lastPayrollPeriodEnd}T00:00:00`);
+        const nextDay = new Date(lastEndDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+        const todayObj = new Date();
+        if (nextDay > todayObj) {
+          start = formatDateLocal(todayObj);
+        } else {
+          start = formatDateLocal(nextDay);
+        }
+      } catch (e) {
+        const startObj = new Date();
+        startObj.setDate(startObj.getDate() - 7);
+        start = formatDateLocal(startObj);
+      }
+    } else {
+      const startObj = new Date();
+      startObj.setDate(startObj.getDate() - 7);
+      start = formatDateLocal(startObj);
+    }
+
     setPayrollStartDate(start);
     setPayrollEndDate(end);
     setDeductAdvances(true);
     setPayMethod('CASH_USD');
     setPayDate(end);
     fetchPayrollSummary(u.id, start, end);
+  };
+
+  const handleToggleBaseSalary = (checked: boolean) => {
+    setIncludeBaseSalary(checked);
+    if (selectedUserForPay) {
+      fetchPayrollSummary(selectedUserForPay.id, payrollStartDate, payrollEndDate, checked);
+    }
+  };
+
+  const handleToggleWorkItemSettled = async (item: any) => {
+    if (!selectedUserForPay) return;
+    try {
+      const newSettledState = !item.commissionPaid;
+      await apiClient.patch(`/users/${selectedUserForPay.id}/settle-work-items`, {
+        reservationIds: item.type === 'RESERVATION' ? [item.id] : [],
+        orderIds: item.type === 'ORDER' ? [item.id] : [],
+        settled: newSettledState,
+      });
+      presentToast({
+        message: newSettledState ? 'Trabajo marcado como liquidado' : 'Trabajo marcado como pendiente de liquidar',
+        duration: 2000,
+        color: 'success',
+      });
+      fetchPayrollSummary(selectedUserForPay.id, payrollStartDate, payrollEndDate, includeBaseSalary);
+    } catch (e: any) {
+      presentToast({ message: 'Error actualizando estado del trabajo', duration: 3000, color: 'danger' });
+    }
   };
 
   const handleToggleDeductAdvances = (checked: boolean) => {
@@ -448,18 +507,28 @@ const Users: React.FC = () => {
   const handlePaySalary = async () => {
     if (!selectedUserForPay || !payAmount) return;
     try {
+      const unsettledWork = payrollSummary?.workItems?.filter((w: any) => !w.commissionPaid && w.isPaid) || [];
+      const reservationIds = unsettledWork.filter((w: any) => w.type === 'RESERVATION').map((w: any) => w.id);
+      const orderIds = unsettledWork.filter((w: any) => w.type === 'ORDER').map((w: any) => w.id);
+
       await apiClient.post(`/users/${selectedUserForPay.id}/pay`, {
         username: selectedUserForPay.username,
         amount: Number(payAmount),
         method: payMethod,
         date: payDate,
         deductAdvances: deductAdvances,
+        periodStart: payrollStartDate,
+        periodEnd: payrollEndDate,
+        includeBaseSalary: includeBaseSalary,
+        reservationIds,
+        orderIds,
       });
 
-      presentToast({ message: 'Pago registrado exitosamente en gastos de nómina', duration: 3000, color: 'success' });
+      presentToast({ message: 'Pago registrado exitosamente en gastos de nómina y período marcado como liquidado', duration: 3000, color: 'success' });
       setSelectedUserForPay(null);
       setPayrollSummary(null);
       setPayAmount('');
+      fetchUsers();
       fetchPendingAdvances();
     } catch (e: any) {
       presentToast({ message: 'Error registrando pago: ' + (e.response?.data?.message || e.message), duration: 3000, color: 'danger' });
@@ -553,7 +622,7 @@ const Users: React.FC = () => {
 
   return (
     <IonPage>
-      <AppHeader title="Gestión de Equipo y Nómina" />
+      <AppHeader title="Gestión de Equipo y Nómina" onRefresh={() => Promise.all([fetchUsers(), fetchAccessRequests(), fetchPendingAdvances(), fetchDeliverySummary()])} />
       <IonContent className="ion-padding ff-has-bottom-nav" style={{ ['--background' as any]: '#F8FAFC' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '90px' }}>
           {/* Barra Superior con Segmentos y Acción */}
@@ -1585,7 +1654,7 @@ const Users: React.FC = () => {
                     size="small"
                     color="primary"
                     disabled={loadingPayrollSummary}
-                    onClick={() => fetchPayrollSummary(selectedUserForPay.id, payrollStartDate, payrollEndDate)}
+                    onClick={() => fetchPayrollSummary(selectedUserForPay.id, payrollStartDate, payrollEndDate, includeBaseSalary)}
                     style={{ width: '100%', height: '36px', margin: 0, fontWeight: 700 }}
                   >
                     {loadingPayrollSummary ? 'Calculando...' : '🔄 Recalcular'}
@@ -1593,6 +1662,33 @@ const Users: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Banner de Última Nómina Liquidada */}
+            {(payrollSummary?.lastPayrollDate || selectedUserForPay?.lastPayrollDate) && (
+              <div style={{
+                background: '#F0FDF4',
+                border: '1px solid #BBF7D0',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}>
+                <span style={{ fontSize: '18px' }}>🗓️</span>
+                <div style={{ fontSize: '12px', color: '#166534' }}>
+                  <strong>Última nómina liquidada:</strong> {payrollSummary?.lastPayrollDate || selectedUserForPay?.lastPayrollDate}
+                  {(payrollSummary?.lastPayrollAmount !== null && payrollSummary?.lastPayrollAmount !== undefined) && (
+                    <span> (${Number(payrollSummary.lastPayrollAmount).toFixed(2)} USD)</span>
+                  )}
+                  {payrollSummary?.lastPayrollPeriodEnd && (
+                    <div style={{ fontSize: '11px', color: '#15803D', marginTop: '2px' }}>
+                      Período liquidado: <strong>{payrollSummary.lastPayrollPeriodStart || 'Inicio'}</strong> al <strong>{payrollSummary.lastPayrollPeriodEnd}</strong>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Loading Indicator */}
             {loadingPayrollSummary && (
@@ -1635,15 +1731,15 @@ const Users: React.FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '12px' }}>
                   <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px' }}>
-                    <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Trabajos Realizados</div>
+                    <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Trabajos en Período</div>
                     <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>
                       {payrollSummary.servicesCount + (payrollSummary.ordersCount || 0)}
                     </div>
                     <div style={{ fontSize: '10px', color: '#64748B' }}>
-                      ${payrollSummary.totalPaidBilled ?? payrollSummary.totalBilled} cobrados
-                      {Number(payrollSummary.totalPendingBilled || 0) > 0 && (
-                        <span style={{ color: '#D97706', display: 'block', fontWeight: 600 }}>
-                          (${payrollSummary.totalPendingBilled} pendientes)
+                      {(payrollSummary.pendingServicesCount ?? payrollSummary.servicesCount) + (payrollSummary.pendingOrdersCount ?? (payrollSummary.ordersCount || 0))} por liquidar
+                      {((payrollSummary.settledServicesCount || 0) + (payrollSummary.settledOrdersCount || 0) > 0) && (
+                        <span style={{ color: '#059669', display: 'block', fontWeight: 700 }}>
+                          ✓ {(payrollSummary.settledServicesCount || 0) + (payrollSummary.settledOrdersCount || 0)} ya liquidados
                         </span>
                       )}
                     </div>
@@ -1651,9 +1747,13 @@ const Users: React.FC = () => {
 
                   {(payrollSummary.compensationType === 'COMISION' || payrollSummary.compensationType === 'MIXTO') && (
                     <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '10px', padding: '10px' }}>
-                      <div style={{ fontSize: '11px', color: '#065F46', fontWeight: 600 }}>Comisión Cobrada ({payrollSummary.commissionPercentage}%)</div>
+                      <div style={{ fontSize: '11px', color: '#065F46', fontWeight: 600 }}>Comisión a Liquidar ({payrollSummary.commissionPercentage}%)</div>
                       <div style={{ fontSize: '16px', fontWeight: 800, color: '#059669' }}>+${payrollSummary.commissionEarned} USD</div>
-                      <div style={{ fontSize: '10px', color: '#047857' }}>A liquidar en nómina</div>
+                      <div style={{ fontSize: '10px', color: '#047857' }}>
+                        {Number(payrollSummary.settledCommission || 0) > 0 ? (
+                          <span style={{ fontWeight: 600 }}>(${payrollSummary.settledCommission} ya liquidados)</span>
+                        ) : 'Pendientes de liquidar'}
+                      </div>
                     </div>
                   )}
 
@@ -1668,7 +1768,12 @@ const Users: React.FC = () => {
                   {(payrollSummary.compensationType === 'FIJO' || payrollSummary.compensationType === 'MIXTO') && (
                     <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px' }}>
                       <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Sueldo Base</div>
-                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>+${payrollSummary.baseSalary} USD</div>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: includeBaseSalary ? '#0F172A' : '#94A3B8' }}>
+                        +${payrollSummary.baseSalary} USD
+                      </div>
+                      <div style={{ fontSize: '10px', color: payrollSummary.baseSalaryAlreadySettled ? '#059669' : '#64748B', fontWeight: payrollSummary.baseSalaryAlreadySettled ? 700 : 500 }}>
+                        {payrollSummary.baseSalaryAlreadySettled ? '✓ Ya liquidado previamente' : (payrollSummary.salaryPeriod || 'Período')}
+                      </div>
                     </div>
                   )}
 
@@ -1685,12 +1790,42 @@ const Users: React.FC = () => {
                   )}
                 </div>
 
+                {/* Toggle para Sueldo Base si aplica */}
+                {(payrollSummary.compensationType === 'FIJO' || payrollSummary.compensationType === 'MIXTO') && (Number(payrollSummary.baseSalaryConfigured || 0) > 0 || Number(payrollSummary.salaryAmount || 0) > 0) && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    background: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: '10px',
+                    marginBottom: '10px',
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
+                        Incluir Sueldo Base (${payrollSummary.baseSalaryConfigured ?? payrollSummary.salaryAmount} USD)
+                      </div>
+                      <div style={{ fontSize: '10px', color: payrollSummary.baseSalaryAlreadySettled ? '#D97706' : '#64748B' }}>
+                        {payrollSummary.baseSalaryAlreadySettled
+                          ? '⚠️ El sueldo base ya fue cancelado en una liquidación previa para este período'
+                          : 'Se sumará al cálculo de la nómina'}
+                      </div>
+                    </div>
+                    <IonToggle
+                      color="primary"
+                      checked={includeBaseSalary}
+                      onIonChange={e => handleToggleBaseSalary(e.detail.checked)}
+                    />
+                  </div>
+                )}
+
                 {/* Resultado Neto Sugerido */}
                 <div style={{ background: '#ECFDF5', border: '1px solid #10B981', borderRadius: '12px', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontSize: '12px', fontWeight: 700, color: '#065F46' }}>Neto a Pagar Calculado</div>
                     <div style={{ fontSize: '10px', color: '#047857' }}>
-                      {deductAdvances ? 'Incluye deducción automática de vales' : 'Sin descontar vales'} (Solo ventas cobradas)
+                      {deductAdvances ? 'Incluye deducción automática de vales' : 'Sin descontar vales'} (Solo ventas cobradas no liquidadas)
                     </div>
                   </div>
                   <div style={{ fontSize: '20px', fontWeight: 900, color: '#065F46' }}>
@@ -1711,7 +1846,7 @@ const Users: React.FC = () => {
                     </IonButton>
 
                     {showWorkDetails && (
-                      <div style={{ marginTop: '8px', maxHeight: '200px', overflowY: 'auto', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '6px' }}>
+                      <div style={{ marginTop: '8px', maxHeight: '220px', overflowY: 'auto', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '6px' }}>
                         {payrollSummary.workItems.map((item: any) => (
                           <div
                             key={item.id}
@@ -1720,19 +1855,25 @@ const Users: React.FC = () => {
                               justifyContent: 'space-between',
                               alignItems: 'center',
                               fontSize: '11px',
-                              padding: '6px 8px',
+                              padding: '8px 8px',
                               borderBottom: '1px solid #F1F5F9',
                               color: '#334155',
+                              background: item.commissionPaid ? '#F8FAFC' : '#FFFFFF',
                             }}
                           >
-                            <div>
-                              <div>
-                                <strong>{item.date}</strong> - {item.client} ({item.description})
+                            <div style={{ flex: 1, paddingRight: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <strong>{item.date}</strong>
+                                <span>- {item.client} ({item.description})</span>
                               </div>
-                              <div style={{ marginTop: '2px', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                {item.isPaid ? (
-                                  <span style={{ background: '#ECFDF5', color: '#065F46', padding: '1px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: 700 }}>
-                                    ✓ Cobrado
+                              <div style={{ marginTop: '3px', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                {item.commissionPaid ? (
+                                  <span style={{ background: '#ECFDF5', color: '#065F46', padding: '1px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: 800, border: '1px solid #A7F3D0' }}>
+                                    ✓ Ya liquidado
+                                  </span>
+                                ) : item.isPaid ? (
+                                  <span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '1px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: 800, border: '1px solid #BFDBFE' }}>
+                                    ⚡ Por liquidar
                                   </span>
                                 ) : item.paymentStatus === 'PARTIAL' ? (
                                   <span style={{ background: '#FFFBEB', color: '#B45309', padding: '1px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: 700 }}>
@@ -1744,16 +1885,39 @@ const Users: React.FC = () => {
                                   </span>
                                 )}
                                 {(payrollSummary.compensationType === 'COMISION' || payrollSummary.compensationType === 'MIXTO') && (
-                                  <span style={{ fontSize: '10px', color: item.isPaid ? '#059669' : '#D97706', fontWeight: 600 }}>
-                                    Comisión: ${Number(item.commissionAmount || 0).toFixed(2)}
+                                  <span style={{ fontSize: '10px', color: item.commissionPaid ? '#64748B' : item.isPaid ? '#059669' : '#D97706', fontWeight: 600 }}>
+                                    {item.commissionPaid
+                                      ? `Comisión liquidada: $${Number(item.historicalCommission || 0).toFixed(2)}`
+                                      : `Comisión: $${Number(item.commissionAmount || 0).toFixed(2)}`}
+                                    {item.commissionableAmount !== undefined && Math.abs(Number(item.commissionableAmount) - Number(item.amount)) > 0.009 && (
+                                      <span style={{ color: '#64748B', fontWeight: 500, marginLeft: '4px' }}>
+                                        (s/ ganancia: ${Number(item.commissionableAmount).toFixed(2)})
+                                      </span>
+                                    )}
                                   </span>
                                 )}
                               </div>
                             </div>
-                            <div style={{ textAlign: 'right' }}>
+                            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
                               <div style={{ fontWeight: 800, color: '#0F172A', fontSize: '12px' }}>
                                 ${Number(item.amount).toFixed(2)}
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleWorkItemSettled(item)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: item.commissionPaid ? '#D97706' : '#2563EB',
+                                  fontSize: '10px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  padding: '2px 4px',
+                                  textDecoration: 'underline',
+                                }}
+                              >
+                                {item.commissionPaid ? 'Desmarcar' : 'Marcar liquidado'}
+                              </button>
                             </div>
                           </div>
                         ))}

@@ -64,6 +64,12 @@ export class Product {
   @Column({ name: 'product_type', type: 'varchar', nullable: true, default: 'REVENTA' })
   product_type: string;
 
+  @Column('boolean', { default: false })
+  isTaxExempt: boolean;
+
+  @Column('decimal', { precision: 5, scale: 2, default: 16.0, transformer: new ColumnNumericTransformer() })
+  taxRate: number;
+
   @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   physicalStock: number;
 

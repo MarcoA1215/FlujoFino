@@ -711,5 +711,163 @@ describe('ReservationsService Suite', () => {
       expect(slots.length).toBeGreaterThan(0);
       expect(slots).toContain('09:00');
     });
+
+    it('al crear cita sin especialista ("Cualquiera disponible") debe auto-asignar un especialista disponible calificado', async () => {
+      const tenantId = 'tenant-123';
+      const prod = { id: 'svc-rubber', name: 'Nivelación', salePrice: 15, durationMinutes: 90, assignedStaffIds: ['emp-eva'] };
+
+      mockProductRepo.findOne.mockResolvedValue(prod);
+      mockProductRepo.find.mockResolvedValue([prod]);
+
+      const mockAccessList = [
+        {
+          userId: 'emp-eva',
+          isActive: true,
+          status: 'ACCEPTED',
+          role: 'POS',
+          user: { id: 'emp-eva', name: 'Eva', username: 'Eva' },
+        },
+      ];
+
+      mockManager.getRepository = jest.fn((entity: any) => {
+        if (entity === 'Settings' || entity?.name === 'Settings') {
+          return {
+            findOne: jest.fn().mockResolvedValue({
+              businessHours: {
+                '4': { isOpen: true, startTime: '08:00', endTime: '18:00' },
+              },
+              slotInterval: 30,
+            }),
+          };
+        }
+        if (entity === UserTenantAccess || entity?.name === 'UserTenantAccess') {
+          return {
+            find: jest.fn().mockResolvedValue(mockAccessList),
+            findOne: jest.fn().mockResolvedValue(mockAccessList[0]),
+          };
+        }
+        if (entity === Product || entity === 'Product' || entity?.name === 'Product') {
+          return mockProductRepo;
+        }
+        if (entity === Reservation || entity?.name === 'Reservation') {
+          return {
+            createQueryBuilder: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              getMany: jest.fn().mockResolvedValue([]),
+            }),
+            save: jest.fn(e => Promise.resolve(e)),
+          };
+        }
+        if (entity === Order || entity?.name === 'Order') return mockOrderRepo;
+        if (entity === OrderItem || entity?.name === 'OrderItem') return mockOrderItemRepo;
+        return { find: jest.fn().mockResolvedValue([]), findOne: jest.fn().mockResolvedValue(null), save: jest.fn(e => Promise.resolve(e)) };
+      });
+
+      const res = await service.create(tenantId, {
+        customerName: 'Cinthya Orellana',
+        customerPhone: '04121234567',
+        date: '2026-10-15', // Thursday
+        time: '09:30:00',
+        serviceId: 'svc-rubber',
+        serviceName: 'Nivelación',
+      });
+
+      expect(res.employeeId).toBe('emp-eva');
+      expect(res.employeeName).toBe('Eva');
+    });
+
+    it('debe rechazar cita con especialista si ya existe una cita no asignada en ese horario que requiere su atención', async () => {
+      const tenantId = 'tenant-123';
+      const prod = { id: 'svc-rubber', name: 'Nivelación', salePrice: 15, durationMinutes: 90, assignedStaffIds: ['emp-eva'] };
+
+      mockProductRepo.findOne.mockResolvedValue(prod);
+      mockProductRepo.find.mockResolvedValue([prod]);
+
+      const mockAccessList = [
+        {
+          userId: 'emp-eva',
+          isActive: true,
+          status: 'ACCEPTED',
+          role: 'POS',
+          user: { id: 'emp-eva', name: 'Eva', username: 'Eva' },
+        },
+        {
+          userId: 'emp-doris',
+          isActive: true,
+          status: 'ACCEPTED',
+          role: 'POS',
+          jobTitle: 'pedicurista, masajista',
+          user: { id: 'emp-doris', name: 'Doris', username: 'doris' },
+        },
+      ];
+
+      // Ya existe una cita pendiente de 09:30 a 11:00 que NO tiene especialista asignado pero es de Nivelación (solo Eva)
+      const existingUnassigned = [
+        {
+          id: 'res-unassigned-cinthya',
+          tenantId,
+          date: '2026-10-15',
+          time: '09:30:00',
+          durationMinutes: 90,
+          employeeId: null,
+          serviceId: 'svc-rubber',
+          customerName: 'Cinthya Orellana',
+          status: ReservationStatus.CONFIRMED,
+        },
+      ];
+
+      mockManager.getRepository = jest.fn((entity: any) => {
+        if (entity === 'Settings' || entity?.name === 'Settings') {
+          return {
+            findOne: jest.fn().mockResolvedValue({
+              businessHours: {
+                '4': { isOpen: true, startTime: '08:00', endTime: '18:00' },
+              },
+              slotInterval: 30,
+            }),
+          };
+        }
+        if (entity === UserTenantAccess || entity?.name === 'UserTenantAccess') {
+          return {
+            find: jest.fn().mockResolvedValue(mockAccessList),
+            findOne: jest.fn().mockImplementation(({ where }: any) => {
+              const uid = Array.isArray(where) ? where[0]?.userId : where?.userId;
+              return Promise.resolve(mockAccessList.find(a => a.userId === uid) || null);
+            }),
+          };
+        }
+        if (entity === Product || entity === 'Product' || entity?.name === 'Product') {
+          return mockProductRepo;
+        }
+        if (entity === Reservation || entity?.name === 'Reservation') {
+          return {
+            createQueryBuilder: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              getMany: jest.fn().mockResolvedValue(existingUnassigned),
+            }),
+            save: jest.fn(e => Promise.resolve(e)),
+          };
+        }
+        if (entity === Order || entity?.name === 'Order') return mockOrderRepo;
+        if (entity === OrderItem || entity?.name === 'OrderItem') return mockOrderItemRepo;
+        return { find: jest.fn().mockResolvedValue([]), findOne: jest.fn().mockResolvedValue(null), save: jest.fn(e => Promise.resolve(e)) };
+      });
+
+      // Marina intenta reservar a las 09:00 con Eva por 90 min (09:00 a 10:30, choca con Cinthya de 09:30 a 10:30)
+      await expect(
+        service.create(tenantId, {
+          customerName: 'Marina Meza',
+          customerPhone: '04129876543',
+          date: '2026-10-15',
+          time: '09:00:00',
+          employeeId: 'emp-eva',
+          serviceId: 'svc-rubber',
+          durationMinutes: 90,
+          force: false,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 });

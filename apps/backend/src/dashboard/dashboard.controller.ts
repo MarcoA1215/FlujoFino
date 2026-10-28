@@ -55,7 +55,15 @@ export class DashboardController {
   @Roles(UserRole.ADMIN)
   setInitialTreasury(
     @Request() req: any,
-    @Body() dto: { initialCashUSD: number; initialBankBs: number; initialDigitalUSD?: number }
+    @Body()
+    dto: {
+      initialCashUSD?: number;
+      initialBankBs?: number;
+      initialCashBs?: number;
+      initialDigitalUSD?: number;
+      initialCashCop?: number;
+      initialBankCop?: number;
+    }
   ) {
     return this.dashboardService.setInitialTreasury(req.user.tenantId, dto);
   }

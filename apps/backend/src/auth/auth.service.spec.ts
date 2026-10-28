@@ -175,6 +175,7 @@ describe('AuthService - Seguridad, Multi-Tenant y Verificación', () => {
         identification: 'V-12345678',
         phone: '+584141234567',
         isEmailVerified: true,
+        isPromoter: false,
         sub: 'usr-abc-123',
         role: UserRole.ADMIN,
         roles: [UserRole.ADMIN, UserRole.POS],

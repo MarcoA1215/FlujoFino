@@ -1020,4 +1020,163 @@ describe('OrdersService', () => {
       createOrderSpy.mockRestore();
     });
   });
+
+  describe('exportOrdersCsv', () => {
+    it('debe lanzar BadRequestException si falta fecha o formato es inválido', async () => {
+      await expect(service.exportOrdersCsv('tenant-1', '', '2026-10-24')).rejects.toThrow('obligatorios');
+      await expect(service.exportOrdersCsv('tenant-1', '24-10-2026', '2026-10-24')).rejects.toThrow('Formato de fecha');
+      await expect(service.exportOrdersCsv('tenant-1', '2026-10-25', '2026-10-20')).rejects.toThrow('rango de fechas');
+    });
+
+    it('debe generar el CSV con cabeceras exactas, BOM, punto y coma, y montos a dos decimales', async () => {
+      const mockOrders: any[] = [
+        {
+          id: 'ord-uuid-1234',
+          createdAt: new Date('2026-10-15T14:30:00Z'),
+          identification: 'V-12345678',
+          customerName: 'Cliente Ejemplo, C.A.',
+          taxableBase: 100.5,
+          subtotalExempt: 0,
+          taxAmount: 16.08,
+          totalAmount: 116.58,
+          paymentMethod: 'PAGO_MOVIL',
+          pagoMovilRef: 'REF123456',
+        },
+      ];
+
+      mockOrderRepo.find.mockResolvedValue(mockOrders);
+
+      const csv = await service.exportOrdersCsv('tenant-1', '2026-10-01', '2026-10-24');
+
+      // Verificar BOM
+      expect(csv.startsWith('\uFEFF')).toBe(true);
+
+      // Verificar cabeceras exactas
+      const lines = csv.replace('\uFEFF', '').split('\r\n');
+      expect(lines[0]).toBe('Fecha_Operacion;Numero_Orden;Identificacion_Cliente;Razon_Social;Base_Imponible;Monto_Exento;Impuesto_IVA;Total_Facturado;Metodo_Pago;Referencia');
+
+      // Verificar contenido de la fila
+      expect(lines[1]).toContain('2026-10-15');
+      expect(lines[1]).toContain('ord-uuid-1234');
+      expect(lines[1]).toContain('V-12345678');
+      expect(lines[1]).toContain('Cliente Ejemplo, C.A.');
+      expect(lines[1]).toContain('100.50');
+      expect(lines[1]).toContain('0.00');
+      expect(lines[1]).toContain('16.08');
+      expect(lines[1]).toContain('116.58');
+      expect(lines[1]).toContain('PAGO_MOVIL');
+      expect(lines[1]).toContain('REF123456');
+
+      // Verificar que se llamó al repositorio con Between
+      expect(mockOrderRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.arrayContaining([
+            expect.objectContaining({
+              tenantId: 'tenant-1',
+              paymentStatus: PaymentStatus.PAID,
+            }),
+          ]),
+        }),
+      );
+    });
+  });
+
+  describe('editOrder - Liquidación en Caja de Reserva/Pedido ya Entregado con Descuento y Divisas', () => {
+    it('debe mantener status DELIVERED (sin degradar a PARTIALLY_DELIVERED) y sincronizar deliveredQuantity y paymentStatus PAID', async () => {
+      const tenantId = 'tenant-res-delivered';
+      const orderId = 'order-delivered-res-1';
+      const reservationId = 'res-linked-1';
+
+      const orderItem: any = {
+        id: 'item-serv-1',
+        orderId,
+        productId: 'prod-serv-1',
+        productName: 'Servicio Especial',
+        quantity: 1,
+        unitPrice: 20,
+        unitCost: 8,
+        subtotal: 20,
+        deliveredQuantity: 0, // Estaba en 0 al haberse marcado como entregado previamente
+      };
+
+      const existingOrder: any = {
+        id: orderId,
+        tenantId,
+        customerName: 'client',
+        status: OrderStatus.DELIVERED,
+        paymentStatus: PaymentStatus.PARTIAL,
+        paymentMethod: 'PENDING',
+        totalAmount: 20,
+        totalCost: 8,
+        discountAmount: 0,
+        deliveryFee: 0,
+        abonosTotal: 5,
+        abonosHistory: [{ id: 'ab-1', amount: 5, method: 'PAGO_MOVIL', status: 'APPROVED' }],
+        linkedReservationId: reservationId,
+        items: [orderItem],
+      };
+
+      const mockReservation: any = {
+        id: reservationId,
+        tenantId,
+        status: 'COMPLETED',
+        paymentStatus: PaymentStatus.PARTIAL,
+        totalAmount: 20,
+        abonosTotal: 5,
+      };
+
+      const mockResRepo = {
+        findOne: jest.fn().mockResolvedValue(mockReservation),
+        save: jest.fn((r) => Promise.resolve(r)),
+      };
+
+      mockManager.getRepository = jest.fn(() => mockResRepo);
+      mockManager.findOne.mockImplementation((entity: any) => {
+        if (entity === Order || entity?.name === 'Order') return Promise.resolve(existingOrder);
+        if (entity === Product || entity?.name === 'Product') {
+          return Promise.resolve({
+            id: 'prod-serv-1',
+            name: 'Servicio Especial',
+            is_service: true,
+            salePrice: 20,
+          });
+        }
+        return Promise.resolve(null);
+      });
+      mockManager.find.mockResolvedValue([orderItem]);
+
+      const dto: any = {
+        customerName: 'client',
+        paymentMethod: 'USD',
+        paymentStatus: PaymentStatus.PAID,
+        usdReceived: 15,
+        discountAmount: 5,
+        discountType: 'FIXED',
+        discountValue: 5,
+        isImmediateDelivery: true,
+        status: OrderStatus.DELIVERED,
+        linkedReservationId: reservationId,
+        items: [
+          {
+            id: 'item-serv-1',
+            productId: 'prod-serv-1',
+            quantity: 1,
+            unitPrice: 20,
+          },
+        ],
+      };
+
+      const result = await service.editOrder(tenantId, orderId, dto);
+
+      expect(result.status).toBe(OrderStatus.DELIVERED);
+      expect(result.paymentStatus).toBe(PaymentStatus.PAID);
+      expect(result.totalAmount).toBe(15);
+      expect(result.discountAmount).toBe(5);
+      expect(result.abonosTotal).toBe(15);
+      expect(orderItem.deliveredQuantity).toBe(1);
+      expect(mockReservation.paymentStatus).toBe(PaymentStatus.PAID);
+      expect(mockReservation.totalAmount).toBe(15);
+    });
+  });
 });
+

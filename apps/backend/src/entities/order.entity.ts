@@ -116,6 +116,22 @@ export class Order {
   @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
   totalAmount: number;
 
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
+  subtotalExempt: number;
+
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
+  taxableBase: number;
+
+  @Column('decimal', { default: 0 , precision: 12, scale: 4, transformer: new ColumnNumericTransformer()})
+  taxAmount: number;
+
+  @Index()
+  @Column({ nullable: true })
+  fiscalInvoiceId?: string;
+
+  @Column({ nullable: true })
+  fiscalStatus?: string;
+
   @Column({ nullable: true })
   pagoMovilRef: string;
 
@@ -154,6 +170,9 @@ export class Order {
 
   @Column('decimal', { nullable: true, precision: 12, scale: 4, transformer: new ColumnNumericTransformer() })
   usdReceived: number;
+
+  @Column('decimal', { nullable: true, precision: 12, scale: 4, transformer: new ColumnNumericTransformer() })
+  bsReceived: number;
 
   @Column('decimal', { nullable: true, precision: 12, scale: 4, transformer: new ColumnNumericTransformer() })
   changeAmount: number;
@@ -240,6 +259,15 @@ export class Order {
   @Index()
   @Column({ nullable: true })
   offlineId?: string;
+
+  @Column({ type: 'boolean', default: false })
+  commissionPaid: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  commissionPaidAt: Date | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  payrollExpenseId: string | null;
 
   @BeforeInsert()
   @BeforeUpdate()

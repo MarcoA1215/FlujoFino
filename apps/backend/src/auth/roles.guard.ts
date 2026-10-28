@@ -1,4 +1,4 @@
-﻿import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { UserRole } from '@finowork/shared-types';
 import { ROLES_KEY } from './roles.decorator';
@@ -30,7 +30,10 @@ export class RolesGuard implements CanActivate {
 
     // Admin has access to all standard routes
     if (user?.role === UserRole.ADMIN) return true;
-    return requiredRoles.includes(user?.role);
+    if (requiredRoles.includes(user?.role)) return true;
+    if (user?.roles && Array.isArray(user.roles) && user.roles.some((r: any) => requiredRoles.includes(r))) return true;
+    if (requiredRoles.includes(UserRole.PROMOTOR) && (user?.isPromoter || user?.role === UserRole.PROMOTOR)) return true;
+    return false;
   }
 }
 

@@ -20,6 +20,7 @@ import {
   closeOutline
 } from 'ionicons/icons';
 import { AuthContext } from '../context/AuthContext';
+import { useLoading } from '../context/LoadingContext';
 import { UserRole, APP_NAME } from '@finowork/shared-types';
 import { apiClient } from '../api/client';
 import { offlineDb } from '../services/offline-db';
@@ -33,7 +34,7 @@ interface AppHeaderProps {
   showRate?: boolean;
   showOfflineToggle?: boolean;
   showCashClose?: boolean;
-  onRefresh?: () => void;
+  onRefresh?: () => void | Promise<unknown>;
   children?: React.ReactNode;
 }
 
@@ -50,6 +51,36 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 }) => {
   const { user } = useContext(AuthContext);
   const [presentToast] = useIonToast();
+  const { showLoading, hideLoading } = useLoading();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    if (!onRefresh || isRefreshing) return;
+    setIsRefreshing(true);
+    showLoading('Actualizando...');
+    let failed = false;
+    try {
+      await Promise.all([
+        Promise.resolve(onRefresh()),
+        new Promise(resolve => setTimeout(resolve, 600)),
+      ]);
+    } catch (e) {
+      failed = true;
+      console.error(e);
+    } finally {
+      hideLoading();
+      setIsRefreshing(false);
+    }
+    if (!failed) {
+      presentToast({
+        message: 'Información actualizada',
+        duration: 1500,
+        position: 'bottom',
+        color: 'light',
+        cssClass: 'ff-subtle-toast',
+      });
+    }
+  };
 
   const isAdmin =
     user?.role === UserRole.ADMIN ||
@@ -553,21 +584,132 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     (user?.role as string) === 'POS' ||
     (user?.role as string) === 'SUPERADMIN';
 
+  const hasAnyPills = Boolean(
+    showOfflineToggle ||
+    pendingOfflineCount > 0 ||
+    (isAdmin && pendingAccessCount > 0) ||
+    showRate
+  );
+
+  const renderPills = () => (
+    <>
+      {/* Status Pill (Interactive toggle for simulation) */}
+      {showOfflineToggle && (
+        <div
+          className={`ff-pill ff-pill-interactive ${isDisconnected ? 'ff-pill-offline' : 'ff-pill-online'}`}
+          onClick={toggleOfflineSimulation}
+          title={isDisconnected ? 'Modo Offline (Toca para reconectar)' : 'En línea (Toca para simular offline)'}
+        >
+          <span
+            className="ff-pill-dot"
+            style={{ background: isDisconnected ? '#F97316' : '#10B981' }}
+          />
+          <IonIcon icon={isDisconnected ? cloudOfflineOutline : cloudDoneOutline} style={{ fontSize: '13px' }} />
+          <span>{isDisconnected ? (isSimulatingOffline ? 'Offline Sim' : 'Offline') : 'En línea'}</span>
+        </div>
+      )}
+
+      {/* Sync Pill - Shown conditionally if pending items exist */}
+      {pendingOfflineCount > 0 && (
+        <div
+          className="ff-pill ff-pill-interactive ff-pill-sync"
+          onClick={() => syncPendingOrders(false)}
+          title="Sincronizar ventas con el servidor"
+        >
+          {isSyncing ? (
+            <IonSpinner name="crescent" style={{ width: '12px', height: '12px' }} />
+          ) : (
+            <IonIcon icon={syncOutline} style={{ fontSize: '13px' }} />
+          )}
+          <span>📦 {pendingOfflineCount} Sinc.</span>
+        </div>
+      )}
+
+      {/* Access Requests Alert Pill for Admin */}
+      {isAdmin && pendingAccessCount > 0 && (
+        <div
+          className="ff-pill ff-pill-interactive ff-pill-sync"
+          onClick={() => window.location.href = '/users'}
+          title="Solicitudes de acceso de empleados pendientes de autorización"
+          style={{ background: '#FEF3C7', color: '#92400E', border: '1px solid #FCD34D' }}
+        >
+          <span className="ff-pill-dot" style={{ background: '#F59E0B' }} />
+          <span>⏳ {pendingAccessCount} {pendingAccessCount === 1 ? 'Acceso' : 'Accesos'}</span>
+        </div>
+      )}
+
+      {/* Rate Pill */}
+      {showRate && (
+        <div
+          className={`ff-pill ${isAdmin ? 'ff-pill-interactive' : ''} ff-pill-rate`}
+          onClick={() => {
+            if (isAdmin) {
+              setShowRateModal(true);
+            } else {
+              presentToast({
+                message: '🔒 Solo un administrador puede modificar la tasa del negocio',
+                duration: 2500,
+                color: 'warning',
+              });
+            }
+          }}
+          title={
+            isAdmin
+              ? 'Tasa de cambio actual (Clic para cambiar de modo)'
+              : 'Tasa de facturación activa del negocio (Solo administradores)'
+          }
+          style={{ cursor: isAdmin ? 'pointer' : 'default', userSelect: 'none' }}
+        >
+          <span>{getRatePillText()}</span>
+        </div>
+      )}
+
+      {/* COP Tri-Currency Pill (Shown when business enables Pesos Colombianos) */}
+      {showRate && enableCopCurrency && (
+        <div
+          className={`ff-pill ${isAdmin ? 'ff-pill-interactive' : ''}`}
+          onClick={() => {
+            if (isAdmin) {
+              setShowRateModal(true);
+            } else {
+              presentToast({
+                message: '🔒 Solo un administrador puede modificar la tasa COP del negocio',
+                duration: 2500,
+                color: 'warning',
+              });
+            }
+          }}
+          title={`Tasa Pesos Colombianos (${exchangeRateCopMode === 'AUTO' ? 'TRM Oficial' : 'Tasa Frontera Manual'})`}
+          style={{
+            cursor: isAdmin ? 'pointer' : 'default',
+            userSelect: 'none',
+            background: '#FEF9C3',
+            color: '#854D0E',
+            border: '1px solid #FDE047',
+            fontWeight: 800,
+          }}
+        >
+          <span>🇨🇴 COP: ${Number(exchangeRateCop || 4000).toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <>
       <IonHeader className="ion-no-border">
-        <IonToolbar className="ff-header-toolbar" style={{ '--background': 'var(--theme-header, #ffffff)', borderBottom: '1px solid #E2E8F0', padding: '0 4px' } as any}>
+        <IonToolbar className={`ff-header-toolbar ${hasAnyPills ? 'ff-has-subbar' : ''}`} style={{ '--background': 'var(--theme-header, #ffffff)', padding: '0 4px' } as any}>
           <IonButtons slot="start">
-            <IonMenuButton color="dark" />
+            <IonMenuButton style={{ color: 'var(--theme-header-contrast, #0F172A)' }} />
           </IonButtons>
 
           <IonTitle style={{ padding: '0 6px' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '17px', fontWeight: '800', color: '#0F172A', letterSpacing: '-0.3px' }}>
+              <span style={{ fontSize: '16px', fontWeight: '800', color: 'var(--theme-header-contrast, #0F172A)', letterSpacing: '-0.3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {title}
               </span>
               {subtitle && (
-                <span style={{ fontSize: '11px', fontWeight: '500', color: '#64748B', marginTop: '-2px' }}>
+                <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--theme-header-contrast, #64748B)', opacity: 0.85, marginTop: '-2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {subtitle}
                 </span>
               )}
@@ -575,114 +717,18 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </IonTitle>
 
           <IonButtons slot="end" style={{ gap: '6px', display: 'flex', alignItems: 'center' }}>
-            {/* Status Pill (Interactive toggle for simulation) */}
-            {showOfflineToggle && (
-              <div
-                className={`ff-pill ff-pill-interactive ${isDisconnected ? 'ff-pill-offline' : 'ff-pill-online'}`}
-                onClick={toggleOfflineSimulation}
-                title={isDisconnected ? 'Modo Offline (Toca para reconectar)' : 'En línea (Toca para simular offline)'}
-              >
-                <span
-                  className="ff-pill-dot"
-                  style={{ background: isDisconnected ? '#F97316' : '#10B981' }}
-                />
-                <IonIcon icon={isDisconnected ? cloudOfflineOutline : cloudDoneOutline} style={{ fontSize: '13px' }} />
-                <span>{isDisconnected ? (isSimulatingOffline ? 'Offline Sim' : 'Offline') : 'En línea'}</span>
-              </div>
-            )}
-
-            {/* Sync Pill - Shown conditionally if pending items exist */}
-            {pendingOfflineCount > 0 && (
-              <div
-                className="ff-pill ff-pill-interactive ff-pill-sync"
-                onClick={() => syncPendingOrders(false)}
-                title="Sincronizar ventas con el servidor"
-              >
-                {isSyncing ? (
-                  <IonSpinner name="crescent" style={{ width: '12px', height: '12px' }} />
-                ) : (
-                  <IonIcon icon={syncOutline} style={{ fontSize: '13px' }} />
-                )}
-                <span>📦 {pendingOfflineCount} Sinc.</span>
-              </div>
-            )}
-
-            {/* Access Requests Alert Pill for Admin */}
-            {isAdmin && pendingAccessCount > 0 && (
-              <div
-                className="ff-pill ff-pill-interactive ff-pill-sync"
-                onClick={() => window.location.href = '/users'}
-                title="Solicitudes de acceso de empleados pendientes de autorización"
-                style={{ background: '#FEF3C7', color: '#92400E', border: '1px solid #FCD34D' }}
-              >
-                <span className="ff-pill-dot" style={{ background: '#F59E0B' }} />
-                <span>⏳ {pendingAccessCount} {pendingAccessCount === 1 ? 'Acceso' : 'Accesos'}</span>
-              </div>
-            )}
-
-            {/* Rate Pill */}
-            {showRate && (
-              <div
-                className={`ff-pill ${isAdmin ? 'ff-pill-interactive' : ''} ff-pill-rate`}
-                onClick={() => {
-                  if (isAdmin) {
-                    setShowRateModal(true);
-                  } else {
-                    presentToast({
-                      message: '🔒 Solo un administrador puede modificar la tasa del negocio',
-                      duration: 2500,
-                      color: 'warning',
-                    });
-                  }
-                }}
-                title={
-                  isAdmin
-                    ? 'Tasa de cambio actual (Clic para cambiar de modo)'
-                    : 'Tasa de facturación activa del negocio (Solo administradores)'
-                }
-                style={{ cursor: isAdmin ? 'pointer' : 'default', userSelect: 'none' }}
-              >
-                <span>{getRatePillText()}</span>
-              </div>
-            )}
-
-            {/* COP Tri-Currency Pill (Shown when business enables Pesos Colombianos) */}
-            {showRate && enableCopCurrency && (
-              <div
-                className={`ff-pill ${isAdmin ? 'ff-pill-interactive' : ''}`}
-                onClick={() => {
-                  if (isAdmin) {
-                    setShowRateModal(true);
-                  } else {
-                    presentToast({
-                      message: '🔒 Solo un administrador puede modificar la tasa COP del negocio',
-                      duration: 2500,
-                      color: 'warning',
-                    });
-                  }
-                }}
-                title={`Tasa Pesos Colombianos (${exchangeRateCopMode === 'AUTO' ? 'TRM Oficial' : 'Tasa Frontera Manual'})`}
-                style={{
-                  cursor: isAdmin ? 'pointer' : 'default',
-                  userSelect: 'none',
-                  background: '#FEF9C3',
-                  color: '#854D0E',
-                  border: '1px solid #FDE047',
-                  fontWeight: 800,
-                }}
-              >
-                <span>🇨🇴 COP: ${Number(exchangeRateCop || 4000).toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
-              </div>
-            )}
+            {/* Desktop pills container */}
+            <div className="ff-header-pills-desktop" style={{ gap: '6px', alignItems: 'center' }}>
+              {renderPills()}
+            </div>
 
             {/* Cash Close Button */}
             {showCashClose && canViewCashClose && (
               <IonButton
                 fill="clear"
-                color="dark"
                 onClick={() => setShowCashCloseModal(true)}
                 title="Cierre de caja / Arqueo diario"
-                style={{ '--padding-start': '6px', '--padding-end': '6px', height: '36px' }}
+                style={{ '--padding-start': '6px', '--padding-end': '6px', height: '36px', color: 'var(--theme-header-contrast, #0F172A)' }}
               >
                 <IonIcon icon={walletOutline} style={{ fontSize: '20px' }} />
               </IonButton>
@@ -692,10 +738,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             {onRefresh && (
               <IonButton
                 fill="clear"
-                color="medium"
-                onClick={onRefresh}
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
                 title="Recargar"
-                style={{ '--padding-start': '4px', '--padding-end': '4px', height: '36px' }}
+                style={{ '--padding-start': '4px', '--padding-end': '4px', height: '36px', color: 'var(--theme-header-contrast, #64748B)' }}
               >
                 <IonIcon icon={refreshOutline} style={{ fontSize: '18px' }} />
               </IonButton>
@@ -704,6 +750,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             {children}
           </IonButtons>
         </IonToolbar>
+
+        {/* Responsive Mobile Subbar for status & currency pills (Nothing gets cut off) */}
+        {hasAnyPills && (
+          <div className="ff-header-subbar-mobile">
+            {renderPills()}
+          </div>
+        )}
         
         <SubscriptionWarningBanner />
 

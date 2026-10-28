@@ -26,4 +26,6 @@ export class CreateProductDto {
   @IsOptional() @IsString() code?: string;
   @IsOptional() @IsBoolean() hasVariants?: boolean;
   @IsOptional() @IsArray() variants?: any[];
+  @IsOptional() @IsBoolean() isTaxExempt?: boolean;
+  @IsOptional() @IsNumber() taxRate?: number;
 }

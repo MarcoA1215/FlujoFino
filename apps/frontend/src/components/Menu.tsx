@@ -228,9 +228,10 @@ const Menu: React.FC = () => {
 
   let visibleItems: NavItem[] = navItems.filter(i => i.isVisible);
 
-  const isPromotor = user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR';
+  const hasPromoterAccess = user?.isPromoter || user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR' || user?.tenantId === 'promoter-space' || workspaces.some((w: any) => w.tenantId === 'promoter-space') || user?.email?.toLowerCase() === 'promotor@finowork.com';
+  const isInPromoterSpace = user?.tenantId === 'promoter-space' || user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR';
 
-  if (!user?.tenantId && !isSuperAdmin && !isPromotor) {
+  if (!user?.tenantId && !isSuperAdmin && !isInPromoterSpace) {
     visibleItems = [];
   } else if (user?.role === UserRole.POS) {
     visibleItems = visibleItems.filter(i => ['/pos', '/orders', '/customers', '/calculator', '/reservations'].includes(i.path));
@@ -242,10 +243,12 @@ const Menu: React.FC = () => {
     visibleItems = visibleItems.filter(i => isProductionEnabled ? ['/orders', '/production'].includes(i.path) : ['/orders'].includes(i.path));
   }
 
-  if (isPromotor) {
+  if (isInPromoterSpace) {
     visibleItems = [
       { id: 'promoter-panel', label: 'Mi Panel de Promotor', path: '/promoter', icon: medalOutline, isVisible: true },
     ];
+  } else if (hasPromoterAccess && !visibleItems.some(i => i.id === 'promoter-panel')) {
+    visibleItems.unshift({ id: 'promoter-panel', label: 'Mi Panel de Promotor', path: '/promoter', icon: medalOutline, isVisible: true });
   }
 
   if (isSuperAdmin) {
@@ -255,10 +258,10 @@ const Menu: React.FC = () => {
     ];
   }
 
-  const acceptedWorkspaces = workspaces.filter(w => (!w.status || w.status === 'ACCEPTED') && w.tenantId !== 'platform-admin');
+  const acceptedWorkspaces = workspaces.filter(w => (!w.status || w.status === 'ACCEPTED') && w.tenantId !== 'platform-admin' && w.tenantId !== 'promoter-space');
   const displayWorkspaces = acceptedWorkspaces.length > 0 
     ? acceptedWorkspaces 
-    : (isSuperAdmin 
+    : (isSuperAdmin || isInPromoterSpace 
         ? [] 
         : [{ tenantId: user?.tenantId || '', name: user?.tenantName || DEFAULT_TENANT_NAME, role: user?.role || '' }]);
 
@@ -353,15 +356,18 @@ const Menu: React.FC = () => {
             }}
             title="Cambiar de sucursal / espacio"
           >
-            <IonIcon icon={isSuperAdmin ? shieldCheckmarkOutline : businessOutline} style={{ fontSize: '15px', color: isSuperAdmin ? '#3b82f6' : 'var(--ion-color-primary)' }} />
+            <IonIcon 
+              icon={isSuperAdmin ? shieldCheckmarkOutline : (isInPromoterSpace ? medalOutline : businessOutline)} 
+              style={{ fontSize: '15px', color: isSuperAdmin ? '#3b82f6' : (isInPromoterSpace ? '#059669' : 'var(--ion-color-primary)') }} 
+            />
             <span style={{ fontSize: '14px', fontWeight: '700', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {isSuperAdmin ? ('Plataforma ' + APP_NAME) : (user?.tenantName || DEFAULT_TENANT_NAME)}
+              {isSuperAdmin ? ('Plataforma ' + APP_NAME) : (isInPromoterSpace ? 'Panel de Promotor' : (user?.tenantName || DEFAULT_TENANT_NAME))}
             </span>
             <IonIcon icon={chevronDownOutline} style={{ fontSize: '13px', color: '#64748b' }} />
           </button>
 
           {/* Selector de Modo de Trabajo (Sombreros Dinámicos) */}
-          {user?.tenantId && !isSuperAdmin && !isPromotor && availableModes.length > 1 && (
+          {user?.tenantId && !isSuperAdmin && !isInPromoterSpace && availableModes.length > 1 && (
             <button
               type="button"
               onClick={() => setShowModeModal(true)}
@@ -482,16 +488,16 @@ const Menu: React.FC = () => {
                     disabled={isSwitchingMode}
                     onClick={() => handleSwitchMode(opt.role)}
                     style={{
-                      '--background': isActive ? '#ecfdf5' : '#ffffff',
+                      '--background': isActive ? 'var(--theme-primary-soft, #ecfdf5)' : '#ffffff',
                       marginBottom: '10px',
                       borderRadius: '12px',
-                      border: isActive ? '2px solid #10b981' : '1px solid #e2e8f0',
+                      border: isActive ? '2px solid var(--theme-primary, #10b981)' : '1px solid #e2e8f0',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                     } as any}
                   >
                     <span style={{ fontSize: '22px', marginRight: '14px' }}>{opt.icon}</span>
                     <IonLabel>
-                      <h2 style={{ fontWeight: 800, fontSize: '15px', color: isActive ? '#065f46' : '#1e293b' }}>
+                      <h2 style={{ fontWeight: 800, fontSize: '15px', color: isActive ? 'var(--theme-primary-readable, #065f46)' : '#1e293b' }}>
                         {opt.name}
                       </h2>
                       <p style={{ fontSize: '12px', color: '#64748b' }}>
@@ -502,7 +508,7 @@ const Menu: React.FC = () => {
                       <IonIcon
                         slot="end"
                         icon={checkmarkCircleOutline}
-                        style={{ color: '#10b981', fontSize: '24px' }}
+                        style={{ color: 'var(--theme-primary, #10b981)', fontSize: '24px' }}
                       />
                     )}
                   </IonItem>
@@ -565,6 +571,42 @@ const Menu: React.FC = () => {
                   )}
                 </IonItem>
               )}
+
+              {hasPromoterAccess && (
+                <IonItem
+                  button
+                  detail={false}
+                  disabled={isSwitching}
+                  onClick={() => handleSwitchTenant('promoter-space')}
+                  style={{
+                    '--background': user?.tenantId === 'promoter-space' ? '#ecfdf5' : '#ffffff',
+                    marginBottom: '10px',
+                    borderRadius: '12px',
+                    border: user?.tenantId === 'promoter-space' ? '2px solid var(--theme-primary, #10b981)' : '1px solid #cbd5e1',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  } as any}
+                >
+                  <IonIcon 
+                    icon={medalOutline} 
+                    slot="start" 
+                    style={{ fontSize: '24px', color: '#10b981' }}
+                  />
+                  <IonLabel>
+                    <h2 style={{ fontWeight: user?.tenantId === 'promoter-space' ? 'bold' : '600', color: '#1e293b' }}>
+                      Mi Panel de Promotor Oficial
+                    </h2>
+                    <p style={{ color: '#64748b', fontSize: '13px' }}>
+                      Comisiones, estadísticas y red de afiliados
+                    </p>
+                  </IonLabel>
+                  {user?.tenantId === 'promoter-space' ? (
+                    <IonBadge slot="end" color="success">Actual</IonBadge>
+                  ) : (
+                    <IonBadge slot="end" color="light">Ingresar</IonBadge>
+                  )}
+                </IonItem>
+              )}
+
               {displayWorkspaces.map((w: any) => {
                 const isCurrent = w.tenantId === user?.tenantId;
                 return (
@@ -606,7 +648,7 @@ const Menu: React.FC = () => {
               })}
             </IonList>
 
-            {displayWorkspaces.length <= 1 && (
+            {displayWorkspaces.length <= 1 && !hasPromoterAccess && (
               <div style={{ textAlign: 'center', marginTop: '20px', padding: '16px', color: '#94a3b8', fontSize: '13px' }}>
                 Actualmente solo tienes acceso a esta sucursal. Cuando recibas una invitación o crees una nueva, podrás alternar entre ellas desde aquí.
               </div>

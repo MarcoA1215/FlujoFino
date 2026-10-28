@@ -8,9 +8,12 @@ import { PlatformConfig } from '../entities/platform-config.entity';
 import { User } from '../entities/user.entity';
 import { Promoter } from '../entities/promoter.entity';
 import { PromoterCommission } from '../entities/promoter-commission.entity';
+import { PlatformExpense } from '../entities/platform-expense.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpdatePlatformConfigDto } from './dto/update-platform-config.dto';
 import { UpdateSuperAdminProfileDto } from './dto/update-superadmin-profile.dto';
+import { CreatePlatformExpenseDto } from './dto/create-platform-expense.dto';
+import { RecordSeniatPaymentDto } from './dto/record-seniat-payment.dto';
 import * as bcrypt from 'bcryptjs';
 import {
   TenantPlanType,
@@ -26,7 +29,13 @@ import {
   PromoterRank,
   SuperAdminPromoterDTO,
   PromoterCommissionDTO,
+  PromoterAffiliatedTenantDTO,
+  PromoterReferralSubStatus,
   CreatePromoterDTO,
+  PlatformExpenseType,
+  PlatformExpenseCategory,
+  PlatformExpenseDTO,
+  SuperAdminFinanceMetricsDTO,
   APP_NAME,
 } from '@finowork/shared-types';
 
@@ -36,35 +45,68 @@ export class SuperAdminService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      // Auto-healing defensivo de la tabla saas_payment_reports
+      // Auto-healing defensivo de la tabla saas_payment_reports y platform_expenses
       await this.paymentReportRepo.query(`
         ALTER TABLE "saas_payment_reports" ADD COLUMN IF NOT EXISTS "months" integer DEFAULT 1;
+        ALTER TABLE "saas_payment_reports" ADD COLUMN IF NOT EXISTS "subtotal" numeric(10, 2);
+        ALTER TABLE "saas_payment_reports" ADD COLUMN IF NOT EXISTS "iva_amount" numeric(10, 2);
+
+        CREATE TABLE IF NOT EXISTS "platform_expenses" (
+          "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+          "type" character varying(50) NOT NULL,
+          "category" character varying(100) NOT NULL,
+          "description" text NOT NULL,
+          "amount" numeric(12, 2) NOT NULL,
+          "amount_bs" numeric(14, 2),
+          "exchange_rate" numeric(10, 2),
+          "payment_method" character varying(50) DEFAULT 'TRANSFERENCIA',
+          "reference" character varying(255),
+          "expense_date" TIMESTAMP NOT NULL DEFAULT now(),
+          "tax_period" character varying(50),
+          "promoter_id" uuid,
+          "metadata" jsonb,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+          "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+          CONSTRAINT "PK_platform_expenses_id" PRIMARY KEY ("id")
+        );
+
+        CREATE INDEX IF NOT EXISTS "IDX_platform_expenses_type" ON "platform_expenses" ("type");
+        CREATE INDEX IF NOT EXISTS "IDX_platform_expenses_expense_date" ON "platform_expenses" ("expense_date");
+        CREATE INDEX IF NOT EXISTS "IDX_platform_expenses_category" ON "platform_expenses" ("category");
+
+        UPDATE "saas_payment_reports"
+        SET
+          "subtotal" = ROUND("amount" / 1.16, 2),
+          "iva_amount" = ROUND("amount" - ROUND("amount" / 1.16, 2), 2)
+        WHERE "subtotal" IS NULL;
       `);
     } catch (err: any) {
-      this.logger.warn(`Nota de auto-healing para saas_payment_reports: ${err?.message || err}`);
+      this.logger.warn(`Nota de auto-healing para saas_payment_reports / platform_expenses: ${err?.message || err}`);
     }
 
-    try {
-      // Auto-healing defensivo: Si 'compraventa' existe y no tiene referidor asignado, vincular a 'negocio prueba'
-      const compraventa = await this.tenantRepo.createQueryBuilder('t')
-        .where('LOWER(t.name) LIKE :name', { name: '%compraventa%' })
-        .andWhere('t.referred_by_tenant_id IS NULL')
-        .getOne();
-
-      if (compraventa) {
-        const negocioPrueba = await this.tenantRepo.createQueryBuilder('t')
-          .where('LOWER(t.name) LIKE :name', { name: '%negocio prueba%' })
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        // Auto-healing para desarrollo local / demo: vincular 'compraventa' a 'negocio prueba' si aplica
+        const compraventa = await this.tenantRepo.createQueryBuilder('t')
+          .where('LOWER(t.name) LIKE :name', { name: '%compraventa%' })
+          .andWhere('t.referred_by_tenant_id IS NULL')
           .getOne();
 
-        if (negocioPrueba) {
-          compraventa.referred_by_tenant_id = negocioPrueba.id;
-          await this.tenantRepo.save(compraventa);
-          this.logger.log(`[Auto-healing] Negocio 'compraventa' (${compraventa.id}) vinculado con éxito a su referidor 'negocio prueba' (${negocioPrueba.id}).`);
-          await this.calculateMonthlyFee(negocioPrueba.id);
+        if (compraventa) {
+          const negocioPrueba = await this.tenantRepo.createQueryBuilder('t')
+            .where('LOWER(t.name) LIKE :name', { name: '%negocio prueba%' })
+            .getOne();
+
+          if (negocioPrueba) {
+            compraventa.referred_by_tenant_id = negocioPrueba.id;
+            await this.tenantRepo.save(compraventa);
+            this.logger.log(`[Auto-healing Dev] Negocio 'compraventa' (${compraventa.id}) vinculado a 'negocio prueba' (${negocioPrueba.id}).`);
+            await this.calculateMonthlyFee(negocioPrueba.id);
+          }
         }
+      } catch (err: any) {
+        this.logger.warn(`Nota de auto-healing dev al iniciar SuperAdminService: ${err?.message || err}`);
       }
-    } catch (err: any) {
-      this.logger.warn(`Nota de auto-healing al iniciar SuperAdminService: ${err?.message || err}`);
     }
   }
 
@@ -83,6 +125,8 @@ export class SuperAdminService implements OnModuleInit {
     private readonly promoterRepo: Repository<Promoter>,
     @InjectRepository(PromoterCommission)
     private readonly commissionRepo: Repository<PromoterCommission>,
+    @InjectRepository(PlatformExpense)
+    private readonly platformExpenseRepo: Repository<PlatformExpense>,
     private readonly dataSource: DataSource,
     private readonly notificationsService: NotificationsService,
   ) {}
@@ -90,13 +134,17 @@ export class SuperAdminService implements OnModuleInit {
   /**
    * Referral Discount Engine:
    * Counts active referred tenants (referred_by_tenant_id = tenantId AND status = 'ACTIVE')
-   * PIONEER: >= 2 active referrals -> 100% discount ($0 fee), else 0% ($base_price).
-   * REGULAR: min(referrals * 10%, 50%) discount, finalFee = base_price * (1 - discount), min $10.
+   * PIONEER: >= 2 active referrals -> 100% discount ($0 fee), else 0% ($base_price + 16% IVA).
+   * REGULAR: min(referrals * 10%, 50%) discount, subtotal = base_price * (1 - discount), min $10 + 16% IVA.
+   * Mensualidad base: $20.00 + IVA (16% = $3.20) -> $23.20 final fee.
    */
   async calculateMonthlyFee(tenantId: string): Promise<{
     basePrice: number;
     activeReferrals: number;
     discountPercentage: number;
+    subtotalFee: number;
+    ivaPercentage: number;
+    ivaAmount: number;
     finalFee: number;
   }> {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
@@ -117,12 +165,12 @@ export class SuperAdminService implements OnModuleInit {
       .getCount();
 
     let discountPercentage = 0;
-    let finalFee = basePrice;
+    let subtotalFee = basePrice;
 
     if (planType === TenantPlanType.PIONEER) {
       if (activeReferrals >= 2) {
         discountPercentage = 100;
-        finalFee = 0;
+        subtotalFee = 0;
 
         // Auto-activación y renovación bonificada mensual (30 días) si está en TRIAL, PAST_DUE o si su periodo ya venció
         const now = Date.now();
@@ -136,7 +184,7 @@ export class SuperAdminService implements OnModuleInit {
         }
       } else {
         discountPercentage = 0;
-        finalFee = basePrice;
+        subtotalFee = basePrice;
 
         // Si bajó de 2 referidos activos y tenía una fecha lejana (ej. por extensiones previas de 365 días),
         // ajustar para que expire al término de un ciclo mensual de 30 días normal (a lo sumo 30 días desde hoy)
@@ -152,13 +200,20 @@ export class SuperAdminService implements OnModuleInit {
       const discounted = basePrice * (1 - discountPercentage / 100);
       // Piso dinámico: nunca menos del 50% de su precio base configurado
       const minAllowedFee = Math.round(basePrice * 0.5 * 100) / 100;
-      finalFee = Math.max(minAllowedFee, Math.round(discounted * 100) / 100);
+      subtotalFee = Math.max(minAllowedFee, Math.round(discounted * 100) / 100);
     }
+
+    const ivaPercentage = 16;
+    const ivaAmount = subtotalFee > 0 ? Math.round(subtotalFee * 0.16 * 100) / 100 : 0;
+    const finalFee = Math.round((subtotalFee + ivaAmount) * 100) / 100;
 
     return {
       basePrice,
       activeReferrals,
       discountPercentage,
+      subtotalFee,
+      ivaPercentage,
+      ivaAmount,
       finalFee,
     };
   }
@@ -179,6 +234,9 @@ export class SuperAdminService implements OnModuleInit {
         activeReferrals: 0,
         totalReferrals: 0,
         discountPercentage: 0,
+        subtotalFee: 0,
+        ivaPercentage: 16,
+        ivaAmount: 0,
         finalFee: 0,
         trialDaysLeft: 999,
         daysLeft: 999,
@@ -215,12 +273,26 @@ export class SuperAdminService implements OnModuleInit {
 
     const now = Date.now();
     let trialDaysLeft = 0;
+    const isPioneerFree = updatedTenant.plan_type === TenantPlanType.PIONEER && feeCalc.activeReferrals >= 2;
+
     if (updatedTenant.status === TenantStatus.TRIAL) {
       const trialEnd = updatedTenant.trial_ends_at
         ? new Date(updatedTenant.trial_ends_at).getTime()
         : new Date(updatedTenant.createdAt).getTime() + 15 * 86400000;
       const diff = Math.ceil((trialEnd - now) / 86400000);
       trialDaysLeft = Math.max(0, diff);
+
+      // Auto-transición persistente si el período de prueba llegó a 0
+      if (trialDaysLeft <= 0 && !isPioneerFree) {
+        updatedTenant.status = TenantStatus.PAST_DUE;
+        await this.tenantRepo.save(updatedTenant);
+      }
+    } else if (updatedTenant.status === TenantStatus.ACTIVE) {
+      // Auto-transición persistente si el período mensual concluyó
+      if (updatedTenant.current_period_ends_at && new Date(updatedTenant.current_period_ends_at).getTime() < now && !isPioneerFree) {
+        updatedTenant.status = TenantStatus.PAST_DUE;
+        await this.tenantRepo.save(updatedTenant);
+      }
     }
 
     let daysLeft = trialDaysLeft;
@@ -235,12 +307,10 @@ export class SuperAdminService implements OnModuleInit {
       daysLeft = 0;
     }
 
-    const isPioneerFree = updatedTenant.plan_type === TenantPlanType.PIONEER && feeCalc.activeReferrals >= 2;
-    // Solo SUSPENDIDO, inactivo o prueba finalizada bloquean totalmente (isExpired).
-    // PAST_DUE (Vencido) tiene días de gracia y NO bloquea la navegación de la app.
+    // Solo SUSPENDIDO o inactivo bloquean totalmente (isExpired).
+    // PAST_DUE (Vencido) mantiene acceso a la app con alerta y días de gracia.
     const isSuspended = !updatedTenant.isActive || updatedTenant.status === TenantStatus.SUSPENDED;
-    const isTrialExpired = !isPioneerFree && updatedTenant.status === TenantStatus.TRIAL && trialDaysLeft <= 0;
-    const isExpired = isSuspended || isTrialExpired;
+    const isExpired = isSuspended;
 
     return {
       tenantId: updatedTenant.id,
@@ -252,6 +322,9 @@ export class SuperAdminService implements OnModuleInit {
       activeReferrals: feeCalc.activeReferrals,
       totalReferrals,
       discountPercentage: feeCalc.discountPercentage,
+      subtotalFee: feeCalc.subtotalFee,
+      ivaPercentage: feeCalc.ivaPercentage,
+      ivaAmount: feeCalc.ivaAmount,
       finalFee: feeCalc.finalFee,
       trialDaysLeft,
       daysLeft,
@@ -321,12 +394,26 @@ export class SuperAdminService implements OnModuleInit {
       const currentT = (await this.tenantRepo.findOne({ where: { id: t.id } })) || t;
 
       let trialDaysLeft = 0;
+      const isPioneerFree = currentT.plan_type === TenantPlanType.PIONEER && feeCalc.activeReferrals >= 2;
+
       if (currentT.status === TenantStatus.TRIAL) {
         const trialEnd = currentT.trial_ends_at
           ? new Date(currentT.trial_ends_at).getTime()
           : new Date(currentT.createdAt).getTime() + 15 * 86400000;
         const diff = Math.ceil((trialEnd - now) / 86400000);
         trialDaysLeft = Math.max(0, diff);
+
+        // Auto-transición persistente: Si la prueba llegó a 0 y no es Pionero bonificado, marcar como PAST_DUE (Vencido)
+        if (trialDaysLeft <= 0 && !isPioneerFree) {
+          currentT.status = TenantStatus.PAST_DUE;
+          await this.tenantRepo.save(currentT);
+        }
+      } else if (currentT.status === TenantStatus.ACTIVE) {
+        // Auto-transición persistente: Si el período mensual pagado venció y no es Pionero bonificado, marcar como PAST_DUE (Vencido)
+        if (currentT.current_period_ends_at && new Date(currentT.current_period_ends_at).getTime() < now && !isPioneerFree) {
+          currentT.status = TenantStatus.PAST_DUE;
+          await this.tenantRepo.save(currentT);
+        }
       }
 
       result.push({
@@ -347,6 +434,9 @@ export class SuperAdminService implements OnModuleInit {
         trialDaysLeft,
         activeReferrals: feeCalc.activeReferrals,
         discountPercentage: feeCalc.discountPercentage,
+        subtotalFee: feeCalc.subtotalFee,
+        ivaPercentage: feeCalc.ivaPercentage,
+        ivaAmount: feeCalc.ivaAmount,
         finalFee: feeCalc.finalFee,
       });
     }
@@ -430,6 +520,8 @@ export class SuperAdminService implements OnModuleInit {
       status: r.status,
       rejectReason: r.reject_reason || undefined,
       months: r.months || 1,
+      subtotal: r.subtotal ? Number(r.subtotal) : Math.round((Number(r.amount) / 1.16) * 100) / 100,
+      ivaAmount: r.iva_amount ? Number(r.iva_amount) : Math.round((Number(r.amount) - (Number(r.amount) / 1.16)) * 100) / 100,
       createdAt: new Date(r.created_at).toISOString(),
     }));
   }
@@ -493,6 +585,25 @@ export class SuperAdminService implements OnModuleInit {
 
       // Promoter Commission Dispatch
       if (savedTenant.promoterId) {
+        // Contar comercios referidos activos del promotor
+        const activeClientsCount = await queryRunner.manager.count(Tenant, {
+          where: {
+            promoterId: savedTenant.promoterId,
+            status: TenantStatus.ACTIVE,
+          },
+        });
+
+        // Escala oficial de comisiones según clientes referidos activos en el mes:
+        // 1 a 49 clientes activos: 10%
+        // 50 a 99 clientes activos: 15%
+        // 100 en adelante: 20%
+        let commissionRate = 0.10;
+        if (activeClientsCount >= 100) {
+          commissionRate = 0.20;
+        } else if (activeClientsCount >= 50) {
+          commissionRate = 0.15;
+        }
+
         const activationCommissionsCount = await queryRunner.manager.count(PromoterCommission, {
           where: {
             promoterId: savedTenant.promoterId,
@@ -501,31 +612,19 @@ export class SuperAdminService implements OnModuleInit {
           },
         });
 
-        if (activationCommissionsCount === 0) {
-          // Caso A: Primera Activación ($10 USD)
-          const commission = queryRunner.manager.create(PromoterCommission, {
-            promoterId: savedTenant.promoterId,
-            tenantId: savedTenant.id,
-            type: PromoterCommissionType.ACTIVATION,
-            amountUSD: 10.00,
-            status: PromoterCommissionStatus.PENDING,
-            saasPaymentReportId: savedReport.id,
-          });
-          generatedCommission = await queryRunner.manager.save(PromoterCommission, commission);
-        } else {
-          // Caso B: Renovación Mensual (10% del monto neto cobrado)
-          const netAmount = Number(savedReport.amount) || 0;
-          const recurringAmount = Math.round(netAmount * 0.10 * 100) / 100;
-          const commission = queryRunner.manager.create(PromoterCommission, {
-            promoterId: savedTenant.promoterId,
-            tenantId: savedTenant.id,
-            type: PromoterCommissionType.RECURRING,
-            amountUSD: recurringAmount,
-            status: PromoterCommissionStatus.PENDING,
-            saasPaymentReportId: savedReport.id,
-          });
-          generatedCommission = await queryRunner.manager.save(PromoterCommission, commission);
-        }
+        const isFirstActivation = activationCommissionsCount === 0;
+        const netAmount = Number(savedReport.amount) || 20.00;
+        const commissionAmount = Math.round(netAmount * commissionRate * 100) / 100;
+
+        const commission = queryRunner.manager.create(PromoterCommission, {
+          promoterId: savedTenant.promoterId,
+          tenantId: savedTenant.id,
+          type: isFirstActivation ? PromoterCommissionType.ACTIVATION : PromoterCommissionType.RECURRING,
+          amountUSD: commissionAmount,
+          status: PromoterCommissionStatus.PENDING,
+          saasPaymentReportId: savedReport.id,
+        });
+        generatedCommission = await queryRunner.manager.save(PromoterCommission, commission);
       }
 
       await queryRunner.commitTransaction();
@@ -638,6 +737,8 @@ export class SuperAdminService implements OnModuleInit {
     }
 
     const months = data.months && data.months > 0 ? Number(data.months) : 1;
+    const subtotal = Math.round((Number(data.amount) / 1.16) * 100) / 100;
+    const iva_amount = Math.round((Number(data.amount) - subtotal) * 100) / 100;
 
     const report = this.paymentReportRepo.create({
       tenant_id: tenantId,
@@ -648,6 +749,8 @@ export class SuperAdminService implements OnModuleInit {
       reference: cleanReference,
       status: SaaSPaymentStatus.PENDING,
       months,
+      subtotal,
+      iva_amount,
     });
 
     let saved: SaaSPaymentReport;
@@ -728,52 +831,81 @@ export class SuperAdminService implements OnModuleInit {
   /**
    * Helper to calculate rank, bonus, and next rank based on monthly activations
    */
-  calculateRank(monthlyActivations: number): {
+  /**
+   * Helper to determine rank and commission percentage based on active referred clients in the month:
+   * - 1 a 49 clientes activos: 10% (Rango Bronce)
+   * - 50 a 99 clientes activos: 15% (Rango Plata)
+   * - 100 en adelante: 20% (Rango Oro)
+   */
+  calculateRank(activeClientsCount: number): {
     rank: PromoterRank;
+    commissionPercentage: number;
+    commissionRate: number;
     bonusUSD: number;
     emoji: string;
-    nextRank: { rank: PromoterRank; rankEmoji: string; activationsNeeded: number; bonusUSD: number } | null;
+    nextRank: {
+      rank: PromoterRank;
+      rankEmoji: string;
+      activationsNeeded: number;
+      clientsNeeded: number;
+      targetPercentage: number;
+      bonusUSD: number;
+    } | null;
   } {
-    if (monthlyActivations >= 20) {
+    if (activeClientsCount >= 100) {
       return {
         rank: PromoterRank.ORO,
+        commissionPercentage: 20,
+        commissionRate: 0.20,
         bonusUSD: 50.00,
         emoji: '🥇',
         nextRank: null,
       };
-    } else if (monthlyActivations >= 10) {
+    } else if (activeClientsCount >= 50) {
       return {
         rank: PromoterRank.PLATA,
+        commissionPercentage: 15,
+        commissionRate: 0.15,
         bonusUSD: 25.00,
         emoji: '🥈',
         nextRank: {
           rank: PromoterRank.ORO,
           rankEmoji: '🥇',
-          activationsNeeded: 20 - monthlyActivations,
+          activationsNeeded: 100 - activeClientsCount,
+          clientsNeeded: 100 - activeClientsCount,
+          targetPercentage: 20,
           bonusUSD: 50.00,
         },
       };
-    } else if (monthlyActivations >= 5) {
+    } else if (activeClientsCount >= 1) {
       return {
         rank: PromoterRank.BRONCE,
+        commissionPercentage: 10,
+        commissionRate: 0.10,
         bonusUSD: 10.00,
         emoji: '🥉',
         nextRank: {
           rank: PromoterRank.PLATA,
           rankEmoji: '🥈',
-          activationsNeeded: 10 - monthlyActivations,
+          activationsNeeded: 50 - activeClientsCount,
+          clientsNeeded: 50 - activeClientsCount,
+          targetPercentage: 15,
           bonusUSD: 25.00,
         },
       };
     } else {
       return {
         rank: PromoterRank.MADERA,
+        commissionPercentage: 10,
+        commissionRate: 0.10,
         bonusUSD: 0,
         emoji: '🪵',
         nextRank: {
           rank: PromoterRank.BRONCE,
           rankEmoji: '🥉',
-          activationsNeeded: 5 - monthlyActivations,
+          activationsNeeded: 1,
+          clientsNeeded: 1,
+          targetPercentage: 10,
           bonusUSD: 10.00,
         },
       };
@@ -787,7 +919,9 @@ export class SuperAdminService implements OnModuleInit {
     const promoters = await this.promoterRepo.find({
       relations: {
         user: true,
-        commissions: true,
+        commissions: {
+          tenant: true,
+        },
         tenants: true,
       },
       order: { createdAt: 'DESC' },
@@ -808,7 +942,11 @@ export class SuperAdminService implements OnModuleInit {
         );
       }).length;
 
-      const rankInfo = this.calculateRank(monthlyActivations);
+      const activeClientsCount = (promoter.tenants || []).filter(
+        (t) => t.status === TenantStatus.ACTIVE && (!t.current_period_ends_at || new Date(t.current_period_ends_at) >= now),
+      ).length;
+
+      const rankInfo = this.calculateRank(activeClientsCount);
 
       let pendingBalanceUSD = 0;
       let paidBalanceUSD = 0;
@@ -824,19 +962,112 @@ export class SuperAdminService implements OnModuleInit {
         }
       });
 
-      // Map commissions DTO
-      const commissionsDto: PromoterCommissionDTO[] = commissions.map((c) => ({
-        id: c.id,
-        promoterId: c.promoterId,
-        tenantId: c.tenantId,
-        type: c.type,
-        amountUSD: Number(c.amountUSD),
-        saasPaymentReportId: c.saasPaymentReportId,
-        status: c.status,
-        paidAt: c.paidAt ? new Date(c.paidAt).toISOString() : null,
-        paymentReference: c.paymentReference,
-        createdAt: new Date(c.createdAt).toISOString(),
-      }));
+      // Map commissions DTO sorted latest first, with tenantName
+      const commissionsDto: PromoterCommissionDTO[] = commissions
+        .slice()
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .map((c) => ({
+          id: c.id,
+          promoterId: c.promoterId,
+          tenantId: c.tenantId,
+          tenantName: c.tenant?.name || (promoter.tenants || []).find((t) => t.id === c.tenantId)?.name || 'Comercio',
+          type: c.type,
+          amountUSD: Number(c.amountUSD),
+          saasPaymentReportId: c.saasPaymentReportId,
+          status: c.status,
+          paidAt: c.paidAt ? new Date(c.paidAt).toISOString() : null,
+          paymentReference: c.paymentReference,
+          createdAt: new Date(c.createdAt).toISOString(),
+        }));
+
+      // Map affiliated tenants with individual statistics
+      const nowMs = Date.now();
+      const affiliatedTenantsDto: PromoterAffiliatedTenantDTO[] = (promoter.tenants || []).map((t) => {
+        const tenantComms = commissions.filter((c) => c.tenantId === t.id);
+        const actComm = tenantComms.find((c) => c.type === PromoterCommissionType.ACTIVATION);
+        const recComms = tenantComms.filter((c) => c.type === PromoterCommissionType.RECURRING);
+        const recUSD = recComms.reduce((acc, curr) => acc + (Number(curr.amountUSD) || 0), 0);
+        const totalUSD = tenantComms.reduce((acc, curr) => acc + (Number(curr.amountUSD) || 0), 0);
+
+        let subStatus: PromoterReferralSubStatus = 'INACTIVE';
+        let subStatusLabel = 'Dado de baja / Inactivo';
+        let daysRemaining: number | null = null;
+        let daysOverdue: number | null = null;
+
+        const isSuspended = t.isActive === false || t.status === TenantStatus.SUSPENDED;
+
+        if (isSuspended) {
+          subStatus = 'INACTIVE';
+          subStatusLabel = 'Dado de baja / Inactivo';
+        } else if (t.status === TenantStatus.PAST_DUE) {
+          subStatus = 'PAST_DUE';
+          subStatusLabel = 'Por Pagar / Vencido';
+          if (t.current_period_ends_at) {
+            const diff = Math.ceil((nowMs - new Date(t.current_period_ends_at).getTime()) / 86400000);
+            daysOverdue = Math.max(1, diff);
+          }
+        } else if (t.status === TenantStatus.ACTIVE) {
+          if (t.current_period_ends_at && new Date(t.current_period_ends_at).getTime() < nowMs) {
+            subStatus = 'PAST_DUE';
+            subStatusLabel = 'Por Pagar / Vencido';
+            const diff = Math.ceil((nowMs - new Date(t.current_period_ends_at).getTime()) / 86400000);
+            daysOverdue = Math.max(1, diff);
+          } else {
+            subStatus = 'ACTIVE';
+            subStatusLabel = 'Activo';
+            if (t.current_period_ends_at) {
+              const diff = Math.ceil((new Date(t.current_period_ends_at).getTime() - nowMs) / 86400000);
+              daysRemaining = Math.max(0, diff);
+            }
+          }
+        } else if (t.status === TenantStatus.TRIAL) {
+          if (t.trial_ends_at && new Date(t.trial_ends_at).getTime() < nowMs) {
+            subStatus = 'PAST_DUE';
+            subStatusLabel = 'Prueba Vencida / Por Pagar';
+            const diff = Math.ceil((nowMs - new Date(t.trial_ends_at).getTime()) / 86400000);
+            daysOverdue = Math.max(1, diff);
+          } else {
+            subStatus = 'TRIAL';
+            subStatusLabel = 'En Prueba';
+            if (t.trial_ends_at) {
+              const diff = Math.ceil((new Date(t.trial_ends_at).getTime() - nowMs) / 86400000);
+              daysRemaining = Math.max(0, diff);
+            }
+          }
+        }
+
+        return {
+          tenantId: t.id,
+          tenantName: t.name,
+          status: t.status,
+          subStatus,
+          subStatusLabel,
+          planType: t.plan_type,
+          createdAt: new Date(t.createdAt).toISOString(),
+          trialEndsAt: t.trial_ends_at ? new Date(t.trial_ends_at).toISOString() : null,
+          currentPeriodEndsAt: t.current_period_ends_at ? new Date(t.current_period_ends_at).toISOString() : null,
+          daysRemaining,
+          daysOverdue,
+          totalCommissionsUSD: Math.round(totalUSD * 100) / 100,
+          activationCommission: actComm
+            ? {
+                id: actComm.id,
+                promoterId: actComm.promoterId,
+                tenantId: actComm.tenantId,
+                tenantName: t.name,
+                type: actComm.type,
+                amountUSD: Number(actComm.amountUSD),
+                saasPaymentReportId: actComm.saasPaymentReportId,
+                status: actComm.status,
+                paidAt: actComm.paidAt ? new Date(actComm.paidAt).toISOString() : null,
+                paymentReference: actComm.paymentReference,
+                createdAt: new Date(actComm.createdAt).toISOString(),
+              }
+            : null,
+          recurringCommissionsCount: recComms.length,
+          recurringCommissionsUSD: Math.round(recUSD * 100) / 100,
+        };
+      });
 
       return {
         id: promoter.id,
@@ -846,6 +1077,10 @@ export class SuperAdminService implements OnModuleInit {
         phone: promoter.user?.phone || null,
         code: promoter.code,
         isActive: promoter.isActive,
+        termsAccepted: !!promoter.termsAccepted,
+        termsAcceptedAt: promoter.termsAcceptedAt ? new Date(promoter.termsAcceptedAt).toISOString() : null,
+        activeClientsCount,
+        commissionPercentage: rankInfo.commissionPercentage,
         pagoMovilPhone: promoter.pagoMovilPhone,
         pagoMovilCedula: promoter.pagoMovilCedula,
         pagoMovilBank: promoter.pagoMovilBank,
@@ -858,9 +1093,81 @@ export class SuperAdminService implements OnModuleInit {
         paidBalanceUSD: Math.round(paidBalanceUSD * 100) / 100,
         totalCommissionsUSD: Math.round(totalCommissionsUSD * 100) / 100,
         commissions: commissionsDto,
+        affiliatedTenants: affiliatedTenantsDto,
         createdAt: new Date(promoter.createdAt).toISOString(),
       };
     });
+  }
+
+  /**
+   * SuperAdmin: Liquidación masiva de comisiones pendientes para un promotor.
+   */
+  async payBulkPromoterCommissions(
+    promoterId: string,
+    paymentReference: string,
+    commissionIds?: string[],
+  ): Promise<{ paidCount: number; totalPaidUSD: number; commissions: PromoterCommission[] }> {
+    if (!paymentReference || !paymentReference.trim()) {
+      throw new BadRequestException('La referencia de pago es obligatoria');
+    }
+
+    const promoter = await this.promoterRepo.findOne({
+      where: { id: promoterId },
+    });
+
+    if (!promoter) {
+      throw new NotFoundException(`Promotor con id ${promoterId} no encontrado`);
+    }
+
+    let query = this.commissionRepo
+      .createQueryBuilder('c')
+      .where('c.promoterId = :promoterId', { promoterId })
+      .andWhere('c.status = :status', { status: PromoterCommissionStatus.PENDING });
+
+    if (commissionIds && commissionIds.length > 0) {
+      query = query.andWhere('c.id IN (:...ids)', { ids: commissionIds });
+    }
+
+    const pendingCommissions = await query.getMany();
+
+    if (!pendingCommissions.length) {
+      throw new BadRequestException('No hay comisiones pendientes seleccionadas para liquidar');
+    }
+
+    const now = new Date();
+    const cleanRef = paymentReference.trim();
+    let totalPaidUSD = 0;
+
+    for (const comm of pendingCommissions) {
+      comm.status = PromoterCommissionStatus.PAID;
+      comm.paidAt = now;
+      comm.paymentReference = cleanRef;
+      totalPaidUSD += Number(comm.amountUSD) || 0;
+    }
+
+    const savedCommissions = await this.commissionRepo.save(pendingCommissions);
+
+    try {
+      const expense = this.platformExpenseRepo.create({
+        type: PlatformExpenseType.PROMOTER_PAYOUT,
+        category: PlatformExpenseCategory.COMISION_PROMOTOR,
+        description: `Liquidación comisiones a promotor: ${promoter.user?.username || promoter.code} (${savedCommissions.length} comisión${savedCommissions.length > 1 ? 'es' : ''})`,
+        amount: Math.round(totalPaidUSD * 100) / 100,
+        payment_method: promoter.binancePayId ? 'BINANCE' : 'PAGO_MOVIL',
+        reference: cleanRef,
+        promoter_id: promoter.id,
+        expense_date: now,
+      });
+      await this.platformExpenseRepo.save(expense);
+    } catch (e: any) {
+      this.logger.error(`Error al registrar PlatformExpense para liquidación de promotor: ${e.message}`);
+    }
+
+    return {
+      paidCount: savedCommissions.length,
+      totalPaidUSD: Math.round(totalPaidUSD * 100) / 100,
+      commissions: savedCommissions,
+    };
   }
 
   /**
@@ -884,11 +1191,31 @@ export class SuperAdminService implements OnModuleInit {
       throw new BadRequestException('Esta comisión ya fue pagada previamente');
     }
 
+    const now = new Date();
+    const cleanRef = paymentReference.trim();
     commission.status = PromoterCommissionStatus.PAID;
-    commission.paidAt = new Date();
-    commission.paymentReference = paymentReference.trim();
+    commission.paidAt = now;
+    commission.paymentReference = cleanRef;
 
-    return await this.commissionRepo.save(commission);
+    const saved = await this.commissionRepo.save(commission);
+
+    try {
+      const expense = this.platformExpenseRepo.create({
+        type: PlatformExpenseType.PROMOTER_PAYOUT,
+        category: PlatformExpenseCategory.COMISION_PROMOTOR,
+        description: `Pago individual de comisión (${commission.type}) a promotor`,
+        amount: Number(commission.amountUSD) || 0,
+        payment_method: commission.promoter?.binancePayId ? 'BINANCE' : 'PAGO_MOVIL',
+        reference: cleanRef,
+        promoter_id: commission.promoterId,
+        expense_date: now,
+      });
+      await this.platformExpenseRepo.save(expense);
+    } catch (e: any) {
+      this.logger.error(`Error al registrar PlatformExpense para comisión individual: ${e.message}`);
+    }
+
+    return saved;
   }
 
   /**
@@ -969,6 +1296,10 @@ export class SuperAdminService implements OnModuleInit {
       phone: savedUser.phone || null,
       code: savedPromoter.code,
       isActive: savedPromoter.isActive,
+      termsAccepted: false,
+      termsAcceptedAt: null,
+      activeClientsCount: 0,
+      commissionPercentage: 10,
       pagoMovilPhone: savedPromoter.pagoMovilPhone,
       pagoMovilCedula: savedPromoter.pagoMovilCedula,
       pagoMovilBank: savedPromoter.pagoMovilBank,
@@ -1046,6 +1377,271 @@ export class SuperAdminService implements OnModuleInit {
         name: user.name,
         role: user.role,
       },
+    };
+  }
+
+  /**
+   * SuperAdmin: Retorna métricas financieras completas de la plataforma SaaS (Flujo de caja, IVA, promotores, OPEX, CAPEX, utilidades).
+   */
+  async getFinanceMetrics(): Promise<SuperAdminFinanceMetricsDTO> {
+    // 1. Ingresos e IVA por suscripciones aprobadas
+    const approvedPayments = await this.paymentReportRepo.find({
+      where: { status: SaaSPaymentStatus.APPROVED },
+    });
+
+    let grossRevenueUSD = 0;
+    let totalIVACollectedUSD = 0;
+
+    for (const p of approvedPayments) {
+      const amt = Number(p.amount) || 0;
+      grossRevenueUSD += amt;
+
+      if (p.iva_amount !== null && p.iva_amount !== undefined) {
+        totalIVACollectedUSD += Number(p.iva_amount) || 0;
+      } else {
+        const sub = Math.round((amt / 1.16) * 100) / 100;
+        totalIVACollectedUSD += Math.round((amt - sub) * 100) / 100;
+      }
+    }
+
+    grossRevenueUSD = Math.round(grossRevenueUSD * 100) / 100;
+    totalIVACollectedUSD = Math.round(totalIVACollectedUSD * 100) / 100;
+    const netRevenueUSD = Math.round((grossRevenueUSD - totalIVACollectedUSD) * 100) / 100;
+
+    // 2. Comisiones a promotores (deuda pendiente vs pagadas)
+    const commissions = await this.commissionRepo.find();
+    let totalPromotersDebtUSD = 0;
+    let totalPromotersPaidUSD = 0;
+
+    for (const c of commissions) {
+      const amt = Number(c.amountUSD) || 0;
+      if (c.status === PromoterCommissionStatus.PENDING) {
+        totalPromotersDebtUSD += amt;
+      } else if (c.status === PromoterCommissionStatus.PAID) {
+        totalPromotersPaidUSD += amt;
+      }
+    }
+
+    totalPromotersDebtUSD = Math.round(totalPromotersDebtUSD * 100) / 100;
+    totalPromotersPaidUSD = Math.round(totalPromotersPaidUSD * 100) / 100;
+
+    // 3. Egresos registrados de la plataforma (OPEX, CAPEX, Retiros Dueño, SENIAT, Promotores)
+    const expenses = await this.platformExpenseRepo.find();
+    let totalOperatingExpensesUSD = 0;
+    let totalInvestmentUSD = 0;
+    let totalOwnerPayoutsUSD = 0;
+    let totalPromoterPayoutsUSD = 0;
+    let totalIVAPaidSeniatUSD = 0;
+
+    for (const e of expenses) {
+      const amt = Number(e.amount) || 0;
+      switch (e.type) {
+        case PlatformExpenseType.OPERATING:
+          totalOperatingExpensesUSD += amt;
+          break;
+        case PlatformExpenseType.INVESTMENT:
+          totalInvestmentUSD += amt;
+          break;
+        case PlatformExpenseType.OWNER_PAYOUT:
+          totalOwnerPayoutsUSD += amt;
+          break;
+        case PlatformExpenseType.PROMOTER_PAYOUT:
+          totalPromoterPayoutsUSD += amt;
+          break;
+        case PlatformExpenseType.TAX_SENIAT:
+          totalIVAPaidSeniatUSD += amt;
+          break;
+      }
+    }
+
+    totalOperatingExpensesUSD = Math.round(totalOperatingExpensesUSD * 100) / 100;
+    totalInvestmentUSD = Math.round(totalInvestmentUSD * 100) / 100;
+    totalOwnerPayoutsUSD = Math.round(totalOwnerPayoutsUSD * 100) / 100;
+    totalPromoterPayoutsUSD = Math.round(totalPromoterPayoutsUSD * 100) / 100;
+    totalIVAPaidSeniatUSD = Math.round(totalIVAPaidSeniatUSD * 100) / 100;
+
+    const effectivePromoterPayouts = Math.max(totalPromoterPayoutsUSD, totalPromotersPaidUSD);
+
+    const pendingIVASeniatUSD = Math.max(0, Math.round((totalIVACollectedUSD - totalIVAPaidSeniatUSD) * 100) / 100);
+
+    const totalExpensesUSD = Math.round(
+      (totalOperatingExpensesUSD + totalInvestmentUSD + totalOwnerPayoutsUSD + effectivePromoterPayouts + totalIVAPaidSeniatUSD) * 100
+    ) / 100;
+
+    const netOperatingProfitUSD = Math.round(
+      (netRevenueUSD - totalOperatingExpensesUSD - effectivePromoterPayouts) * 100
+    ) / 100;
+
+    const availableCashUSD = Math.round((grossRevenueUSD - totalExpensesUSD) * 100) / 100;
+
+    return {
+      grossRevenueUSD,
+      totalIVACollectedUSD,
+      netRevenueUSD,
+      totalIVAPaidSeniatUSD,
+      pendingIVASeniatUSD,
+      totalPromotersDebtUSD,
+      totalPromotersPaidUSD,
+      totalOperatingExpensesUSD,
+      totalInvestmentUSD,
+      totalOwnerPayoutsUSD,
+      totalPromoterPayoutsUSD: effectivePromoterPayouts,
+      totalExpensesUSD,
+      netOperatingProfitUSD,
+      availableCashUSD,
+    };
+  }
+
+  /**
+   * SuperAdmin: Listado de gastos y salidas de la plataforma con filtros
+   */
+  async getExpenses(query?: { type?: string; month?: string; search?: string }): Promise<PlatformExpenseDTO[]> {
+    let qb = this.platformExpenseRepo.createQueryBuilder('e')
+      .leftJoinAndSelect('e.promoter', 'p')
+      .leftJoinAndSelect('p.user', 'u')
+      .orderBy('e.expense_date', 'DESC');
+
+    if (query?.type && query.type !== 'ALL') {
+      qb = qb.andWhere('e.type = :type', { type: query.type });
+    }
+
+    if (query?.search && query.search.trim()) {
+      qb = qb.andWhere(
+        '(LOWER(e.description) LIKE :s OR LOWER(e.category) LIKE :s OR LOWER(e.reference) LIKE :s OR LOWER(e.tax_period) LIKE :s)',
+        { s: `%${query.search.trim().toLowerCase()}%` }
+      );
+    }
+
+    if (query?.month) {
+      qb = qb.andWhere("TO_CHAR(e.expense_date, 'YYYY-MM') = :month", { month: query.month });
+    }
+
+    const expenses = await qb.getMany();
+
+    return expenses.map((e) => ({
+      id: e.id,
+      type: e.type,
+      category: e.category,
+      description: e.description,
+      amount: Number(e.amount),
+      amountBs: e.amount_bs ? Number(e.amount_bs) : null,
+      exchangeRate: e.exchange_rate ? Number(e.exchange_rate) : null,
+      paymentMethod: e.payment_method || 'TRANSFERENCIA',
+      reference: e.reference || null,
+      expenseDate: new Date(e.expense_date).toISOString(),
+      taxPeriod: e.tax_period || null,
+      promoterId: e.promoter_id || null,
+      promoterName: e.promoter?.user?.username || (e.promoter ? e.promoter.code : null),
+      createdAt: new Date(e.createdAt).toISOString(),
+    }));
+  }
+
+  /**
+   * SuperAdmin: Registrar un nuevo gasto operativo, inversión o retiro personal
+   */
+  async createExpense(dto: CreatePlatformExpenseDto): Promise<PlatformExpenseDTO> {
+    if (!dto.amount || dto.amount <= 0) {
+      throw new BadRequestException('El monto debe ser mayor a 0');
+    }
+    if (!dto.description || !dto.description.trim()) {
+      throw new BadRequestException('La descripción o concepto es obligatoria');
+    }
+
+    const expense = this.platformExpenseRepo.create({
+      type: dto.type,
+      category: dto.category.trim(),
+      description: dto.description.trim(),
+      amount: dto.amount,
+      amount_bs: dto.amountBs || null,
+      exchange_rate: dto.exchangeRate || null,
+      payment_method: dto.paymentMethod || 'TRANSFERENCIA',
+      reference: dto.reference?.trim() || null,
+      expense_date: dto.expenseDate ? new Date(dto.expenseDate) : new Date(),
+      tax_period: dto.taxPeriod?.trim() || null,
+      promoter_id: dto.promoterId || null,
+    });
+
+    const saved = await this.platformExpenseRepo.save(expense);
+
+    return {
+      id: saved.id,
+      type: saved.type,
+      category: saved.category,
+      description: saved.description,
+      amount: Number(saved.amount),
+      amountBs: saved.amount_bs ? Number(saved.amount_bs) : null,
+      exchangeRate: saved.exchange_rate ? Number(saved.exchange_rate) : null,
+      paymentMethod: saved.payment_method,
+      reference: saved.reference,
+      expenseDate: new Date(saved.expense_date).toISOString(),
+      taxPeriod: saved.tax_period,
+      promoterId: saved.promoter_id,
+      createdAt: new Date(saved.createdAt).toISOString(),
+    };
+  }
+
+  /**
+   * SuperAdmin: Registrar pago/declaración de IVA ante el SENIAT
+   */
+  async recordSeniatPayment(dto: RecordSeniatPaymentDto): Promise<PlatformExpenseDTO> {
+    if (!dto.amount || dto.amount <= 0) {
+      throw new BadRequestException('El monto a liquidar debe ser mayor a 0');
+    }
+    if (!dto.taxPeriod || !dto.taxPeriod.trim()) {
+      throw new BadRequestException('El periodo fiscal es obligatorio (ej. "2026-10" o "Octubre 2026")');
+    }
+    if (!dto.reference || !dto.reference.trim()) {
+      throw new BadRequestException('El número de comprobante o referencia bancaria es obligatorio');
+    }
+
+    const description = dto.notes && dto.notes.trim()
+      ? `Pago IVA SENIAT (${dto.taxPeriod}): ${dto.notes.trim()}`
+      : `Declaración y pago de IVA al SENIAT correspondiente a ${dto.taxPeriod}`;
+
+    const expense = this.platformExpenseRepo.create({
+      type: PlatformExpenseType.TAX_SENIAT,
+      category: PlatformExpenseCategory.SENIAT_IVA,
+      description,
+      amount: dto.amount,
+      amount_bs: dto.amountBs || null,
+      exchange_rate: dto.exchangeRate || null,
+      payment_method: dto.paymentMethod || 'TRANSFERENCIA',
+      reference: dto.reference.trim(),
+      tax_period: dto.taxPeriod.trim(),
+      expense_date: dto.paymentDate ? new Date(dto.paymentDate) : new Date(),
+    });
+
+    const saved = await this.platformExpenseRepo.save(expense);
+
+    return {
+      id: saved.id,
+      type: saved.type,
+      category: saved.category,
+      description: saved.description,
+      amount: Number(saved.amount),
+      amountBs: saved.amount_bs ? Number(saved.amount_bs) : null,
+      exchangeRate: saved.exchange_rate ? Number(saved.exchange_rate) : null,
+      paymentMethod: saved.payment_method,
+      reference: saved.reference,
+      expenseDate: new Date(saved.expense_date).toISOString(),
+      taxPeriod: saved.tax_period,
+      createdAt: new Date(saved.createdAt).toISOString(),
+    };
+  }
+
+  /**
+   * SuperAdmin: Anular/Eliminar un gasto o salida registrado
+   */
+  async deleteExpense(id: string): Promise<{ success: boolean; message: string }> {
+    const expense = await this.platformExpenseRepo.findOne({ where: { id } });
+    if (!expense) {
+      throw new NotFoundException(`Gasto con id ${id} no encontrado`);
+    }
+
+    await this.platformExpenseRepo.remove(expense);
+    return {
+      success: true,
+      message: 'Egreso eliminado correctamente del historial',
     };
   }
 }

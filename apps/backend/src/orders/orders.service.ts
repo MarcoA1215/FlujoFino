@@ -258,6 +258,10 @@ export class CreateOrderDto {
 
   @IsOptional()
   nextAbonoDueDate?: string | Date;
+
+  @IsOptional()
+  @IsBoolean()
+  strictStockCheck?: boolean;
 }
 
 export class UpdatePaymentDto {
@@ -619,7 +623,7 @@ export class OrdersService implements OnModuleInit {
     if ((dto.discountAmount || 0) < 0) throw new BadRequestException('El descuento no puede ser negativo');
 
     const tenantSettings = typeof this.settingsService?.getSettings === 'function' ? await this.settingsService.getSettings(tenantId) : null;
-    const allowNegativeStock = Boolean(tenantSettings?.allowNegativeStock);
+    const allowNegativeStock = dto.strictStockCheck ? false : Boolean(tenantSettings?.allowNegativeStock);
 
     const orderExchangeRate = (dto.exchangeRate && Number(dto.exchangeRate) > 0)
       ? Number(dto.exchangeRate)
@@ -683,8 +687,9 @@ export class OrdersService implements OnModuleInit {
         }
       }
 
-      // Bloqueo pesimista de escritura sobre los productos involucrados
+      // Bloqueo pesimista de escritura sobre los productos y variantes involucrados
       const productIds = Array.from(new Set((dto.items || []).map(i => i.productId).filter(Boolean)));
+      const variantIds = Array.from(new Set((dto.items || []).map(i => i.variantId).filter(Boolean)));
       let products: Product[] = [];
       if (productIds.length > 0) {
         if (manager.createQueryBuilder) {
@@ -694,6 +699,13 @@ export class OrdersService implements OnModuleInit {
               .setLock('pessimistic_write')
               .where('p.tenantId = :tenantId AND p.id IN (:...ids)', { tenantId, ids: productIds })
               .getMany();
+            if (variantIds.length > 0) {
+              await manager
+                .createQueryBuilder(ProductVariant, 'pv')
+                .setLock('pessimistic_write')
+                .where('pv.tenantId = :tenantId AND pv.id IN (:...vIds)', { tenantId, vIds: variantIds })
+                .getMany();
+            }
           } catch {
             // fallback si el driver mock no soporta bloqueo pesimista
           }
@@ -1212,6 +1224,11 @@ export class OrdersService implements OnModuleInit {
         if (isImmediate && savedOrder.paymentStatus === PaymentStatus.PAID) {
           savedOrder.status = OrderStatus.DELIVERED;
         }
+        if (savedOrder.status === OrderStatus.DELIVERED && typeof manager.update === 'function') {
+          try {
+            await manager.update(OrderItem, { orderId: savedOrder.id }, { deliveredQuantity: () => '"quantity"' } as any);
+          } catch {}
+        }
 
         if (dto.linkedReservationId) {
           try {
@@ -1274,6 +1291,18 @@ export class OrdersService implements OnModuleInit {
       }
     }
 
+    // Auto-curación: Si una orden quedó en PARTIALLY_DELIVERED por tener deliveredQuantity=0 en todos sus items al editarse luego de entregada
+    if (
+      order.status === OrderStatus.PARTIALLY_DELIVERED &&
+      Array.isArray(order.items) &&
+      order.items.length > 0 &&
+      order.items.every(it => Number(it.deliveredQuantity || 0) === 0)
+    ) {
+      order.status = OrderStatus.DELIVERED;
+      order.items.forEach(it => { it.deliveredQuantity = it.quantity; });
+      this.dataSource.getRepository(Order).update({ id: order.id }, { status: OrderStatus.DELIVERED }).catch(() => {});
+    }
+
     // Auto-curación: Si una orden vinculada a cita quedó marcada erróneamente como PAID pero el abono confirmado es menor al total
     if (
       order.linkedReservationId &&
@@ -1285,7 +1314,13 @@ export class OrdersService implements OnModuleInit {
         .filter((e: any) => e.status !== 'REJECTED')
         .reduce((sum: number, e: any) => sum + (Number(e.amount) || 0), 0);
       const total = Number(order.totalAmount || 0);
-      if (historySum > 0 && historySum < total && (!order.notes || !order.notes.includes('Pago USD:'))) {
+      const hasDirectPayment = Boolean(
+        (order.usdReceived && Number(order.usdReceived) > 0) ||
+        (order.copReceived && Number(order.copReceived) > 0) ||
+        (order.paymentMethod && !['PENDING', 'ON_ARRIVAL'].includes(order.paymentMethod.toUpperCase())) ||
+        (order.notes && order.notes.includes('Pago USD:'))
+      );
+      if (historySum > 0 && historySum < total && !hasDirectPayment) {
         order.abonosTotal = historySum;
         order.paymentStatus = PaymentStatus.PARTIAL;
         this.dataSource.getRepository(Order).update({ id: order.id }, { abonosTotal: historySum, paymentStatus: PaymentStatus.PARTIAL }).catch(() => {});
@@ -1675,6 +1710,10 @@ export class OrdersService implements OnModuleInit {
                 }
               }
           }
+          if (item.deliveredQuantity !== item.quantity) {
+            item.deliveredQuantity = item.quantity;
+            await manager.save(OrderItem, item);
+          }
         }
       }
 
@@ -1703,6 +1742,10 @@ export class OrdersService implements OnModuleInit {
                   await manager.save(Product, product);
                 }
               }
+          }
+          if (item.deliveredQuantity && item.deliveredQuantity > 0) {
+            item.deliveredQuantity = 0;
+            await manager.save(OrderItem, item);
           }
         }
       }
@@ -2329,31 +2372,33 @@ export class OrdersService implements OnModuleInit {
         order.linkedReservationId = dto.linkedReservationId;
       }
 
-      // Sincronizar reservación vinculada si existe
-      const resId = dto.linkedReservationId || order.linkedReservationId;
-      if (resId) {
-        try {
-          const resRepo = manager.getRepository(Reservation);
-          const reservation = await resRepo.findOne({ where: { id: resId, tenantId } });
-          if (reservation) {
-            reservation.orderId = order.id;
-            if (order.paymentStatus === PaymentStatus.PAID) {
-              reservation.paymentStatus = PaymentStatus.PAID;
-              reservation.status = ReservationStatus.COMPLETED;
-            }
-            await resRepo.save(reservation);
-          }
-        } catch (resErr) {
-          console.error('Error sincronizando reserva en editOrder:', resErr);
-        }
-      }
-
       // Update payment status for partial / open tab orders
-      if (order.paymentMethod === 'PENDING' || order.paymentStatus === PaymentStatus.PARTIAL || order.paymentStatus === PaymentStatus.PENDING) {
+      if (dto.paymentStatus === PaymentStatus.PAID && order.paymentMethod !== 'PENDING') {
+        order.paymentStatus = PaymentStatus.PAID;
+        order.nextAbonoDueDate = null;
+        const totalAmt = Number(order.totalAmount || 0);
+        const abonosAmt = Number(order.abonosTotal || 0);
+        const restante = Math.max(0, totalAmt - abonosAmt);
+        if (restante > 0.01 && (abonosAmt > 0 || (Array.isArray(order.abonosHistory) && order.abonosHistory.length > 0))) {
+          const history = Array.isArray(order.abonosHistory) ? [...order.abonosHistory] : [];
+          history.push({
+            id: randomUUID(),
+            amount: Number(restante.toFixed(2)),
+            method: (order.paymentMethod || 'USD').toUpperCase(),
+            ref: order.pagoMovilRef || order.puntoRef || order.transferRef || order.binanceRef || undefined,
+            bank: order.pagoMovilBank || order.puntoBank || order.transferBank || undefined,
+            date: new Date().toISOString(),
+            status: 'APPROVED',
+          });
+          order.abonosHistory = history;
+          order.abonosTotal = totalAmt;
+        }
+      } else if (order.paymentMethod === 'PENDING' || order.paymentStatus === PaymentStatus.PARTIAL || order.paymentStatus === PaymentStatus.PENDING) {
         const roundedAbonos = roundCurrency(order.abonosTotal || 0);
         const roundedTotal = roundCurrency(order.totalAmount || 0);
         if (roundedAbonos >= roundedTotal && roundedTotal > 0) {
           order.paymentStatus = PaymentStatus.PAID;
+          order.nextAbonoDueDate = null;
         } else if (roundedAbonos > 0 && roundedAbonos < roundedTotal) {
           order.paymentStatus = PaymentStatus.PARTIAL;
         } else if (roundedAbonos === 0 && order.paymentStatus !== PaymentStatus.PAID) {
@@ -2364,11 +2409,50 @@ export class OrdersService implements OnModuleInit {
       if ((dto.isImmediateDelivery === true || dto.status === OrderStatus.DELIVERED) && order.paymentStatus === PaymentStatus.PAID) {
         order.status = OrderStatus.DELIVERED;
       }
-      
+
       const currentItems = await manager.find(OrderItem, { where: { orderId: order.id } });
-      const hasUndelivered = currentItems.some(it => (it.deliveredQuantity || 0) < it.quantity);
-      if (hasUndelivered && order.status === OrderStatus.DELIVERED) {
-        order.status = OrderStatus.PARTIALLY_DELIVERED;
+      if (order.status === OrderStatus.DELIVERED) {
+        if (dto.isImmediateDelivery === true || dto.status === OrderStatus.DELIVERED) {
+          for (const it of currentItems) {
+            if (it.deliveredQuantity !== it.quantity) {
+              it.deliveredQuantity = it.quantity;
+              await manager.save(OrderItem, it);
+            }
+          }
+        } else {
+          const someDelivered = currentItems.some(it => Number(it.deliveredQuantity || 0) > 0);
+          const hasUndelivered = currentItems.some(it => Number(it.deliveredQuantity || 0) < it.quantity);
+          if (someDelivered && hasUndelivered) {
+            order.status = OrderStatus.PARTIALLY_DELIVERED;
+          } else if (!someDelivered) {
+            for (const it of currentItems) {
+              it.deliveredQuantity = it.quantity;
+              await manager.save(OrderItem, it);
+            }
+          }
+        }
+      }
+
+      // Sincronizar reservación vinculada si existe
+      const resId = dto.linkedReservationId || order.linkedReservationId;
+      if (resId) {
+        try {
+          const resRepo = manager.getRepository(Reservation);
+          const reservation = await resRepo.findOne({ where: { id: resId, tenantId } });
+          if (reservation) {
+            reservation.orderId = order.id;
+            reservation.totalAmount = order.totalAmount;
+            if (order.paymentStatus === PaymentStatus.PAID) {
+              reservation.paymentStatus = PaymentStatus.PAID;
+              reservation.status = ReservationStatus.COMPLETED;
+              reservation.abonosTotal = order.abonosTotal;
+              reservation.abonosHistory = order.abonosHistory;
+            }
+            await resRepo.save(reservation);
+          }
+        } catch (resErr) {
+          console.error('Error sincronizando reserva en editOrder:', resErr);
+        }
       }
 
       if (dto.offlineCreatedAt && !isNaN(new Date(dto.offlineCreatedAt).getTime())) {
@@ -3088,6 +3172,129 @@ export class OrdersService implements OnModuleInit {
     await orderRepo.remove(order);
 
     return { success: true, message: 'Pedido eliminado exitosamente' };
+  }
+
+  async exportOrdersCsv(tenantId: string, desde: string, hasta: string): Promise<string> {
+    if (!tenantId) {
+      throw new BadRequestException('El tenant_id es requerido para realizar la exportación');
+    }
+
+    if (!desde || !hasta) {
+      throw new BadRequestException('Los parámetros "desde" y "hasta" son obligatorios en formato YYYY-MM-DD');
+    }
+
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (!datePattern.test(desde) || !datePattern.test(hasta)) {
+      throw new BadRequestException('Formato de fecha inválido. Utilice el formato YYYY-MM-DD (ej: 2026-10-24)');
+    }
+
+    // Cobertura completa del día: 00:00:00 a 23:59:59.999
+    const [startYear, startMonth, startDay] = desde.split('-').map(Number);
+    const [endYear, endMonth, endDay] = hasta.split('-').map(Number);
+
+    const startDate = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
+    const endDate = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999);
+
+    if (startDate > endDate) {
+      throw new BadRequestException('El rango de fechas es inválido: "desde" no puede ser mayor que "hasta"');
+    }
+
+    const orderRepo = this.dataSource.getRepository(Order);
+
+    // Filtrar por tenantId, estado 'PAGADO' (PaymentStatus.PAID) y rango de fechas con Between
+    const orders = await orderRepo.find({
+      where: [
+        {
+          tenantId,
+          paymentStatus: PaymentStatus.PAID,
+          createdAt: Between(startDate, endDate),
+        },
+        {
+          tenantId,
+          paymentStatus: 'PAGADO' as any,
+          createdAt: Between(startDate, endDate),
+        },
+      ],
+      relations: { customer: true },
+      order: { createdAt: 'ASC' },
+    });
+
+    const escapeCsv = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      const str = String(val).trim();
+      if (str.includes(';') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const headers = [
+      'Fecha_Operacion',
+      'Numero_Orden',
+      'Identificacion_Cliente',
+      'Razon_Social',
+      'Base_Imponible',
+      'Monto_Exento',
+      'Impuesto_IVA',
+      'Total_Facturado',
+      'Metodo_Pago',
+      'Referencia',
+    ];
+
+    const rows = orders.map((order) => {
+      // Formato ISO YYYY-MM-DD
+      const dateObj = order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt);
+      const fechaOperacion = !isNaN(dateObj.getTime())
+        ? dateObj.toISOString().slice(0, 10)
+        : '';
+
+      const numeroOrden = (order as any).orderNumber || (order as any).numeroOrden || order.id;
+
+      const identificacion =
+        order.identification ||
+        order.customer?.identification ||
+        order.pagoMovilCedula ||
+        '';
+
+      const razonSocial =
+        order.customerName ||
+        order.customer?.name ||
+        'Consumidor Final';
+
+      const baseImponible = Number(order.taxableBase || 0).toFixed(2);
+      const montoExento = Number(order.subtotalExempt || 0).toFixed(2);
+      const impuestoIva = Number(order.taxAmount || 0).toFixed(2);
+      const totalFacturado = Number(order.totalAmount || 0).toFixed(2);
+
+      const metodoPago =
+        order.paymentMethod ||
+        (order.splitPayments && order.splitPayments.length > 0 ? 'MIXTO' : 'NO_DEFINIDO');
+
+      const referencia =
+        order.pagoMovilRef ||
+        order.transferRef ||
+        order.puntoRef ||
+        order.binanceRef ||
+        order.copRef ||
+        (order.splitPayments?.map(p => p.reference).filter(Boolean).join('/')) ||
+        '';
+
+      return [
+        escapeCsv(fechaOperacion),
+        escapeCsv(numeroOrden),
+        escapeCsv(identificacion),
+        escapeCsv(razonSocial),
+        escapeCsv(baseImponible),
+        escapeCsv(montoExento),
+        escapeCsv(impuestoIva),
+        escapeCsv(totalFacturado),
+        escapeCsv(metodoPago),
+        escapeCsv(referencia),
+      ].join(';');
+    });
+
+    const BOM = '\uFEFF';
+    return BOM + [headers.join(';'), ...rows].join('\r\n');
   }
 }
 

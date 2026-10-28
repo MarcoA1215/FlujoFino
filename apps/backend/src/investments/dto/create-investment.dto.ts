@@ -1,4 +1,4 @@
-﻿import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { InvestmentType } from '@finowork/shared-types';
 
 export class CreateInvestmentDto {
@@ -25,4 +25,8 @@ export class CreateInvestmentDto {
   @IsOptional()
   @IsString()
   date?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
 }

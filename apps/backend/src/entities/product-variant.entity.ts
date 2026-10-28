@@ -39,6 +39,12 @@ export class ProductVariant {
   @Column('decimal', { precision: 12, scale: 2, nullable: true, transformer: new ColumnNumericTransformer() })
   salePrice: number | null;
 
+  @Column('boolean', { default: false })
+  isTaxExempt: boolean;
+
+  @Column('decimal', { precision: 5, scale: 2, default: 16.0, transformer: new ColumnNumericTransformer() })
+  taxRate: number;
+
   @Column('simple-array', { nullable: true })
   images: string[];
 

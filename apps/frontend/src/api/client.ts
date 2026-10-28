@@ -11,24 +11,50 @@ declare module 'axios' {
 
 export const PROD_API_FALLBACK = 'https://flujofino.onrender.com';
 
+export const isLocalAddress = (hostOrUrl?: string): boolean => {
+  if (!hostOrUrl) return false;
+  const clean = hostOrUrl.toLowerCase().trim();
+  return (
+    clean.includes('localhost') ||
+    clean.includes('127.0.0.1') ||
+    clean.includes('0.0.0.0') ||
+    /^https?:\/\/192\.168\./.test(clean) ||
+    /^192\.168\./.test(clean) ||
+    /^https?:\/\/10\./.test(clean) ||
+    /^10\./.test(clean) ||
+    /^https?:\/\/172\.(1[6-9]|2\d|3[0-1])\./.test(clean) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(clean) ||
+    clean.endsWith('.local')
+  );
+};
+
 export const getBaseURL = () => {
-  // 1. En compilación de producción de Vite (PROD) siempre debe respetarse el backend
-  if (import.meta.env.PROD) {
-    return import.meta.env.VITE_API_URL || PROD_API_FALLBACK;
-  }
+  const envApiUrl = (import.meta.env.VITE_API_URL as string)?.trim();
+  const isProdBuild = !!import.meta.env.PROD;
 
-  const envApiUrl = import.meta.env.VITE_API_URL;
+  if (typeof window !== 'undefined' && window.location) {
+    const hostname = window.location.hostname || '';
+    const isCapacitor =
+      window.location.protocol === 'capacitor:' ||
+      Boolean((window as any).Capacitor?.isNativePlatform?.());
 
-  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
-    const hostname = window.location.hostname;
+    // 1. En Capacitor (Android / iOS): Nunca debe consultar a localhost en producción
+    if (isCapacitor) {
+      if (envApiUrl && !isLocalAddress(envApiUrl)) {
+        return envApiUrl;
+      }
+      return PROD_API_FALLBACK;
+    }
 
-    // 2. Si estamos en un dominio web real de producción (Vercel, dominio propio)
-    if (
-      hostname.includes('finowork.com') ||
-      hostname.includes('onrender.com') ||
-      hostname.includes('vercel.app')
-    ) {
-      return envApiUrl || PROD_API_FALLBACK;
+    const isCurrentHostLocal = isLocalAddress(hostname);
+
+    // 2. Si estamos en un dominio web real de producción (Vercel, dominio propio, etc.)
+    if (!isCurrentHostLocal) {
+      // Si la variable de entorno es remota y válida, se respeta; de lo contrario, fallback a producción
+      if (envApiUrl && !isLocalAddress(envApiUrl)) {
+        return envApiUrl;
+      }
+      return PROD_API_FALLBACK;
     }
 
     // 3. Si estamos en desarrollo local accediendo desde celular/tablet en red local (LAN)
@@ -44,6 +70,15 @@ export const getBaseURL = () => {
     }
   }
 
+  // 4. Compilación de producción fuera del navegador o sin window
+  if (isProdBuild) {
+    if (envApiUrl && !isLocalAddress(envApiUrl)) {
+      return envApiUrl;
+    }
+    return PROD_API_FALLBACK;
+  }
+
+  // 5. Entorno de desarrollo local puro en localhost
   return envApiUrl || 'http://localhost:3001';
 };
 

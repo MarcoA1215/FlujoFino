@@ -60,4 +60,24 @@ describe('OrdersController', () => {
       expect(mockOrdersService.syncOfflineOrders).toHaveBeenCalledWith('tenant-1', orders, 'usr-1', UserRole.POS);
     });
   });
+
+  describe('exportCsv', () => {
+    it('debe exportar órdenes en CSV y configurar los encabezados de respuesta correctamente', async () => {
+      const req = { user: { tenantId: 'tenant-xyz' } };
+      mockOrdersService.exportOrdersCsv = jest.fn().mockResolvedValue('\uFEFFFecha_Operacion;Numero_Orden\r\n2026-10-24;ord-1');
+      const mockRes: any = {
+        setHeader: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        send: jest.fn().mockImplementation((val) => val),
+      };
+
+      await controller.exportCsv(req, '2026-10-01', '2026-10-24', mockRes);
+
+      expect(mockOrdersService.exportOrdersCsv).toHaveBeenCalledWith('tenant-xyz', '2026-10-01', '2026-10-24');
+      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'text/csv; charset=utf-8');
+      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="reporte_transaccional_2026-10-01_2026-10-24.csv"');
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.send).toHaveBeenCalledWith('\uFEFFFecha_Operacion;Numero_Orden\r\n2026-10-24;ord-1');
+    });
+  });
 });

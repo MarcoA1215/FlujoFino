@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonButton, IonIcon, IonList, IonListHeader, useIonToast } from '@ionic/react';
 import { useIonRouter } from '@ionic/react';
-import { businessOutline, shieldCheckmarkOutline } from 'ionicons/icons';
+import { businessOutline, shieldCheckmarkOutline, medalOutline } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import { UserRole, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
@@ -56,20 +56,21 @@ const SelectWorkspace: React.FC = () => {
 
   const isSuperAdmin = user?.role === UserRole.SUPERADMIN || (user?.role as string) === 'SUPERADMIN' || user?.email?.toLowerCase() === DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
   const workspaces = user?.workspaces || [];
+  const hasPromoterAccess = user?.isPromoter || user?.role === UserRole.PROMOTOR || (user?.role as string) === 'PROMOTOR' || workspaces.some((w: any) => w.tenantId === 'promoter-space') || user?.email?.toLowerCase() === 'promotor@finowork.com';
   const pending = workspaces.filter((w: any) => w.status === 'PENDING');
-  const active = workspaces.filter((w: any) => w.status === 'ACCEPTED');
+  const active = workspaces.filter((w: any) => w.status === 'ACCEPTED' && w.tenantId !== 'promoter-space');
 
   return (
     <IonPage>
       <IonContent className="ion-padding" style={{ '--background': '#f4f5f8' } as any}>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100%' }}>
-          <IonCard style={{ width: '100%', maxWidth: '400px' }}>
+          <IonCard style={{ width: '100%', maxWidth: '420px', borderRadius: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}>
             <IonCardHeader className="ion-text-center">
-              <div style={{ width: '60px', height: '60px', background: 'var(--ion-color-primary)', color: 'white', borderRadius: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '36px', fontWeight: '900', margin: '0 auto 15px auto', boxShadow: '0 4px 10px rgba(0,0,0,0.15)' }}>
+              <div style={{ width: '60px', height: '60px', background: 'var(--ion-color-primary, #10b981)', color: 'white', borderRadius: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '36px', fontWeight: '900', margin: '0 auto 15px auto', boxShadow: '0 4px 10px rgba(0,0,0,0.15)' }}>
                 F
               </div>
               <IonCardTitle style={{ fontWeight: 'bold' }}>Elige tu espacio</IonCardTitle>
-              <p style={{ margin: '5px 0 0 0', color: 'gray' }}>¿A dónde quieres entrar?</p>
+              <p style={{ margin: '5px 0 0 0', color: '#64748b', fontSize: '14px' }}>¿A dónde quieres entrar?</p>
             </IonCardHeader>
             <IonCardContent>
               {isSuperAdmin && (
@@ -86,8 +87,22 @@ const SelectWorkspace: React.FC = () => {
                 </div>
               )}
 
+              {hasPromoterAccess && (
+                <div style={{ marginBottom: '16px' }}>
+                  <IonButton 
+                    expand="block" 
+                    color="success"
+                    style={{ fontWeight: 'bold' }}
+                    onClick={() => handleSelect('promoter-space')}
+                  >
+                    <IonIcon icon={medalOutline} slot="start" />
+                    Mi Panel de Promotor Oficial
+                  </IonButton>
+                </div>
+              )}
+
               {pending.length > 0 && (
-                <IonList>
+                <IonList style={{ background: 'transparent', marginBottom: '16px' }}>
                   <IonListHeader>Invitaciones Pendientes</IonListHeader>
                   {pending.map((w: any) => (
                     <IonItem key={w.tenantId}>
@@ -105,11 +120,23 @@ const SelectWorkspace: React.FC = () => {
               )}
 
               {active.length > 0 && (
-                <IonList>
-                  <IonListHeader>Mis Sucursales</IonListHeader>
+                <IonList style={{ background: 'transparent' }}>
+                  <IonListHeader style={{ color: '#475569', fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Mis Sucursales / Negocios
+                  </IonListHeader>
                   {active.map((w: any) => (
-                    <IonItem button key={w.tenantId} onClick={() => handleSelect(w.tenantId)}>
-                      <IonIcon icon={businessOutline} slot="start" />
+                    <IonItem 
+                      button 
+                      key={w.tenantId} 
+                      onClick={() => handleSelect(w.tenantId)}
+                      style={{
+                        marginBottom: '8px',
+                        borderRadius: '12px',
+                        border: '1px solid #e2e8f0',
+                        '--background': '#ffffff'
+                      } as any}
+                    >
+                      <IonIcon icon={businessOutline} slot="start" color="primary" />
                       <IonLabel>
                         <h2><strong>{w.name}</strong></h2>
                         <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '2px 0 0 0' }}>
@@ -121,7 +148,7 @@ const SelectWorkspace: React.FC = () => {
                 </IonList>
               )}
 
-              {workspaces.length === 0 && (
+              {workspaces.length === 0 && !hasPromoterAccess && (
                 <div className="ion-text-center ion-padding">
                   {isSuperAdmin ? (
                     <>

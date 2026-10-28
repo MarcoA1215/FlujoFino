@@ -4,8 +4,10 @@ import {
   Post,
   Patch,
   Put,
+  Delete,
   Param,
   Body,
+  Query,
   UseGuards,
   Req,
 } from '@nestjs/common';
@@ -16,6 +18,8 @@ import { ReportPaymentDto } from './dto/report-payment.dto';
 import { UpdatePlatformConfigDto } from './dto/update-platform-config.dto';
 import { CreatePromoterDto } from './dto/create-promoter.dto';
 import { UpdateSuperAdminProfileDto } from './dto/update-superadmin-profile.dto';
+import { CreatePlatformExpenseDto } from './dto/create-platform-expense.dto';
+import { RecordSeniatPaymentDto } from './dto/record-seniat-payment.dto';
 import { SettingsService } from '../settings/settings.service';
 
 @Controller('superadmin')
@@ -122,6 +126,20 @@ export class SuperAdminController {
     return await this.superadminService.payPromoterCommission(id, paymentReference);
   }
 
+  @Post('promoters/:id/payout-bulk')
+  @UseGuards(SuperAdminGuard)
+  async payBulkCommissions(
+    @Param('id') id: string,
+    @Body('paymentReference') paymentReference: string,
+    @Body('commissionIds') commissionIds?: string[],
+  ) {
+    return await this.superadminService.payBulkPromoterCommissions(
+      id,
+      paymentReference,
+      commissionIds,
+    );
+  }
+
   @Get('profile')
   @UseGuards(SuperAdminGuard)
   async getProfile(@Req() req: any) {
@@ -147,6 +165,42 @@ export class SuperAdminController {
   @UseGuards(SuperAdminGuard)
   async syncRates() {
     return await this.settingsService.syncRates();
+  }
+
+  // --- SaaS PLATFORM FINANCES, TAXES (SENIAT) & EXPENSES ---
+
+  @Get('finances/metrics')
+  @UseGuards(SuperAdminGuard)
+  async getFinanceMetrics() {
+    return await this.superadminService.getFinanceMetrics();
+  }
+
+  @Get('finances/expenses')
+  @UseGuards(SuperAdminGuard)
+  async getExpenses(
+    @Query('type') type?: string,
+    @Query('month') month?: string,
+    @Query('search') search?: string,
+  ) {
+    return await this.superadminService.getExpenses({ type, month, search });
+  }
+
+  @Post('finances/expenses')
+  @UseGuards(SuperAdminGuard)
+  async createExpense(@Body() body: CreatePlatformExpenseDto) {
+    return await this.superadminService.createExpense(body);
+  }
+
+  @Post('finances/seniat')
+  @UseGuards(SuperAdminGuard)
+  async recordSeniatPayment(@Body() body: RecordSeniatPaymentDto) {
+    return await this.superadminService.recordSeniatPayment(body);
+  }
+
+  @Delete('finances/expenses/:id')
+  @UseGuards(SuperAdminGuard)
+  async deleteExpense(@Param('id') id: string) {
+    return await this.superadminService.deleteExpense(id);
   }
 }
 

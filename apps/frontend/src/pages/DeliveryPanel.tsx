@@ -117,7 +117,7 @@ const DeliveryPanel: React.FC = () => {
 
   return (
     <IonPage>
-      <AppHeader title="Panel de Repartidor" />
+      <AppHeader title="Panel de Repartidor" onRefresh={fetchHistory} />
       <IonContent className="ion-padding ff-has-bottom-nav" style={{ ['--background' as any]: '#F8FAFC' }}>
         <div style={{ maxWidth: '800px', margin: '0 auto', paddingBottom: '90px' }}>
           {/* Tarjetas de Resumen */}

@@ -59,8 +59,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [uploadingMedia, setUploadingMedia] = useState<boolean>(false);
   const [hasVariants, setHasVariants] = useState<boolean>(false);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [isTaxExempt, setIsTaxExempt] = useState<boolean>(false);
+  const [taxRate, setTaxRate] = useState<string>('16');
 
-  const { settings: contextSettings } = useSettings();
+  const { settings: contextSettings, exchangeRate } = useSettings();
   const [localSettings, setLocalSettings] = useState<any>(() => {
     try {
       const cached = localStorage.getItem('tenant_settings') || localStorage.getItem('flujofino_cached_settings');
@@ -68,6 +70,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     } catch {}
     return {};
   });
+
+  const isFiscalEnabled = Boolean(propSettings?.featureFiscalSupport ?? (localSettings?.featureFiscalSupport ?? contextSettings?.featureFiscalSupport));
+  const defaultFiscalRate = Number(propSettings?.fiscalDefaultTaxRate ?? (localSettings?.fiscalDefaultTaxRate ?? (contextSettings?.fiscalDefaultTaxRate || 16.0)));
 
   const [localStaffUsers, setLocalStaffUsers] = useState<any[]>(users || []);
 
@@ -163,6 +168,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         staffIds = (product.assignedStaffIds as string).split(',').map(s => s.trim()).filter(Boolean);
       }
       setSelectedStaffIds(staffIds);
+
+      setIsTaxExempt(Boolean(product.isTaxExempt));
+      setTaxRate(product.taxRate !== undefined && product.taxRate !== null ? String(product.taxRate) : String(defaultFiscalRate));
     } else {
       let defaultType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = archetype || (isResaleOnly ? 'REVENTA' : 'REVENTA');
       if (!availableTypes.includes(defaultType)) {
@@ -182,8 +190,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setBaseImages([]);
       setHasVariants(false);
       setVariants([]);
+      setIsTaxExempt(false);
+      setTaxRate(String(defaultFiscalRate));
     }
-  }, [product, isCombo, archetype, isResaleOnly, isOpen, isProductionEnabled, isRetailEnabled, isReservationsEnabled, availableTypes]);
+  }, [product, isCombo, archetype, isResaleOnly, isOpen, isProductionEnabled, isRetailEnabled, isReservationsEnabled, availableTypes, defaultFiscalRate]);
 
   useEffect(() => {
     if (!product && !availableTypes.includes(selectedType) && availableTypes.length > 0) {
@@ -299,6 +309,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const totalVariantsStock = variants.reduce((acc, v) => acc + Math.max(0, Number(v.stockQuantity || 0)), 0);
 
+  const handleToggleTaxExempt = (exempt: boolean) => {
+    setIsTaxExempt(exempt);
+    if (exempt) {
+      setTaxRate('0');
+    } else {
+      setTaxRate(String(defaultFiscalRate));
+    }
+  };
+
+  const parsedSalePrice = parseFloat(salePrice) || 0;
+  const parsedTaxRate = isTaxExempt ? 0 : (parseFloat(taxRate) || 0);
+  const taxAmount = (parsedSalePrice * parsedTaxRate) / 100;
+  const finalPriceWithTax = parsedSalePrice + taxAmount;
+  const effectiveExchangeRate = exchangeRate || Number(localSettings?.exchangeRateBs || contextSettings?.exchangeRateBs || 40);
+  const finalPriceBs = finalPriceWithTax * effectiveExchangeRate;
+
   const handleSave = async () => {
     if (!name.trim()) {
       presentToast({ message: 'El nombre es obligatorio', duration: 2500, color: 'warning' });
@@ -351,7 +377,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         isSupplierPreorder: isService ? false : isSupplierPreorder,
         images: baseImages,
         hasVariants: !isService && hasVariants && cleanedVariants.length > 0,
-        variants: !isService && hasVariants ? cleanedVariants : []
+        variants: !isService && hasVariants ? cleanedVariants : [],
+        isTaxExempt: isFiscalEnabled ? Boolean(isTaxExempt) : false,
+        taxRate: isFiscalEnabled ? (isTaxExempt ? 0 : (parseFloat(taxRate) >= 0 ? parseFloat(taxRate) : defaultFiscalRate)) : 0,
       };
 
       if (product) {
@@ -561,6 +589,169 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             {isService && (
               <div style={{ fontSize: '12px', color: '#64748b', marginTop: '-4px', marginBottom: '12px' }}>
                 💡 <b>Costo estimado del servicio:</b> Lo que te cuesta realizar la atención (mano de obra, insumos o gastos fijos). Se utiliza para calcular tu ganancia neta en Caja y Estadísticas.
+              </div>
+            )}
+
+            {isFiscalEnabled && (
+              <div style={{
+                backgroundColor: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '14px 16px',
+                marginBottom: '14px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '18px' }}>🧾</span>
+                    <div>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>Régimen de IVA (Exento / Gravado)</span>
+                      <div style={{ fontSize: '11px', color: '#64748b' }}>Configuración de impuesto para cálculos comerciales y ventas</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pregunta si es exento de IVA */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  backgroundColor: isTaxExempt ? '#ecfdf5' : '#f8fafc',
+                  border: `1px solid ${isTaxExempt ? '#a7f3d0' : '#e2e8f0'}`,
+                  borderRadius: '8px',
+                  marginBottom: '10px'
+                }}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: isTaxExempt ? '#065f46' : '#1e293b' }}>
+                      ¿Está exento de IVA?
+                    </div>
+                    <div style={{ fontSize: '11px', color: isTaxExempt ? '#047857' : '#64748b' }}>
+                      {isTaxExempt ? 'Marcado como exento (Alícuota 0%)' : 'Gravado con IVA (Aplica porcentaje de impuesto)'}
+                    </div>
+                  </div>
+                  <IonToggle
+                    checked={isTaxExempt}
+                    onIonChange={e => handleToggleTaxExempt(e.detail.checked)}
+                  />
+                </div>
+
+                {/* Si no es exento, se coloca 16% extra de manera predeterminada y es editable */}
+                {!isTaxExempt ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
+                        % Alícuota de IVA (Predeterminado 16%)
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={taxRate}
+                          onChange={e => setTaxRate(e.target.value)}
+                          placeholder="16.00"
+                          style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
+                        />
+                        <span style={{ fontSize: '14px', fontWeight: '700', color: '#475569' }}>%</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '4px' }}>
+                        Alícuotas Rápidas SENIAT:
+                      </label>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => setTaxRate('16')}
+                          style={{
+                            padding: '5px 9px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            border: taxRate === '16' ? '1px solid #10b981' : '1px solid #cbd5e1',
+                            backgroundColor: taxRate === '16' ? '#ecfdf5' : '#ffffff',
+                            color: taxRate === '16' ? '#065f46' : '#475569',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          16% General
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTaxRate('8')}
+                          style={{
+                            padding: '5px 9px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            border: taxRate === '8' ? '1px solid #10b981' : '1px solid #cbd5e1',
+                            backgroundColor: taxRate === '8' ? '#ecfdf5' : '#ffffff',
+                            color: taxRate === '8' ? '#065f46' : '#475569',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          8% Reducida
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTaxRate('31')}
+                          style={{
+                            padding: '5px 9px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            border: taxRate === '31' ? '1px solid #10b981' : '1px solid #cbd5e1',
+                            backgroundColor: taxRate === '31' ? '#ecfdf5' : '#ffffff',
+                            color: taxRate === '31' ? '#065f46' : '#475569',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          31% Lujo
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Resumen dinámico en vivo del precio con IVA */}
+                {parsedSalePrice > 0 && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '10px 12px',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b' }}>
+                      <span>Precio Neto (Base Imponible):</span>
+                      <span style={{ fontWeight: '600', color: '#1e293b' }}>${parsedSalePrice.toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b' }}>
+                      <span>IVA ({isTaxExempt ? '0% Exento' : `${parsedTaxRate}%`}):</span>
+                      <span style={{ fontWeight: '600', color: isTaxExempt ? '#059669' : '#0f172a' }}>
+                        {isTaxExempt ? '$0.00 (Exento)' : `+$${taxAmount.toFixed(2)}`}
+                      </span>
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      color: '#065f46',
+                      borderTop: '1px solid #e2e8f0',
+                      paddingTop: '4px',
+                      marginTop: '2px'
+                    }}>
+                      <span>Precio Final al Consumidor:</span>
+                      <span>${finalPriceWithTax.toFixed(2)} <span style={{ fontSize: '11px', fontWeight: '500', color: '#64748b' }}>({effectiveExchangeRate > 0 ? `Bs. ${finalPriceBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''})</span></span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

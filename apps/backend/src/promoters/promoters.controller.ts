@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Put, Body, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Put, Post, Body, Req, UseGuards } from '@nestjs/common';
 import { PromotersService } from './promoters.service';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -30,5 +30,18 @@ export class PromotersController {
     const userId = req.user.id || req.user.sub;
     return await this.promotersService.updatePayoutDetails(userId, body);
   }
-}
 
+  @Put('accept-terms')
+  @Roles(UserRole.PROMOTOR)
+  async acceptTerms(@Req() req: any) {
+    const userId = req.user.id || req.user.sub;
+    return await this.promotersService.acceptTerms(userId);
+  }
+
+  @Post('accept-terms')
+  @Roles(UserRole.PROMOTOR)
+  async acceptTermsPost(@Req() req: any) {
+    const userId = req.user.id || req.user.sub;
+    return await this.promotersService.acceptTerms(userId);
+  }
+}

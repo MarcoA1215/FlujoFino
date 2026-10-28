@@ -177,17 +177,24 @@ export class PublicReservationsController {
       return p.is_service === true || p.category === 'Servicios';
     });
 
-    const services = onlyServices.map(p => ({
-      id: p.id,
-      name: p.name,
-      price: p.salePrice,
-      durationMinutes: p.durationMinutes || settings?.slotInterval || 30,
-      category: p.category,
-      assignedStaffIds: p.assignedStaffIds || [],
-      product_type: 'SERVICIO',
-      is_service: true,
-      image: p.images && p.images.length > 0 ? (Array.isArray(p.images) ? p.images[p.images.length - 1] : String(p.images).split(',').pop()?.trim()) : null
-    }));
+    const services = onlyServices.map(p => {
+      const rawImages = Array.isArray(p.images)
+        ? p.images
+        : (typeof p.images === 'string' && (p.images as string).trim() ? (p.images as string).split(',').map(s => s.trim()) : []);
+      const validImages = rawImages.filter(Boolean);
+      return {
+        id: p.id,
+        name: p.name,
+        price: p.salePrice,
+        durationMinutes: p.durationMinutes || settings?.slotInterval || 30,
+        category: p.category,
+        assignedStaffIds: p.assignedStaffIds || [],
+        product_type: 'SERVICIO',
+        is_service: true,
+        image: validImages[0] || null,
+        images: validImages,
+      };
+    });
 
     // Fetch active staff if staff selection is allowed (defaults to true unless explicitly disabled)
     let staff: any[] = [];
@@ -262,6 +269,13 @@ export class PublicReservationsController {
       rate = Number(globalSettings?.exchangeRateBs || 40.0);
     }
 
+    const enableCopCurrency = Boolean(settings?.enableCopCurrency);
+    let rateCop = Number(settings?.exchangeRateCop || 0);
+    if (!rateCop) {
+      const globalSettings = await settingsRepo.findOne({ where: { id: 'GLOBAL' } });
+      rateCop = Number(globalSettings?.ratesCache?.cop || globalSettings?.exchangeRateCop || 4000.0);
+    }
+
     const isDepositReq = settings?.bookingRequireDeposit === true;
     const depositPct = isDepositReq ? Number(settings?.bookingDepositPercentage ?? settings?.minDepositPercentage ?? 0) : 0;
 
@@ -283,6 +297,8 @@ export class PublicReservationsController {
         hasStore: Boolean(hasStore),
         staff: staff,
         exchangeRateBs: rate,
+        enableCopCurrency,
+        exchangeRateCop: rateCop,
         minDepositPercentage: depositPct,
         bookingRequireDeposit: isDepositReq,
         bookingDepositPercentage: depositPct,
@@ -292,12 +308,20 @@ export class PublicReservationsController {
       companyPhone: settings?.companyPhone || '',
       companyAccountNumber: settings?.companyAccountNumber || '',
       companyAccountHolder: settings?.companyAccountHolder || '',
+      companyCopBank: settings?.companyCopBank || '',
+      companyCopAccountNumber: settings?.companyCopAccountNumber || '',
+      companyCopAccountHolder: settings?.companyCopAccountHolder || '',
+      companyCopAccountType: settings?.companyCopAccountType || 'AHORROS',
+      companyCopCedula: settings?.companyCopCedula || '',
       binancePayId: settings?.binancePayId || '',
       binanceEmail: settings?.binanceEmail || '',
       acceptCashUsd: settings?.acceptCashUsd ?? true,
+      acceptCashBs: settings?.acceptCashBs !== false,
       acceptPagoMovil: settings?.acceptPagoMovil ?? true,
       acceptTransfer: settings?.acceptTransfer ?? false,
       acceptBinance: settings?.acceptBinance ?? false,
+      acceptCashCop: settings?.acceptCashCop !== false,
+      acceptTransferCop: settings?.acceptTransferCop === true,
       themePrimaryColor: settings?.themePrimaryColor || '#10b981',
       themeHeaderColor: settings?.themeHeaderColor || settings?.themePrimaryColor || '#10b981',
       companyLogoUrl: settings?.companyLogoUrl || null,
@@ -448,6 +472,7 @@ export class PublicReservationsController {
       serviceName: dto.serviceName,
       numberOfPeople: dto.numberOfPeople || 1,
       employeeId: dto.employeeId,
+      employeeName: dto.employeeName?.trim() || undefined,
       serviceSpecialists: dto.serviceSpecialists || undefined,
       notes: (dto.paymentMethod === 'ON_ARRIVAL' || dto.paymentMethod === 'PENDING')
         ? (dto.notes?.trim() ? `${dto.notes.trim()} | [Por pagar al asistir (Cuenta abierta)]` : '[Por pagar al asistir (Cuenta abierta)]')
@@ -660,7 +685,7 @@ export class PublicReservationsController {
   @Get('appointment/:id')
   async getAppointment(@Param('id') id: string) {
     const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
-    const reservation = await reservationRepo.findOne({ where: { id }, relations: { tenant: true } });
+    const reservation = await reservationRepo.findOne({ where: { id }, relations: { tenant: true, employee: true } });
     if (!reservation) throw new NotFoundException('Cita no encontrada');
 
     const settingsRepo = this.tenantRepo.manager.getRepository(Settings);
@@ -716,6 +741,9 @@ export class PublicReservationsController {
       rescheduleReason: reservation.rescheduleReason || null,
       serviceId: reservation.serviceId,
       serviceName: reservation.serviceName,
+      employeeId: reservation.employeeId || null,
+      employeeName: reservation.employeeName || reservation.employee?.name || reservation.employee?.username || null,
+      serviceSpecialists: reservation.serviceSpecialists || [],
       status: reservation.status,
       tenantName: reservation.tenant?.name || '',
       tenantId: reservation.tenantId, // Real tenant UUID is OK to return here since they already have the appointment UUID
@@ -912,42 +940,62 @@ export class PublicReservationsController {
     // Instead of complex SQL, we'll fetch them, map into a unified format, sort, and slice.
     // This is fine for small to medium scale. For huge scale, we'd need a unified view or unified table.
     
-    const products = await productRepo.find({ where: { tenantId: id } });
+    const products = await productRepo.find({
+      where: { tenantId: id },
+      relations: { variants: true },
+    });
     const serviceProducts = products.filter(p => {
       if (p.product_type === 'SERVICIO') return true;
       if (p.product_type === 'REVENTA' || p.product_type === 'FORMULA') return false;
       return p.is_service === true || p.category === 'Servicios';
     });
 
-    const productImages = serviceProducts
-      .filter(p => p.images && p.images.length > 0)
-      .flatMap(p => p.images.map((img, i) => ({
-        id: `prod-${p.id}-${i}`,
-        type: 'service',
-        productId: p.id,
-        badge: 'Servicio',
-        url: img,
-        title: p.name,
-        subtitle: `Precio: $${Number(p.salePrice || 0).toFixed(2)}${p.durationMinutes ? ` • ${p.durationMinutes} min` : ''}`,
-        date: p.updatedAt // Approximated
-      })));
+    const productItems = serviceProducts
+      .filter(p => {
+        const hasImgs = Array.isArray(p.images) ? p.images.length > 0 : Boolean(p.images);
+        const hasVariantImgs = p.variants?.some(v => Array.isArray(v.images) && v.images.length > 0);
+        return hasImgs || hasVariantImgs;
+      })
+      .map(p => {
+        const rawImages = Array.isArray(p.images)
+          ? p.images
+          : (typeof p.images === 'string' && (p.images as string).trim() ? (p.images as string).split(',').map(s => s.trim()) : []);
+        const variantImages = (p.variants || []).flatMap(v => Array.isArray(v.images) ? v.images : []);
+        const validImages = Array.from(new Set([...rawImages, ...variantImages].filter(Boolean)));
+
+        return {
+          id: `prod-${p.id}`,
+          type: 'service',
+          productId: p.id,
+          badge: 'Servicio',
+          url: validImages[0] || '',
+          images: validImages,
+          title: p.name,
+          subtitle: `Precio: $${Number(p.salePrice || 0).toFixed(2)}${p.durationMinutes ? ` • ${p.durationMinutes} min` : ''}`,
+          date: p.updatedAt || p.createdAt || new Date(),
+        };
+      });
 
     const orderItems = await orderItemRepo.find({
       where: { order: { tenantId: id } },
       relations: { media: true, order: true }
     });
     
-    const orderImages = orderItems
+    const orderItemsWithMedia = orderItems
       .filter(oi => oi.media && oi.media.length > 0)
-      .flatMap(oi => oi.media.map(m => ({
-        id: `media-${m.id}`,
-        type: 'work',
-        badge: 'Trabajo Realizado',
-        url: m.imageUrl,
-        title: oi.productName || 'Trabajo Realizado',
-        subtitle: oi.order?.customerName ? `Cliente: ${oi.order.customerName}` : 'Trabajo completado',
-        date: m.createdAt
-      })));
+      .map(oi => {
+        const validImages = oi.media.map(m => m.imageUrl).filter(Boolean);
+        return {
+          id: `order-item-${oi.id}`,
+          type: 'work',
+          badge: 'Trabajo Realizado',
+          url: validImages[0] || '',
+          images: validImages,
+          title: oi.productName || 'Trabajo Realizado',
+          subtitle: oi.order?.customerName ? `Cliente: ${oi.order.customerName}` : 'Trabajo completado',
+          date: oi.media[0]?.createdAt || oi.order?.createdAt || new Date(),
+        };
+      });
 
     const reservationRepo = this.tenantRepo.manager.getRepository(Reservation);
     const completedReservations = await reservationRepo.find({
@@ -957,7 +1005,7 @@ export class PublicReservationsController {
       },
     });
 
-    const reservationImages = completedReservations
+    const reservationItems = completedReservations
       .filter(r => Boolean(r.imageUrl))
       .map(r => ({
         id: `res-${r.id}`,
@@ -965,12 +1013,13 @@ export class PublicReservationsController {
         productId: r.serviceId,
         badge: 'Trabajo Realizado',
         url: r.imageUrl,
+        images: [r.imageUrl],
         title: r.serviceName || 'Servicio Realizado',
         subtitle: r.customerName ? `Cliente: ${r.customerName}` : 'Servicio finalizado',
-        date: r.updatedAt || r.date || r.createdAt,
+        date: r.updatedAt || r.date || r.createdAt || new Date(),
       }));
 
-    const combined = [...productImages, ...reservationImages, ...orderImages];
+    const combined = [...productItems, ...reservationItems, ...orderItemsWithMedia];
     // Sort descending by date
     combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -1353,6 +1402,8 @@ export class PublicReservationsController {
       employeeId: string | null;
       start: number;
       end: number;
+      isBlock?: boolean;
+      serviceId?: string;
     }
 
     const busyBookings: BusyBooking[] = [];
@@ -1387,7 +1438,7 @@ export class PublicReservationsController {
         rDuration = interval;
       }
 
-      if (Array.isArray(r.serviceSpecialists) && r.serviceSpecialists.length > 0) {
+      if (Array.isArray(r.serviceSpecialists) && r.serviceSpecialists.length > 0 && !r.isBlock) {
         let segStart = startMins;
         for (const s of r.serviceSpecialists) {
           const sp = s.serviceId ? productMap.get(s.serviceId) : null;
@@ -1396,6 +1447,8 @@ export class PublicReservationsController {
             employeeId: s.employeeId || null,
             start: segStart,
             end: segStart + dur,
+            isBlock: false,
+            serviceId: s.serviceId || r.serviceId,
           });
           segStart += dur;
         }
@@ -1404,6 +1457,8 @@ export class PublicReservationsController {
           employeeId: r.employeeId || null,
           start: startMins,
           end: startMins + rDuration,
+          isBlock: Boolean(r.isBlock),
+          serviceId: r.serviceId,
         });
       }
     }
@@ -1426,6 +1481,13 @@ export class PublicReservationsController {
         }
 
         const slotEnd = currentMins + duration;
+
+        // Check store-wide schedule blocks first (isBlock = true and no employeeId)
+        const hasStoreBlock = busyBookings.some(b => b.isBlock && !b.employeeId && currentMins < b.end && slotEnd > b.start);
+        if (hasStoreBlock) {
+          currentMins += interval;
+          continue;
+        }
 
         if (isSoloBusiness) {
           // Solo business (single operator / no staff accounts configured)
@@ -1460,11 +1522,46 @@ export class PublicReservationsController {
               b => (b.employeeId === emp.userId || b.employeeId === emp.id || b.employeeId === emp.user?.id) && currentMins < b.end && slotEnd > b.start
             );
             if (!empDirectOverlap) {
-              // Also ensure unassigned bookings haven't exhausted all working staff capacity
-              const unassignedCount = busyBookings.filter(
-                b => !b.employeeId && currentMins < b.end && slotEnd > b.start
-              ).length;
-              if (unassignedCount > 0) {
+              // Also ensure unassigned bookings haven't exhausted capacity or locked this specialist
+              const overlappingUnassigned = busyBookings.filter(
+                b => !b.employeeId && !b.isBlock && currentMins < b.end && slotEnd > b.start
+              );
+              let isBlockedByUnassigned = false;
+              for (const ub of overlappingUnassigned) {
+                let ubQualifiedStaff = staffList;
+                if (ub.serviceId) {
+                  const ubProd = productMap.get(ub.serviceId);
+                  const raw: any = ubProd?.assignedStaffIds;
+                  let ubAssignedIds: string[] = [];
+                  if (Array.isArray(raw)) ubAssignedIds = raw;
+                  else if (typeof raw === 'string' && raw.trim()) ubAssignedIds = raw.split(',').map((x: string) => x.trim()).filter(Boolean);
+                  if (ubAssignedIds.length > 0) {
+                    const match = staffList.filter(st => ubAssignedIds.includes(st.userId) || ubAssignedIds.includes(st.id) || (st.user && ubAssignedIds.includes(st.user.id)));
+                    if (match.length > 0) ubQualifiedStaff = match;
+                  }
+                }
+                const isEmpQualifiedForUb = ubQualifiedStaff.some(st => st.userId === emp.userId || st.id === emp.id || st.user?.id === emp.user?.id);
+                if (isEmpQualifiedForUb) {
+                  const otherFree = ubQualifiedStaff.filter(st => {
+                    if (st.userId === emp.userId || st.id === emp.id || st.user?.id === emp.user?.id) return false;
+                    const { entry: se, exit: sx, lStart: sls, lEnd: sle } = getStaffBounds(st);
+                    if (se !== null && currentMins < se) return false;
+                    if (sx !== null && slotEnd > sx) return false;
+                    if (sls !== null && sle !== null && currentMins < sle && slotEnd > sls) return false;
+                    return !busyBookings.some(b => (b.employeeId === st.userId || b.employeeId === st.id || b.employeeId === st.user?.id) && currentMins < b.end && slotEnd > b.start);
+                  });
+                  if (otherFree.length === 0) {
+                    isBlockedByUnassigned = true;
+                    break;
+                  }
+                }
+              }
+              if (isBlockedByUnassigned) {
+                currentMins += interval;
+                continue;
+              }
+
+              if (overlappingUnassigned.length > 0) {
                 const totalFreeWorkingStaff = staffList.filter(s => {
                   const { entry: sEntry, exit: sExit, lStart: sLStart, lEnd: sLEnd } = getStaffBounds(s);
                   if (sEntry !== null && currentMins < sEntry) return false;
@@ -1473,7 +1570,7 @@ export class PublicReservationsController {
                   return !busyBookings.some(b => (b.employeeId === s.userId || b.employeeId === s.id || b.employeeId === s.user?.id) && currentMins < b.end && slotEnd > b.start);
                 }).length;
 
-                if (totalFreeWorkingStaff <= unassignedCount) {
+                if (totalFreeWorkingStaff <= overlappingUnassigned.length) {
                   currentMins += interval;
                   continue;
                 }
@@ -1522,7 +1619,7 @@ export class PublicReservationsController {
             });
 
             const unassignedInSegment = busyBookings.filter(
-              b => !b.employeeId && segStart < b.end && segEnd > b.start
+              b => !b.employeeId && !b.isBlock && segStart < b.end && segEnd > b.start
             ).length;
 
             if (freeForThisSegment.length - unassignedInSegment <= 0) {
@@ -1550,7 +1647,7 @@ export class PublicReservationsController {
           });
 
           const unassignedOverlapCount = busyBookings.filter(
-            b => !b.employeeId && currentMins < b.end && slotEnd > b.start
+            b => !b.employeeId && !b.isBlock && currentMins < b.end && slotEnd > b.start
           ).length;
 
           const availableCapacity = freeCandidateStaff.length - unassignedOverlapCount;

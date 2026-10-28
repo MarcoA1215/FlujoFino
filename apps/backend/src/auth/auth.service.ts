@@ -74,6 +74,11 @@ export class AuthService {
 
     const { passwordHash, ...result } = user;
     
+    // Check if user is a promoter
+    const promoterRepo = this.dataSource.getRepository(Promoter);
+    const promoterProfile = await promoterRepo.findOne({ where: { userId: user.id } });
+    const isPromoter = user.role === UserRole.PROMOTOR || (user.role as string) === 'PROMOTOR' || !!promoterProfile;
+
     // Build workspaces list for the frontend
     const workspaces = (user.tenantAccess || []).map(a => ({
       tenantId: a.tenantId,
@@ -83,16 +88,37 @@ export class AuthService {
       status: a.status
     }));
 
+    if (isPromoter) {
+      workspaces.unshift({
+        tenantId: 'promoter-space',
+        name: 'Mi Panel de Promotor',
+        role: UserRole.PROMOTOR,
+        roles: [UserRole.PROMOTOR],
+        status: 'ACCEPTED'
+      });
+    }
+
     // Check if user is SuperAdmin
     const isSuperAdmin = user.role === UserRole.SUPERADMIN || (user.role as string) === 'SUPERADMIN' || (user.email && user.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN_EMAIL).toLowerCase());
     if (isSuperAdmin) {
       let activeAccess = requestedTenantId ? user.tenantAccess?.find(a => a.tenantId === requestedTenantId) : user.tenantAccess?.[0];
       return {
-        user: result,
+        user: { ...result, isPromoter },
         tenantId: requestedTenantId || (activeAccess?.tenantId || 'platform-admin'),
         role: UserRole.SUPERADMIN,
         roles: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
         tenantName: activeAccess?.tenant?.name || 'Plataforma Global',
+        workspaces
+      };
+    }
+
+    if (requestedTenantId === 'promoter-space' && isPromoter) {
+      return {
+        user: { ...result, isPromoter: true },
+        tenantId: 'promoter-space',
+        role: UserRole.PROMOTOR,
+        roles: [UserRole.PROMOTOR],
+        tenantName: 'Red de Promotores FinoWork',
         workspaces
       };
     }
@@ -108,12 +134,15 @@ export class AuthService {
     const pending = workspaces.filter(w => w.status === 'PENDING');
     if (!requestedTenantId && (workspaces.length > 1 || pending.length > 0)) {
       // Force user to select a workspace
-      return { user: result, tenantId: null, role: user.role, roles: [user.role], tenantName: '', workspaces };
+      return { user: { ...result, isPromoter }, tenantId: null, role: user.role, roles: [user.role], tenantName: '', workspaces };
     }
 
     if (!access && workspaces.length > 0) {
-      // User has workspaces but none accepted or active.
-      return { user: result, tenantId: null, role: user.role, roles: [user.role], tenantName: '', workspaces };
+      // If user is promoter and promoter-space is available
+      if (isPromoter && (!requestedTenantId || requestedTenantId === 'promoter-space')) {
+        return { user: { ...result, isPromoter: true }, tenantId: 'promoter-space', role: UserRole.PROMOTOR, roles: [UserRole.PROMOTOR], tenantName: 'Red de Promotores FinoWork', workspaces };
+      }
+      return { user: { ...result, isPromoter }, tenantId: null, role: user.role, roles: [user.role], tenantName: '', workspaces };
     }
 
     if (!access) {
@@ -124,7 +153,7 @@ export class AuthService {
             const centralTenant = await tenantRepo.findOne({ where: { name: 'FinoWork Central' } });
             if (centralTenant) {
               return {
-                user: result,
+                user: { ...result, isPromoter },
                 tenantId: centralTenant.id,
                 role: user.role,
                 roles: [user.role],
@@ -147,7 +176,7 @@ export class AuthService {
               await accessRepo.save(userAccess);
             }
             return {
-              user: result,
+              user: { ...result, isPromoter },
               tenantId: userAccess.tenantId,
               role: userAccess.role || user.role,
               roles: (userAccess.roles && userAccess.roles.length > 0) ? userAccess.roles : [userAccess.role || user.role],
@@ -158,10 +187,10 @@ export class AuthService {
         } catch (e) {
           console.warn('[validateUser] Tenant resolution error:', e);
         }
-        return { user: result, tenantId: requestedTenantId || null, role: user.role, roles: [user.role], tenantName: 'Mi Negocio', workspaces };
+        return { user: { ...result, isPromoter }, tenantId: requestedTenantId || null, role: user.role, roles: [user.role], tenantName: 'Mi Negocio', workspaces };
       }
-      if (user.role === UserRole.PROMOTOR || (user.role as string) === 'PROMOTOR') {
-        return { user: result, tenantId: requestedTenantId || 'promoter-space', role: UserRole.PROMOTOR, roles: [UserRole.PROMOTOR], tenantName: 'Red de Promotores', workspaces };
+      if (user.role === UserRole.PROMOTOR || (user.role as string) === 'PROMOTOR' || isPromoter) {
+        return { user: { ...result, isPromoter: true }, tenantId: requestedTenantId || 'promoter-space', role: UserRole.PROMOTOR, roles: [UserRole.PROMOTOR], tenantName: 'Red de Promotores FinoWork', workspaces };
       }
       throw new UnauthorizedException('El usuario no tiene acceso a ninguna sucursal');
     }
@@ -174,7 +203,7 @@ export class AuthService {
     const effectiveRole = access.role || user.role;
     const effectiveRoles = (access.roles && access.roles.length > 0) ? access.roles : [effectiveRole];
     const tenantName = access?.tenant?.name || 'Sistema Central';
-    return { user: result, tenantId: access?.tenantId || 'admin-system', role: effectiveRole, roles: effectiveRoles, tenantName, workspaces };
+    return { user: { ...result, isPromoter }, tenantId: access?.tenantId || 'admin-system', role: effectiveRole, roles: effectiveRoles, tenantName, workspaces };
   }
 
   async checkEmployeeAccess(
@@ -298,6 +327,11 @@ export class AuthService {
 
     const isSuperAdmin = user.role === UserRole.SUPERADMIN || (user.role as string) === 'SUPERADMIN' || (user.email && user.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN_EMAIL).toLowerCase());
     const { passwordHash, ...result } = user;
+
+    const promoterRepo = this.dataSource.getRepository(Promoter);
+    const promoterProfile = await promoterRepo.findOne({ where: { userId: user.id } });
+    const isPromoter = user.role === UserRole.PROMOTOR || (user.role as string) === 'PROMOTOR' || !!promoterProfile;
+
     const workspaces = (user.tenantAccess || []).map(a => ({
       tenantId: a.tenantId,
       name: a.tenant?.name || 'Sucursal',
@@ -305,6 +339,16 @@ export class AuthService {
       roles: (a.roles && a.roles.length > 0) ? a.roles : [a.role],
       status: a.status
     }));
+
+    if (isPromoter) {
+      workspaces.unshift({
+        tenantId: 'promoter-space',
+        name: 'Mi Panel de Promotor',
+        role: UserRole.PROMOTOR,
+        roles: [UserRole.PROMOTOR],
+        status: 'ACCEPTED'
+      });
+    }
 
     if (isSuperAdmin) {
       let tenantName = 'Plataforma Global';
@@ -314,11 +358,25 @@ export class AuthService {
         if (t) tenantName = t.name;
       }
       return {
-        user: result,
+        user: { ...result, isPromoter },
         tenantId: requestedTenantId,
         role: UserRole.SUPERADMIN,
         roles: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
         tenantName,
+        workspaces
+      };
+    }
+
+    if (requestedTenantId === 'promoter-space') {
+      if (!isPromoter) {
+        throw new ForbiddenException('No tienes acceso al panel de promotores');
+      }
+      return {
+        user: { ...result, isPromoter: true },
+        tenantId: 'promoter-space',
+        role: UserRole.PROMOTOR,
+        roles: [UserRole.PROMOTOR],
+        tenantName: 'Red de Promotores FinoWork',
         workspaces
       };
     }
@@ -333,7 +391,7 @@ export class AuthService {
 
     const authorizedRoles = (access.roles && access.roles.length > 0) ? access.roles : [access.role];
 
-    return { user: result, tenantId: access.tenantId, role: access.role, roles: authorizedRoles, tenantName: access.tenant?.name || 'Sucursal', workspaces };
+    return { user: { ...result, isPromoter }, tenantId: access.tenantId, role: access.role, roles: authorizedRoles, tenantName: access.tenant?.name || 'Sucursal', workspaces };
   }
 
   async login(user: any, tenantId: string, role: string, tenantName?: string, roles?: UserRole[]) {
@@ -346,6 +404,7 @@ export class AuthService {
       identification: user.identification,
       phone: user.phone,
       isEmailVerified: !!user.isEmailVerified,
+      isPromoter: !!user.isPromoter,
       sub: user.id || user.sub,
       role: role,
       roles: effectiveRoles,
@@ -570,14 +629,29 @@ export class AuthService {
     const user = await this.usersService.findByUsername(username);
     if (!user) return [];
 
-    if (!user.tenantAccess) return [];
-    return user.tenantAccess.map(a => ({
+    const promoterRepo = this.dataSource.getRepository(Promoter);
+    const promoterProfile = await promoterRepo.findOne({ where: { userId: user.id } });
+    const isPromoter = user.role === UserRole.PROMOTOR || (user.role as string) === 'PROMOTOR' || !!promoterProfile;
+
+    const list = (user.tenantAccess || []).map(a => ({
       tenantId: a.tenantId,
       name: a.tenant?.name || 'Sucursal',
       role: a.role,
       roles: (a.roles && a.roles.length > 0) ? a.roles : [a.role],
       status: a.status
     }));
+
+    if (isPromoter) {
+      list.unshift({
+        tenantId: 'promoter-space',
+        name: 'Mi Panel de Promotor',
+        role: UserRole.PROMOTOR,
+        roles: [UserRole.PROMOTOR],
+        status: 'ACCEPTED'
+      });
+    }
+
+    return list;
   }
 
   async sendVerificationCode(email: string, username?: string) {

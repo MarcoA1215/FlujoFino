@@ -3,6 +3,7 @@ import React from 'react';
 import { IonCol, IonCard, IonCardContent, IonBadge, IonButton, useIonActionSheet, useIonToast, useIonLoading } from '@ionic/react';
 import type { Product } from '../../types';
 import { useImageViewer } from '../../context/ImageViewerContext';
+import { FinoImageCarousel } from '../ui';
 
 interface ProductCardProps {
   product: Product;
@@ -169,18 +170,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     }
   };
   
-  const getProductImage = () => {
-    if (!p.images) return null;
-    if (Array.isArray(p.images) && p.images.length > 0) {
-      return p.images[p.images.length - 1];
-    }
-    if (typeof p.images === 'string' && (p.images as string).trim().length > 0) {
-      const parts = (p.images as string).split(',');
-      return parts[parts.length - 1].trim();
-    }
-    return null;
-  };
-  const imageUrl = getProductImage();
+  const allProductImages = React.useMemo(() => {
+    const mainImages = Array.isArray(p.images)
+      ? p.images
+      : (typeof p.images === 'string' && (p.images as string).trim() ? (p.images as string).split(',').map(s => s.trim()) : []);
+    const variantImages = (p.variants || []).flatMap(v => Array.isArray(v.images) ? v.images : []);
+    return Array.from(new Set([...mainImages, ...variantImages].filter(Boolean)));
+  }, [p.images, p.variants]);
+
   const currentType: 'REVENTA' | 'FORMULA' | 'SERVICIO' = 
     p.product_type || 
     (p.is_service === true || p.category === 'Servicios' ? 'SERVICIO' : 
@@ -200,14 +197,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <IonCardContent style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '15px' }}>
           
           <div style={{ flex: 1 }}>
-            {imageUrl && (
-              <img 
-                src={imageUrl} 
-                alt={p.name} 
-                onClick={(e) => { e.stopPropagation(); openImage(imageUrl, p.name); }}
-                title="Toca para ver en grande"
-                style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '10px', cursor: 'zoom-in' }} 
-              />
+            {allProductImages.length > 0 && (
+              <div style={{ marginBottom: '10px' }}>
+                <FinoImageCarousel
+                  images={allProductImages}
+                  alt={p.name}
+                  height="150px"
+                  borderRadius="8px"
+                  onImageClick={(index) => {
+                    openImage(allProductImages, p.name, index);
+                  }}
+                />
+              </div>
             )}
             <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0 0 5px 0', lineHeight: '1.3', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               <span>{p.name}</span>

@@ -1,4 +1,4 @@
-﻿import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Investment } from '../entities/investment.entity';
@@ -7,13 +7,21 @@ import { InvestmentType } from '@finowork/shared-types';
 import { CreateInvestmentDto } from './dto/create-investment.dto';
 
 @Injectable()
-export class InvestmentsService {
+export class InvestmentsService implements OnModuleInit {
   constructor(
     @InjectRepository(Investment)
     private readonly investmentRepo: Repository<Investment>,
     @InjectRepository(Settings)
     private readonly settingsRepo: Repository<Settings>,
   ) {}
+
+  async onModuleInit() {
+    try {
+      await this.investmentRepo.query(`
+        ALTER TABLE "investments" ADD COLUMN IF NOT EXISTS "paymentMethod" character varying;
+      `);
+    } catch {}
+  }
 
   async create(tenantId: string, dto: CreateInvestmentDto): Promise<Investment> {
     let rate = dto.exchangeRate;
@@ -26,6 +34,8 @@ export class InvestmentsService {
     const amountBS = dto.amountBS !== undefined ? Number(dto.amountBS) : Number((amountUSD * rate).toFixed(2));
     const invDate = dto.date || new Date().toISOString().split('T')[0];
 
+    const defaultMethod = dto.type === InvestmentType.REINVERSION_GANANCIA ? 'CASH_USD' : undefined;
+
     const investment = this.investmentRepo.create({
       negocioId: tenantId,
       type: dto.type,
@@ -34,6 +44,7 @@ export class InvestmentsService {
       exchangeRate: rate,
       description: dto.description,
       date: invDate,
+      paymentMethod: dto.paymentMethod || defaultMethod,
     });
 
     return this.investmentRepo.save(investment);

@@ -25,6 +25,14 @@ vi.mock('@ionic/react', async () => {
     IonButton: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
     IonContent: ({ children }: any) => <main>{children}</main>,
     IonIcon: () => <span data-testid="ion-icon" />,
+    IonToggle: ({ checked, onIonChange }: any) => (
+      <input
+        type="checkbox"
+        data-testid="ion-toggle"
+        checked={checked}
+        onChange={e => onIonChange?.({ detail: { checked: e.target.checked } })}
+      />
+    ),
     useIonToast: () => [vi.fn()],
   };
 });
@@ -179,6 +187,37 @@ describe('ProductFormModal & Service Feature Flag Control Suite', () => {
     expect(screen.getByText(/Doris Especialista/i)).toBeDefined();
     // Juan (aseo/limpieza puro) debe ser excluido
     expect(screen.queryByText(/Juan Limpieza/i)).toBeNull();
+  });
+  it('NO debe mostrar la sección fiscal si featureFiscalSupport está inactivo', () => {
+    const nonFiscalSettings = {
+      featureFiscalSupport: false,
+      featureBuySell: true,
+    };
+
+    renderModalWithSettings(nonFiscalSettings);
+
+    expect(screen.queryByText(/Régimen Fiscal \(IVA \/ SENIAT\)/i)).toBeNull();
+    expect(screen.queryByText(/¿Está exento de IVA\?/i)).toBeNull();
+  });
+
+  it('Debe mostrar la sección fiscal, preguntar por exención de IVA y predeterminar 16% editable cuando featureFiscalSupport está activo', () => {
+    const fiscalSettings = {
+      featureFiscalSupport: true,
+      fiscalDefaultTaxRate: 16,
+      featureBuySell: true,
+    };
+
+    renderModalWithSettings(fiscalSettings);
+
+    // Debe mostrar el módulo fiscal
+    expect(screen.getByText(/Régimen de IVA \(Exento \/ Gravado\)/i)).toBeDefined();
+    expect(screen.getByText(/¿Está exento de IVA\?/i)).toBeDefined();
+
+    // Debe mostrar el 16% predeterminado
+    expect(screen.getByText(/% Alícuota de IVA \(Predeterminado 16%\)/i)).toBeDefined();
+    expect(screen.getByText(/16% General/i)).toBeDefined();
+    expect(screen.getByText(/8% Reducida/i)).toBeDefined();
+    expect(screen.getByText(/31% Lujo/i)).toBeDefined();
   });
 });
 
