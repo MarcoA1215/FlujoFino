@@ -631,9 +631,12 @@ const SuperAdminDashboard: React.FC = () => {
               }
               loadData();
             } catch (err: any) {
+              const errorMsg = Array.isArray(err?.response?.data?.message)
+                ? err.response.data.message.join(', ')
+                : (err?.response?.data?.message || err?.message || 'Error al eliminar el negocio.');
               presentToast({
-                message: err?.response?.data?.message || 'Error al eliminar el negocio.',
-                duration: 3500,
+                message: errorMsg,
+                duration: 4000,
                 color: 'danger',
               });
             }

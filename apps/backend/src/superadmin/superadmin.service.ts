@@ -508,97 +508,131 @@ export class SuperAdminService implements OnModuleInit {
     }
 
     await this.dataSource.transaction(async (manager) => {
-      // 1. Quitar referencia de referidos
-      await manager.query(`UPDATE "tenant" SET "referred_by_tenant_id" = NULL WHERE "referred_by_tenant_id" = $1`, [tenantId]);
+      // 1. Quitar referencia de referidos hacia este tenant
+      await manager.query(
+        `UPDATE "tenant" SET "referred_by_tenant_id" = NULL WHERE "referred_by_tenant_id" = $1`,
+        [tenantId],
+      );
 
-      // 2. Reportes de pago SaaS y comisiones de promotores
+      // 2. Comisiones de promotores (debe borrarse antes de saas_payment_reports debido a FK saasPaymentReportId)
+      await manager.query(
+        `DELETE FROM "promoter_commissions" 
+         WHERE "tenantId" = $1 
+            OR "saasPaymentReportId" IN (SELECT id FROM "saas_payment_reports" WHERE "tenant_id" = $1)`,
+        [tenantId],
+      );
+
+      // 3. Reportes de pago SaaS del tenant
       await manager.query(`DELETE FROM "saas_payment_reports" WHERE "tenant_id" = $1`, [tenantId]);
-      await manager.query(`DELETE FROM "promoter_commissions" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
 
-      // 3. Facturación fiscal y comprobantes
-      await manager.query(`DELETE FROM "fiscal_invoices" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+      // 4. Facturación fiscal y comprobantes (debe borrarse antes de order debido a FK orderId)
+      await manager.query(`DELETE FROM "fiscal_invoices" WHERE "tenantId" = $1`, [tenantId]);
 
-      // 4. Medios de items de ordenes
-      await manager.query(`DELETE FROM "order_item_media" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+      // 5. Medios de items de órdenes (debe borrarse antes de order_item debido a FK orderItemId)
+      await manager.query(`DELETE FROM "order_item_media" WHERE "tenantId" = $1`, [tenantId]);
 
-      // 5. Items de órdenes
-      await manager.query(`
-        DELETE FROM "order_item" WHERE "orderId" IN (
-          SELECT id FROM "order" WHERE "tenantId" = $1
-        )
-      `, [tenantId]).catch(() => null);
+      // 6. Items de órdenes (debe borrarse antes de order y product)
+      await manager.query(
+        `DELETE FROM "order_item" WHERE "orderId" IN (SELECT id FROM "order" WHERE "tenantId" = $1)`,
+        [tenantId],
+      );
 
-      // 6. Órdenes de venta
+      // 7. Órdenes de venta
       await manager.query(`DELETE FROM "order" WHERE "tenantId" = $1`, [tenantId]);
 
-      // 7. Recetas y combos de productos
-      await manager.query(`
-        DELETE FROM "recipe_item" WHERE "productId" IN (
-          SELECT id FROM "product" WHERE "tenantId" = $1
-        )
-      `, [tenantId]).catch(() => null);
+      // 8. Recetas de productos (debe borrarse antes de product y raw_material)
+      await manager.query(
+        `DELETE FROM "recipe_item" 
+         WHERE "productId" IN (SELECT id FROM "product" WHERE "tenantId" = $1)
+            OR "rawMaterialId" IN (SELECT id FROM "raw_material" WHERE "tenantId" = $1)`,
+        [tenantId],
+      );
 
-      await manager.query(`
-        DELETE FROM "combo_item" WHERE "comboId" IN (
-          SELECT id FROM "product" WHERE "tenantId" = $1
-        )
-      `, [tenantId]).catch(() => null);
+      // 9. Combos de productos (debe borrarse antes de product)
+      await manager.query(
+        `DELETE FROM "combo_item" 
+         WHERE "comboId" IN (SELECT id FROM "product" WHERE "tenantId" = $1)
+            OR "componentId" IN (SELECT id FROM "product" WHERE "tenantId" = $1)`,
+        [tenantId],
+      );
 
-      // 8. Variantes de producto
-      await manager.query(`
-        DELETE FROM "product_variant" WHERE "productId" IN (
-          SELECT id FROM "product" WHERE "tenantId" = $1
-        )
-      `, [tenantId]).catch(() => null);
+      // 10. Variantes de producto
+      await manager.query(`DELETE FROM "product_variant" WHERE "tenantId" = $1`, [tenantId]);
 
-      // 9. Movimientos de stock y producción
-      await manager.query(`DELETE FROM "stock_movement" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
-      await manager.query(`DELETE FROM "production_batch" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+      // 11. Batches de producción
+      await manager.query(`DELETE FROM "production_batch" WHERE "tenantId" = $1`, [tenantId]);
 
-      // 10. Productos y Materia Prima
+      // 12. Movimientos de stock
+      await manager.query(`DELETE FROM "stock_movement" WHERE "tenantId" = $1`, [tenantId]);
+
+      // 13. Productos y Materia Prima
       await manager.query(`DELETE FROM "product" WHERE "tenantId" = $1`, [tenantId]);
-      await manager.query(`DELETE FROM "raw_material" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+      await manager.query(`DELETE FROM "raw_material" WHERE "tenantId" = $1`, [tenantId]);
 
-      // 11. Reservas y Citas
+      // 14. Reservas y Citas (debe borrarse antes de customers y users)
       await manager.query(`DELETE FROM "reservation" WHERE "tenantId" = $1`, [tenantId]);
 
-      // 12. Clientes
-      await manager.query(`DELETE FROM "customers" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+      // 15. Clientes y Zonas de entrega (órdenes y reservas ya fueron borradas)
+      await manager.query(`DELETE FROM "customers" WHERE "tenantId" = $1`, [tenantId]);
+      await manager.query(`DELETE FROM "delivery_zone" WHERE "tenantId" = $1`, [tenantId]);
 
-      // 13. Operaciones de Tesorería, Inversiones, Gastos y Adelantos de Sueldo
-      await manager.query(`DELETE FROM "cash_exchanges" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
-      await manager.query(`DELETE FROM "operating_expenses" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
-      await manager.query(`DELETE FROM "investments" WHERE "negocioId" = $1`, [tenantId]).catch(() => null);
-      await manager.query(`DELETE FROM "salary_advances" WHERE "negocioId" = $1`, [tenantId]).catch(() => null);
+      // 16. Tesorería, Inversiones, Gastos y Adelantos de Sueldo
+      await manager.query(`DELETE FROM "cash_exchanges" WHERE "tenantId" = $1`, [tenantId]);
+      await manager.query(`DELETE FROM "operating_expenses" WHERE "tenantId" = $1`, [tenantId]);
+      await manager.query(`DELETE FROM "investments" WHERE "negocioId" = $1`, [tenantId]);
+      await manager.query(`DELETE FROM "salary_advances" WHERE "negocioId" = $1`, [tenantId]);
 
-      // 14. Ajustes adicionales
-      await manager.query(`DELETE FROM "delivery_zone" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
-      await manager.query(`DELETE FROM "feedback" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
-      await manager.query(`DELETE FROM "access_request" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
-      await manager.query(`DELETE FROM "work_schedule" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
-      await manager.query(`DELETE FROM "push_subscriptions" WHERE "tenantId" = $1`, [tenantId]).catch(() => null);
+      // 17. Feedback y Solicitudes de Acceso
+      await manager.query(`DELETE FROM "feedback" WHERE "tenantId" = $1`, [tenantId]);
+      await manager.query(`DELETE FROM "access_request" WHERE "tenantId" = $1`, [tenantId]);
 
-      // 15. Configuración de negocio (Settings)
+      // 18. Notificaciones push (la columna es negocioId)
+      await manager.query(`DELETE FROM "push_subscriptions" WHERE "negocioId" = $1`, [tenantId]);
+
+      // 19. Horarios de trabajo (FK hacia user_tenant_access)
+      await manager.query(
+        `DELETE FROM "work_schedule" 
+         WHERE "userTenantAccessId" IN (SELECT id FROM "user_tenant_access" WHERE "tenantId" = $1)`,
+        [tenantId],
+      );
+
+      // 20. Configuración de negocio (Settings)
       await manager.query(`DELETE FROM "settings" WHERE "tenantId" = $1`, [tenantId]);
 
-      // 16. Identificar y eliminar usuarios huérfanos que solo pertenecían a este negocio
-      const userRows = await manager.query(`SELECT "userId" FROM "user_tenant_access" WHERE "tenantId" = $1`, [tenantId]);
+      // 21. Identificar usuarios asociados antes de borrar accesos
+      const userRows: { userId: string }[] = await manager.query(
+        `SELECT DISTINCT "userId" FROM "user_tenant_access" WHERE "tenantId" = $1`,
+        [tenantId],
+      );
+
+      // 22. Borrar accesos del tenant
       await manager.query(`DELETE FROM "user_tenant_access" WHERE "tenantId" = $1`, [tenantId]);
 
+      // 23. Eliminar usuarios huérfanos que ya no pertenezcan a ningún negocio y no sean SUPERADMIN ni promotores
       for (const row of userRows) {
         if (!row.userId) continue;
-        const otherAccess = await manager.query(`SELECT COUNT(*) as count FROM "user_tenant_access" WHERE "userId" = $1`, [row.userId]);
+        const otherAccess = await manager.query(
+          `SELECT COUNT(*) as count FROM "user_tenant_access" WHERE "userId" = $1`,
+          [row.userId],
+        );
         const otherCount = Number(otherAccess[0]?.count || 0);
+
         if (otherCount === 0) {
-          await manager.query(`DELETE FROM "users" WHERE id = $1 AND role != 'SUPERADMIN'`, [row.userId]);
+          const promoterCount = await manager.query(
+            `SELECT COUNT(*) as count FROM "promoters" WHERE "userId" = $1`,
+            [row.userId],
+          );
+          if (Number(promoterCount[0]?.count || 0) === 0) {
+            await manager.query(`DELETE FROM "users" WHERE id = $1 AND role != 'SUPERADMIN'`, [row.userId]);
+          }
         }
       }
 
-      // 17. Finalmente eliminar el negocio
+      // 24. Finalmente eliminar el negocio (Tenant)
       await manager.query(`DELETE FROM "tenant" WHERE id = $1`, [tenantId]);
     });
 
-    this.logger.log(`[SuperAdmin] Negocio "${tenant.name}" (${tenantId}) eliminado exitosamente.`);
+    this.logger.log(`[SuperAdmin] Negocio "${tenant.name}" (${tenantId}) y todos sus datos fueron eliminados.`);
     return {
       success: true,
       message: `El negocio "${tenant.name}" y todos sus datos fueron eliminados de forma definitiva.`,
