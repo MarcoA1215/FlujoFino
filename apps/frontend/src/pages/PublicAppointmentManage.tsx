@@ -755,10 +755,10 @@ const PublicAppointmentManage: React.FC = () => {
 
                 {/* Appointment Info Box */}
                 <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #e2e8f0' }}>
-                  <p style={{ margin: '0 0 10px 0', color: '#334155' }}>
+                  <p style={{ margin: '0 0 10px 0', color: '#334155', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                     <strong style={{ color: '#0f172a' }}>Cliente:</strong> {appointment.customerName}
                   </p>
-                  <p style={{ margin: '0 0 10px 0', color: '#334155' }}>
+                  <p style={{ margin: '0 0 10px 0', color: '#334155', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                     <strong style={{ color: '#0f172a' }}>Servicio:</strong> {appointment.serviceName || 'Reserva Estándar'} ({Number(appointment.durationMinutes) || 30} min)
                   </p>
                   {Array.isArray(appointment.serviceSpecialists) && appointment.serviceSpecialists.length > 1 ? (
@@ -767,10 +767,10 @@ const PublicAppointmentManage: React.FC = () => {
                         Desglose de Servicios
                       </div>
                       {appointment.serviceSpecialists.map((s: any, idx: number) => (
-                        <div key={idx} style={{ fontSize: '13px', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: idx < appointment.serviceSpecialists.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                          <span style={{ fontWeight: '600' }}>• {s.serviceName || 'Servicio'} ({s.durationMinutes || 30} min)</span>
+                        <div key={idx} style={{ fontSize: '13px', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', padding: '4px 0', borderBottom: idx < appointment.serviceSpecialists.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                          <span style={{ fontWeight: '600', minWidth: 0, flex: '1 1 auto', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>• {s.serviceName || 'Servicio'} ({s.durationMinutes || 30} min)</span>
                           {s.employeeName && (
-                            <span style={{ fontSize: '11px', fontWeight: '700', color: primaryReadable, background: primarySoftBg, padding: '1px 6px', borderRadius: '4px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: '700', color: primaryReadable, background: primarySoftBg, padding: '1px 6px', borderRadius: '4px', flexShrink: 0 }}>
                               👤 {s.employeeName}
                             </span>
                           )}
@@ -778,7 +778,7 @@ const PublicAppointmentManage: React.FC = () => {
                       ))}
                     </div>
                   ) : appointment.employeeName ? (
-                    <p style={{ margin: '0 0 10px 0', color: '#334155' }}>
+                    <p style={{ margin: '0 0 10px 0', color: '#334155', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                       <strong style={{ color: '#0f172a' }}>Especialista:</strong> {appointment.employeeName}
                     </p>
                   ) : null}

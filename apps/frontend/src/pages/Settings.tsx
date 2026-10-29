@@ -125,6 +125,7 @@ interface Settings {
   featureShowCatalog?: boolean;
   bookingRequireService?: boolean;
   bookingAllowStaffSelection?: boolean;
+  allowSimultaneousServices?: boolean;
   bookingRequireDeposit?: boolean;
   bookingDepositPercentage?: number;
   bookingMaxAdvanceDays?: number;
@@ -403,6 +404,7 @@ const SettingsPage: React.FC = () => {
         allowNegativeStock: settings.allowNegativeStock === true,
         bookingRequireService: settings.bookingRequireService !== false,
         bookingAllowStaffSelection: settings.bookingAllowStaffSelection !== false,
+        allowSimultaneousServices: settings.allowSimultaneousServices === true,
         bookingRequireDeposit: settings.bookingRequireDeposit !== undefined ? settings.bookingRequireDeposit : false,
         bookingDepositPercentage: settings.bookingDepositPercentage !== undefined ? Number(settings.bookingDepositPercentage) : 0,
         bookingMaxAdvanceDays: settings.bookingMaxAdvanceDays !== undefined ? Number(settings.bookingMaxAdvanceDays) : 365,

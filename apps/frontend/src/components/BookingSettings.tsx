@@ -159,6 +159,28 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
 
               <IonItem lines="none" style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', marginTop: '12px' }}>
                 <IonLabel className="ion-text-wrap">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h2 style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                      ⚡ Atención Simultánea (Modo a Cuatro Manos)
+                    </h2>
+                    <span style={{ fontSize: '10px', background: 'rgba(16, 185, 129, 0.12)', color: 'var(--theme-primary-readable, #065F46)', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
+                      NUEVO
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px', lineHeight: '1.4' }}>
+                    Permite que 2 o más especialistas atiendan al mismo cliente en paralelo cuando reserva servicios distintos (ej. manos y pies al mismo tiempo). Optimiza el tiempo total de la cita a la duración del servicio más largo en lugar de sumarlos.
+                  </p>
+                </IonLabel>
+                <IonToggle 
+                  slot="end" 
+                  checked={settings.allowSimultaneousServices === true} 
+                  onIonChange={e => setSettings({ ...settings, allowSimultaneousServices: e.detail.checked })} 
+                  color="primary" 
+                />
+              </IonItem>
+
+              <IonItem lines="none" style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', marginTop: '12px' }}>
+                <IonLabel className="ion-text-wrap">
                   <h2 style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>Exigir Seña / Anticipo para Reservas Online</h2>
                   <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
                     Requiere que el cliente pague un abono previo obligatorio para apartar su turno y evitar inasistencias (no-shows). Si lo desactivas, los clientes podrán agendar pagando completo o pagando al ser atendidos.

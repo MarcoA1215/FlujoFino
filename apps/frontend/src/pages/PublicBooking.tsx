@@ -73,7 +73,18 @@ const PublicBooking: React.FC = () => {
     setSelectedTime(''); // Reset time because combined duration changes
   };
 
+  const isSimultaneousMode = useMemo(() => {
+    return Boolean(tenantInfo?.allowSimultaneousServices && selectedServices.length > 1 && !selectedStaff);
+  }, [tenantInfo?.allowSimultaneousServices, selectedServices.length, selectedStaff]);
+
   const totalDurationMinutes = useMemo(() => {
+    if (isSimultaneousMode) {
+      return Math.max(...selectedServices.map(s => Number(s.durationMinutes) || 30), 0);
+    }
+    return selectedServices.reduce((sum, s) => sum + (Number(s.durationMinutes) || 30), 0);
+  }, [selectedServices, isSimultaneousMode]);
+
+  const sequentialDurationMinutes = useMemo(() => {
     return selectedServices.reduce((sum, s) => sum + (Number(s.durationMinutes) || 30), 0);
   }, [selectedServices]);
 
@@ -444,6 +455,7 @@ const PublicBooking: React.FC = () => {
         serviceName: selectedServiceNames || undefined,
         employeeId: selectedStaff?.id || undefined,
         employeeName: selectedStaff?.name || undefined,
+        isSimultaneous: isSimultaneousMode,
         totalAmount: totalServicePrice,
         paymentMethod: totalServicePrice > 0 ? bookingPaymentMethod : undefined,
         paymentReference: totalServicePrice > 0 && !isPayOnArrival ? bookingPaymentRef.trim() : undefined,
@@ -881,7 +893,7 @@ const PublicBooking: React.FC = () => {
                   <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Hora:</b> {formatTime12h(selectedTime)}</p>
                   {selectedServices.length > 0 && (
                     <>
-                      <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Servicio(s):</b> {selectedServiceNames}</p>
+                      <p style={{ margin: '4px 0', wordBreak: 'break-word', overflowWrap: 'anywhere' }}><b style={{ color: '#334155' }}>Servicio(s):</b> {selectedServiceNames}</p>
                       <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Duración estimada:</b> {totalDurationMinutes} min</p>
                       <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Total:</b> <span style={{ color: primaryReadable, fontWeight: 700 }}>${totalServicePrice.toFixed(2)}</span></p>
                       {bookingPaymentMethod === 'ON_ARRIVAL' && (
@@ -1277,11 +1289,14 @@ const PublicBooking: React.FC = () => {
                               display: 'flex',
                               justifyContent: 'space-between',
                               alignItems: 'center',
+                              gap: '12px',
                               transition: 'all 0.2s ease',
-                              boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.06)' : '0 1px 3px rgba(0,0,0,0.02)'
+                              boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.06)' : '0 1px 3px rgba(0,0,0,0.02)',
+                              boxSizing: 'border-box',
+                              width: '100%'
                             }}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: '1 1 auto', minWidth: 0 }}>
                               {svc.image ? (
                                 <div style={{ position: 'relative', width: '54px', height: '54px', flexShrink: 0 }}>
                                   <img 
@@ -1317,25 +1332,44 @@ const PublicBooking: React.FC = () => {
                                   ✨
                                 </div>
                               )}
-                              <div>
-                                <div style={{ fontWeight: '800', fontSize: '15px', color: '#0F172A' }}>{svc.name}</div>
-                                <div style={{ fontSize: '12px', color: '#64748B', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                  <IonIcon icon={timeOutline} style={{ fontSize: '14px', color: '#94A3B8' }} /> 
-                                  <span>{svc.durationMinutes} min</span>
-                                  {svc.category && svc.category !== 'Servicios' && <span>• {svc.category}</span>}
+                              <div style={{ minWidth: 0, flex: '1 1 auto' }}>
+                                <div style={{ 
+                                  fontWeight: '800', 
+                                  fontSize: '15px', 
+                                  color: '#0F172A',
+                                  lineHeight: '1.3',
+                                  wordBreak: 'break-word',
+                                  overflowWrap: 'anywhere'
+                                }}>
+                                  {svc.name}
+                                </div>
+                                <div style={{ 
+                                  fontSize: '12px', 
+                                  color: '#64748B', 
+                                  marginTop: '3px', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: '5px',
+                                  flexWrap: 'wrap'
+                                }}>
+                                  <IonIcon icon={timeOutline} style={{ fontSize: '14px', color: '#94A3B8', flexShrink: 0 }} /> 
+                                  <span style={{ whiteSpace: 'nowrap' }}>{svc.durationMinutes} min</span>
+                                  {svc.category && svc.category !== 'Servicios' && (
+                                    <span style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>• {svc.category}</span>
+                                  )}
                                 </div>
                               </div>
                             </div>
-                            <div style={{ textAlign: 'right' }}>
-                              <div style={{ fontWeight: '900', fontSize: '17px', color: primaryReadable }}>
+                            <div style={{ textAlign: 'right', flexShrink: 0, minWidth: '70px', marginLeft: '8px' }}>
+                              <div style={{ fontWeight: '900', fontSize: '17px', color: primaryReadable, whiteSpace: 'nowrap' }}>
                                 ${Number(svc.price).toFixed(2)}
                               </div>
                               {isSelected ? (
-                                <div style={{ fontSize: '11px', color: primaryReadable, fontWeight: '800', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px', background: primarySoftBg, padding: '3px 8px', borderRadius: '6px' }}>
+                                <div style={{ fontSize: '11px', color: primaryReadable, fontWeight: '800', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px', background: primarySoftBg, padding: '3px 8px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
                                   <IonIcon icon={checkmarkCircleOutline} /> Seleccionado
                                 </div>
                               ) : (
-                                <div style={{ fontSize: '12px', color: primaryReadable, fontWeight: '700', marginTop: '4px' }}>
+                                <div style={{ fontSize: '12px', color: primaryReadable, fontWeight: '700', marginTop: '4px', whiteSpace: 'nowrap' }}>
                                   + Agregar
                                 </div>
                               )}
@@ -1356,18 +1390,23 @@ const PublicBooking: React.FC = () => {
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
+                          gap: '12px'
                         }}>
-                          <div>
+                          <div style={{ minWidth: 0, flex: '1 1 auto' }}>
                             <div style={{ fontWeight: 'bold', color: '#166534', fontSize: '13px' }}>
                               {selectedServices.length === 1 ? '1 servicio seleccionado' : `${selectedServices.length} servicios seleccionados`}
                             </div>
                             <div style={{ color: '#15803d', fontSize: '12px', marginTop: '2px' }}>
-                              ⏱️ Duración total: <b>{totalDurationMinutes} min</b>
+                              {isSimultaneousMode ? (
+                                <span>⚡ A 4 manos: <b>{totalDurationMinutes} min</b> <span style={{ textDecoration: 'line-through', opacity: 0.7, fontSize: '11px' }}>({sequentialDurationMinutes} min)</span></span>
+                              ) : (
+                                <span>⏱️ Duración total: <b>{totalDurationMinutes} min</b></span>
+                              )}
                             </div>
                           </div>
-                          <div style={{ textAlign: 'right' }}>
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
                             <div style={{ fontSize: '11px', color: '#166534' }}>Total estimado</div>
-                            <div style={{ fontWeight: '800', fontSize: '17px', color: '#166534' }}>
+                            <div style={{ fontWeight: '800', fontSize: '17px', color: '#166534', whiteSpace: 'nowrap' }}>
                               ${totalServicePrice.toFixed(2)}
                             </div>
                           </div>
@@ -1562,12 +1601,12 @@ const PublicBooking: React.FC = () => {
                   </p>
 
                   {selectedServices.length > 0 && (
-                    <div style={{ backgroundColor: '#f1f5f9', padding: '10px 14px', borderRadius: '12px', marginBottom: '16px', fontSize: '13px', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #e2e8f0' }}>
-                      <div>
+                    <div style={{ backgroundColor: '#f1f5f9', padding: '10px 14px', borderRadius: '12px', marginBottom: '16px', fontSize: '13px', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #e2e8f0', gap: '12px' }}>
+                      <div style={{ minWidth: 0, flex: '1 1 auto', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                         <b>{selectedServiceNames}</b> • ⏱️ {totalDurationMinutes} min
                         {selectedStaff && <div><span style={{ color: '#64748b' }}>Especialista:</span> <b>{formatStaffName(selectedStaff.name)}</b></div>}
                       </div>
-                      <div style={{ fontWeight: 'bold', color: primaryColor, fontSize: '15px' }}>
+                      <div style={{ fontWeight: 'bold', color: primaryColor, fontSize: '15px', flexShrink: 0, whiteSpace: 'nowrap' }}>
                         ${totalServicePrice.toFixed(2)}
                       </div>
                     </div>
@@ -1956,7 +1995,7 @@ const PublicBooking: React.FC = () => {
                       📅 <b>Fecha:</b> {selectedDate?.toLocaleDateString()} a las {formatTime12h(selectedTime)}<br/>
                       {selectedServices.length > 0 && (
                         <>
-                          💅 <b>Servicio(s):</b> {selectedServiceNames} (⏱️ {totalDurationMinutes} min)<br/>
+                          💅 <b>Servicio(s):</b> <span style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{selectedServiceNames}</span> (⏱️ {totalDurationMinutes} min)<br/>
                           💰 <b>Inversión:</b> ${totalServicePrice.toFixed(2)}<br/>
                         </>
                       )}
@@ -2865,7 +2904,7 @@ const PublicBooking: React.FC = () => {
                   />
                   <IonCardContent style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
-                      <h3 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#1e293b', lineHeight: '1.3' }}>{item.title}</h3>
+                      <h3 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#1e293b', lineHeight: '1.3', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{item.title}</h3>
                       <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>{item.subtitle}</p>
                     </div>
                     {item.productId && isServiceRequired && (

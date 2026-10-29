@@ -2543,6 +2543,8 @@ const PublicStore: React.FC = () => {
                           fontWeight: 'bold',
                           color: '#0f172a',
                           lineHeight: '1.3',
+                          wordBreak: 'break-word',
+                          overflowWrap: 'anywhere',
                         }}
                       >
                         {product.name}

@@ -28,7 +28,8 @@ import {
   imageOutline,
   copyOutline,
   linkOutline,
-  lockClosedOutline
+  lockClosedOutline,
+  searchOutline
 } from 'ionicons/icons';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -67,6 +68,7 @@ const Reservations: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return formatDateLocal(new Date());
   });
+  const [search, setSearch] = useState('');
 
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -84,6 +86,7 @@ const Reservations: React.FC = () => {
   const [loadingSlots, setLoadingSlots] = useState<boolean>(false);
   const [employeeId, setEmployeeId] = useState('');
   const [serviceSpecialistMap, setServiceSpecialistMap] = useState<Record<string, string>>({});
+  const [isSimultaneous, setIsSimultaneous] = useState<boolean>(false);
   const [products, setProducts] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
 
@@ -109,7 +112,7 @@ const Reservations: React.FC = () => {
   const [isSubmittingBlock, setIsSubmittingBlock] = useState<boolean>(false);
 
   const openBlockModal = () => {
-    setBlockTarget('');
+    setBlockTarget('ALL');
     setBlockStartDate(selectedDate || formatDateLocal(new Date()));
     setBlockEndDate(selectedDate || formatDateLocal(new Date()));
     setBlockAllDay(false);
@@ -136,14 +139,18 @@ const Reservations: React.FC = () => {
 
     setIsSubmittingBlock(true);
     try {
-      const empObj = employees.find(e => e.id === blockTarget || e.userId === blockTarget);
+      const isAllStore = !blockTarget || blockTarget === 'ALL' || blockTarget === '';
+      const empObj = !isAllStore
+        ? employees.find(e => String(e.id) === String(blockTarget) || String(e.userId) === String(blockTarget))
+        : null;
+
       const res = await apiClient.post('/reservations/block', {
         startDate: blockStartDate,
         endDate: effectiveEndDate,
         startTime: blockAllDay ? '00:00' : blockStartTime,
         endTime: blockAllDay ? '23:59' : blockEndTime,
         allDay: blockAllDay,
-        employeeId: blockTarget ? (empObj?.userId || empObj?.id || blockTarget) : undefined,
+        employeeId: empObj ? (empObj.userId || empObj.id) : undefined,
         employeeName: empObj ? (empObj.name || empObj.username) : undefined,
         reason: blockReason.trim() || (blockAllDay ? 'Día Libre / No Disponible' : 'Horario Bloqueado'),
       });
@@ -670,6 +677,7 @@ const Reservations: React.FC = () => {
       durationMinutes,
       employeeId: primaryEmployeeId,
       serviceSpecialists,
+      isSimultaneous: isSimultaneous && selectedServices.length > 1,
       numberOfPeople,
       tableNumber,
       totalAmount,
@@ -860,6 +868,7 @@ const Reservations: React.FC = () => {
     setTableNumber(res.tableNumber || '');
     setTotalAmount(res.totalAmount || 0);
     setNotes(res.notes || '');
+    setIsSimultaneous(Boolean(res.isSimultaneous));
     setShowDetails(false);
     setShowModal(true);
   };
@@ -870,6 +879,39 @@ const Reservations: React.FC = () => {
       .filter(r => r.date === selectedDate)
       .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
   }, [reservations, selectedDate]);
+
+  // Search results across all appointments
+  const searchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return reservations
+      .filter(r => {
+        const customerName = (r.customerName || '').toLowerCase();
+        const customerPhone = (r.customerPhone || '').toLowerCase();
+        const identification = (r.identification || '').toLowerCase();
+        const serviceName = (r.serviceName || '').toLowerCase();
+        const employeeName = (r.employeeName || r.employee?.name || r.employee?.username || '').toLowerCase();
+        const tableNumber = (r.tableNumber || '').toLowerCase();
+        const notes = (r.notes || '').toLowerCase();
+        const dateStr = (r.date || '').toLowerCase();
+        return (
+          customerName.includes(q) ||
+          customerPhone.includes(q) ||
+          identification.includes(q) ||
+          serviceName.includes(q) ||
+          employeeName.includes(q) ||
+          tableNumber.includes(q) ||
+          notes.includes(q) ||
+          dateStr.includes(q)
+        );
+      })
+      .sort((a, b) => {
+        if (a.date !== b.date) return (a.date || '').localeCompare(b.date || '');
+        return (a.time || '').localeCompare(b.time || '');
+      });
+  }, [reservations, search]);
+
+  const displayedReservations = search.trim() ? searchResults : dayReservations;
 
   // Date formatted for header e.g. "Viernes, 26 de Septiembre"
   const formattedSelectedDate = useMemo(() => {
@@ -940,8 +982,11 @@ const Reservations: React.FC = () => {
 
   const totalDurationMinutes = useMemo(() => {
     if (selectedServices.length === 0) return 30;
+    if (isSimultaneous && selectedServices.length > 1) {
+      return Math.max(...selectedServices.map(s => Number(s.durationMinutes) || 30), 0);
+    }
     return selectedServices.reduce((sum, s) => sum + (Number(s.durationMinutes) || 30), 0);
-  }, [selectedServices]);
+  }, [selectedServices, isSimultaneous]);
 
   const totalCalculatedPrice = useMemo(() => {
     return selectedServices.reduce((sum, s) => sum + (Number(s.salePrice) || 0), 0);
@@ -1079,6 +1124,24 @@ const Reservations: React.FC = () => {
             />
           </div>
 
+          {/* Search Pill */}
+          <div className="ff-search-pill" style={{ marginBottom: '14px' }}>
+            <IonIcon icon={searchOutline} style={{ fontSize: '18px', color: '#64748B' }} />
+            <input
+              type="text"
+              placeholder="Buscar por cliente, teléfono, servicio o especialista..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && (
+              <IonIcon
+                icon={closeOutline}
+                style={{ fontSize: '18px', color: '#64748B', cursor: 'pointer' }}
+                onClick={() => setSearch('')}
+              />
+            )}
+          </div>
+
           {/* 2. Segmented Pill Switch + Quick Block Button */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
             <div
@@ -1155,8 +1218,8 @@ const Reservations: React.FC = () => {
             </button>
           </div>
 
-          {/* DAY VIEW */}
-          {viewMode === 'day' && (
+          {/* DAY VIEW or SEARCH RESULTS */}
+          {(viewMode === 'day' || Boolean(search.trim())) && (
             <div>
               {/* Date Subheader with arrows */}
               <div
@@ -1174,72 +1237,116 @@ const Reservations: React.FC = () => {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => changeDay(-1)}
-                    style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                  >
-                    <IonIcon icon={chevronBackOutline} style={{ color: '#0F172A' }} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => changeDay(1)}
-                    style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                  >
-                    <IonIcon icon={chevronForwardOutline} style={{ color: '#0F172A' }} />
-                  </button>
+                  {!search.trim() ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => changeDay(-1)}
+                        style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                        title="Día anterior"
+                      >
+                        <IonIcon icon={chevronBackOutline} style={{ color: '#0F172A' }} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => changeDay(1)}
+                        style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                        title="Día siguiente"
+                      >
+                        <IonIcon icon={chevronForwardOutline} style={{ color: '#0F172A' }} />
+                      </button>
+                    </>
+                  ) : (
+                    <div style={{ background: 'var(--theme-primary, #10B981)', color: 'var(--theme-primary-contrast, #ffffff)', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <IonIcon icon={searchOutline} style={{ fontSize: '16px' }} />
+                    </div>
+                  )}
 
                   <div style={{ marginLeft: '4px' }}>
-                    <div style={{ fontSize: '14px', fontWeight: '800', color: '#0F172A', textTransform: 'capitalize' }}>
-                      {formattedSelectedDate}
-                    </div>
-                    <div style={{ fontSize: '12px', fontWeight: '600', color: '#64748B' }}>
-                      {dayReservations.filter(r => !r.isBlock).length} {dayReservations.filter(r => !r.isBlock).length === 1 ? 'cita asignada' : 'citas asignadas'}
-                      {dayReservations.some(r => r.isBlock) && ` • ${dayReservations.filter(r => r.isBlock).length} bloqueo(s)`}
-                    </div>
+                    {search.trim() ? (
+                      <>
+                        <div style={{ fontSize: '14px', fontWeight: '800', color: '#0F172A' }}>
+                          Resultados de búsqueda
+                        </div>
+                        <div style={{ fontSize: '12px', fontWeight: '600', color: '#64748B' }}>
+                          {displayedReservations.length} {displayedReservations.length === 1 ? 'cita encontrada' : 'citas encontradas'} para "{search}"
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: '14px', fontWeight: '800', color: '#0F172A', textTransform: 'capitalize' }}>
+                          {formattedSelectedDate}
+                        </div>
+                        <div style={{ fontSize: '12px', fontWeight: '600', color: '#64748B' }}>
+                          {dayReservations.filter(r => !r.isBlock).length} {dayReservations.filter(r => !r.isBlock).length === 1 ? 'cita asignada' : 'citas asignadas'}
+                          {dayReservations.some(r => r.isBlock) && ` • ${dayReservations.filter(r => r.isBlock).length} bloqueo(s)`}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '6px' }}>
-                  <button
-                    type="button"
-                    onClick={openShiftModal}
-                    title="Registrar retraso"
-                    style={{
-                      background: '#FFFBEB',
-                      border: '1px solid rgba(245, 158, 11, 0.3)',
-                      color: '#92400E',
-                      borderRadius: '8px',
-                      padding: '6px 10px',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    ⏱️ Retraso
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetToToday}
-                    style={{
-                      background: '#F1F5F9',
-                      border: '1px solid #E2E8F0',
-                      color: '#0F172A',
-                      borderRadius: '8px',
-                      padding: '6px 10px',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Hoy
-                  </button>
+                  {search.trim() ? (
+                    <button
+                      type="button"
+                      onClick={() => setSearch('')}
+                      style={{
+                        background: '#F1F5F9',
+                        border: '1px solid #CBD5E1',
+                        color: '#334155',
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Limpiar
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={openShiftModal}
+                        title="Registrar retraso"
+                        style={{
+                          background: '#FFFBEB',
+                          border: '1px solid rgba(245, 158, 11, 0.3)',
+                          color: '#92400E',
+                          borderRadius: '8px',
+                          padding: '6px 10px',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ⏱️ Retraso
+                      </button>
+                      <button
+                        type="button"
+                        onClick={resetToToday}
+                        style={{
+                          background: '#F1F5F9',
+                          border: '1px solid #E2E8F0',
+                          color: '#0F172A',
+                          borderRadius: '8px',
+                          padding: '6px 10px',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Hoy
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
               {/* Timeline Cards (Figma Modern Timeline) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '90px' }}>
-                {dayReservations.map(res => {
+                {displayedReservations.map(res => {
                   const duration = Number(res.durationMinutes) || 30;
                   const isConfirmed = res.status === ReservationStatus.CONFIRMED;
                   const isPending = res.status === ReservationStatus.PENDING;
@@ -1274,6 +1381,11 @@ const Reservations: React.FC = () => {
                             textAlign: 'center'
                           }}
                         >
+                          {Boolean(search.trim()) && res.date && (
+                            <div style={{ fontSize: '10px', fontWeight: '800', color: '#475569', marginBottom: '2px' }}>
+                              {res.date === formatDateLocal(new Date()) ? 'Hoy' : res.date.slice(5)}
+                            </div>
+                          )}
                           <div style={{ fontSize: '12px', fontWeight: '800', color: '#334155', whiteSpace: 'nowrap' }}>
                             {isAllDayBlock ? 'Todo el' : (res.time ? formatTime12h(res.time) : '')}
                           </div>
@@ -1310,7 +1422,7 @@ const Reservations: React.FC = () => {
                                   }}
                                 >
                                   {res.employeeId
-                                    ? `👤 ${res.employeeName || res.employee?.name || res.employee?.username || 'Especialista'}`
+                                    ? `👤 ${res.employeeName || res.employee?.name || res.employee?.username || 'Personal'}`
                                     : '🏪 Todo el Comercio'}
                                 </span>
                               </div>
@@ -1384,6 +1496,11 @@ const Reservations: React.FC = () => {
                           boxShadow: 'var(--ff-shadow-sm)'
                         }}
                       >
+                        {Boolean(search.trim()) && res.date && (
+                          <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--theme-primary-readable, #065F46)', marginBottom: '2px' }}>
+                            {res.date === formatDateLocal(new Date()) ? 'Hoy' : res.date.slice(5)}
+                          </div>
+                        )}
                         <div style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A', whiteSpace: 'nowrap' }}>
                           {res.time ? formatTime12h(res.time) : ''}
                         </div>
@@ -1406,12 +1523,37 @@ const Reservations: React.FC = () => {
                         }}
                       >
                         {/* Top: Customer & Status Pill */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                          <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+                          <div style={{ minWidth: 0, flex: '1 1 auto' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '15px', fontWeight: '800', color: '#0F172A' }}>
+                              <span style={{ fontSize: '15px', fontWeight: '800', color: '#0F172A', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                                 {res.customerName}
                               </span>
+                              {Boolean(search.trim()) && res.date && (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedDate(res.date);
+                                    setSearch('');
+                                  }}
+                                  title="Ir a este día en la agenda"
+                                  style={{
+                                    fontSize: '11px',
+                                    fontWeight: '700',
+                                    background: '#EFF6FF',
+                                    color: '#1D4ED8',
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}
+                                >
+                                  <IonIcon icon={calendarOutline} style={{ fontSize: '11px' }} />
+                                  {res.date}
+                                </span>
+                              )}
                               {res.tableNumber && (
                                 <span style={{ fontSize: '12px', color: '#64748B' }}>
                                   &bull; Mesa {res.tableNumber}
@@ -1443,7 +1585,7 @@ const Reservations: React.FC = () => {
                           {/* Status Pill */}
                           <div
                             className={`ff-pill ${isConfirmed ? 'ff-pill-online' : (isPending ? 'ff-pill-sync' : 'ff-pill-danger')}`}
-                            style={{ fontSize: '11px', padding: '3px 10px' }}
+                            style={{ fontSize: '11px', padding: '3px 10px', flexShrink: 0 }}
                           >
                             <span
                               className="ff-pill-dot"
@@ -1455,11 +1597,11 @@ const Reservations: React.FC = () => {
 
                         {/* Service Name & Optional Photo */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '6px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', color: '#334155' }}>
-                            <span>✂️</span>
-                            <span>{res.serviceName || 'Servicio Agendado'}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', color: '#334155', minWidth: 0, flex: '1 1 auto' }}>
+                            <span style={{ flexShrink: 0 }}>✂️</span>
+                            <span style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{res.serviceName || 'Servicio Agendado'}</span>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', flexShrink: 0 }}>
                             {res.imageUrl && (
                               <img
                                 src={res.imageUrl}
@@ -1479,6 +1621,11 @@ const Reservations: React.FC = () => {
                                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                                 }}
                               />
+                            )}
+                            {Boolean(res.isSimultaneous) && (
+                              <span style={{ fontSize: '10px', background: 'rgba(16, 185, 129, 0.1)', color: '#065F46', padding: '2px 6px', borderRadius: '6px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                ⚡ Simultánea
+                              </span>
                             )}
                             {res.totalAmount > 0 && (
                               <span style={{ color: '#10B981', fontWeight: '800', fontSize: '13px' }}>
@@ -1731,54 +1878,74 @@ const Reservations: React.FC = () => {
                   );
                 })}
 
-                {dayReservations.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '60px 20px', background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
-                    <IonIcon icon={calendarOutline} style={{ fontSize: '48px', color: '#CBD5E1', marginBottom: '8px' }} />
-                    <h3 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: '800', color: '#0F172A' }}>
-                      Sin citas para este día
-                    </h3>
-                    <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748B' }}>
-                      No hay citas agendadas para el {formattedSelectedDate}.
-                    </p>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                {displayedReservations.length === 0 && (
+                  search.trim() ? (
+                    <div style={{ textAlign: 'center', padding: '60px 20px', background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
+                      <IonIcon icon={searchOutline} style={{ fontSize: '48px', color: '#CBD5E1', marginBottom: '8px' }} />
+                      <h3 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: '800', color: '#0F172A' }}>
+                        Sin resultados para "{search}"
+                      </h3>
+                      <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748B' }}>
+                        No se encontraron citas que coincidan con tu búsqueda.
+                      </p>
                       <button
                         type="button"
-                        onClick={openNew}
+                        onClick={() => setSearch('')}
                         className="ff-btn-primary bg-theme-primary"
-                        style={{ padding: '10px 20px', backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast, #ffffff)' }}
+                        style={{ padding: '8px 18px', backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast, #ffffff)', border: 'none', borderRadius: '10px', fontWeight: '700', cursor: 'pointer' }}
                       >
-                        <IonIcon icon={addOutline} />
-                        Agendar Cita
-                      </button>
-                      <button
-                        type="button"
-                        onClick={openBlockModal}
-                        style={{
-                          padding: '10px 16px',
-                          borderRadius: '12px',
-                          border: '1px solid #CBD5E1',
-                          background: '#F8FAFC',
-                          color: '#334155',
-                          fontSize: '13px',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                      >
-                        <IonIcon icon={lockClosedOutline} />
-                        Bloquear Horario
+                        Limpiar búsqueda
                       </button>
                     </div>
-                  </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '60px 20px', background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
+                      <IonIcon icon={calendarOutline} style={{ fontSize: '48px', color: '#CBD5E1', marginBottom: '8px' }} />
+                      <h3 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: '800', color: '#0F172A' }}>
+                        Sin citas para este día
+                      </h3>
+                      <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748B' }}>
+                        No hay citas agendadas para el {formattedSelectedDate}.
+                      </p>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={openNew}
+                          className="ff-btn-primary bg-theme-primary"
+                          style={{ padding: '10px 20px', backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-contrast, #ffffff)' }}
+                        >
+                          <IonIcon icon={addOutline} />
+                          Agendar Cita
+                        </button>
+                        <button
+                          type="button"
+                          onClick={openBlockModal}
+                          style={{
+                            padding: '10px 16px',
+                            borderRadius: '12px',
+                            border: '1px solid #CBD5E1',
+                            background: '#F8FAFC',
+                            color: '#334155',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <IonIcon icon={lockClosedOutline} />
+                          Bloquear Horario
+                        </button>
+                      </div>
+                    </div>
+                  )
                 )}
               </div>
             </div>
           )}
 
           {/* WEEK VIEW (FullCalendar) */}
-          {viewMode === 'week' && (
+          {viewMode === 'week' && !search.trim() && (
             <div className="fc-wrapper">
               <FullCalendar
                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
@@ -1974,11 +2141,25 @@ const Reservations: React.FC = () => {
                   {selectedServiceIds.length > 0 && (
                     <div style={{ marginTop: '8px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '10px', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontSize: '12px', color: '#166534', fontWeight: '600' }}>
-                        ⏱️ Duración total: <b>{totalDurationMinutes} min</b>
+                        {isSimultaneous && selectedServices.length > 1 ? '⚡ Duración (a 4 manos):' : '⏱️ Duración total:'} <b>{totalDurationMinutes} min</b>
                       </div>
                       <div style={{ fontSize: '12px', color: '#166534', fontWeight: '800' }}>
                         Total servicios: <b>${totalCalculatedPrice.toFixed(2)}</b>
                       </div>
+                    </div>
+                  )}
+
+                  {selectedServices.length > 1 && (
+                    <div style={{ marginTop: '8px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>⚡ Atención a 4 Manos (Simultánea)</div>
+                        <div style={{ fontSize: '11px', color: '#64748B' }}>Servicios al mismo tiempo con especialistas distintos</div>
+                      </div>
+                      <IonToggle
+                        checked={isSimultaneous}
+                        onIonChange={e => setIsSimultaneous(e.detail.checked)}
+                        color="primary"
+                      />
                     </div>
                   )}
                 </div>
@@ -2082,11 +2263,18 @@ const Reservations: React.FC = () => {
                       } as any}
                     >
                       <IonSelectOption value="">Sin asignar / Cualquiera disponible</IonSelectOption>
-                      {(selectedServices.length === 1 ? getStaffForSingleService(selectedServices[0]) : availableSpecialists).map(emp => (
-                        <IonSelectOption key={emp.id} value={emp.id}>
-                          👤 {emp.name || emp.username} {emp.jobTitle ? `(${emp.jobTitle})` : ''}
-                        </IonSelectOption>
-                      ))}
+                      {(selectedServices.length === 1 ? getStaffForSingleService(selectedServices[0]) : availableSpecialists).map(emp => {
+                        const isBlockedOnDate = Boolean(date && reservations.some(r =>
+                          r.isBlock &&
+                          r.date === date &&
+                          (r.employeeId === emp.id || r.employeeId === emp.userId)
+                        ));
+                        return (
+                          <IonSelectOption key={emp.id} value={emp.id}>
+                            👤 {emp.name || emp.username} {emp.jobTitle ? `(${emp.jobTitle})` : ''}{isBlockedOnDate ? ' 🚫 (Bloqueado/Día Libre)' : ''}
+                          </IonSelectOption>
+                        );
+                      })}
                     </IonSelect>
                   )}
                 </div>
@@ -2240,7 +2428,7 @@ const Reservations: React.FC = () => {
                         color: selectedEvent.employeeId ? '#92400E' : '#1E293B',
                       }}>
                         {selectedEvent.employeeId
-                          ? `👤 Especialista: ${selectedEvent.employee?.name || selectedEvent.employee?.username || 'Personal'}`
+                          ? `👤 Personal: ${selectedEvent.employeeName || selectedEvent.employee?.name || selectedEvent.employee?.username || 'Personal'}`
                           : '🏪 Cierre / Bloqueo de Todo el Comercio'}
                       </span>
                       <span style={{
@@ -3194,24 +3382,34 @@ const Reservations: React.FC = () => {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
-              {/* Alcance del Bloqueo: Comercio completo o Especialista */}
+              {/* Alcance del Bloqueo: Comercio completo o Personal */}
               <div style={{ marginBottom: '16px' }}>
                 <FinoSelect
                   label="¿A quién aplica este bloqueo?"
                   title="Seleccionar Alcance del Bloqueo"
-                  value={blockTarget}
+                  value={blockTarget || 'ALL'}
                   onChange={val => setBlockTarget(String(val))}
                   options={[
                     {
                       value: 'ALL',
                       label: '🏪 Todo el Comercio (Cierre Temporal / Feriado)',
-                      description: 'Nadie podrá reservar citas en este rango de horario',
+                      description: 'Nadie podrá reservar citas ni turnos en este rango de fechas/horario',
                     },
-                    ...availableSpecialists.map(emp => ({
-                      value: String(emp.id),
-                      label: `👤 ${emp.name || emp.username}`,
-                      description: 'Día libre, permiso o receso solo para este especialista',
-                    })),
+                    ...employees.map(emp => {
+                      const titleOrRole = emp.jobTitle || (
+                        emp.role === 'ADMIN' ? 'Administrador' :
+                        emp.role === 'DELIVERY' ? 'Repartidor / Delivery' :
+                        emp.role === 'KITCHEN' ? 'Cocina / Preparación' :
+                        emp.role === 'POS' ? 'Caja / POS' :
+                        emp.role === 'OPERATIVO' ? 'Personal Operativo' :
+                        emp.role || 'Personal'
+                      );
+                      return {
+                        value: String(emp.id),
+                        label: `👤 ${emp.name || emp.username} (${titleOrRole})`,
+                        description: `Día libre, permiso o receso para ${emp.name || emp.username}`,
+                      };
+                    }),
                   ]}
                 />
               </div>
