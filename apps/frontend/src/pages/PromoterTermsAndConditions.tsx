@@ -65,49 +65,65 @@ export const PromoterTermsContent: React.FC = () => {
         </ul>
 
         <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-          3. Esquema Oficial de Comisiones Escalonadas por Clientes Activos
+          3. Esquema Oficial de Comisiones: Activación y Recurrencia Escalonada
         </h2>
         <p>
-          FinoWork remunera el esfuerzo de captación y fidelización mediante un sistema de <strong>comisiones escalonadas basadas en el número de comercios referidos activos en el mes</strong>:
+          FinoWork remunera tanto la captación inmediata de nuevos comercios como la fidelización a largo plazo mediante dos modalidades complementarias:
+        </p>
+
+        <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
+          <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '14px', marginBottom: '4px' }}>
+            A. Comisión de Activación (50% del Primer Pago)
+          </div>
+          <p style={{ margin: 0, fontSize: '13px', color: '#475569' }}>
+            Al concluir los 15 días de prueba gratuita, en el momento en que el comercio procesa su primer pago formal, el Promotor recibe de inmediato el <strong>50% del monto total abonado</strong>: <strong>$10.00 USD</strong> en cuota mensual estándar ($20 USD) o <strong>$100.00 USD</strong> en plan anual ($200 USD). La primera activación histórica del promotor desbloquea además un bono complementario único de <strong>+$10.00 USD</strong>.
+          </p>
+        </div>
+
+        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '14px', marginBottom: '8px' }}>
+          B. Comisiones Recurrentes por Renovación
+        </div>
+        <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#64748b' }}>
+          En cada pago subsiguiente realizado por el comercio para renovar su servicio, el Promotor comisiona según su volumen de clientes activos:
         </p>
         
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
           gap: '12px',
-          margin: '16px 0'
+          margin: '12px 0 16px 0'
         }}>
           <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontWeight: 800, color: '#b45309', fontSize: '14px' }}>🥉 Nivel 1: Bronce (1 a 49 clientes)</div>
+            <div style={{ fontWeight: 800, color: '#b45309', fontSize: '14px' }}>Nivel 1: Bronce (1 a 49 clientes)</div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: '6px 0' }}>10% por pago</div>
             <div style={{ fontSize: '12px', color: '#64748b' }}>
-              Equivale a aprox. <strong>$2.00 USD</strong> por cada mensualidad estándar de $20 USD.
+              Equivale a <strong>$2.00 USD</strong> por mensualidad o <strong>$20.00 USD</strong> por anualidad.
             </div>
           </div>
 
           <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontWeight: 800, color: '#475569', fontSize: '14px' }}>🥈 Nivel 2: Plata (50 a 99 clientes)</div>
+            <div style={{ fontWeight: 800, color: '#475569', fontSize: '14px' }}>Nivel 2: Plata (50 a 99 clientes)</div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: '6px 0' }}>15% por pago</div>
             <div style={{ fontSize: '12px', color: '#64748b' }}>
-              Equivale a aprox. <strong>$3.00 USD</strong> por cada mensualidad estándar de $20 USD.
+              Equivale a <strong>$3.00 USD</strong> por mensualidad o <strong>$30.00 USD</strong> por anualidad. Bono de ascenso: <strong>+$25.00 USD</strong>.
             </div>
           </div>
 
           <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontWeight: 800, color: '#15803d', fontSize: '14px' }}>🥇 Nivel 3: Oro (100+ clientes)</div>
+            <div style={{ fontWeight: 800, color: '#15803d', fontSize: '14px' }}>Nivel 3: Oro (100+ clientes)</div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: '6px 0' }}>20% por pago</div>
             <div style={{ fontSize: '12px', color: '#64748b' }}>
-              Equivale a aprox. <strong>$4.00 USD</strong> por cada mensualidad estándar de $20 USD.
+              Equivale a <strong>$4.00 USD</strong> por mensualidad o <strong>$40.00 USD</strong> por anualidad. Bono de ascenso: <strong>+$50.00 USD</strong>.
             </div>
           </div>
         </div>
 
         <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '14px', margin: '14px 0' }}>
           <div style={{ fontWeight: 700, color: '#1e40af', fontSize: '13px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <IonIcon icon={cashOutline} /> <strong>Cálculo Basado en Porcentajes Reales sobre Todo Tipo de Pago</strong>
+            <IonIcon icon={cashOutline} /> <strong>Devengo por Evento Real de Pago Aprobado</strong>
           </div>
           <p style={{ margin: 0, fontSize: '13px', color: '#1e3a8a' }}>
-            Las comisiones se liquidan como un porcentaje directo del monto neto pagado y aprobado por la plataforma. Si un comercio referido cancela una cuota mensual ($20 USD), un trimestre ($60 USD) o un año adelantado ($200 USD), el Promotor recibirá exactamente el <strong>10%, 15% o 20%</strong> de dicho pago total según su escalón activo en ese mes.
+            Las comisiones recurrentes se liquidan estrictamente sobre el monto neto efectivamente pagado y aprobado por la plataforma en cada ciclo de cobro. No se generan mensualidades ficticias anticipadas si el comercio optó por un plan anual: la comisión recurrente se devenga en su totalidad al aprobarse cada pago.
           </p>
         </div>
 

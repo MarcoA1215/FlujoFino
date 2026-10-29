@@ -761,7 +761,10 @@ export class SuperAdminService implements OnModuleInit {
 
         const isFirstActivation = activationCommissionsCount === 0;
         const netAmount = Number(savedReport.amount) || 20.00;
-        const commissionAmount = Math.round(netAmount * commissionRate * 100) / 100;
+        // Comisión de Activación oficial: 50% del monto total del primer pago realizado por el cliente.
+        // Comisión Recurrente: según escala por comercios activos (10%, 15% o 20%) de cada pago subsiguiente.
+        const effectiveRate = isFirstActivation ? 0.50 : commissionRate;
+        const commissionAmount = Math.round(netAmount * effectiveRate * 100) / 100;
 
         const commission = queryRunner.manager.create(PromoterCommission, {
           promoterId: savedTenant.promoterId,

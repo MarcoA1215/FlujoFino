@@ -423,7 +423,43 @@ describe('SuperAdminService', () => {
           promoterId: 'promoter-123',
           tenantId: 'tenant-prom-1',
           type: PromoterCommissionType.ACTIVATION,
-          amountUSD: 2.00, // 10% of $20.00 for tier 1-49
+          amountUSD: 10.00, // 50% of $20.00 first activation payment
+          status: PromoterCommissionStatus.PENDING,
+        }),
+      );
+    });
+
+    it('generates an ACTIVATION commission of 50% ($100 USD) on first annual payment ($200 USD)', async () => {
+      const mockReport = {
+        id: 'report-act-annual',
+        tenant_id: 'tenant-prom-1',
+        amount: 200.0,
+        status: SaaSPaymentStatus.PENDING,
+      };
+      const mockTenant = {
+        id: 'tenant-prom-1',
+        name: 'Promo Store 1',
+        promoterId: 'promoter-123',
+        status: TenantStatus.TRIAL,
+      };
+
+      queryRunner.manager.findOne.mockImplementation((entityClass: any) => {
+        if (entityClass === SaaSPaymentReport) return Promise.resolve(mockReport);
+        if (entityClass === Tenant) return Promise.resolve(mockTenant);
+        return Promise.resolve(null);
+      });
+
+      queryRunner.manager.count.mockResolvedValue(0); // 0 prior activation commissions
+
+      const result = await service.approvePayment('report-act-annual');
+      expect(result.success).toBe(true);
+      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+        PromoterCommission,
+        expect.objectContaining({
+          promoterId: 'promoter-123',
+          tenantId: 'tenant-prom-1',
+          type: PromoterCommissionType.ACTIVATION,
+          amountUSD: 100.00, // 50% of $200.00 first activation payment
           status: PromoterCommissionStatus.PENDING,
         }),
       );

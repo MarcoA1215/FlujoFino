@@ -8,36 +8,40 @@ Este documento constituye la guía oficial de formación comercial, técnica y o
 
 ## 1. El Modelo de Negocio: Escalera de Rangos y Comisiones Reales
 
-En FinoWork el promotor construye una cartera de ingresos mensuales recurrentes en dólares vinculada a sus comercios afiliados.
+En FinoWork el promotor cuenta con un modelo altamente rentable que premia la captación con un fuerte incentivo inmediato y premia la fidelización con ingresos mensuales recurrentes.
 
 * **Cuota Oficial Base del Comercio:** **$20.00 USD / mes** (o **$200.00 USD / año** con descuento de dos meses).
-* **Comisión de Activación (Primer cobro por comercio):**
-  * Se genera en el momento en que el comercio referido completa sus 15 días de prueba gratuita y procesa su primer pago formal.
-  * En una mensualidad de **$20.00 USD**, recibes de inmediato el **10% ($2.00 USD)** en Nivel Bronce.
-  * En una anualidad de **$200.00 USD**, recibes **$20.00 USD** en un solo desembolso (10% en Bronce) o hasta **$40.00 USD** (20% en Oro).
-  * *Bono de Bienvenida:* Tu primera activación desbloquea el Nivel Bronce y un bono complementario de **$10.00 USD**, totalizando **$12.00 USD en tu primer cliente**.
-* **Comisión Recurrente (Ingreso mensual continuo):**
-  * Todos los meses subsiguientes en los que el comercio renueva su cuota de $20 USD, recibes de forma automática el **10% ($2.00 USD/mes)** en Bronce.
-  * Al alcanzar 50 comercios activos asciendes a Plata con **15% ($3.00 USD/mes)**.
-  * Con 100 comercios activos asciendes a Oro con **20% ($4.00 USD/mes)** por cada negocio.
+* **Comisión de Activación (50% del primer cobro por comercio):**
+  * Se genera en el momento en que el comercio referido completa sus 15 días de prueba gratuita y procesa su primer pago formal para activar la plataforma.
+  * Si el comercio activa con la cuota mensual de **$20.00 USD**, recibes de inmediato **$10.00 USD (50%)**.
+  * Si el comercio activa con la cuota anual de **$200.00 USD**, recibes de inmediato **$100.00 USD (50%)** en un solo desembolso.
+  * *Bono de Bienvenida:* Tu primera activación histórica en la plataforma desbloquea el Nivel Bronce y un bono complementario único de **+$10.00 USD**, totalizando **$20.00 USD en tu primer cliente mensual** (recuperas el 100% de la primera cuota) o **$110.00 USD** si tu primer cliente paga el año.
+* **Comisión Recurrente (Por cada pago y renovación subsiguiente):**
+  * Se genera **por evento real de cobro aprobado**, no en cuotas mensuales ficticias anticipadas si el cliente ya pagó el año completo.
+  * En renovaciones mensuales de **$20.00 USD**:
+    * **Nivel Bronce (1 a 49 clientes activos):** **10% ($2.00 USD / mes)** por cliente.
+    * **Nivel Plata (50 a 99 clientes activos):** **15% ($3.00 USD / mes)** por cliente.
+    * **Nivel Oro (100+ clientes activos):** **20% ($4.00 USD / mes)** por cliente.
+  * En renovaciones anuales de **$200.00 USD**:
+    * Cuando el comercio vuelva a pagar el año subsiguiente, recibes tu porcentaje correspondiente sobre ese cobro: **$20.00 USD** (10% Bronce), **$30.00 USD** (15% Plata) o **$40.00 USD** (20% Oro).
 
 ### Escalera Oficial de Rangos y Ganancias por Comercio:
-| Nivel Oficial | Comercios Activos | % Comisión | Comisión por Mensualidad ($20) | Comisión por Anualidad ($200) | Bono de Ascenso |
+| Nivel Oficial | Comercios Activos | Activación (50% 1er Pago) | Recurrente Mensual ($20) | Recurrente Anual ($200) | Bono de Ascenso |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Madera** | 0 comercios | **10%** | $2.00 USD | $20.00 USD | $0.00 USD |
-| **Bronce** | 1 a 49 comercios | **10%** | **$2.00 USD / mes** | **$20.00 USD** | **+$10.00 USD** |
-| **Plata** | 50 a 99 comercios | **15%** | **$3.00 USD / mes** | **$30.00 USD** | **+$25.00 USD** |
-| **Oro** | 100+ comercios | **20%** | **$4.00 USD / mes** | **$40.00 USD** | **+$50.00 USD** |
+| **Madera** | 0 comercios | **$10.00 USD** (mes) / **$100.00 USD** (año) | 10% ($2.00 USD) | 10% ($20.00 USD) | $0.00 USD |
+| **Bronce** | 1 a 49 comercios | **$10.00 USD** (mes) / **$100.00 USD** (año) | **10% ($2.00 USD) / mes** | **10% ($20.00 USD)** | **+$10.00 USD** |
+| **Plata** | 50 a 99 comercios | **$10.00 USD** (mes) / **$100.00 USD** (año) | **15% ($3.00 USD) / mes** | **15% ($30.00 USD)** | **+$25.00 USD** |
+| **Oro** | 100+ comercios | **$10.00 USD** (mes) / **$100.00 USD** (año) | **20% ($4.00 USD) / mes** | **20% ($40.00 USD)** | **+$50.00 USD** |
 
-### Proyección Mensual Recurrente del Promotor:
-| Comercios Activos | Nivel | Cálculo Mensual | Ingreso Mensual Recurrente |
-| :--- | :--- | :--- | :--- |
-| **10 comercios** | Bronce (10%) | 10 x $2.00 USD | **$20.00 USD / mes** |
-| **25 comercios** | Bronce (10%) | 25 x $2.00 USD | **$50.00 USD / mes** |
-| **50 comercios** | Plata (15%) | 50 x $3.00 USD + $25 bono | **$175.00 USD / mes** |
-| **80 comercios** | Plata (15%) | 80 x $3.00 USD | **$240.00 USD / mes** |
-| **100 comercios** | Oro (20%) | 100 x $4.00 USD + $50 bono | **$450.00 USD / mes** |
-| **150 comercios** | Oro (20%) | 150 x $4.00 USD | **$600.00 USD / mes** |
+### Proyección de Ingresos Recurrentes Mensuales (Comercios en Cuota Mensual):
+| Comercios Activos | Nivel | Cálculo Recurrente | Ingreso Mensual Continuo | Activaciones Acumuladas Previas |
+| :--- | :--- | :--- | :--- | :--- |
+| **10 comercios** | Bronce (10%) | 10 x $2.00 USD | **$20.00 USD / mes** | +$100.00 USD (50% activación) |
+| **25 comercios** | Bronce (10%) | 25 x $2.00 USD | **$50.00 USD / mes** | +$250.00 USD (50% activación) |
+| **50 comercios** | Plata (15%) | 50 x $3.00 USD + $25 bono | **$175.00 USD / mes** | +$500.00 USD (50% activación) |
+| **80 comercios** | Plata (15%) | 80 x $3.00 USD | **$240.00 USD / mes** | +$800.00 USD (50% activación) |
+| **100 comercios** | Oro (20%) | 100 x $4.00 USD + $50 bono | **$450.00 USD / mes** | +$1,000.00 USD (50% activación) |
+| **150 comercios** | Oro (20%) | 150 x $4.00 USD | **$600.00 USD / mes** | +$1,500.00 USD (50% activación) |
 
 ### Canales de Liquidación Oficial:
 En tu panel de promotor (`/promoter`), configuras tus datos de retiro:
