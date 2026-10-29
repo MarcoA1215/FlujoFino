@@ -1495,6 +1495,31 @@ export class SuperAdminService implements OnModuleInit {
     });
     const savedPromoter = await this.promoterRepo.save(promoter);
 
+    // Regla General: Vincular automáticamente a todos los espacios de prueba demo (isTest: true)
+    try {
+      const demoTenants = await this.tenantRepo.find({ where: { isTest: true } });
+      for (const dt of demoTenants) {
+        if (dt.name === 'FinoWork Central') continue;
+        const existingAcc = await this.userAccessRepo.findOne({
+          where: { userId: savedUser.id, tenantId: dt.id },
+        });
+        if (!existingAcc) {
+          const acc = this.userAccessRepo.create({
+            userId: savedUser.id,
+            tenantId: dt.id,
+            role: UserRole.ADMIN,
+            roles: [UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
+            isActive: true,
+            status: 'ACCEPTED',
+            jobTitle: 'Promotor Oficial (Demo)',
+          });
+          await this.userAccessRepo.save(acc);
+        }
+      }
+    } catch (e: any) {
+      this.logger.warn(`No se pudieron auto-vincular los negocios demo al nuevo promotor: ${e.message}`);
+    }
+
     return {
       id: savedPromoter.id,
       userId: savedUser.id,

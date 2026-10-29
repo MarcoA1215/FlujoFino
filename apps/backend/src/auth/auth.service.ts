@@ -80,7 +80,7 @@ export class AuthService {
     const isPromoter = user.role === UserRole.PROMOTOR || (user.role as string) === 'PROMOTOR' || !!promoterProfile;
 
     // Build workspaces list for the frontend
-    const workspaces = (user.tenantAccess || []).map(a => ({
+    const workspaces: any[] = (user.tenantAccess || []).map(a => ({
       tenantId: a.tenantId,
       name: a.tenant?.name || 'Sucursal',
       role: a.role,
@@ -96,6 +96,30 @@ export class AuthService {
         roles: [UserRole.PROMOTOR],
         status: 'ACCEPTED'
       });
+
+      // Regla General: Todos los promotores tienen acceso a los negocios de prueba (demo seed)
+      try {
+        const tenantRepo = this.dataSource.getRepository(Tenant);
+        const demoTenants = await tenantRepo.find({
+          where: { isTest: true },
+          order: { name: 'ASC' }
+        });
+        for (const dt of demoTenants) {
+          if (dt.name === 'FinoWork Central') continue;
+          if (!workspaces.some(w => w.tenantId === dt.id)) {
+            workspaces.push({
+              tenantId: dt.id,
+              name: dt.name,
+              role: UserRole.ADMIN,
+              roles: [UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
+              status: 'ACCEPTED',
+              isTest: true,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[auth.validateUserToken] Error fetching demo tenants for promoter:', err);
+      }
     }
 
     // Check if user is SuperAdmin
@@ -123,6 +147,41 @@ export class AuthService {
       };
     }
 
+    // Regla General: Promotores accediendo a un negocio demo
+    if (isPromoter && requestedTenantId) {
+      const tenantRepo = this.dataSource.getRepository(Tenant);
+      const demoTenant = await tenantRepo.findOne({ where: { id: requestedTenantId, isTest: true } });
+      if (demoTenant && demoTenant.name !== 'FinoWork Central') {
+        const accessRepo = this.dataSource.getRepository(UserTenantAccess);
+        let userAccess = await accessRepo.findOne({ where: { userId: user.id, tenantId: demoTenant.id } });
+        if (!userAccess) {
+          userAccess = accessRepo.create({
+            userId: user.id,
+            tenantId: demoTenant.id,
+            role: UserRole.ADMIN,
+            roles: [UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
+            isActive: true,
+            status: 'ACCEPTED',
+            jobTitle: 'Promotor Autorizado (Demo)',
+          });
+          await accessRepo.save(userAccess);
+        } else if (!userAccess.isActive || userAccess.status !== 'ACCEPTED') {
+          userAccess.isActive = true;
+          userAccess.status = 'ACCEPTED';
+          await accessRepo.save(userAccess);
+        }
+
+        return {
+          user: { ...result, isPromoter: true },
+          tenantId: demoTenant.id,
+          role: UserRole.ADMIN,
+          roles: [UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
+          tenantName: demoTenant.name,
+          workspaces
+        };
+      }
+    }
+
     // Find the first accepted active tenant to issue the default token
     let access: any;
     if (requestedTenantId) {
@@ -132,6 +191,9 @@ export class AuthService {
     }
 
     const pending = workspaces.filter(w => w.status === 'PENDING');
+    if (!requestedTenantId && isPromoter) {
+      return { user: { ...result, isPromoter: true }, tenantId: 'promoter-space', role: UserRole.PROMOTOR, roles: [UserRole.PROMOTOR], tenantName: 'Red de Promotores FinoWork', workspaces };
+    }
     if (!requestedTenantId && (workspaces.length > 1 || pending.length > 0)) {
       // Force user to select a workspace
       return { user: { ...result, isPromoter }, tenantId: null, role: user.role, roles: [user.role], tenantName: '', workspaces };
@@ -332,7 +394,7 @@ export class AuthService {
     const promoterProfile = await promoterRepo.findOne({ where: { userId: user.id } });
     const isPromoter = user.role === UserRole.PROMOTOR || (user.role as string) === 'PROMOTOR' || !!promoterProfile;
 
-    const workspaces = (user.tenantAccess || []).map(a => ({
+    const workspaces: any[] = (user.tenantAccess || []).map(a => ({
       tenantId: a.tenantId,
       name: a.tenant?.name || 'Sucursal',
       role: a.role,
@@ -348,6 +410,30 @@ export class AuthService {
         roles: [UserRole.PROMOTOR],
         status: 'ACCEPTED'
       });
+
+      // Regla General: Todos los promotores tienen acceso a los negocios de prueba (demo seed)
+      try {
+        const tenantRepo = this.dataSource.getRepository(Tenant);
+        const demoTenants = await tenantRepo.find({
+          where: { isTest: true },
+          order: { name: 'ASC' }
+        });
+        for (const dt of demoTenants) {
+          if (dt.name === 'FinoWork Central') continue;
+          if (!workspaces.some(w => w.tenantId === dt.id)) {
+            workspaces.push({
+              tenantId: dt.id,
+              name: dt.name,
+              role: UserRole.ADMIN,
+              roles: [UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
+              status: 'ACCEPTED',
+              isTest: true,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[auth.validateUserToken] Error fetching demo tenants for promoter:', err);
+      }
     }
 
     if (isSuperAdmin) {
@@ -379,6 +465,41 @@ export class AuthService {
         tenantName: 'Red de Promotores FinoWork',
         workspaces
       };
+    }
+
+    // Regla General: Promotores accediendo a un negocio demo
+    if (isPromoter && requestedTenantId) {
+      const tenantRepo = this.dataSource.getRepository(Tenant);
+      const demoTenant = await tenantRepo.findOne({ where: { id: requestedTenantId, isTest: true } });
+      if (demoTenant && demoTenant.name !== 'FinoWork Central') {
+        const accessRepo = this.dataSource.getRepository(UserTenantAccess);
+        let userAccess = await accessRepo.findOne({ where: { userId: user.id, tenantId: demoTenant.id } });
+        if (!userAccess) {
+          userAccess = accessRepo.create({
+            userId: user.id,
+            tenantId: demoTenant.id,
+            role: UserRole.ADMIN,
+            roles: [UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
+            isActive: true,
+            status: 'ACCEPTED',
+            jobTitle: 'Promotor Autorizado (Demo)',
+          });
+          await accessRepo.save(userAccess);
+        } else if (!userAccess.isActive || userAccess.status !== 'ACCEPTED') {
+          userAccess.isActive = true;
+          userAccess.status = 'ACCEPTED';
+          await accessRepo.save(userAccess);
+        }
+
+        return {
+          user: { ...result, isPromoter: true },
+          tenantId: demoTenant.id,
+          role: UserRole.ADMIN,
+          roles: [UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
+          tenantName: demoTenant.name,
+          workspaces
+        };
+      }
     }
 
     const access = (user.tenantAccess || []).find(a => a.tenantId === requestedTenantId && a.isActive && a.status === 'ACCEPTED');
@@ -421,13 +542,32 @@ export class AuthService {
     const isSuperAdmin = currentUser?.role === UserRole.SUPERADMIN || (currentUser?.email && currentUser.email.toLowerCase() === (process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN_EMAIL).toLowerCase());
 
     const accessRepo = this.dataSource.getRepository(UserTenantAccess);
-    const access = await accessRepo.findOne({
+    let access = await accessRepo.findOne({
       where: { userId, tenantId },
       relations: { tenant: true }
     });
 
     if (!access && !isSuperAdmin) {
-      throw new ForbiddenException('No tienes acceso a esta sucursal');
+      // Regla General: Si es promotor y el tenant es de prueba (isTest: true), permitir acceso completo
+      if (currentUser?.isPromoter) {
+        const tenantRepo = this.dataSource.getRepository(Tenant);
+        const demoTenant = await tenantRepo.findOne({ where: { id: tenantId, isTest: true } });
+        if (demoTenant && demoTenant.name !== 'FinoWork Central') {
+          access = accessRepo.create({
+            userId,
+            tenantId,
+            role: UserRole.ADMIN,
+            roles: [UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
+            isActive: true,
+            status: 'ACCEPTED',
+            jobTitle: 'Promotor Autorizado (Demo)',
+          });
+          await accessRepo.save(access);
+        }
+      }
+      if (!access) {
+        throw new ForbiddenException('No tienes acceso a esta sucursal');
+      }
     }
 
     let authorizedRoles: UserRole[] = [];
@@ -633,7 +773,7 @@ export class AuthService {
     const promoterProfile = await promoterRepo.findOne({ where: { userId: user.id } });
     const isPromoter = user.role === UserRole.PROMOTOR || (user.role as string) === 'PROMOTOR' || !!promoterProfile;
 
-    const list = (user.tenantAccess || []).map(a => ({
+    const list: any[] = (user.tenantAccess || []).map(a => ({
       tenantId: a.tenantId,
       name: a.tenant?.name || 'Sucursal',
       role: a.role,
@@ -649,6 +789,30 @@ export class AuthService {
         roles: [UserRole.PROMOTOR],
         status: 'ACCEPTED'
       });
+
+      // Regla General: Todos los promotores tienen acceso a los negocios de prueba (demo seed)
+      try {
+        const tenantRepo = this.dataSource.getRepository(Tenant);
+        const demoTenants = await tenantRepo.find({
+          where: { isTest: true },
+          order: { name: 'ASC' }
+        });
+        for (const dt of demoTenants) {
+          if (dt.name === 'FinoWork Central') continue;
+          if (!list.some(w => w.tenantId === dt.id)) {
+            list.push({
+              tenantId: dt.id,
+              name: dt.name,
+              role: UserRole.ADMIN,
+              roles: [UserRole.ADMIN, UserRole.POS, UserRole.INVENTORY, UserRole.DELIVERY, UserRole.KITCHEN],
+              status: 'ACCEPTED',
+              isTest: true,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[auth.getWorkspaces] Error fetching demo tenants for promoter:', err);
+      }
     }
 
     return list;

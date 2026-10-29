@@ -46,6 +46,13 @@ import {
   timeOutline,
   bookOutline,
   openOutline,
+  arrowForwardOutline,
+  pricetagOutline,
+  fastFoodOutline,
+  carOutline,
+  cutOutline,
+  restaurantOutline,
+  sparklesOutline,
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
@@ -111,9 +118,11 @@ const generateTemplateMessage = (
 };
 
 const PromoterDashboard: React.FC = () => {
-  const { user } = useContext(AuthContext);
+  const { user, switchWorkspace } = useContext(AuthContext);
   const [presentToast] = useIonToast();
 
+  const [workspaces, setWorkspaces] = useState<any[]>(user?.workspaces || []);
+  const [isSwitchingWorkspace, setIsSwitchingWorkspace] = useState(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [stats, setStats] = useState<PromoterStatsDTO | null>(null);
 
@@ -141,6 +150,103 @@ const PromoterDashboard: React.FC = () => {
   const [binancePayId, setBinancePayId] = useState<string>('');
   const [isSavingPayout, setIsSavingPayout] = useState<boolean>(false);
 
+  const getDemoBusinessMeta = (name: string) => {
+    const lower = (name || '').toLowerCase();
+    if (lower.includes('boutique') || lower.includes('retail') || lower.includes('moda')) {
+      return {
+        category: '👗 Moda & Retail (Inventario con Tallas y Colores)',
+        icon: pricetagOutline,
+        color: '#8b5cf6',
+        bg: '#f5f3ff',
+        description: 'Control de prendas, tallas, variantes y punto de venta ágil.',
+      };
+    }
+    if (lower.includes('panadería') || lower.includes('panaderia') || lower.includes('espiga')) {
+      return {
+        category: '🥖 Panadería & Pastelería (Producción y Fórmulas)',
+        icon: restaurantOutline,
+        color: '#d97706',
+        bg: '#fffbeb',
+        description: 'Recetas de masas, ensamblaje de panes y venta rápida de mostrador.',
+      };
+    }
+    if (lower.includes('barbería') || lower.includes('barberia') || lower.includes('spa') || lower.includes('élite') || lower.includes('elite')) {
+      return {
+        category: '✂️ Barbería & Spa Élite (Citas y Comisiones)',
+        icon: cutOutline,
+        color: '#0891b2',
+        bg: '#ecfeff',
+        description: 'Agenda de citas online, comisiones de barberos y propinas.',
+      };
+    }
+    if (lower.includes('lavado') || lower.includes('auto')) {
+      return {
+        category: '🚗 Auto Lavado Express (Servicios Rápidos)',
+        icon: carOutline,
+        color: '#2563eb',
+        bg: '#eff6ff',
+        description: 'Bahías de lavado, comisiones por vehículo y tickets de servicio.',
+      };
+    }
+    if (lower.includes('burger') || lower.includes('house') || lower.includes('gourmet') || lower.includes('gastronomia')) {
+      return {
+        category: '🍔 Burger House Gourmet (Cocina, Salón y Delivery)',
+        icon: fastFoodOutline,
+        color: '#dc2626',
+        bg: '#fef2f2',
+        description: 'Pantalla de cocina en tiempo real, mesas y repartidores en moto.',
+      };
+    }
+    if (lower.includes('estética') || lower.includes('estetica') || lower.includes('glow')) {
+      return {
+        category: '💆 Centro Estético Glow (Salud, Cabinas y Citas)',
+        icon: sparklesOutline,
+        color: '#db2777',
+        bg: '#fdf2f8',
+        description: 'Citas médicas, ficha de pacientes, aparatología y tratamientos.',
+      };
+    }
+    return {
+      category: '🏪 Negocio de Demostración en Vivo',
+      icon: businessOutline,
+      color: '#059669',
+      bg: '#ecfdf5',
+      description: 'Espacio de prueba completo para mostrar todas las funciones de FinoWork.',
+    };
+  };
+
+  const loadWorkspaces = async () => {
+    try {
+      const res = await apiClient.get<any[]>('/auth/workspaces');
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        setWorkspaces(res.data);
+      }
+    } catch {
+      if (user?.workspaces) {
+        setWorkspaces(user.workspaces);
+      }
+    }
+  };
+
+  const handleSwitchToDemo = async (tenantId: string, demoName: string) => {
+    try {
+      setIsSwitchingWorkspace(true);
+      presentToast({
+        message: `Cambiando a ${demoName} para demostración en vivo...`,
+        duration: 1500,
+        color: 'primary',
+      });
+      await switchWorkspace(tenantId);
+    } catch (err: any) {
+      setIsSwitchingWorkspace(false);
+      presentToast({
+        message: 'Error al ingresar al espacio demo: ' + (err.response?.data?.message || err.message),
+        duration: 3500,
+        color: 'danger',
+      });
+    }
+  };
+
   const fetchStats = async () => {
     try {
       setLoading(true);
@@ -163,6 +269,7 @@ const PromoterDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchStats();
+    loadWorkspaces();
   }, []);
 
   const referralCode = stats?.code || 'PROM-';
@@ -540,6 +647,122 @@ const PromoterDashboard: React.FC = () => {
                 Términos y Condiciones
               </button>
             </div>
+
+            {/* SUCURSALES DE DEMOSTRACIÓN EN VIVO (Para mostrar en calle a prospectos) */}
+            {workspaces.filter(w => (!w.status || w.status === 'ACCEPTED') && w.tenantId !== 'platform-admin' && w.tenantId !== 'promoter-space').length > 0 && (
+              <IonCard style={{ margin: '0 0 20px 0', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#ffffff', overflow: 'hidden' }}>
+                <IonCardHeader style={{ borderBottom: '1px solid #f1f5f9', padding: '16px 20px', background: '#ffffff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <IonCardTitle style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <IonIcon icon={businessOutline} style={{ color: '#10b981' }} />
+                        Sucursales Demo para Demostración en Calle
+                      </IonCardTitle>
+                      <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>
+                        Tienes acceso completo como Administrador a los negocios de prueba. Ingresa a cualquiera con un toque para mostrar el sistema en vivo a tus clientes potenciales.
+                      </p>
+                    </div>
+                    <span style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '4px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: 800 }}>
+                      Negocios Listos
+                    </span>
+                  </div>
+                </IonCardHeader>
+                <IonCardContent style={{ padding: '18px 20px' }}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                    gap: '12px'
+                  }}>
+                    {workspaces
+                      .filter(w => (!w.status || w.status === 'ACCEPTED') && w.tenantId !== 'platform-admin' && w.tenantId !== 'promoter-space')
+                      .map((demo) => {
+                        const meta = getDemoBusinessMeta(demo.name);
+                        const isCurrent = demo.tenantId === user?.tenantId;
+                        return (
+                          <div
+                            key={demo.tenantId}
+                            style={{
+                              borderRadius: '12px',
+                              border: isCurrent ? '2px solid #10b981' : '1px solid #e2e8f0',
+                              background: meta.bg,
+                              padding: '14px 16px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              gap: '12px',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                            }}
+                          >
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <div style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '3px 8px',
+                                  borderRadius: '8px',
+                                  background: '#ffffff',
+                                  fontSize: '11px',
+                                  fontWeight: 800,
+                                  color: meta.color,
+                                  border: `1px solid ${meta.color}30`
+                                }}>
+                                  <IonIcon icon={meta.icon} style={{ fontSize: '13px' }} />
+                                  {meta.category}
+                                </div>
+                                {isCurrent && (
+                                  <span style={{ background: '#10b981', color: '#ffffff', fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '10px' }}>
+                                    Actualmente aquí
+                                  </span>
+                                )}
+                              </div>
+                              <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0' }}>
+                                {demo.name}
+                              </h3>
+                              <p style={{ fontSize: '12px', color: '#64748b', margin: 0, lineHeight: 1.4 }}>
+                                {meta.description}
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={isSwitchingWorkspace || isCurrent}
+                              onClick={() => handleSwitchToDemo(demo.tenantId, demo.name)}
+                              style={{
+                                width: '100%',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                padding: '9px 12px',
+                                borderRadius: '10px',
+                                border: 'none',
+                                background: isCurrent ? '#cbd5e1' : meta.color,
+                                color: '#ffffff',
+                                fontWeight: 700,
+                                fontSize: '13px',
+                                cursor: isCurrent ? 'default' : 'pointer',
+                                boxShadow: isCurrent ? 'none' : '0 2px 4px rgba(0,0,0,0.1)',
+                                opacity: isSwitchingWorkspace ? 0.6 : 1,
+                                transition: 'background 0.2s'
+                              }}
+                            >
+                              {isCurrent ? (
+                                <>Estás en este negocio</>
+                              ) : (
+                                <>
+                                  Entrar a Demostración
+                                  <IonIcon icon={arrowForwardOutline} style={{ fontSize: '14px' }} />
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </IonCardContent>
+              </IonCard>
+            )}
 
             {/* CAJA DE ENLACE DE AFILIADO */}
             <IonCard style={{ margin: '0 0 20px 0', borderRadius: '14px', border: '1px solid #e2e8f0' }}>

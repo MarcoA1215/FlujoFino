@@ -2720,6 +2720,22 @@ export async function runDemoSeed(
     console.log('4. Auto Lavado Express        (demo-autolavado)');
     console.log('5. Burger House Gourmet       (demo-gastronomia)');
     console.log('6. Centro Estético Glow       (demo-estetica)');
+    // Regla General: Vincular a TODOS los promotores existentes en la base de datos a los 6 negocios demo
+    try {
+      const allPromoters = await promoterRepo.find();
+      const demoTenantsList = [tenantRetail, tenantPan, tenantSpa, tenantLavado, tenantBurger, tenantGlow];
+      for (const p of allPromoters) {
+        if (p.userId) {
+          for (const dt of demoTenantsList) {
+            await linkAccess(p.userId, dt.id, UserRole.ADMIN, 'Promotor Oficial (Demo)');
+          }
+        }
+      }
+      console.log(`✅ Vinculados ${allPromoters.length} promotor(es) a los 6 negocios de prueba de forma exitosa.`);
+    } catch (err) {
+      console.warn('⚠️ No se pudieron auto-vincular todos los promotores:', err);
+    }
+
     console.log('==================================================\n');
 
     return {
