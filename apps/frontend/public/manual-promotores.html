@@ -20,9 +20,9 @@
       --slate-100: #F1F5F9;
       --slate-50: #F8FAFC;
       --white: #FFFFFF;
-      --amber-500: #F59E0B;
+      --amber-500: #D97706;
       --amber-50: #FFFBEB;
-      --blue-500: #3B82F6;
+      --blue-500: #2563EB;
       --blue-50: #EFF6FF;
     }
 
@@ -105,24 +105,10 @@
       gap: 12px;
     }
 
-    .logo-icon {
-      width: 44px;
-      height: 44px;
-      background: var(--primary);
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: 800;
-      font-size: 22px;
-    }
-
-    .logo-text {
-      font-size: 24px;
-      font-weight: 800;
-      color: var(--slate-900);
-      letter-spacing: -0.5px;
+    .brand-logo-img {
+      height: 42px;
+      width: auto;
+      object-fit: contain;
     }
 
     .doc-pill {
@@ -189,13 +175,10 @@
       color: var(--slate-900);
       margin-bottom: 16px;
       letter-spacing: -0.5px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
     }
 
     h3 {
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 700;
       color: var(--slate-800);
       margin: 22px 0 10px 0;
@@ -226,8 +209,10 @@
     }
 
     .alert-box h4 {
-      font-size: 15px;
-      font-weight: 700;
+      font-size: 14px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
       margin-bottom: 6px;
       color: var(--slate-900);
     }
@@ -246,7 +231,7 @@
       color: white;
       text-align: left;
       padding: 12px 14px;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -263,18 +248,18 @@
     }
 
     .badge-rank {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
+      display: inline-block;
       font-weight: 700;
       padding: 4px 10px;
-      border-radius: 20px;
+      border-radius: 6px;
       font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .badge-wood { background: #E2E8F0; color: #475569; }
-    .badge-bronze { background: #FED7AA; color: #9A3412; }
-    .badge-silver { background: #E2E8F0; color: #334155; }
+    .badge-bronze { background: #FFEDD5; color: #9A3412; }
+    .badge-silver { background: #E2E8F0; color: #1E293B; }
     .badge-gold { background: #FEF08A; color: #854D0E; }
 
     .steps-grid {
@@ -317,7 +302,7 @@
     }
 
     .script-box::before {
-      content: "💬 QUÉ DECIRLE AL CLIENTE:";
+      content: "ARGUMENTO COMERCIAL:";
       font-style: normal;
       font-weight: 800;
       font-size: 11px;
@@ -327,7 +312,6 @@
       letter-spacing: 0.5px;
     }
 
-    /* Galería de capturas */
     .flow-screenshot {
       width: 100%;
       border-radius: 10px;
@@ -376,13 +360,14 @@
 
   <!-- Barra de control no imprimible -->
   <div class="no-print-bar">
-    <div style="font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px;">
-      <span>🟢 FinoWork</span>
-      <span style="opacity: 0.5;">|</span>
-      <span style="font-weight: 500; font-size: 14px;">Manual de Campo Oficial para Promotores y Afiliados</span>
+    <div style="font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 10px;">
+      <img src="/assets/logo-192.png" alt="FinoWork Logo" style="height: 24px; width: 24px; border-radius: 6px;">
+      <span>FinoWork</span>
+      <span style="opacity: 0.4;">|</span>
+      <span style="font-weight: 500; font-size: 13px;">Manual de Campo Oficial para Promotores y Afiliados</span>
     </div>
     <button class="btn-print" onclick="window.print()">
-      🖨️ Imprimir / Guardar como PDF
+      Imprimir / Guardar como PDF
     </button>
   </div>
 
@@ -392,8 +377,7 @@
     <div class="page">
       <div class="cover-header">
         <div class="logo-badge">
-          <div class="logo-icon">F</div>
-          <div class="logo-text">FinoWork</div>
+          <img src="/assets/logo.png" alt="FinoWork Logo Oficial" class="brand-logo-img">
         </div>
         <div class="doc-pill">Guía de Campo Oficial &bull; Cuota $20 USD</div>
       </div>
@@ -401,7 +385,7 @@
       <h1 class="cover-title">Manual Maestro del Promotor FinoWork</h1>
       <p class="cover-subtitle">Estrategias de Venta, Escalera de Comisiones Reales y Guía Ilustrada de Flujos Operativos para el Comercio en Venezuela.</p>
 
-      <img src="/assets/promoter_field_guide.jpg" alt="Promotor FinoWork en comercio" class="cover-image">
+      <img src="/assets/promoter_field_guide.jpg" alt="Demostración de FinoWork en local comercial" class="cover-image">
 
       <div class="cover-meta-grid">
         <div class="meta-item">
@@ -409,11 +393,11 @@
           <p>$20.00 USD / mes</p>
         </div>
         <div class="meta-item">
-          <h4>Comisión Base</h4>
-          <p>10% con Escalera a 20%</p>
+          <h4>Comisión Escalonada</h4>
+          <p>10% a 20% Recurrente</p>
         </div>
         <div class="meta-item">
-          <h4>Métodos de Liquidación</h4>
+          <h4>Liquidación Oficial</h4>
           <p>Pago Móvil / Binance Pay</p>
         </div>
       </div>
@@ -423,33 +407,33 @@
 
     <!-- PÁGINA 2: EL SISTEMA DE COMISIONES Y ESCALERA -->
     <div class="page">
-      <h2>💰 1. El Sistema de Comisiones y Escalera de Rangos</h2>
-      <p>El modelo de FinoWork está diseñado para que construyas un **ingreso mensual recurrente en dólares**. Cada comercio que afilies con tu enlace paga una cuota oficial de **$20.00 USD al mes**.</p>
+      <h2>1. El Sistema de Comisiones y Escalera de Rangos</h2>
+      <p>El modelo comercial de FinoWork permite construir un ingreso mensual recurrente en dólares. Cada comercio afiliado mediante tu enlace abona una cuota oficial base de <strong>$20.00 USD al mes</strong>.</p>
 
       <div class="alert-box gold">
-        <h4>⚡ ¿Cuánto es la Comisión de Activación y cuánto la Recurrente?</h4>
-        <p><strong>1. Comisión de Activación (Tu primer cobro por cada negocio):</strong><br>
-        En el momento exacto en que tu comercio referido termina sus 15 días de prueba y realiza su primer pago de suscripción oficial ($20 USD), se genera tu <strong>Comisión de Activación</strong> del <strong>10% ($2.00 USD)</strong> en rango Bronce. Si el cliente decide pagar el plan anual adelantado ($200 USD), ¡tu comisión de activación es de <strong>$20.00 USD</strong> de inmediato!<br>
-        <em>🎁 Bono de Bienvenida: Tu primera activación desbloquea el Rango Bronce y un bono especial de $10.00 USD, cobrando $12.00 USD en tu primer cliente.</em></p>
-        <p style="margin-bottom: 0;"><strong>2. Comisión Recurrente (Tu sueldo pasivo mensual):</strong><br>
-        Cada mes subsiguiente que el negocio renueva su cuota de $20 USD para seguir usando FinoWork, tú vuelves a cobrar automáticamente el <strong>10% ($2.00 USD/mes)</strong>. Al alcanzar 50 comercios subes a Plata cobrando el <strong>15% ($3.00 USD/mes)</strong>, y con 100 comercios subes a Oro cobrando el <strong>20% ($4.00 USD/mes)</strong> por cada negocio.</p>
+        <h4>Condiciones de Activación y Recurrencia</h4>
+        <p><strong>1. Comisión de Activación (Primer cobro por comercio):</strong><br>
+        En el momento en que tu comercio referido concluye sus 15 días de prueba gratuita y procesa su primer pago formal ($20 USD), se acredita de inmediato tu comisión de activación del <strong>10% ($2.00 USD)</strong> en nivel Bronce. Si el comercio abona el plan anual ($200 USD), la comisión de activación es de <strong>$20.00 USD</strong> en una sola liquidación.<br>
+        <em>Bono de Bienvenida: Tu primera activación desbloquea el Nivel Bronce y un bono complementario de $10.00 USD, totalizando $12.00 USD en tu primer cliente.</em></p>
+        <p style="margin-bottom: 0;"><strong>2. Comisión Recurrente (Ingreso mensual continuo):</strong><br>
+        Cada mes subsiguiente que el negocio renueva su cuota de $20 USD, recibes de forma automática el <strong>10% ($2.00 USD/mes)</strong>. Al alcanzar 50 comercios asciendes a Plata con <strong>15% ($3.00 USD/mes)</strong>, y a partir de 100 comercios activos alcanzas Oro con <strong>20% ($4.00 USD/mes)</strong> por comercio.</p>
       </div>
 
       <h3>Escalera Oficial de Rangos y Ganancias por Comercio:</h3>
       <table>
         <thead>
           <tr>
-            <th>Rango Oficial</th>
+            <th>Nivel Oficial</th>
             <th>Comercios Activos</th>
             <th>% Comisión</th>
-            <th>Comisión por Pago ($20)</th>
-            <th>Comisión Anual ($200)</th>
-            <th>Bono de Rango</th>
+            <th>Comisión por Mensualidad ($20)</th>
+            <th>Comisión por Anualidad ($200)</th>
+            <th>Bono de Ascenso</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td><span class="badge-rank badge-wood">🪵 Madera</span></td>
+            <td><span class="badge-rank badge-wood">Madera</span></td>
             <td>0 comercios</td>
             <td><strong>10%</strong></td>
             <td>$2.00 USD</td>
@@ -457,7 +441,7 @@
             <td>$0.00 USD</td>
           </tr>
           <tr>
-            <td><span class="badge-rank badge-bronze">🥉 Bronce</span></td>
+            <td><span class="badge-rank badge-bronze">Bronce</span></td>
             <td>1 a 49 comercios</td>
             <td><strong>10%</strong></td>
             <td><strong>$2.00 USD</strong> / mes</td>
@@ -465,7 +449,7 @@
             <td><strong>+$10.00 USD</strong></td>
           </tr>
           <tr>
-            <td><span class="badge-rank badge-silver">🥈 Plata</span></td>
+            <td><span class="badge-rank badge-silver">Plata</span></td>
             <td>50 a 99 comercios</td>
             <td><strong>15%</strong></td>
             <td><strong>$3.00 USD</strong> / mes</td>
@@ -473,7 +457,7 @@
             <td><strong>+$25.00 USD</strong></td>
           </tr>
           <tr>
-            <td><span class="badge-rank badge-gold">🥇 Oro</span></td>
+            <td><span class="badge-rank badge-gold">Oro</span></td>
             <td>100+ comercios</td>
             <td><strong>20%</strong></td>
             <td><strong>$4.00 USD</strong> / mes</td>
@@ -483,12 +467,12 @@
         </tbody>
       </table>
 
-      <h3>Tabla de Proyección Real de Ingresos para el Promotor:</h3>
+      <h3>Proyección Mensual Recurrente del Promotor:</h3>
       <table>
         <thead>
           <tr>
             <th>Comercios Activos</th>
-            <th>Rango Alcanzado</th>
+            <th>Nivel</th>
             <th>Cálculo Mensual</th>
             <th>Ingreso Mensual Recurrente</th>
           </tr>
@@ -496,37 +480,37 @@
         <tbody>
           <tr>
             <td><strong>10 comercios</strong></td>
-            <td>🥉 Bronce (10%)</td>
+            <td>Bronce (10%)</td>
             <td>10 x $2.00 USD</td>
             <td><strong>$20.00 USD / mes</strong></td>
           </tr>
           <tr>
             <td><strong>25 comercios</strong></td>
-            <td>🥉 Bronce (10%)</td>
+            <td>Bronce (10%)</td>
             <td>25 x $2.00 USD</td>
             <td><strong>$50.00 USD / mes</strong></td>
           </tr>
           <tr>
             <td><strong>50 comercios</strong></td>
-            <td>🥈 Plata (15%)</td>
+            <td>Plata (15%)</td>
             <td>50 x $3.00 USD + $25 bono</td>
             <td><strong>$175.00 USD / mes</strong></td>
           </tr>
           <tr>
             <td><strong>80 comercios</strong></td>
-            <td>🥈 Plata (15%)</td>
+            <td>Plata (15%)</td>
             <td>80 x $3.00 USD</td>
             <td><strong>$240.00 USD / mes</strong></td>
           </tr>
           <tr>
             <td><strong>100 comercios</strong></td>
-            <td>🥇 Oro (20%)</td>
+            <td>Oro (20%)</td>
             <td>100 x $4.00 USD + $50 bono</td>
             <td><strong>$450.00 USD / mes</strong></td>
           </tr>
           <tr>
             <td><strong>150 comercios</strong></td>
-            <td>🥇 Oro (20%)</td>
+            <td>Oro (20%)</td>
             <td>150 x $4.00 USD</td>
             <td><strong>$600.00 USD / mes</strong></td>
           </tr>
@@ -534,8 +518,8 @@
       </table>
 
       <div class="alert-box blue">
-        <h4>🏦 ¿Cómo cobras tus comisiones?</h4>
-        <p>En tu panel de promotor (`/promoter`), configuras tus datos de cobro: <strong>Pago Móvil</strong> (Teléfono, Cédula y Banco) para recibir bolívares a tasa oficial, o <strong>Binance Pay ID</strong> para recibir USDT directamente.</p>
+        <h4>Canales de Liquidación</h4>
+        <p style="margin: 0;">En tu panel de promotor (`/promoter`), configuras tus datos de cobro: <strong>Pago Móvil</strong> (Teléfono, Cédula y Banco) para liquidación en bolívares a la tasa oficial del día, o <strong>Binance Pay</strong> en USDT directo a tu cuenta.</p>
       </div>
     </div>
 
@@ -543,94 +527,94 @@
 
     <!-- PÁGINA 3: FLUJO 1 - PUNTO DE VENTA (POS) -->
     <div class="page">
-      <h2>🛒 2. Flujo Operativo: Punto de Venta (POS) y Caja</h2>
-      <p>El POS de FinoWork es el corazón del comercio físico. Resuelve el dolor de la tasa de cambio diaria y el enredo al cobrar en bolívares y dólares simultáneamente.</p>
+      <h2>2. Flujo Operativo: Punto de Venta (POS) y Caja</h2>
+      <p>El POS de FinoWork está adaptado al dinamismo del comercio presencial en Venezuela. Permite cobros rápidos sin calculadoras auxiliares y garantiza continuidad operativa sin internet.</p>
 
       <h3>Paso 1: Selección Táctil de Productos y Carrito Lateral</h3>
-      <p>El cajero o dueño ve fotos, precios en dólares y bolívares a la tasa oficial del día (ej. BCV). Toca los productos y se acumulan en el carrito flotante.</p>
+      <p>El cajero visualiza fotos, precios en dólares y bolívares convertidos automáticamente a la tasa oficial activa (ej. BCV). Los productos se agregan con un toque al carrito flotante.</p>
       <img src="/assets/pos-catalog-desktop.png" alt="Catálogo POS Desktop" class="flow-screenshot">
-      <div class="caption">Pantalla principal de POS / Caja con cálculo en vivo a tasa oficial BCV.</div>
+      <div class="caption">Pantalla principal de POS / Caja con indicador de conectividad y tasa oficial activa.</div>
 
       <h3>Paso 2: Resumen, Descuentos y Entrega Inmediata</h3>
       <div class="flow-grid-2">
         <div>
           <img src="/assets/pos-order-summary.png" alt="Resumen de Pedido" class="flow-screenshot">
-          <div class="caption">Resumen con opción de Entrega Inmediata (no estorba en comanda).</div>
+          <div class="caption">Resumen con opción de Entrega Inmediata para despejar comandas de cocina.</div>
         </div>
         <div>
           <img src="/assets/pos-customer-discount.png" alt="Buscador de Cliente" class="flow-screenshot">
-          <div class="caption">Búsqueda rápida de cliente por cédula y descuento ($ o %).</div>
+          <div class="caption">Búsqueda de cliente por cédula y asignación a empleado para nómina.</div>
         </div>
       </div>
 
-      <h3>Paso 3: Cobro Multimoneda (Efectivo $, Efectivo Bs, Pago Móvil o Cuenta Abierta)</h3>
-      <p>El modal de pago permite registrar pagos mixtos y calcula el **vuelto exacto en bolívares o dólares**. Si el cliente es de confianza, se puede marcar como **Cuenta Abierta (Abono / Por Pagar)**.</p>
+      <h3>Paso 3: Cobro Multimoneda y Cálculo de Vuelto</h3>
+      <p>El sistema soporta Pago Móvil con verificación de banco y referencia, Efectivo USD, Efectivo en Bolívares y Cuenta Abierta (Abonos parciales), calculando el vuelto exacto al centavo.</p>
       <img src="/assets/pos-payment-methods.png" alt="Métodos de Pago POS" class="flow-screenshot">
-      <div class="caption">Selección de métodos de pago: Pago Móvil con Banco y Referencia, Efectivo y Cuenta Abierta.</div>
+      <div class="caption">Modal de cobro con selector de banco emisor, referencia y confirmación instantánea.</div>
     </div>
 
     <div class="page-break"></div>
 
     <!-- PÁGINA 4: FLUJO 2 - TIENDA ONLINE Y CATÁLOGO WHATSAPP -->
     <div class="page">
-      <h2>🌐 3. Flujo Operativo: Tienda Online Pública y Pedidos Web</h2>
-      <p>Cada negocio afiliado recibe su propio enlace web (`/public/store`) para colocarlo en su perfil de Instagram, bio o estados de WhatsApp. **0% comisiones a terceros.**</p>
+      <h2>3. Flujo Operativo: Tienda Online Pública y Pedidos Web</h2>
+      <p>Cada negocio dispone de su propia tienda online pública (`/public/store`) para difundir su catálogo en WhatsApp e Instagram con cero comisiones por venta.</p>
 
-      <h3>Paso 1: Menú Digital con Filtro por Categorías</h3>
+      <h3>Paso 1: Menú Digital con Filtros por Categoría</h3>
       <img src="/assets/store-catalog-public.png" alt="Tienda Online Pública" class="flow-screenshot">
-      <div class="caption">Catálogo público responsive: fotos, buscador y precios actualizados en bolívares y dólares.</div>
+      <div class="caption">Catálogo web adaptable a teléfonos: fotos, categorías y precios duales en bolívares y dólares.</div>
 
-      <h3>Paso 2: Carrito con Retiro en Tienda o Delivery</h3>
+      <h3>Paso 2: Carrito y Selección de Retiro o Delivery</h3>
       <div class="flow-grid-2">
         <div>
           <img src="/assets/store-cart-checkout.png" alt="Carrito de Tienda" class="flow-screenshot">
-          <div class="caption">Carrito de compras: Retiro en tienda (gratis) o envío a domicilio.</div>
+          <div class="caption">Carrito de compras: Retiro en tienda presencial o despacho a domicilio.</div>
         </div>
         <div>
           <img src="/assets/store-customer-form.png" alt="Datos de Cliente" class="flow-screenshot">
-          <div class="caption">Apartado Inmediato de stock al pagar para proteger el inventario.</div>
+          <div class="caption">Apartado Inmediato de stock para proteger el inventario mientras el cliente paga.</div>
         </div>
       </div>
 
-      <h3>Paso 3: Pago Móvil Directo con Monto Exacto en Bolívares</h3>
-      <p>El cliente ve los datos del negocio (teléfono, cédula, banco), copia el monto exacto en bolívares y coloca los últimos dígitos de su comprobante.</p>
+      <h3>Paso 3: Pago Móvil con Monto Exacto en Bolívares</h3>
+      <p>El cliente visualiza los datos bancarios del negocio, copia el monto exacto en bolívares con un botón e introduce los dígitos de su comprobante.</p>
       <img src="/assets/store-pagomovil-modal.png" alt="Reporte Pago Móvil Web" class="flow-screenshot">
-      <div class="caption">Modal de pago del cliente con botón "Copiar todo" para su app bancaria.</div>
+      <div class="caption">Modal de pago del cliente con botón para copiar el monto exacto a su aplicación bancaria.</div>
     </div>
 
     <div class="page-break"></div>
 
     <!-- PÁGINA 5: FLUJO 3 - AGENDAMIENTO DE CITAS ONLINE -->
     <div class="page">
-      <h2>📅 4. Flujo Operativo: Citas y Reservaciones para Servicios</h2>
-      <p>Ideal para barberías, peluquerías, salones de estética, spas y consultorios. El cliente agenda su cita desde su teléfono sin necesidad de llamar.</p>
+      <h2>4. Flujo Operativo: Citas y Reservaciones para Servicios</h2>
+      <p>Diseñado para barberías, peluquerías, salones de estética, spas y consultorios (`/public/reservations`).</p>
 
       <h3>Paso 1: Selección Multi-Servicio y Duración Acumulada</h3>
       <img src="/assets/booking-service-selection.png" alt="Selección de Servicios" class="flow-screenshot">
-      <div class="caption">El cliente puede elegir varios servicios (ej. Masaje + Limpieza Facial) sumando tiempo y precio automáticamente.</div>
+      <div class="caption">Selección de múltiples tratamientos acumulando duración y valor de forma automática.</div>
 
-      <h3>Paso 2: Calendario y Horas Disponibles en Tiempo Real</h3>
+      <h3>Paso 2: Calendario y Turnos Disponibles</h3>
       <div class="flow-grid-2">
         <div>
           <img src="/assets/booking-calendar-date.png" alt="Calendario de Citas" class="flow-screenshot">
-          <div class="caption">Calendario con bloqueo automático de días no laborables o llenos.</div>
+          <div class="caption">Calendario con bloqueo de días no laborables o agendas completas.</div>
         </div>
         <div>
           <img src="/assets/booking-time-slots.png" alt="Horarios Disponibles" class="flow-screenshot">
-          <div class="caption">Horarios disponibles según el tiempo acumulado de los servicios.</div>
+          <div class="caption">Bloques de horarios disponibles ajustados a la duración de los servicios.</div>
         </div>
       </div>
 
-      <h3>Paso 3: Reserva con Cuenta Abierta ("Pagar al Asistir") y Panel Privado</h3>
-      <p>El cliente puede pagar por adelantado con Pago Móvil o elegir **"Por pagar al asistir"**. Al confirmar, recibe un **enlace privado único** con botones directos para autogestionar su cita y recibir avisos Web Push.</p>
+      <h3>Paso 3: Reserva con Cuenta Abierta ("Pagar al Asistir") y Portal Privado</h3>
+      <p>El cliente puede registrar su reserva sin pago anticipado forzoso. Al confirmar, accede a un enlace privado con autogestión de citas y alertas Web Push.</p>
       <div class="flow-grid-2">
         <div>
           <img src="/assets/booking-open-tab-confirm.png" alt="Confirmación Cuenta Abierta" class="flow-screenshot">
-          <div class="caption">Confirmación con opción de pagar en efectivo al asistir.</div>
+          <div class="caption">Confirmación con modalidad de pago presencial al momento de la atención.</div>
         </div>
         <div>
           <img src="/assets/booking-client-portal.png" alt="Portal Privado de Cita" class="flow-screenshot">
-          <div class="caption">Panel privado del cliente con botón directo de WhatsApp y reprogramación.</div>
+          <div class="caption">Panel privado del cliente con botón de WhatsApp y opción de reprogramar.</div>
         </div>
       </div>
     </div>
@@ -639,13 +623,13 @@
 
     <!-- PÁGINA 6: FLUJO 4 - CONTROL FINANCIERO Y ARQUEO -->
     <div class="page">
-      <h2>📊 5. Control Financiero: Tesorería, Arqueo y Libro de Ventas</h2>
-      <p>Esta es la sección que convence de inmediato a los dueños y contadores: **transparencia total del dinero físico y digital**.</p>
+      <h2>5. Control Financiero: Tesorería, Arqueo y Libro de Ventas</h2>
+      <p>Herramientas contables que brindan control absoluto al propietario y facilitan la labor del contador.</p>
 
-      <h3>1. Tesorería y Fondos Reales (Separación de Gaveta y Bancos)</h3>
-      <p>Muestra exactamente cuánto dinero físico hay en la gaveta en dólares y cuánto hay en cuentas bancarias nacionales en bolívares, sin distorsión por la tasa de cambio.</p>
+      <h3>1. Tesorería y Fondos Reales (Gaveta Física vs Cuentas Bancarias)</h3>
+      <p>Diferencia el efectivo real disponible en caja respecto al saldo en cuentas bancarias nacionales en bolívares.</p>
       <img src="/assets/treasury-real-funds.png" alt="Tesorería y Fondos Reales" class="flow-screenshot">
-      <div class="caption">Patrimonio Líquido Total desglosado en Gaveta Física USD y Bancos Nacionales en Bs.</div>
+      <div class="caption">Patrimonio líquido desglosado en Gaveta Física (USD) y Cuentas Bancarias Nacionales (Bs).</div>
 
       <h3>2. Arqueo Mensual Detallado y Libro de Ventas (Control de IVA)</h3>
       <div class="flow-grid-2">
@@ -655,72 +639,72 @@
         </div>
         <div>
           <img src="/assets/fiscal-sales-book-table.png" alt="Libro de Ventas Fiscal" class="flow-screenshot">
-          <div class="caption">Libro de Ventas SENIAT con Nº de Factura, Nº Control, Base e IVA 16% exportable a Excel.</div>
+          <div class="caption">Libro de Ventas SENIAT con Nº Factura, Nº Control, Base Imponible y Débito Fiscal 16%.</div>
         </div>
       </div>
 
-      <h3>3. Arqueo y Cierre Diario de Caja con Reporte para WhatsApp</h3>
-      <p>Al final de la noche, el cajero declara su base inicial y el sistema cuadra las ventas en efectivo, punto y pago móvil. Con un solo clic, se genera el resumen listo para enviar por WhatsApp al dueño del negocio.</p>
+      <h3>3. Arqueo Diario de Caja con Resumen para WhatsApp</h3>
+      <p>El cajero declara su base inicial y el sistema cuadra ingresos por efectivo, punto y pago móvil, permitiendo compartir el reporte al dueño en un solo clic.</p>
       <div class="flow-grid-2">
         <div>
           <img src="/assets/cash-close-drawer-modal.png" alt="Modal de Arqueo Diario" class="flow-screenshot">
-          <div class="caption">Arqueo diario con base de gaveta y cálculo de vueltos entregados.</div>
+          <div class="caption">Arqueo diario de gaveta con cálculo de vueltos entregados y egresos.</div>
         </div>
         <div>
           <img src="/assets/cash-close-whatsapp-report.png" alt="Reporte para WhatsApp" class="flow-screenshot">
-          <div class="caption">Botón verde "Copiar Reporte para WhatsApp" para enviar el cuadre al dueño.</div>
+          <div class="caption">Botón "Copiar Reporte para WhatsApp" para enviar el cuadre al propietario al instante.</div>
         </div>
       </div>
     </div>
 
     <div class="page-break"></div>
 
-    <!-- PÁGINA 7: GUION DE CALLE Y HERRAMIENTAS DEL PROMOTOR -->
+    <!-- PÁGINA 7: GUION DE CALLE Y PROTOCOLO DE SEGUIMIENTO -->
     <div class="page">
-      <h2>🗣️ 6. Guion de Calle (El Pitch de 2 Minutos)</h2>
+      <h2>6. Guion de Calle: El Pitch de 2 Minutos</h2>
 
-      <h3>⏱️ Minuto 0: La Entrada al Negocio</h3>
+      <h3>Paso 1: Identificación del Problema Operativo</h3>
       <div class="script-box">
-        "Buenas tardes, amigo. Una pregunta rápida: ¿cuánto tiempo pierden tú o tus cajeros calculando el vuelto en bolívares con la tasa del BCV o cuando un cliente te paga mitad en dólares y mitad en pago móvil?"
+        "Buenas tardes. Una consulta rápida: ¿cuánto tiempo invierten tú o tus cajeros calculando el vuelto en bolívares con la tasa del BCV o cuando un cliente paga una parte en dólares en efectivo y el resto por pago móvil?"
       </div>
 
-      <h3>⏱️ Minuto 1: La Demostración en tu Teléfono</h3>
+      <h3>Paso 2: Demostración Práctica en Teléfono</h3>
       <div class="script-box">
-        "Mira mi pantalla un segundo. Selecciono dos productos de $18 y $25. Total: $43. El cliente me da $50 en efectivo. Le doy a cobrar y mira esto: la app me dice de inmediato: 'Vuelto: $7.00 o Bs. 6,216.84 a tasa BCV'. Todo al centavo. Y si ahorita mismo se nos corta la luz, la app sigue cobrando sin internet gracias a su base de datos offline."
+        "Observa la pantalla un momento. Selecciono dos productos de $18 y $25. Total: $43. El cliente entrega $50 en efectivo. Al presionar cobrar, el sistema indica de inmediato: 'Vuelto: $7.00 o Bs. 6,216.84 a tasa oficial'. Todo exacto. Además, si se interrumpe la electricidad o la conexión, el punto de venta continúa operando sin conexión mediante su base de datos local."
       </div>
 
-      <h3>⏱️ Minuto 2: El Cierre Sin Riesgo (Prueba Gratuita de 15 Días)</h3>
+      <h3>Paso 3: Cierre con Período de Prueba</h3>
       <div class="script-box">
-        "Te la instalo ahorita en tu propio teléfono o en tu computadora en 3 minutos. Te doy 15 días gratis para que la pruebes en tu mostrador con la cuota oficial base de $20 al mes. Si al final de la semana no te ahorró dolores de cabeza, la desinstalas y listo. ¿Cuál es tu correo para vincularte?"
+        "Te habilito el sistema de prueba durante 15 días en tu teléfono o computadora sin costo alguno. Pruebas la cuota oficial base de $20 al mes en tu propio mostrador. Si al término de la semana no te optimiza la cobranza, simplemente no continúas. ¿A qué correo te vinculo la cuenta?"
       </div>
 
       <hr style="border: none; border-top: 1px solid var(--slate-200); margin: 28px 0;">
 
-      <h2>📱 7. Las 4 Plantillas de WhatsApp en tu Panel de Promotor</h2>
-      <p>Dentro de tu panel de promotor (`/promoter`), tienes un generador automático de mensajes para dar seguimiento a tus comercios con un clic:</p>
+      <h2>7. Protocolo de Seguimiento y Plantillas de WhatsApp</h2>
+      <p>Tu panel de promotor (`/promoter`) incluye cuatro plantillas preconfiguradas para dar seguimiento profesional a tus comercios:</p>
 
       <div class="steps-grid">
         <div class="step-card">
-          <h4>1. Satisfacción</h4>
-          <p>Para preguntar cómo ha sido la experiencia tras los primeros 3 días y ayudarlos a cargar más productos.</p>
+          <h4>1. Encuesta de Satisfacción</h4>
+          <p>Para verificar la experiencia tras los primeros tres días de uso y apoyar con la carga del catálogo.</p>
         </div>
         <div class="step-card">
-          <h4>2. Acompañamiento en Prueba (Trial)</h4>
-          <p>Les recuerda cuántos días de prueba les quedan y les ofrece ayuda para dejar el catálogo listo al 100%.</p>
+          <h4>2. Acompañamiento en Prueba</h4>
+          <p>Notifica los días restantes de prueba gratuita y asiste en la configuración final del inventario.</p>
         </div>
         <div class="step-card">
-          <h4>3. Cobro y Renovación Amigable</h4>
-          <p>Avisa cuando su cuota de $20 USD está por vencer y les ofrece los datos de Pago Móvil o Binance Pay.</p>
+          <h4>3. Recordatorio de Renovación</h4>
+          <p>Informa con antelación sobre el vencimiento de la cuota mensual de $20 USD con datos de Pago Móvil o Binance.</p>
         </div>
         <div class="step-card">
           <h4>4. Recuperación de Inactivos</h4>
-          <p>Reactiva comercios que dejaron de usar la app con ofertas o soporte personalizado.</p>
+          <p>Permite contactar a comercios pausados para ofrecer asistencia técnica y reactivar su cuenta.</p>
         </div>
       </div>
 
       <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--slate-200);">
         <p style="font-size: 13px; color: var(--slate-500); font-weight: 600;">
-          FinoWork &copy; 2026 &bull; Plataforma Oficial Multi-Tenant &bull; Sistema de Promotores y Afiliados
+          FinoWork &bull; Plataforma Oficial Multi-Tenant &bull; Programa de Promotores Oficiales
         </p>
       </div>
     </div>
