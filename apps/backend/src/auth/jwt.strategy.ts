@@ -7,6 +7,7 @@ import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { isValidUUID } from '../utils/tenant-crypto';
 import { UserRole } from '@finowork/shared-types';
+import { RedisService } from '../redis/redis.service';
 
 interface CachedSessionValidation {
   userId: string;
@@ -16,22 +17,26 @@ interface CachedSessionValidation {
   expiresAt: number;
 }
 
-// Caché en memoria para evitar saturar la base de datos con consultas repetitivas de sesión
+// Caché en memoria local como respaldo inmediato y fallback
 const sessionValidationCache = new Map<string, CachedSessionValidation>();
 
 // TTL de 60 segundos: el usuario se valida en BD como máximo 1 vez por minuto
 const SESSION_CACHE_TTL_MS = 60 * 1000;
 
+let globalRedisService: RedisService | null = null;
+
 export function invalidateSessionCache(userId?: string) {
   if (!userId) {
     sessionValidationCache.clear();
+    globalRedisService?.delPattern('sess:*');
     return;
   }
   for (const [key, item] of sessionValidationCache.entries()) {
-    if (item.userId === userId || key.startsWith(`${userId}:`)) {
+    if (item.userId === userId || key.startsWith(`sess:${userId}:`) || key.startsWith(`${userId}:`)) {
       sessionValidationCache.delete(key);
     }
   }
+  globalRedisService?.delPattern(`sess:${userId}:*`);
 }
 
 @Injectable()
@@ -39,24 +44,38 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private configService: ConfigService,
     @Optional() private dataSource?: DataSource,
+    @Optional() private redisService?: RedisService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_SECRET'),
     });
+    if (redisService) {
+      globalRedisService = redisService;
+    }
   }
 
   async validate(payload: any) {
     if (this.dataSource && this.dataSource.isInitialized) {
       const userId = payload.sub || payload.id;
       const tenantId = payload.tenantId || '';
-      const cacheKey = `${userId}:${tenantId}`;
+      const cacheKey = `sess:${userId}:${tenantId}`;
       const now = Date.now();
 
-      // Si la sesión ya fue validada recientemente en memoria RAM, evitamos la llamada a BD
-      const cached = sessionValidationCache.get(cacheKey);
-      if (cached && cached.expiresAt > now) {
+      // 1. Intentar validar primero con Redis distribuido o con memoria local
+      let cached: CachedSessionValidation | null = null;
+      if (this.redisService) {
+        cached = await this.redisService.getJson<CachedSessionValidation>(cacheKey);
+      }
+      if (!cached) {
+        const ramCached = sessionValidationCache.get(cacheKey);
+        if (ramCached && ramCached.expiresAt > now) {
+          cached = ramCached;
+        }
+      }
+
+      if (cached && (cached.expiresAt ? cached.expiresAt > now : true)) {
         return {
           id: payload.sub,
           username: payload.username,
@@ -87,6 +106,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
       if (!user) {
         sessionValidationCache.delete(cacheKey);
+        await this.redisService?.del(cacheKey);
         throw new UnauthorizedException('El usuario no existe o su sesión ha sido revocada.');
       }
 
@@ -115,6 +135,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
         if (!access || access.isActive === false || access.status === 'REJECTED') {
           sessionValidationCache.delete(cacheKey);
+          await this.redisService?.del(cacheKey);
           throw new UnauthorizedException('El acceso a este espacio de trabajo ha sido revocado o suspendido.');
         }
 
@@ -138,14 +159,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         }
       }
 
-      // Guardar validación exitosa en memoria RAM por 60 segundos
-      sessionValidationCache.set(cacheKey, {
+      const sessionData: CachedSessionValidation = {
         userId: user.id,
         tenantId,
         role: effectiveRole,
         roles: effectiveRoles,
         expiresAt: now + SESSION_CACHE_TTL_MS,
-      });
+      };
+
+      // Guardar validación exitosa tanto en memoria RAM local como en Redis
+      sessionValidationCache.set(cacheKey, sessionData);
+      if (this.redisService) {
+        await this.redisService.setJson(cacheKey, sessionData, 60);
+      }
 
       // Mantenimiento de memoria: limpiar registros viejos si el mapa crece
       if (sessionValidationCache.size > 2000) {

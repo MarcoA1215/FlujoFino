@@ -1,4 +1,5 @@
-import { Injectable, BadRequestException, ForbiddenException, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException, OnModuleInit, Optional } from '@nestjs/common';
+import { RedisService } from '../redis/redis.service';
 import { randomUUID } from 'crypto';
 import { DataSource, Between, In, Not, MoreThanOrEqual, EntityManager } from 'typeorm';
 import { IsOptional, IsArray, IsString, IsNumber, IsBoolean, IsEnum } from 'class-validator';
@@ -391,6 +392,7 @@ export class OrdersService implements OnModuleInit {
     private dataSource: DataSource,
     private readonly customersService: CustomersService,
     private readonly settingsService: SettingsService,
+    @Optional() private readonly redisService?: RedisService,
   ) {}
 
   async onModuleInit() {
@@ -3009,7 +3011,17 @@ export class OrdersService implements OnModuleInit {
       const offlineId = item.offlineId || item.id || 'desconocido';
 
       // Evitar que dos hilos o llamadas procesen el mismo offlineId concurrentemente
-      if (offlineId !== 'desconocido' && OrdersService.syncingOfflineIds.has(`${tenantId}_${offlineId}`)) {
+      const lockKey = 'lock:offline_sync:' + tenantId + ':' + offlineId;
+      let isLocked = false;
+      if (offlineId !== 'desconocido') {
+        if (this.redisService) {
+          const acquired = await this.redisService.setNx(lockKey, '1', 45);
+          isLocked = !acquired;
+        } else {
+          isLocked = OrdersService.syncingOfflineIds.has(`${tenantId}_${offlineId}`);
+        }
+      }
+      if (isLocked) {
         syncedOfflineIds.push(offlineId);
         continue;
       }
@@ -3064,6 +3076,9 @@ export class OrdersService implements OnModuleInit {
       } finally {
         if (offlineId !== 'desconocido') {
           OrdersService.syncingOfflineIds.delete(`${tenantId}_${offlineId}`);
+          if (this.redisService) {
+            await this.redisService.del(`lock:offline_sync:${tenantId}:${offlineId}`);
+          }
         }
       }
     }

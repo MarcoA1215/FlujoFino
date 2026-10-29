@@ -62,12 +62,14 @@ import { SalaryAdvancesModule } from './salary-advances/salary-advances.module';
 import { DeliveriesModule } from './deliveries/deliveries.module';
 import { InvestmentsModule } from './investments/investments.module';
 import { PromotersModule } from './promoters/promoters.module';
+import { RedisModule } from './redis/redis.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { SentryModule } from '@sentry/nestjs/setup';
 
 @Module({
   imports: [
     SentryModule.forRoot(),
+    RedisModule,
     ThrottlerModule.forRoot([{
       ttl: 60000,
       limit: 300,

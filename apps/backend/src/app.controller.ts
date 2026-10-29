@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { AppService } from './app.service';
 import { Public } from './auth/public.decorator';
 import { SettingsService } from './settings/settings.service';
+import { RedisService } from './redis/redis.service';
 
 @Controller()
 export class AppController {
@@ -10,6 +11,7 @@ export class AppController {
     private readonly appService: AppService,
     private readonly settingsService: SettingsService,
     @Optional() private readonly dataSource?: DataSource,
+    @Optional() private readonly redisService?: RedisService,
   ) {}
 
   @Get()
@@ -36,6 +38,7 @@ export class AppController {
     return {
       status: isHealthy ? 'ok' : 'degraded',
       database: dbStatus,
+      redis: this.redisService?.isReady() ? 'connected' : 'fallback-ram',
       timestamp: new Date().toISOString(),
     };
   }
