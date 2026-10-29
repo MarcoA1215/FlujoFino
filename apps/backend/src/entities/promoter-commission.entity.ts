@@ -1,4 +1,4 @@
-﻿import {
+import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
@@ -64,6 +64,9 @@ export class PromoterCommission {
 
   @Column({ type: 'varchar', nullable: true })
   paymentReference: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  notes: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

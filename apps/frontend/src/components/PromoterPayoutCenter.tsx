@@ -107,8 +107,8 @@ export const PromoterPayoutCenter: React.FC<Props> = ({ promoter, rate, onClose,
     }
     msg += `Método: ${m === 'BINANCE' ? 'Binance Pay' : 'Pago Móvil'}\nReferencia: ${ref}\n\n*Detalle:*\n`;
     comms.forEach((c, i) => {
-      const t = c.type === PromoterCommissionType.ACTIVATION ? 'Activación' : 'Recurrente';
-      msg += `${i + 1}. ${c.tenantName || 'Comercio'} - ${t}: $${c.amountUSD.toFixed(2)}\n`;
+      const t = c.type === PromoterCommissionType.ACTIVATION ? 'Activación' : c.type === PromoterCommissionType.BONUS ? 'Bono Meta' : 'Recurrente';
+      msg += `${i + 1}. ${c.tenantName || 'Comercio'} - ${t}: $${c.amountUSD.toFixed(2)}${c.notes ? ` (${c.notes})` : ''}\n`;
     });
     msg += `\n¡Gracias por impulsar FinoWork!`;
     const num = waNumber(p.phone || p.pagoMovilPhone || '');
@@ -373,10 +373,11 @@ export const PromoterPayoutCenter: React.FC<Props> = ({ promoter, rate, onClose,
                                 )}
                               </td>
                               <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0f172a' }}>
-                                {c.tenantName || 'Comercio vinculado'}
+                                <div>{c.tenantName || 'Comercio vinculado'}</div>
+                                {c.notes && <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>{c.notes}</div>}
                               </td>
                               <td style={{ padding: '10px 12px', fontSize: '11px', fontWeight: 700 }}>
-                                {c.type === PromoterCommissionType.ACTIVATION ? '⭐ Activación' : '🔄 Recurrente'}
+                                {c.type === PromoterCommissionType.ACTIVATION ? '⭐ Activación' : c.type === PromoterCommissionType.BONUS ? '🎁 Bono Meta' : '🔄 Recurrente'}
                               </td>
                               <td style={{ padding: '10px 12px' }}>
                                 <strong>${c.amountUSD.toFixed(2)}</strong>

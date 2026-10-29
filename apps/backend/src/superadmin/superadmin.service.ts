@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, DataSource } from 'typeorm';
+import { Repository, In, DataSource, Like } from 'typeorm';
 import { Tenant } from '../entities/tenant.entity';
 import { SaaSPaymentReport } from '../entities/saas-payment-report.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
@@ -773,8 +773,58 @@ export class SuperAdminService implements OnModuleInit {
           amountUSD: commissionAmount,
           status: PromoterCommissionStatus.PENDING,
           saasPaymentReportId: savedReport.id,
+          notes: isFirstActivation
+            ? `Comisión de activación inicial (50%) tenant ${savedTenant.name}`
+            : `Comisión recurrente renovación tenant ${savedTenant.name}`,
         });
         generatedCommission = await queryRunner.manager.save(PromoterCommission, commission);
+
+        // Si fue una primera activación formal, evaluar metas de activación acumuladas históricas:
+        // Meta 1: 5 activaciones -> $10 USD
+        // Meta 2: 10 activaciones -> $25 USD
+        // Meta 3: 20 activaciones -> $50 USD
+        // Meta 4: 50 activaciones -> $100 USD
+        if (isFirstActivation) {
+          const MILESTONES: Array<{ count: number; bonusUSD: number; code: string; label: string }> = [
+            { count: 5, bonusUSD: 10.00, code: 'MILESTONE_5', label: 'Meta 5 activaciones' },
+            { count: 10, bonusUSD: 25.00, code: 'MILESTONE_10', label: 'Meta 10 activaciones' },
+            { count: 20, bonusUSD: 50.00, code: 'MILESTONE_20', label: 'Meta 20 activaciones' },
+            { count: 50, bonusUSD: 100.00, code: 'MILESTONE_50', label: 'Meta 50 activaciones' },
+          ];
+
+          const totalHistoricalActivations = await queryRunner.manager.count(PromoterCommission, {
+            where: {
+              promoterId: savedTenant.promoterId,
+              type: PromoterCommissionType.ACTIVATION,
+            },
+          });
+
+          for (const milestone of MILESTONES) {
+            if (totalHistoricalActivations >= milestone.count) {
+              // Blindaje anti-rebote: verificar si ya se le otorgó este bono en su historial
+              const existingBonus = await queryRunner.manager.findOne(PromoterCommission, {
+                where: {
+                  promoterId: savedTenant.promoterId,
+                  type: PromoterCommissionType.BONUS,
+                  notes: Like(`%${milestone.code}%`),
+                },
+              });
+
+              if (!existingBonus) {
+                const bonusCommission = queryRunner.manager.create(PromoterCommission, {
+                  promoterId: savedTenant.promoterId,
+                  tenantId: savedTenant.id,
+                  type: PromoterCommissionType.BONUS,
+                  amountUSD: milestone.bonusUSD,
+                  status: PromoterCommissionStatus.PENDING,
+                  saasPaymentReportId: savedReport.id,
+                  notes: `Bono por meta histórica alcanzada: ${milestone.label} (${milestone.code})`,
+                });
+                await queryRunner.manager.save(PromoterCommission, bonusCommission);
+              }
+            }
+          }
+        }
       }
 
       await queryRunner.commitTransaction();
@@ -1007,7 +1057,7 @@ export class SuperAdminService implements OnModuleInit {
         rank: PromoterRank.ORO,
         commissionPercentage: 20,
         commissionRate: 0.20,
-        bonusUSD: 50.00,
+        bonusUSD: 0,
         emoji: '🥇',
         nextRank: null,
       };
@@ -1016,7 +1066,7 @@ export class SuperAdminService implements OnModuleInit {
         rank: PromoterRank.PLATA,
         commissionPercentage: 15,
         commissionRate: 0.15,
-        bonusUSD: 25.00,
+        bonusUSD: 0,
         emoji: '🥈',
         nextRank: {
           rank: PromoterRank.ORO,
@@ -1024,7 +1074,7 @@ export class SuperAdminService implements OnModuleInit {
           activationsNeeded: 100 - activeClientsCount,
           clientsNeeded: 100 - activeClientsCount,
           targetPercentage: 20,
-          bonusUSD: 50.00,
+          bonusUSD: 0,
         },
       };
     } else if (activeClientsCount >= 1) {
@@ -1032,7 +1082,7 @@ export class SuperAdminService implements OnModuleInit {
         rank: PromoterRank.BRONCE,
         commissionPercentage: 10,
         commissionRate: 0.10,
-        bonusUSD: 10.00,
+        bonusUSD: 0,
         emoji: '🥉',
         nextRank: {
           rank: PromoterRank.PLATA,
@@ -1040,7 +1090,7 @@ export class SuperAdminService implements OnModuleInit {
           activationsNeeded: 50 - activeClientsCount,
           clientsNeeded: 50 - activeClientsCount,
           targetPercentage: 15,
-          bonusUSD: 25.00,
+          bonusUSD: 0,
         },
       };
     } else {
@@ -1056,7 +1106,7 @@ export class SuperAdminService implements OnModuleInit {
           activationsNeeded: 1,
           clientsNeeded: 1,
           targetPercentage: 10,
-          bonusUSD: 10.00,
+          bonusUSD: 0,
         },
       };
     }
@@ -1101,10 +1151,14 @@ export class SuperAdminService implements OnModuleInit {
       let pendingBalanceUSD = 0;
       let paidBalanceUSD = 0;
       let totalCommissionsUSD = 0;
+      let totalBonusCommissionsUSD = 0;
 
       commissions.forEach((c) => {
         const amt = Number(c.amountUSD) || 0;
         totalCommissionsUSD += amt;
+        if (c.type === PromoterCommissionType.BONUS) {
+          totalBonusCommissionsUSD += amt;
+        }
         if (c.status === PromoterCommissionStatus.PENDING) {
           pendingBalanceUSD += amt;
         } else if (c.status === PromoterCommissionStatus.PAID) {
@@ -1127,6 +1181,7 @@ export class SuperAdminService implements OnModuleInit {
           status: c.status,
           paidAt: c.paidAt ? new Date(c.paidAt).toISOString() : null,
           paymentReference: c.paymentReference,
+          notes: c.notes,
           createdAt: new Date(c.createdAt).toISOString(),
         }));
 
@@ -1237,7 +1292,8 @@ export class SuperAdminService implements OnModuleInit {
         binancePayId: promoter.binancePayId,
         currentRank: rankInfo.rank,
         monthlyActivations,
-        rankBonusUSD: rankInfo.bonusUSD,
+        rankBonusUSD: Math.round(totalBonusCommissionsUSD * 100) / 100,
+        totalBonusCommissionsUSD: Math.round(totalBonusCommissionsUSD * 100) / 100,
         totalAffiliatedTenants: (promoter.tenants || []).length,
         pendingBalanceUSD: Math.round(pendingBalanceUSD * 100) / 100,
         paidBalanceUSD: Math.round(paidBalanceUSD * 100) / 100,

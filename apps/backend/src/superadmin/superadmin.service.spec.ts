@@ -584,6 +584,121 @@ describe('SuperAdminService', () => {
         }),
       );
     });
+
+    it('generates a BONUS commission ($10 USD) upon reaching 5th historical activation', async () => {
+      const mockReport = {
+        id: 'report-milestone-5',
+        tenant_id: 'tenant-prom-5',
+        amount: 20.0,
+        status: SaaSPaymentStatus.PENDING,
+      };
+      const mockTenant = {
+        id: 'tenant-prom-5',
+        name: 'Promo Store 5',
+        promoterId: 'promoter-123',
+        status: TenantStatus.TRIAL,
+      };
+
+      queryRunner.manager.findOne.mockImplementation((entityClass: any, criteria: any) => {
+        if (entityClass === SaaSPaymentReport) return Promise.resolve(mockReport);
+        if (entityClass === Tenant) return Promise.resolve(mockTenant);
+        if (entityClass === PromoterCommission) {
+          // No prior bonus found for milestone
+          return Promise.resolve(null);
+        }
+        return Promise.resolve(null);
+      });
+
+      // 1st count call: activeClientsCount for this promoter (Tenant) -> 5
+      // 2nd count call: activationCommissionsCount for this tenant (PromoterCommission) -> 0 (isFirstActivation = true)
+      // 3rd count call: totalHistoricalActivations for this promoter (PromoterCommission) -> 5 (triggers MILESTONE_5)
+      queryRunner.manager.count
+        .mockResolvedValueOnce(5) // activeClientsCount
+        .mockResolvedValueOnce(0) // isFirstActivation for this tenant
+        .mockResolvedValueOnce(5); // totalHistoricalActivations for promoter
+
+      const result = await service.approvePayment('report-milestone-5');
+      expect(result.success).toBe(true);
+
+      // Verify that the regular ACTIVATION commission (50% = $10) was created
+      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+        PromoterCommission,
+        expect.objectContaining({
+          promoterId: 'promoter-123',
+          tenantId: 'tenant-prom-5',
+          type: PromoterCommissionType.ACTIVATION,
+          amountUSD: 10.00,
+        }),
+      );
+
+      // Verify that the BONUS commission ($10 for Meta 5) was created and saved
+      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+        PromoterCommission,
+        expect.objectContaining({
+          promoterId: 'promoter-123',
+          tenantId: 'tenant-prom-5',
+          type: PromoterCommissionType.BONUS,
+          amountUSD: 10.00,
+          notes: expect.stringContaining('MILESTONE_5'),
+        }),
+      );
+    });
+
+    it('does NOT re-issue a milestone bonus if already awarded (anti-bounce protection)', async () => {
+      const mockReport = {
+        id: 'report-milestone-rebound',
+        tenant_id: 'tenant-prom-6',
+        amount: 20.0,
+        status: SaaSPaymentStatus.PENDING,
+      };
+      const mockTenant = {
+        id: 'tenant-prom-6',
+        name: 'Promo Store 6',
+        promoterId: 'promoter-123',
+        status: TenantStatus.TRIAL,
+      };
+
+      queryRunner.manager.findOne.mockImplementation((entityClass: any, criteria: any) => {
+        if (entityClass === SaaSPaymentReport) return Promise.resolve(mockReport);
+        if (entityClass === Tenant) return Promise.resolve(mockTenant);
+        if (entityClass === PromoterCommission) {
+          // An existing bonus for MILESTONE_5 is found
+          return Promise.resolve({
+            id: 'comm-bonus-prior',
+            promoterId: 'promoter-123',
+            type: PromoterCommissionType.BONUS,
+            notes: 'Bono por meta histórica alcanzada: Meta 5 activaciones (MILESTONE_5)',
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      queryRunner.manager.count
+        .mockResolvedValueOnce(5) // activeClientsCount
+        .mockResolvedValueOnce(0) // isFirstActivation for this tenant
+        .mockResolvedValueOnce(6); // totalHistoricalActivations = 6
+
+      queryRunner.manager.create.mockClear();
+
+      const result = await service.approvePayment('report-milestone-rebound');
+      expect(result.success).toBe(true);
+
+      // Verify activation commission was created
+      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+        PromoterCommission,
+        expect.objectContaining({
+          type: PromoterCommissionType.ACTIVATION,
+        }),
+      );
+
+      // Verify BONUS was NOT created again because it already exists
+      expect(queryRunner.manager.create).not.toHaveBeenCalledWith(
+        PromoterCommission,
+        expect.objectContaining({
+          type: PromoterCommissionType.BONUS,
+        }),
+      );
+    });
   });
 
   describe('rejectPayment', () => {

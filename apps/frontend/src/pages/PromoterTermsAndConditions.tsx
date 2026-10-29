@@ -65,10 +65,10 @@ export const PromoterTermsContent: React.FC = () => {
         </ul>
 
         <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-          3. Esquema Oficial de Comisiones: Activación y Recurrencia Escalonada
+          3. Esquema Oficial de Comisiones: Activación, Recurrencia y Metas Históricas
         </h2>
         <p>
-          FinoWork remunera tanto la captación inmediata de nuevos comercios como la fidelización a largo plazo mediante dos modalidades complementarias:
+          FinoWork remunera el esfuerzo de los promotores mediante tres componentes comerciales transparentes y auditables:
         </p>
 
         <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
@@ -76,7 +76,7 @@ export const PromoterTermsContent: React.FC = () => {
             A. Comisión de Activación (50% del Primer Pago)
           </div>
           <p style={{ margin: 0, fontSize: '13px', color: '#475569' }}>
-            Al concluir los 15 días de prueba gratuita, en el momento en que el comercio procesa su primer pago formal, el Promotor recibe de inmediato el <strong>50% del monto total abonado</strong>: <strong>$10.00 USD</strong> en cuota mensual estándar ($20 USD) o <strong>$100.00 USD</strong> en plan anual ($200 USD). La primera activación histórica del promotor desbloquea además un bono complementario único de <strong>+$10.00 USD</strong>.
+            Al concluir los 15 días de prueba gratuita, en el momento en que el comercio procesa su primer pago formal para activar la plataforma, el Promotor recibe de inmediato el <strong>50% del monto total abonado</strong>: <strong>$10.00 USD</strong> en cuota mensual estándar ($20 USD) o <strong>$100.00 USD</strong> en plan anual ($200 USD). La empresa y el promotor comparten dicho primer cobro al 50/50.
           </p>
         </div>
 
@@ -105,7 +105,7 @@ export const PromoterTermsContent: React.FC = () => {
             <div style={{ fontWeight: 800, color: '#475569', fontSize: '14px' }}>Nivel 2: Plata (50 a 99 clientes)</div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: '6px 0' }}>15% por pago</div>
             <div style={{ fontSize: '12px', color: '#64748b' }}>
-              Equivale a <strong>$3.00 USD</strong> por mensualidad o <strong>$30.00 USD</strong> por anualidad. Bono de ascenso: <strong>+$25.00 USD</strong>.
+              Equivale a <strong>$3.00 USD</strong> por mensualidad o <strong>$30.00 USD</strong> por anualidad.
             </div>
           </div>
 
@@ -113,9 +113,27 @@ export const PromoterTermsContent: React.FC = () => {
             <div style={{ fontWeight: 800, color: '#15803d', fontSize: '14px' }}>Nivel 3: Oro (100+ clientes)</div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: '6px 0' }}>20% por pago</div>
             <div style={{ fontSize: '12px', color: '#64748b' }}>
-              Equivale a <strong>$4.00 USD</strong> por mensualidad o <strong>$40.00 USD</strong> por anualidad. Bono de ascenso: <strong>+$50.00 USD</strong>.
+              Equivale a <strong>$4.00 USD</strong> por mensualidad o <strong>$40.00 USD</strong> por anualidad.
             </div>
           </div>
+        </div>
+
+        <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
+          <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '14px', marginBottom: '4px' }}>
+            C. Bonos por Metas Históricas de Activación (Pagos Únicos Irrepetibles)
+          </div>
+          <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#475569' }}>
+            FinoWork premia el volumen acumulado histórico de activaciones comerciales formales mediante bonos en dólares que se liquidan una única vez en la vida de la cuenta al alcanzar el hito:
+          </p>
+          <ul style={{ margin: '0 0 10px 0', paddingLeft: '20px', fontSize: '13px', color: '#334155' }}>
+            <li><strong>Meta 1 (5 comercios activados):</strong> Bono directo de <strong>+$10.00 USD</strong>.</li>
+            <li><strong>Meta 2 (10 comercios activados):</strong> Bono directo de <strong>+$25.00 USD</strong>.</li>
+            <li><strong>Meta 3 (20 comercios activados):</strong> Bono directo de <strong>+$50.00 USD</strong>.</li>
+            <li><strong>Meta 4 (50 comercios activados):</strong> Bono directo de <strong>+$100.00 USD</strong>.</li>
+          </ul>
+          <p style={{ margin: 0, fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>
+            *Cláusula anti-rebote: Cada bono por meta se devenga y liquida estrictamente una sola vez. Si un comercio referido entra en mora, no renueva o cancela su cuenta disminuyendo el número de clientes activos, la meta histórica previamente alcanzada no se pierde, pero tampoco se vuelve a pagar si el promotor alcanza nuevamente dicha cifra.
+          </p>
         </div>
 
         <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '14px', margin: '14px 0' }}>

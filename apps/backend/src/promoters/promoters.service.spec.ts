@@ -89,7 +89,7 @@ describe('PromotersService', () => {
       expect(rank.rank).toBe(PromoterRank.BRONCE);
       expect(rank.commissionPercentage).toBe(10);
       expect(rank.commissionRate).toBe(0.10);
-      expect(rank.bonusUSD).toBe(10);
+      expect(rank.bonusUSD).toBe(0);
       expect(rank.nextRank?.rank).toBe(PromoterRank.PLATA);
       expect(rank.nextRank?.clientsNeeded).toBe(30);
       expect(rank.nextRank?.targetPercentage).toBe(15);
@@ -100,7 +100,7 @@ describe('PromotersService', () => {
       expect(rank.rank).toBe(PromoterRank.PLATA);
       expect(rank.commissionPercentage).toBe(15);
       expect(rank.commissionRate).toBe(0.15);
-      expect(rank.bonusUSD).toBe(25);
+      expect(rank.bonusUSD).toBe(0);
       expect(rank.nextRank?.rank).toBe(PromoterRank.ORO);
       expect(rank.nextRank?.clientsNeeded).toBe(35);
       expect(rank.nextRank?.targetPercentage).toBe(20);
@@ -111,7 +111,7 @@ describe('PromotersService', () => {
       expect(rank.rank).toBe(PromoterRank.ORO);
       expect(rank.commissionPercentage).toBe(20);
       expect(rank.commissionRate).toBe(0.20);
-      expect(rank.bonusUSD).toBe(50);
+      expect(rank.bonusUSD).toBe(0);
       expect(rank.nextRank).toBeNull();
     });
   });
@@ -156,6 +156,16 @@ describe('PromotersService', () => {
             status: PromoterCommissionStatus.PENDING,
             createdAt: thisMonthDate,
           },
+          {
+            id: 'c-3',
+            promoterId: 'prom-1',
+            tenantId: 't-1',
+            type: PromoterCommissionType.BONUS,
+            amountUSD: 10.00,
+            status: PromoterCommissionStatus.PENDING,
+            notes: 'Bono por meta histórica alcanzada: Meta 5 activaciones (MILESTONE_5)',
+            createdAt: thisMonthDate,
+          },
         ],
       };
 
@@ -174,8 +184,14 @@ describe('PromotersService', () => {
       expect(stats.currentRank).toBe(PromoterRank.BRONCE);
       expect(stats.totalActivationCommissionsUSD).toBe(2.00);
       expect(stats.totalRecurringCommissionsUSD).toBe(2.00);
-      expect(stats.totalCommissionsEarnedUSD).toBe(4.00);
-      expect(stats.totalPendingBalanceUSD).toBe(4.00);
+      expect(stats.totalBonusCommissionsUSD).toBe(10.00);
+      expect(stats.totalCommissionsEarnedUSD).toBe(14.00);
+      expect(stats.totalPendingBalanceUSD).toBe(14.00);
+      expect(stats.nextMilestone).toBeDefined();
+      expect(stats.nextMilestone?.targetActivations).toBe(5);
+      expect(stats.nextMilestone?.bonusUSD).toBe(10);
+      expect(stats.nextMilestone?.activationsNeeded).toBe(4);
+      expect(stats.nextMilestone?.progressPercentage).toBe(20);
       expect(stats.affiliatedTenants.length).toBe(1);
       expect(stats.affiliatedTenants[0].subStatus).toBe('ACTIVE');
       expect(stats.affiliatedTenants[0].ownerName).toBe('Carlos Dueño');

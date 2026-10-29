@@ -744,6 +744,88 @@ const PromoterDashboard: React.FC = () => {
               </IonCardContent>
             </IonCard>
 
+            {/* TARJETA DE METAS HISTÓRICAS DE ACTIVACIÓN Y BONOS ÚNICOS */}
+            <IonCard style={{ margin: '0 0 20px 0', borderRadius: '14px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
+              <IonCardContent style={{ padding: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '22px' }}>🎯</span>
+                    <span style={{ fontWeight: 800, fontSize: '16px', color: '#0f172a' }}>
+                      Metas Históricas de Activación Comercial
+                    </span>
+                  </div>
+                  {stats?.totalBonusCommissionsUSD !== undefined && stats.totalBonusCommissionsUSD > 0 && (
+                    <IonBadge style={{ background: '#ecfdf5', color: '#065f46', padding: '6px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 800 }}>
+                      🎁 ${stats.totalBonusCommissionsUSD.toFixed(2)} USD en Bonos Cobrados
+                    </IonBadge>
+                  )}
+                </div>
+
+                <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 14px 0' }}>
+                  Premian tu constancia captando nuevos comercios. Cada bono se acredita <strong>una única vez de forma definitiva</strong> al alcanzar el número acumulado de activaciones comerciales en tu historia como promotor (no se pierden ni se duplican si un cliente concluye su suscripción más adelante).
+                </p>
+
+                {stats?.nextMilestone ? (
+                  <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>
+                      <span style={{ color: '#0f172a' }}>Próxima meta: {stats.nextMilestone.label}</span>
+                      <span style={{ color: '#10b981' }}>Bono: +${stats.nextMilestone.bonusUSD} USD</span>
+                    </div>
+                    <IonProgressBar
+                      value={stats.nextMilestone.progressPercentage / 100}
+                      color="success"
+                      style={{ height: '8px', borderRadius: '4px', marginBottom: '6px' }}
+                    />
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                      Te {stats.nextMilestone.activationsNeeded === 1 ? 'falta' : 'faltan'} <strong>{stats.nextMilestone.activationsNeeded} {stats.nextMilestone.activationsNeeded === 1 ? 'activación comercial' : 'activaciones comerciales'}</strong> para desbloquear este bono único en tu panel.
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ background: '#ecfdf5', padding: '12px 16px', borderRadius: '10px', color: '#065f46', fontWeight: 700, fontSize: '13px', marginBottom: '16px' }}>
+                    🏆 ¡Felicitaciones! Has completado todas las metas de activación comercial disponibles.
+                  </div>
+                )}
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: '10px',
+                }}>
+                  {[
+                    { count: 5, bonus: 10, label: '5 Comercios' },
+                    { count: 10, bonus: 25, label: '10 Comercios' },
+                    { count: 20, bonus: 50, label: '20 Comercios' },
+                    { count: 50, bonus: 100, label: '50 Comercios' },
+                  ].map((m) => {
+                    const totalActs = (stats?.recentCommissions || []).filter((c) => c.type === 'ACTIVATION').length;
+                    const isUnlocked = totalActs >= m.count;
+                    return (
+                      <div
+                        key={m.count}
+                        style={{
+                          background: isUnlocked ? '#f0fdf4' : '#f8fafc',
+                          border: isUnlocked ? '2px solid #10b981' : '1px solid #e2e8f0',
+                          borderRadius: '10px',
+                          padding: '12px',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: isUnlocked ? '#15803d' : '#64748b' }}>
+                          {isUnlocked ? '✅ Desbloqueado' : m.label}
+                        </div>
+                        <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: '4px 0' }}>
+                          +${m.bonus} USD
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>
+                          al activar {m.count} clientes
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </IonCardContent>
+            </IonCard>
+
             {/* SECCIÓN DE COMERCIOS AFILIADOS Y SEGUIMIENTO ACTIVO */}
             <IonCard style={{ margin: '0 0 24px 0', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#ffffff', overflow: 'hidden' }}>
               <IonCardHeader style={{ borderBottom: '1px solid #f1f5f9', padding: '18px 20px', background: '#ffffff' }}>
@@ -1436,10 +1518,11 @@ const PromoterDashboard: React.FC = () => {
                                 {new Date(comm.createdAt).toLocaleDateString('es-VE')}
                               </td>
                               <td style={{ padding: '12px 16px', fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>
-                                {comm.tenantName || 'Comercio Referido'}
+                                <div>{comm.tenantName || 'Comercio Referido'}</div>
+                                {comm.notes && <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>{comm.notes}</div>}
                               </td>
                               <td style={{ padding: '12px 16px', fontSize: '12px', color: '#334155' }}>
-                                {comm.type === 'ACTIVATION' ? '🚀 1ª Activación' : '🔄 Renovación de Suscripción'}
+                                {comm.type === 'ACTIVATION' ? '⭐ 1ª Activación (50%)' : comm.type === 'BONUS' ? '🎁 Bono por Meta' : '🔄 Renovación de Suscripción'}
                               </td>
                               <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, fontSize: '14px', color: '#0f172a' }}>
                                 ${Number(comm.amountUSD).toFixed(2)} USD

@@ -546,6 +546,7 @@ export interface InvestmentDTO {
 export enum PromoterCommissionType {
   ACTIVATION = 'ACTIVATION',
   RECURRING = 'RECURRING',
+  BONUS = 'BONUS',
 }
 
 export enum PromoterCommissionStatus {
@@ -561,6 +562,14 @@ export enum PromoterRank {
   ORO = 'ORO',
 }
 
+export interface PromoterMilestoneDTO {
+  targetActivations: number;
+  bonusUSD: number;
+  activationsNeeded: number;
+  progressPercentage: number;
+  label: string;
+}
+
 export interface PromoterCommissionDTO {
   id: string;
   promoterId: string;
@@ -572,6 +581,7 @@ export interface PromoterCommissionDTO {
   status: PromoterCommissionStatus;
   paidAt?: string | null;
   paymentReference?: string | null;
+  notes?: string | null;
   createdAt: string;
 }
 
@@ -616,6 +626,8 @@ export interface PromoterStatsDTO {
   termsAccepted: boolean;
   termsAcceptedAt?: string | null;
   rankBonusUSD: number;
+  totalBonusCommissionsUSD?: number;
+  nextMilestone?: PromoterMilestoneDTO | null;
   nextRank?: {
     rank: PromoterRank;
     rankEmoji: string;
@@ -655,6 +667,7 @@ export interface SuperAdminPromoterDTO {
   currentRank: PromoterRank;
   monthlyActivations: number;
   rankBonusUSD: number;
+  totalBonusCommissionsUSD?: number;
   totalAffiliatedTenants: number;
   pendingBalanceUSD: number;
   paidBalanceUSD: number;

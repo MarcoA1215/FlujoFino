@@ -58,7 +58,7 @@ export class PromotersService {
         rank: PromoterRank.ORO,
         commissionPercentage: 20,
         commissionRate: 0.20,
-        bonusUSD: 50.00,
+        bonusUSD: 0,
         emoji: '🥇',
         nextRank: null,
       };
@@ -67,7 +67,7 @@ export class PromotersService {
         rank: PromoterRank.PLATA,
         commissionPercentage: 15,
         commissionRate: 0.15,
-        bonusUSD: 25.00,
+        bonusUSD: 0,
         emoji: '🥈',
         nextRank: {
           rank: PromoterRank.ORO,
@@ -75,7 +75,7 @@ export class PromotersService {
           activationsNeeded: 100 - activeClientsCount,
           clientsNeeded: 100 - activeClientsCount,
           targetPercentage: 20,
-          bonusUSD: 50.00,
+          bonusUSD: 0,
         },
       };
     } else if (activeClientsCount >= 1) {
@@ -83,7 +83,7 @@ export class PromotersService {
         rank: PromoterRank.BRONCE,
         commissionPercentage: 10,
         commissionRate: 0.10,
-        bonusUSD: 10.00,
+        bonusUSD: 0,
         emoji: '🥉',
         nextRank: {
           rank: PromoterRank.PLATA,
@@ -91,7 +91,7 @@ export class PromotersService {
           activationsNeeded: 50 - activeClientsCount,
           clientsNeeded: 50 - activeClientsCount,
           targetPercentage: 15,
-          bonusUSD: 25.00,
+          bonusUSD: 0,
         },
       };
     } else {
@@ -107,7 +107,7 @@ export class PromotersService {
           activationsNeeded: 1,
           clientsNeeded: 1,
           targetPercentage: 10,
-          bonusUSD: 10.00,
+          bonusUSD: 0,
         },
       };
     }
@@ -179,6 +179,7 @@ export class PromotersService {
 
     let totalActivationCommissionsUSD = 0;
     let totalRecurringCommissionsUSD = 0;
+    let totalBonusCommissionsUSD = 0;
     let totalPendingBalanceUSD = 0;
     let totalPaidBalanceUSD = 0;
     let monthlyEarnedUSD = 0;
@@ -195,6 +196,8 @@ export class PromotersService {
         totalActivationCommissionsUSD += amt;
       } else if (c.type === PromoterCommissionType.RECURRING) {
         totalRecurringCommissionsUSD += amt;
+      } else if (c.type === PromoterCommissionType.BONUS) {
+        totalBonusCommissionsUSD += amt;
       }
 
       if (isThisMonth) {
@@ -335,6 +338,28 @@ export class PromotersService {
 
     const rankInfo = this.calculateRank(activeClientsCount);
 
+    // Conteo total acumulado histórico de activaciones comerciales para evaluar metas
+    const totalHistoricalActivations = commissions.filter(
+      (c) => c.type === PromoterCommissionType.ACTIVATION && c.status !== PromoterCommissionStatus.CANCELLED,
+    ).length;
+
+    const MILESTONES: Array<{ count: number; bonusUSD: number; label: string }> = [
+      { count: 5, bonusUSD: 10.00, label: 'Meta 5 activaciones' },
+      { count: 10, bonusUSD: 25.00, label: 'Meta 10 activaciones' },
+      { count: 20, bonusUSD: 50.00, label: 'Meta 20 activaciones' },
+      { count: 50, bonusUSD: 100.00, label: 'Meta 50 activaciones' },
+    ];
+    const nextTarget = MILESTONES.find((m) => m.count > totalHistoricalActivations);
+    const nextMilestone = nextTarget
+      ? {
+          targetActivations: nextTarget.count,
+          bonusUSD: nextTarget.bonusUSD,
+          activationsNeeded: nextTarget.count - totalHistoricalActivations,
+          progressPercentage: Math.min(100, Math.round((totalHistoricalActivations / nextTarget.count) * 100)),
+          label: nextTarget.label,
+        }
+      : null;
+
     const recentCommissions: PromoterCommissionDTO[] = commissions
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .map((c) => ({
@@ -348,6 +373,7 @@ export class PromotersService {
         status: c.status,
         paidAt: c.paidAt ? new Date(c.paidAt).toISOString() : null,
         paymentReference: c.paymentReference,
+        notes: c.notes,
         createdAt: new Date(c.createdAt).toISOString(),
       }));
 
@@ -365,14 +391,16 @@ export class PromotersService {
       commissionPercentage: rankInfo.commissionPercentage,
       termsAccepted: !!promoter.termsAccepted,
       termsAcceptedAt: promoter.termsAcceptedAt ? new Date(promoter.termsAcceptedAt).toISOString() : null,
-      rankBonusUSD: rankInfo.bonusUSD,
+      rankBonusUSD: Math.round(totalBonusCommissionsUSD * 100) / 100,
+      totalBonusCommissionsUSD: Math.round(totalBonusCommissionsUSD * 100) / 100,
+      nextMilestone,
       nextRank: rankInfo.nextRank,
       monthlyEarnedUSD: Math.round(monthlyEarnedUSD * 100) / 100,
       monthlyPaidUSD: Math.round(monthlyPaidUSD * 100) / 100,
       monthlyPendingUSD: Math.round(monthlyPendingUSD * 100) / 100,
       totalActivationCommissionsUSD: Math.round(totalActivationCommissionsUSD * 100) / 100,
       totalRecurringCommissionsUSD: Math.round(totalRecurringCommissionsUSD * 100) / 100,
-      totalCommissionsEarnedUSD: Math.round((totalActivationCommissionsUSD + totalRecurringCommissionsUSD) * 100) / 100,
+      totalCommissionsEarnedUSD: Math.round((totalActivationCommissionsUSD + totalRecurringCommissionsUSD + totalBonusCommissionsUSD) * 100) / 100,
       totalPendingBalanceUSD: Math.round(totalPendingBalanceUSD * 100) / 100,
       totalPaidBalanceUSD: Math.round(totalPaidBalanceUSD * 100) / 100,
       affiliatedTenants,

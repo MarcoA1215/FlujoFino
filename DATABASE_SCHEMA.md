@@ -269,12 +269,13 @@ Comisiones devengadas por los promotores por activación o renovación de negoci
 | `id` | `id` | `uuid` (PK) | No | `uuid_generate_v4()` | ID de la comisión. |
 | `promoterId` | `promoterId` | `uuid` (FK) | No | — | Referencia a `promoters.id` (`ON DELETE CASCADE`). |
 | `tenantId` | `tenantId` | `uuid` (FK) | No | — | Referencia a `tenant.id` (`ON DELETE CASCADE`). |
-| `type` | `type` | `varchar(30)` | No | `'ACTIVATION'` | `'ACTIVATION' \| 'RECURRING'`. |
-| `amountUSD` | `amountUSD` | `decimal(10,2)` | No | — | Monto de la comisión en USD. |
+| `type` | `type` | `varchar(30)` | No | `'ACTIVATION'` | `'ACTIVATION' \| 'RECURRING' \| 'BONUS'`. |
+| `amountUSD` | `amountUSD` | `decimal(10,2)` | No | — | Monto de la comisión o bono en USD. |
 | `saasPaymentReportId` | `saasPaymentReportId` | `uuid` (FK) | Sí | `NULL` | Pago SaaS que originó esta comisión (`ON DELETE SET NULL`). |
 | `status` | `status` | `varchar(30)` | No | `'PENDING'` | `'PENDING' \| 'PAID' \| 'CANCELLED'`. |
 | `paidAt` | `paidAt` | `timestamp` | Sí | `NULL` | Fecha en que FinoWork liquidó la comisión al promotor. |
 | `paymentReference` | `paymentReference` | `varchar` | Sí | `NULL` | Referencia bancaria/Binance del pago al promotor. |
+| `notes` | `notes` | `varchar(255)` | Sí | `NULL` | Notas o identificador de meta histórica (ej. `MILESTONE_5`). |
 | `createdAt` | `createdAt` | `timestamp` | No | `now()` | Fecha de generación. |
 
 ---

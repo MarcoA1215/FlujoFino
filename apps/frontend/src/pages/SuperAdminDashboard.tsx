@@ -2582,7 +2582,11 @@ const SuperAdminDashboard: React.FC = () => {
                           </td>
                           <td style={{ padding: '14px 16px', fontWeight: 800, fontSize: '13px' }}>
                             {rankEmoji} {p.currentRank} ({p.commissionPercentage}%)
-                            {p.rankBonusUSD > 0 && <div style={{ fontSize: '11px', color: '#10b981' }}>🎁 +${p.rankBonusUSD}</div>}
+                            {(p.totalBonusCommissionsUSD ?? p.rankBonusUSD) > 0 && (
+                              <div style={{ fontSize: '11px', color: '#10b981', fontWeight: 700 }}>
+                                🎁 Bonos: +${(p.totalBonusCommissionsUSD ?? p.rankBonusUSD).toFixed(2)}
+                              </div>
+                            )}
                           </td>
                           <td style={{ padding: '14px 16px', fontWeight: 700 }}>
                             {p.totalAffiliatedTenants}
