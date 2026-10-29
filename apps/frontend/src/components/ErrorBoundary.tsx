@@ -22,6 +22,23 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('FinoWork ErrorBoundary caught an error:', error, errorInfo);
+
+    const isChunkLoadFailed =
+      error?.name === 'ChunkLoadError' ||
+      error?.message?.includes('Failed to fetch dynamically imported module') ||
+      error?.message?.includes('error loading dynamically imported module') ||
+      error?.message?.includes('Importing a module script failed');
+
+    if (isChunkLoadFailed) {
+      const storageKey = 'finowork_chunk_reload';
+      const hasReloaded = sessionStorage.getItem(storageKey);
+      if (!hasReloaded) {
+        sessionStorage.setItem(storageKey, 'true');
+        console.warn('FinoWork: Actualización de versión detectada. Recargando automáticamente...');
+        window.location.reload();
+        return;
+      }
+    }
     if (import.meta.env.VITE_SENTRY_DSN) {
       Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
     }

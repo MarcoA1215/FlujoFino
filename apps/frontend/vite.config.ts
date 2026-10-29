@@ -16,7 +16,16 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id: string) {
-          if (id.includes('@ionic') || id.includes('ionicons')) {
+          if (id.includes('recharts') || id.includes('d3-') || id.includes('victory-vendor')) {
+            return 'vendor-charts';
+          }
+          if (id.includes('@fullcalendar')) {
+            return 'vendor-calendar';
+          }
+          if (id.includes('ionicons')) {
+            return 'vendor-icons';
+          }
+          if (id.includes('@ionic')) {
             return 'vendor-ionic';
           }
           if (id.includes('@sentry')) {
