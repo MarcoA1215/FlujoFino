@@ -591,6 +591,127 @@ describe('ReservationsService Suite', () => {
       expect(res.serviceSpecialists[1].employeeId).toBe('emp-carlos');
     });
 
+    it('al crear cita con múltiples servicios y allowSimultaneousServices activo debe marcar isSimultaneous=true y durationMinutes = max(duraciones)', async () => {
+      const tenantId = 'tenant-123';
+      const prodA = { id: 'svc-rubber', name: 'Nivelación', salePrice: 15, durationMinutes: 90, assignedStaffIds: ['emp-eva'] };
+      const prodB = { id: 'svc-pedi', name: 'Pedicura', salePrice: 10, durationMinutes: 90, assignedStaffIds: ['emp-doris'] };
+
+      mockProductRepo.findOne.mockImplementation(({ where }) => {
+        if (where?.id === 'svc-rubber') return Promise.resolve(prodA);
+        if (where?.id === 'svc-pedi') return Promise.resolve(prodB);
+        return Promise.resolve(null);
+      });
+      mockProductRepo.find.mockResolvedValue([prodA, prodB]);
+
+      mockManager.getRepository.mockImplementation((entity) => {
+        if (entity === 'Settings' || entity?.name === 'Settings' || entity === Settings) {
+          return {
+            findOne: jest.fn().mockResolvedValue({
+              slotInterval: 30,
+              allowSimultaneousServices: true,
+              businessHours: {
+                '6': { isOpen: true, startTime: '08:00', endTime: '18:00' },
+              },
+            }),
+          };
+        }
+        if (entity === Product || entity?.name === 'Product') {
+          return mockProductRepo;
+        }
+        if (entity === UserTenantAccess || entity?.name === 'UserTenantAccess') {
+          return {
+            find: jest.fn().mockResolvedValue([
+              { id: 'emp-eva', userId: 'emp-eva', isActive: true, status: 'ACCEPTED', user: { id: 'emp-eva', username: 'Eva' } },
+              { id: 'emp-doris', userId: 'emp-doris', isActive: true, status: 'ACCEPTED', user: { id: 'emp-doris', username: 'Doris' } },
+            ]),
+            findOne: jest.fn().mockResolvedValue({ id: 'emp-eva', user: { name: 'Eva' } }),
+          };
+        }
+        if (entity === Reservation || entity?.name === 'Reservation') {
+          return {
+            createQueryBuilder: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              getMany: jest.fn().mockResolvedValue([]),
+            }),
+            save: jest.fn(e => Promise.resolve(e)),
+          };
+        }
+        if (entity === Order || entity?.name === 'Order') return mockOrderRepo;
+        if (entity === OrderItem || entity?.name === 'OrderItem') return mockOrderItemRepo;
+        return { find: jest.fn().mockResolvedValue([]), findOne: jest.fn().mockResolvedValue(null), save: jest.fn(e => Promise.resolve(e)) };
+      });
+
+      const res = await service.create(tenantId, {
+        customerName: 'Arnely Acevedo',
+        customerPhone: '123456',
+        date: '2026-10-31',
+        time: '13:30:00',
+        serviceId: 'svc-rubber,svc-pedi',
+        force: true,
+      });
+
+      expect(res.isSimultaneous).toBe(true);
+      expect(res.durationMinutes).toBe(90);
+      expect(res.serviceSpecialists).toHaveLength(2);
+      expect(res.serviceSpecialists[0].employeeId).toBe('emp-eva');
+      expect(res.serviceSpecialists[1].employeeId).toBe('emp-doris');
+    });
+
+    it('debe rechazar cita con isSimultaneous si se asigna el mismo especialista a servicios simultáneos', async () => {
+      const tenantId = 'tenant-123';
+      const prodA = { id: 'svc-rubber', name: 'Nivelación', salePrice: 15, durationMinutes: 90, assignedStaffIds: ['emp-eva'] };
+      const prodB = { id: 'svc-pedi', name: 'Pedicura', salePrice: 10, durationMinutes: 90, assignedStaffIds: ['emp-eva'] };
+
+      mockProductRepo.find.mockResolvedValue([prodA, prodB]);
+      mockManager.getRepository.mockImplementation((entity) => {
+        if (entity === 'Settings' || entity?.name === 'Settings' || entity === Settings) {
+          return {
+            findOne: jest.fn().mockResolvedValue({ slotInterval: 30, allowSimultaneousServices: true }),
+          };
+        }
+        if (entity === Product || entity?.name === 'Product') return mockProductRepo;
+        if (entity === UserTenantAccess || entity?.name === 'UserTenantAccess') {
+          return {
+            find: jest.fn().mockResolvedValue([
+              { id: 'emp-eva', userId: 'emp-eva', isActive: true, status: 'ACCEPTED', user: { id: 'emp-eva', username: 'Eva' } },
+            ]),
+            findOne: jest.fn().mockResolvedValue({ id: 'emp-eva', user: { name: 'Eva' } }),
+          };
+        }
+        if (entity === Reservation || entity?.name === 'Reservation') {
+          return {
+            createQueryBuilder: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              getMany: jest.fn().mockResolvedValue([]),
+            }),
+            save: jest.fn(e => Promise.resolve(e)),
+          };
+        }
+        return { find: jest.fn().mockResolvedValue([]), findOne: jest.fn().mockResolvedValue(null) };
+      });
+
+      await expect(
+        service.validateSlotOverlap(
+          tenantId,
+          '2026-10-31',
+          '13:30:00',
+          'svc-rubber,svc-pedi',
+          undefined,
+          undefined,
+          undefined,
+          mockManager,
+          90,
+          [
+            { serviceId: 'svc-rubber', employeeId: 'emp-eva', durationMinutes: 90 },
+            { serviceId: 'svc-pedi', employeeId: 'emp-eva', durationMinutes: 90 },
+          ],
+          true,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('al actualizar el especialista de un servicio en la cita debe sincronizar el employeeId en los OrderItems de la orden vinculada', async () => {
       const tenantId = 'tenant-123';
       const resId = 'res-spec-sync';

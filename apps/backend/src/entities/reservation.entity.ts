@@ -125,6 +125,9 @@ export class Reservation {
   isBlock: boolean;
 
   @Column({ type: 'boolean', default: false })
+  isSimultaneous: boolean;
+
+  @Column({ type: 'boolean', default: false })
   commissionPaid: boolean;
 
   @Column({ type: 'timestamp', nullable: true })

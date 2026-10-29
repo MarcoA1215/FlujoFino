@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, IsArray } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, IsArray, IsBoolean } from 'class-validator';
 import { Controller, Post, Body, Param, Get, NotFoundException, BadRequestException, Put, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -107,6 +107,10 @@ export class CreatePublicReservationDto {
   @IsOptional()
   @IsArray()
   serviceSpecialists?: any[];
+
+  @IsOptional()
+  @IsBoolean()
+  isSimultaneous?: boolean;
 }
 
 @Public()
@@ -292,6 +296,7 @@ export class PublicReservationsController {
         featureShowCatalog: settings?.featureShowCatalog || false,
         bookingRequireService: settings?.bookingRequireService ?? true,
         bookingAllowStaffSelection: allowStaffSelection,
+        allowSimultaneousServices: Boolean(settings?.allowSimultaneousServices),
         bookingMaxAdvanceDays: Number(settings?.bookingMaxAdvanceDays || 365),
         featureBuySell: settings?.featureBuySell ?? false,
         featureRecipes: settings?.featureRecipes ?? false,
@@ -476,6 +481,7 @@ export class PublicReservationsController {
       employeeId: dto.employeeId,
       employeeName: dto.employeeName?.trim() || undefined,
       serviceSpecialists: dto.serviceSpecialists || undefined,
+      isSimultaneous: dto.isSimultaneous,
       notes: (dto.paymentMethod === 'ON_ARRIVAL' || dto.paymentMethod === 'PENDING')
         ? (dto.notes?.trim() ? `${dto.notes.trim()} | [Por pagar al asistir (Cuenta abierta)]` : '[Por pagar al asistir (Cuenta abierta)]')
         : dto.paymentMethod === 'CASH'
@@ -1315,10 +1321,11 @@ export class PublicReservationsController {
       const sIds = serviceId.split(',').map(s => s.trim()).filter(Boolean);
       for (const sId of sIds) {
         const sp = productMap.get(sId);
-        if (sp && sp.durationMinutes) {
-          duration += Number(sp.durationMinutes);
+        const sDur = (sp && sp.durationMinutes) ? Number(sp.durationMinutes) : interval;
+        if (settings?.allowSimultaneousServices && !employeeId) {
+          duration = Math.max(duration, sDur);
         } else {
-          duration += interval;
+          duration += sDur;
         }
       }
     }
@@ -1441,18 +1448,22 @@ export class PublicReservationsController {
       }
 
       if (Array.isArray(r.serviceSpecialists) && r.serviceSpecialists.length > 0 && !r.isBlock) {
+        const rSimultaneous = Boolean((r as any).isSimultaneous);
         let segStart = startMins;
         for (const s of r.serviceSpecialists) {
           const sp = s.serviceId ? productMap.get(s.serviceId) : null;
           const dur = Number(s.durationMinutes) || Number(sp?.durationMinutes) || interval;
+          const currentStart = rSimultaneous ? startMins : segStart;
           busyBookings.push({
             employeeId: s.employeeId || null,
-            start: segStart,
-            end: segStart + dur,
+            start: currentStart,
+            end: currentStart + dur,
             isBlock: false,
             serviceId: s.serviceId || r.serviceId,
           });
-          segStart += dur;
+          if (!rSimultaneous) {
+            segStart += dur;
+          }
         }
       } else {
         busyBookings.push({
@@ -1585,6 +1596,56 @@ export class PublicReservationsController {
             }
           }
         } else if (requestedServices.length > 1) {
+          const allowSimultaneous = Boolean(settings?.allowSimultaneousServices);
+          let isSimultaneousFeasible = false;
+
+          if (allowSimultaneous && !employeeId) {
+            const pools: any[][] = [];
+            for (const sProd of requestedServices) {
+              const sDur = Number((sProd as any).durationMinutes) || interval;
+              const sEnd = currentMins + sDur;
+              let segQualified = staffList;
+              const raw = (sProd as any)?.assignedStaffIds;
+              let assignedIds: string[] = [];
+              if (Array.isArray(raw)) assignedIds = raw;
+              else if (typeof raw === 'string' && raw.trim()) assignedIds = raw.split(',').map((x: string) => x.trim()).filter(Boolean);
+              if (assignedIds.length > 0) {
+                const matched = segQualified.filter(st =>
+                  assignedIds.includes(st.userId) || assignedIds.includes(st.id) || (st.user && assignedIds.includes(st.user.id))
+                );
+                segQualified = matched.length > 0 ? matched : staffList;
+              }
+              const freeForSvc = segQualified.filter(st => {
+                const { entry: stEntry, exit: stExit, lStart: stLStart, lEnd: stLEnd } = getStaffBounds(st);
+                if (stEntry !== null && currentMins < stEntry) return false;
+                if (stExit !== null && sEnd > stExit) return false;
+                if (stLStart !== null && stLEnd !== null && currentMins < stLEnd && sEnd > stLStart) return false;
+                return !busyBookings.some(b =>
+                  (b.employeeId === st.userId || b.employeeId === st.id || (st.user && b.employeeId === st.user.id)) &&
+                  currentMins < b.end && sEnd > b.start
+                );
+              });
+              pools.push(freeForSvc);
+            }
+
+            const unassignedSimulCount = busyBookings.filter(
+              b => !b.employeeId && !b.isBlock && currentMins < b.end && (currentMins + duration) > b.start
+            ).length;
+
+            if (this.hasDistinctAssignment(pools) && (pools.reduce((sum, p) => sum + p.length, 0) > unassignedSimulCount)) {
+              isSimultaneousFeasible = true;
+            }
+          }
+
+          if (isSimultaneousFeasible) {
+            const timeStr = this.minutesToTime(currentMins).substring(0, 5);
+            if (!slots.includes(timeStr)) {
+              slots.push(timeStr);
+            }
+            currentMins += interval;
+            continue;
+          }
+
           // Multi-service coordinated availability:
           // Check if each sequential service segment has qualified staff available during its specific time window
           let segStart = currentMins;
@@ -1678,5 +1739,19 @@ export class PublicReservationsController {
     const h = Math.floor(m / 60);
     const min = m % 60;
     return `${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00`;
+  }
+
+  private hasDistinctAssignment(pools: any[][], index = 0, usedIds = new Set<string>()): boolean {
+    if (index >= pools.length) return true;
+    for (const st of pools[index]) {
+      const id = st?.userId || st?.id || st?.user?.id;
+      if (!id || usedIds.has(id)) continue;
+      usedIds.add(id);
+      if (this.hasDistinctAssignment(pools, index + 1, usedIds)) {
+        return true;
+      }
+      usedIds.delete(id);
+    }
+    return false;
   }
 }

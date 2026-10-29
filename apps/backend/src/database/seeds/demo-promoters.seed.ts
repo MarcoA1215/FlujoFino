@@ -115,6 +115,31 @@ export async function runDemoSeed(
     }
   }
 
+  // Limpieza defensiva de aislamiento: Desvincular promoterId de negocios demo y borrar reportes/comisiones de prueba
+  try {
+    await dataSource.query(`
+      UPDATE "tenant" 
+      SET "promoterId" = NULL 
+      WHERE "is_test" = true 
+         OR "referral_code" IN ('demo-retail', 'demo-panaderia', 'demo-servicios', 'demo-autolavado', 'demo-gastronomia', 'demo-estetica', 'FINO-CENTRAL')
+         OR "name" IN ('Boutique Moda Urbana', 'Panadería La Espiga', 'Barbería & Spa Élite', 'Auto Lavado Express', 'Burger House Gourmet', 'Centro Estético Glow', 'FinoWork Central');
+    `);
+    await dataSource.query(`
+      DELETE FROM "promoter_commissions" 
+      WHERE "tenantId" IN (
+        SELECT id FROM "tenant" WHERE "is_test" = true OR "referral_code" IN ('demo-retail', 'demo-panaderia', 'demo-servicios', 'demo-autolavado', 'demo-gastronomia', 'demo-estetica', 'FINO-CENTRAL')
+      );
+    `);
+    await dataSource.query(`
+      DELETE FROM "saas_payment_reports" 
+      WHERE "tenant_id" IN (
+        SELECT id FROM "tenant" WHERE "is_test" = true OR "referral_code" IN ('demo-retail', 'demo-panaderia', 'demo-servicios', 'demo-autolavado', 'demo-gastronomia', 'demo-estetica', 'FINO-CENTRAL')
+      );
+    `);
+  } catch (cleanErr) {
+    console.warn('Advertencia en limpieza defensiva de demo:', cleanErr);
+  }
+
   const userRepo = dataSource.getRepository(User);
   const tenantRepo = dataSource.getRepository(Tenant);
   const accessRepo = dataSource.getRepository(UserTenantAccess);
@@ -689,7 +714,7 @@ export async function runDemoSeed(
         base_price: 25.00,
         isActive: true,
         isTest: true,
-        promoterId: promoterProfile ? promoterProfile.id : undefined,
+        promoterId: null as any,
       }));
     } else {
       let updated = false;
@@ -697,8 +722,8 @@ export async function runDemoSeed(
         tenantRetail.isTest = true;
         updated = true;
       }
-      if (promoterProfile && tenantRetail.promoterId !== promoterProfile.id) {
-        tenantRetail.promoterId = promoterProfile.id;
+      if (tenantRetail.promoterId) {
+        tenantRetail.promoterId = null as any;
         updated = true;
       }
       if (updated) {
@@ -1061,7 +1086,7 @@ export async function runDemoSeed(
         base_price: 25.00,
         isActive: true,
         isTest: true,
-        promoterId: promoterProfile ? promoterProfile.id : undefined,
+        promoterId: null as any,
       }));
     } else {
       let updated = false;
@@ -1069,8 +1094,8 @@ export async function runDemoSeed(
         tenantPan.isTest = true;
         updated = true;
       }
-      if (promoterProfile && tenantPan.promoterId !== promoterProfile.id) {
-        tenantPan.promoterId = promoterProfile.id;
+      if (tenantPan.promoterId) {
+        tenantPan.promoterId = null as any;
         updated = true;
       }
       if (updated) {
@@ -1399,7 +1424,7 @@ export async function runDemoSeed(
         base_price: 25.00,
         isActive: true,
         isTest: true,
-        promoterId: promoterProfile ? promoterProfile.id : undefined,
+        promoterId: null as any,
       }));
     } else {
       let updated = false;
@@ -1407,8 +1432,8 @@ export async function runDemoSeed(
         tenantSpa.isTest = true;
         updated = true;
       }
-      if (promoterProfile && tenantSpa.promoterId !== promoterProfile.id) {
-        tenantSpa.promoterId = promoterProfile.id;
+      if (tenantSpa.promoterId) {
+        tenantSpa.promoterId = null as any;
         updated = true;
       }
       if (updated) {
@@ -1701,7 +1726,7 @@ export async function runDemoSeed(
         base_price: 25.00,
         isActive: true,
         isTest: true,
-        promoterId: promoterProfile ? promoterProfile.id : undefined,
+        promoterId: null as any,
       }));
     } else {
       let updated = false;
@@ -1709,8 +1734,8 @@ export async function runDemoSeed(
         tenantLavado.isTest = true;
         updated = true;
       }
-      if (promoterProfile && tenantLavado.promoterId !== promoterProfile.id) {
-        tenantLavado.promoterId = promoterProfile.id;
+      if (tenantLavado.promoterId) {
+        tenantLavado.promoterId = null as any;
         updated = true;
       }
       if (updated) {
@@ -1989,7 +2014,7 @@ export async function runDemoSeed(
         base_price: 25.00,
         isActive: true,
         isTest: true,
-        promoterId: promoterProfile ? promoterProfile.id : undefined,
+        promoterId: null as any,
       }));
     } else {
       let updated = false;
@@ -1997,8 +2022,8 @@ export async function runDemoSeed(
         tenantBurger.isTest = true;
         updated = true;
       }
-      if (promoterProfile && tenantBurger.promoterId !== promoterProfile.id) {
-        tenantBurger.promoterId = promoterProfile.id;
+      if (tenantBurger.promoterId) {
+        tenantBurger.promoterId = null as any;
         updated = true;
       }
       if (updated) {
@@ -2326,7 +2351,7 @@ export async function runDemoSeed(
         base_price: 25.00,
         isActive: true,
         isTest: true,
-        promoterId: promoterProfile ? promoterProfile.id : undefined,
+        promoterId: null as any,
       }));
     } else {
       let updated = false;
@@ -2334,8 +2359,8 @@ export async function runDemoSeed(
         tenantGlow.isTest = true;
         updated = true;
       }
-      if (promoterProfile && tenantGlow.promoterId !== promoterProfile.id) {
-        tenantGlow.promoterId = promoterProfile.id;
+      if (tenantGlow.promoterId) {
+        tenantGlow.promoterId = null as any;
         updated = true;
       }
       if (updated) {

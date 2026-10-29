@@ -275,6 +275,7 @@ export interface ReservationDTO {
   employeeId?: string;
   employeeName?: string;
   serviceSpecialists?: ReservationServiceSpecialistDTO[];
+  isSimultaneous?: boolean;
 }
 
 export interface BusinessHourDay {
@@ -397,6 +398,7 @@ export interface SettingsDTO {
   featureShowCatalog?: boolean;
   bookingRequireService?: boolean;
   bookingAllowStaffSelection?: boolean;
+  allowSimultaneousServices?: boolean;
   requireApprovalAlways?: boolean;
   businessHours?: any;
   services?: any[];

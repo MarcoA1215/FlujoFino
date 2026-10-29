@@ -137,7 +137,8 @@ export class PromotersService {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    const commissions = promoter.commissions || [];
+    // Regla de Aislamiento: Excluir estrictamente comisiones de negocios demo (isTest)
+    const commissions = (promoter.commissions || []).filter(c => !c.tenant?.isTest);
 
     // Monthly activations: ACTIVATION commissions created in current calendar month
     const monthlyActivations = commissions.filter((c) => {
@@ -149,7 +150,8 @@ export class PromotersService {
       );
     }).length;
 
-    const tenants = promoter.tenants || [];
+    // Regla de Aislamiento: Excluir estrictamente negocios demo/prueba (isTest) de la lista de clientes referidos
+    const tenants = (promoter.tenants || []).filter(t => !t.isTest && t.name !== 'FinoWork Central');
     const tenantIds = tenants.map((t) => t.id);
 
     // Fetch tenant owner details (admin role in UserTenantAccess prioritized)

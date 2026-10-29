@@ -484,6 +484,7 @@ export class ReservationsService implements OnModuleInit {
     serviceName?: string,
     excludeReservationId?: string,
     manager?: EntityManager,
+    excludeStaffIds?: string[],
   ): Promise<{ employeeId: string; employeeName: string; staff: any } | null> {
     const em = manager || this.repo.manager;
     const accessRepo = em.getRepository(UserTenantAccess);
@@ -545,6 +546,13 @@ export class ReservationsService implements OnModuleInit {
       set.includes(st.userId) || set.includes(st.id) || (st.user && set.includes(st.user.id));
 
     let candidateStaff = staffList;
+    if (excludeStaffIds && excludeStaffIds.length > 0) {
+      candidateStaff = candidateStaff.filter(st =>
+        !excludeStaffIds.includes(st.userId) &&
+        !excludeStaffIds.includes(st.id) &&
+        (!st.user || !excludeStaffIds.includes(st.user.id))
+      );
+    }
     const requestedServices = serviceId
       ? serviceId.split(',').map(s => productMap.get(s.trim())).filter(Boolean) as Product[]
       : (serviceName ? serviceName.split(',').map(s => productNameMap.get(s.trim().toLowerCase())).filter(Boolean) as Product[] : []);
@@ -613,18 +621,22 @@ export class ReservationsService implements OnModuleInit {
       if (exDuration <= 0) exDuration = interval;
 
       if (Array.isArray(res.serviceSpecialists) && res.serviceSpecialists.length > 0 && !res.isBlock) {
+        const resSimultaneous = Boolean((res as any).isSimultaneous);
         let segStart = exStart;
         for (const s of res.serviceSpecialists) {
           const sp = s.serviceId ? productMap.get(s.serviceId) : null;
           const dur = Number(s.durationMinutes) || Number(sp?.durationMinutes) || interval;
+          const currentStart = resSimultaneous ? exStart : segStart;
           busyBookings.push({
             employeeId: s.employeeId || null,
-            start: segStart,
-            end: segStart + dur,
+            start: currentStart,
+            end: currentStart + dur,
             isBlock: false,
             serviceId: s.serviceId,
           });
-          segStart += dur;
+          if (!resSimultaneous) {
+            segStart += dur;
+          }
         }
       } else {
         busyBookings.push({
@@ -728,6 +740,7 @@ export class ReservationsService implements OnModuleInit {
     manager?: EntityManager,
     explicitDuration?: number,
     serviceSpecialists?: Array<{ serviceId: string; employeeId?: string; employeeName?: string; durationMinutes?: number; serviceName?: string; price?: number }>,
+    isSimultaneous?: boolean,
   ) {
     const em = manager || this.repo.manager;
     const settingsRepo = em.getRepository('Settings');
@@ -745,16 +758,24 @@ export class ReservationsService implements OnModuleInit {
       const sIds = serviceId.split(',').map(s => s.trim()).filter(Boolean);
       for (const sId of sIds) {
         const sp = productMap.get(sId);
-        if (sp && sp.durationMinutes) reqDuration += Number(sp.durationMinutes);
-        else reqDuration += interval;
+        const dur = (sp && sp.durationMinutes) ? Number(sp.durationMinutes) : interval;
+        if (isSimultaneous) {
+          reqDuration = Math.max(reqDuration, dur);
+        } else {
+          reqDuration += dur;
+        }
       }
     }
     if (reqDuration === 0 && serviceName) {
       const names = serviceName.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
       for (const nm of names) {
         const sp = productNameMap.get(nm);
-        if (sp && sp.durationMinutes) reqDuration += Number(sp.durationMinutes);
-        else reqDuration += interval;
+        const dur = (sp && sp.durationMinutes) ? Number(sp.durationMinutes) : interval;
+        if (isSimultaneous) {
+          reqDuration = Math.max(reqDuration, dur);
+        } else {
+          reqDuration += dur;
+        }
       }
     }
     if (reqDuration <= 0) reqDuration = interval;
@@ -858,19 +879,23 @@ export class ReservationsService implements OnModuleInit {
       if (exDuration <= 0) exDuration = interval;
 
       if (Array.isArray(res.serviceSpecialists) && res.serviceSpecialists.length > 0 && !res.isBlock) {
+        const resSimultaneous = Boolean((res as any).isSimultaneous);
         let segStart = exStart;
         for (const s of res.serviceSpecialists) {
           const sp = s.serviceId ? productMap.get(s.serviceId) : null;
           const dur = Number(s.durationMinutes) || Number(sp?.durationMinutes) || interval;
+          const currentStart = resSimultaneous ? exStart : segStart;
           busyBookings.push({
             employeeId: s.employeeId || null,
             customerName: res.customerName || 'Cliente',
-            start: segStart,
-            end: segStart + dur,
+            start: currentStart,
+            end: currentStart + dur,
             isBlock: false,
             serviceId: s.serviceId || res.serviceId,
           });
-          segStart += dur;
+          if (!resSimultaneous) {
+            segStart += dur;
+          }
         }
       } else {
         busyBookings.push({
@@ -896,13 +921,23 @@ export class ReservationsService implements OnModuleInit {
 
     // Si la cita tiene asignación específica de especialistas por servicio
     if (Array.isArray(serviceSpecialists) && serviceSpecialists.length > 0) {
+      if (isSimultaneous && serviceSpecialists.length > 1) {
+        const assignedIds = serviceSpecialists.map(s => s.employeeId).filter(Boolean);
+        const uniqueIds = new Set(assignedIds);
+        if (assignedIds.length > 0 && uniqueIds.size < assignedIds.length) {
+          throw new BadRequestException(
+            'En una cita con servicios simultáneos, cada servicio debe ser atendido por un especialista diferente.'
+          );
+        }
+      }
+
       let currentSegStart = reqStart;
       for (const spec of serviceSpecialists) {
         const sProd = spec.serviceId ? productMap.get(spec.serviceId) : null;
         const dur = Number(spec.durationMinutes) || Number(sProd?.durationMinutes) || interval;
-        const segStart = currentSegStart;
+        const segStart = isSimultaneous ? reqStart : currentSegStart;
         const segEnd = segStart + dur;
-        currentSegStart = segEnd;
+        if (!isSimultaneous) currentSegStart = segEnd;
 
         const rawAssigned = (sProd as any)?.assignedStaffIds;
         let sAssignedIds: string[] = [];
@@ -1178,7 +1213,7 @@ export class ReservationsService implements OnModuleInit {
     }
   }
 
-  private async calculateServiceDuration(tenantId: string, serviceId?: string, serviceName?: string, explicitMinutes?: number): Promise<number> {
+  private async calculateServiceDuration(tenantId: string, serviceId?: string, serviceName?: string, explicitMinutes?: number, isSimultaneous?: boolean): Promise<number> {
     if (explicitMinutes && explicitMinutes > 0) return explicitMinutes;
 
     const settingsRepo = this.repo.manager.getRepository('Settings');
@@ -1195,16 +1230,24 @@ export class ReservationsService implements OnModuleInit {
       const sIds = serviceId.split(',').map(s => s.trim()).filter(Boolean);
       for (const sId of sIds) {
         const sp = productMap.get(sId);
-        if (sp && sp.durationMinutes) reqDuration += Number(sp.durationMinutes);
-        else reqDuration += interval;
+        const dur = (sp && sp.durationMinutes) ? Number(sp.durationMinutes) : interval;
+        if (isSimultaneous) {
+          reqDuration = Math.max(reqDuration, dur);
+        } else {
+          reqDuration += dur;
+        }
       }
     }
     if (reqDuration === 0 && serviceName) {
       const names = serviceName.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
       for (const nm of names) {
         const sp = productNameMap.get(nm);
-        if (sp && sp.durationMinutes) reqDuration += Number(sp.durationMinutes);
-        else reqDuration += interval;
+        const dur = (sp && sp.durationMinutes) ? Number(sp.durationMinutes) : interval;
+        if (isSimultaneous) {
+          reqDuration = Math.max(reqDuration, dur);
+        } else {
+          reqDuration += dur;
+        }
       }
     }
     return reqDuration > 0 ? reqDuration : interval;
@@ -1216,7 +1259,12 @@ export class ReservationsService implements OnModuleInit {
         await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`${tenantId}_${dto.date}`]);
       }
 
-      const duration = dto.durationMinutes || await this.calculateServiceDuration(tenantId, dto.serviceId, dto.serviceName);
+      const settingsRepo = manager.getRepository('Settings');
+      const settings: any = await settingsRepo.findOne({ where: { tenantId } });
+      const allowSimultaneous = Boolean(settings?.allowSimultaneousServices);
+
+      let isSimultaneous = dto.isSimultaneous !== undefined ? Boolean(dto.isSimultaneous) : false;
+      let duration = dto.durationMinutes || await this.calculateServiceDuration(tenantId, dto.serviceId, dto.serviceName, undefined, isSimultaneous);
 
       // Auto-asignar especialista si no se especificó uno ("Cualquiera disponible")
       if (!dto.employeeId && dto.date && dto.time) {
@@ -1258,11 +1306,13 @@ export class ReservationsService implements OnModuleInit {
         let segCurMins = (dto.time || '00:00').split(':').map(Number);
         let curMins = (segCurMins[0] || 0) * 60 + (segCurMins[1] || 0);
 
+        const shouldAttemptSimultaneous = allowSimultaneous && !dto.employeeId;
         for (const sId of sIds) {
           const prod: any = await productRepo.findOne({ where: { id: sId, tenantId } });
           if (prod) {
             const segDuration = Number(prod.durationMinutes || 30);
-            const segTimeStr = this.minutesToTime(curMins).substring(0, 5);
+            const segTimeStr = shouldAttemptSimultaneous ? (dto.time || '00:00').substring(0, 5) : this.minutesToTime(curMins).substring(0, 5);
+            const excludeStaffIds = shouldAttemptSimultaneous ? autoSpecialists.map(a => a.employeeId).filter(Boolean) : [];
 
             let itemEmpId: string | undefined = dto.employeeId || undefined;
             let itemEmpName: string | undefined = dto.employeeName || undefined;
@@ -1303,6 +1353,7 @@ export class ReservationsService implements OnModuleInit {
                 prod.name,
                 undefined,
                 manager,
+                excludeStaffIds,
               );
               if (segStaff) {
                 itemEmpId = segStaff.employeeId;
@@ -1342,12 +1393,20 @@ export class ReservationsService implements OnModuleInit {
             dto.employeeId = autoSpecialists[0].employeeId;
             dto.employeeName = autoSpecialists[0].employeeName;
           }
+          if (allowSimultaneous && autoSpecialists.length > 1 && dto.isSimultaneous === undefined) {
+            const assignedIds = autoSpecialists.map(a => a.employeeId).filter(Boolean);
+            const uniqueIds = new Set(assignedIds);
+            if (assignedIds.length === autoSpecialists.length && uniqueIds.size === assignedIds.length) {
+              isSimultaneous = true;
+              duration = await this.calculateServiceDuration(tenantId, dto.serviceId, dto.serviceName, undefined, true);
+            }
+          }
         }
       }
 
       if (dto.date && dto.time && !dto.force) {
         await this.validateBusinessHours(tenantId, dto.date, dto.time, duration);
-        await this.validateSlotOverlap(tenantId, dto.date, dto.time, dto.serviceId, dto.serviceName, undefined, dto.employeeId, manager, duration, effectiveSpecialists);
+        await this.validateSlotOverlap(tenantId, dto.date, dto.time, dto.serviceId, dto.serviceName, undefined, dto.employeeId, manager, duration, effectiveSpecialists, isSimultaneous);
       }
       if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
       if (dto.totalAmount !== undefined && dto.totalAmount < 0) throw new BadRequestException('El monto total no puede ser negativo');
@@ -1356,6 +1415,7 @@ export class ReservationsService implements OnModuleInit {
       Object.assign(reservation, dto);
       reservation.tenantId = tenantId;
       reservation.durationMinutes = duration;
+      reservation.isSimultaneous = isSimultaneous;
       reservation.employeeId = dto.employeeId || null;
       reservation.employeeName = dto.employeeName || null;
       if (effectiveSpecialists) {
@@ -1432,14 +1492,15 @@ export class ReservationsService implements OnModuleInit {
         await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`${tenantId}_${targetDate}`]);
       }
 
-      const duration = dto.durationMinutes || reservation.durationMinutes || await this.calculateServiceDuration(tenantId, dto.serviceId || reservation.serviceId, dto.serviceName || reservation.serviceName);
+      const isSimultaneous = dto.isSimultaneous !== undefined ? Boolean(dto.isSimultaneous) : Boolean(reservation.isSimultaneous);
+      const duration = dto.durationMinutes || reservation.durationMinutes || await this.calculateServiceDuration(tenantId, dto.serviceId || reservation.serviceId, dto.serviceName || reservation.serviceName, undefined, isSimultaneous);
 
-      const shouldValidateSlot = (dto.date || dto.time || dto.employeeId !== undefined || dto.serviceSpecialists !== undefined) && !dto.force;
+      const shouldValidateSlot = (dto.date || dto.time || dto.employeeId !== undefined || dto.serviceSpecialists !== undefined || dto.isSimultaneous !== undefined) && !dto.force;
       if (shouldValidateSlot) {
         if (dto.date || dto.time) {
           await this.validateBusinessHours(tenantId, targetDate, targetTime, duration);
         }
-        await this.validateSlotOverlap(tenantId, targetDate, targetTime, dto.serviceId || reservation.serviceId, dto.serviceName || reservation.serviceName, id, dto.employeeId !== undefined ? dto.employeeId : reservation.employeeId, manager, duration, dto.serviceSpecialists !== undefined ? dto.serviceSpecialists : reservation.serviceSpecialists);
+        await this.validateSlotOverlap(tenantId, targetDate, targetTime, dto.serviceId || reservation.serviceId, dto.serviceName || reservation.serviceName, id, dto.employeeId !== undefined ? dto.employeeId : reservation.employeeId, manager, duration, dto.serviceSpecialists !== undefined ? dto.serviceSpecialists : reservation.serviceSpecialists, isSimultaneous);
       }
       if (dto.numberOfPeople !== undefined && dto.numberOfPeople <= 0) throw new BadRequestException('La cantidad de personas debe ser mayor a 0');
       if (dto.totalAmount !== undefined && dto.totalAmount < 0) throw new BadRequestException('El monto total no puede ser negativo');
@@ -1460,6 +1521,7 @@ export class ReservationsService implements OnModuleInit {
       
       Object.assign(reservation, dto);
       reservation.durationMinutes = duration;
+      reservation.isSimultaneous = isSimultaneous;
       if (dto.serviceSpecialists !== undefined) {
         reservation.serviceSpecialists = dto.serviceSpecialists;
       }
@@ -1522,7 +1584,7 @@ export class ReservationsService implements OnModuleInit {
 
       if (!dto.force) {
         await this.validateBusinessHours(tenantId, dto.date, tfFormatted, duration);
-        await this.validateSlotOverlap(tenantId, dto.date, tfFormatted, reservation.serviceId, reservation.serviceName, id, reservation.employeeId, manager, duration, reservation.serviceSpecialists);
+        await this.validateSlotOverlap(tenantId, dto.date, tfFormatted, reservation.serviceId, reservation.serviceName, id, reservation.employeeId, manager, duration, reservation.serviceSpecialists, reservation.isSimultaneous);
       }
 
       const oldDate = reservation.date;
@@ -1991,6 +2053,20 @@ export class ReservationsService implements OnModuleInit {
     return `${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00`;
   }
 
+  private hasDistinctAssignment(pools: any[][], index = 0, usedIds = new Set<string>()): boolean {
+    if (index >= pools.length) return true;
+    for (const st of pools[index]) {
+      const id = st?.userId || st?.id || st?.user?.id;
+      if (!id || usedIds.has(id)) continue;
+      usedIds.add(id);
+      if (this.hasDistinctAssignment(pools, index + 1, usedIds)) {
+        return true;
+      }
+      usedIds.delete(id);
+    }
+    return false;
+  }
+
   async notifyDelay(tenantId: string, id: string, minutes: number = 15) {
     const reservation = await this.repo.findOne({ where: { id, tenantId } });
     if (!reservation) {
@@ -2187,10 +2263,11 @@ export class ReservationsService implements OnModuleInit {
       const sIds = serviceId.split(',').map(s => s.trim()).filter(Boolean);
       for (const sId of sIds) {
         const sp = productMap.get(sId);
-        if (sp && sp.durationMinutes) {
-          duration += Number(sp.durationMinutes);
+        const sDur = (sp && sp.durationMinutes) ? Number(sp.durationMinutes) : interval;
+        if (settings?.allowSimultaneousServices && !employeeId) {
+          duration = Math.max(duration, sDur);
         } else {
-          duration += interval;
+          duration += sDur;
         }
       }
     }
@@ -2313,18 +2390,22 @@ export class ReservationsService implements OnModuleInit {
       }
 
       if (Array.isArray(r.serviceSpecialists) && r.serviceSpecialists.length > 0 && !r.isBlock) {
+        const rSimultaneous = Boolean((r as any).isSimultaneous);
         let segStart = startMins;
         for (const s of r.serviceSpecialists) {
           const sp = s.serviceId ? productMap.get(s.serviceId) : null;
           const dur = Number(s.durationMinutes) || Number(sp?.durationMinutes) || interval;
+          const currentStart = rSimultaneous ? startMins : segStart;
           busyBookings.push({
             employeeId: s.employeeId || null,
-            start: segStart,
-            end: segStart + dur,
+            start: currentStart,
+            end: currentStart + dur,
             isBlock: false,
             serviceId: s.serviceId || r.serviceId,
           });
-          segStart += dur;
+          if (!rSimultaneous) {
+            segStart += dur;
+          }
         }
       } else {
         busyBookings.push({
@@ -2452,6 +2533,56 @@ export class ReservationsService implements OnModuleInit {
             }
           }
         } else if (requestedServices.length > 1) {
+          const allowSimultaneous = Boolean(settings?.allowSimultaneousServices);
+          let isSimultaneousFeasible = false;
+
+          if (allowSimultaneous && !employeeId) {
+            const pools: any[][] = [];
+            for (const sProd of requestedServices) {
+              const sDur = Number((sProd as any).durationMinutes) || interval;
+              const sEnd = currentMins + sDur;
+              let segQualified = staffList;
+              const raw = (sProd as any)?.assignedStaffIds;
+              let assignedIds: string[] = [];
+              if (Array.isArray(raw)) assignedIds = raw;
+              else if (typeof raw === 'string' && raw.trim()) assignedIds = raw.split(',').map((x: string) => x.trim()).filter(Boolean);
+              if (assignedIds.length > 0) {
+                const matched = segQualified.filter(st =>
+                  assignedIds.includes(st.userId) || assignedIds.includes(st.id) || (st.user && assignedIds.includes(st.user.id))
+                );
+                segQualified = matched.length > 0 ? matched : staffList;
+              }
+              const freeForSvc = segQualified.filter(st => {
+                const { entry: stEntry, exit: stExit, lStart: stLStart, lEnd: stLEnd } = getStaffBounds(st);
+                if (stEntry !== null && currentMins < stEntry) return false;
+                if (stExit !== null && sEnd > stExit) return false;
+                if (stLStart !== null && stLEnd !== null && currentMins < stLEnd && sEnd > stLStart) return false;
+                return !busyBookings.some(b =>
+                  (b.employeeId === st.userId || b.employeeId === st.id || (st.user && b.employeeId === st.user.id)) &&
+                  currentMins < b.end && sEnd > b.start
+                );
+              });
+              pools.push(freeForSvc);
+            }
+
+            const unassignedSimulCount = busyBookings.filter(
+              b => !b.employeeId && !b.isBlock && currentMins < b.end && (currentMins + duration) > b.start
+            ).length;
+
+            if (this.hasDistinctAssignment(pools) && (pools.reduce((sum, p) => sum + p.length, 0) > unassignedSimulCount)) {
+              isSimultaneousFeasible = true;
+            }
+          }
+
+          if (isSimultaneousFeasible) {
+            const timeStr = this.minutesToTime(currentMins).substring(0, 5);
+            if (!slots.includes(timeStr)) {
+              slots.push(timeStr);
+            }
+            currentMins += interval;
+            continue;
+          }
+
           // Multi-service coordinated availability:
           // Check if each sequential service segment has qualified staff available during its specific time window
           let segStart = currentMins;

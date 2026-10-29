@@ -159,6 +159,7 @@ export class SuperAdminService implements OnModuleInit {
     // Count how many active tenants or valid trial tenants were referred by this tenant
     const activeReferrals = await this.tenantRepo.createQueryBuilder('t')
       .where('t.referred_by_tenant_id = :tenantId', { tenantId })
+      .andWhere('(t.is_test = false OR t.is_test IS NULL)')
       .andWhere(
         '(t.status = :active OR (t.status = :trial AND (t.trial_ends_at > :now OR t.trial_ends_at IS NULL)))',
         { active: TenantStatus.ACTIVE, trial: TenantStatus.TRIAL, now: new Date() }
@@ -649,11 +650,12 @@ export class SuperAdminService implements OnModuleInit {
    * List all pending SaaS payment reports
    */
   async getPendingPayments(): Promise<SaaSPaymentReportDTO[]> {
-    const reports = await this.paymentReportRepo.find({
-      where: { status: SaaSPaymentStatus.PENDING },
-      relations: { tenant: true },
-      order: { created_at: 'DESC' },
-    });
+    const reports = await this.paymentReportRepo.createQueryBuilder('p')
+      .innerJoinAndSelect('p.tenant', 't')
+      .where('p.status = :status', { status: SaaSPaymentStatus.PENDING })
+      .andWhere('(t.is_test = false OR t.is_test IS NULL)')
+      .orderBy('p.created_at', 'DESC')
+      .getMany();
 
     return reports.map((r) => ({
       id: r.id,
@@ -712,6 +714,10 @@ export class SuperAdminService implements OnModuleInit {
         throw new NotFoundException(`Negocio asociado no encontrado`);
       }
 
+      if (tenant.isTest) {
+        throw new BadRequestException('No se pueden aprobar pagos ni generar comisiones sobre cuentas de prueba/demostración.');
+      }
+
       // Extend current_period_ends_at dynamically based on reported months
       const now = new Date();
       const baseDate = tenant.current_period_ends_at && new Date(tenant.current_period_ends_at) > now
@@ -731,13 +737,14 @@ export class SuperAdminService implements OnModuleInit {
       savedTenant = await queryRunner.manager.save(Tenant, tenant);
       savedReport = await queryRunner.manager.save(SaaSPaymentReport, report);
 
-      // Promoter Commission Dispatch
-      if (savedTenant.promoterId) {
-        // Contar comercios referidos activos del promotor
+      // Promoter Commission Dispatch (excluyendo estrictamente negocios de prueba)
+      if (savedTenant.promoterId && !savedTenant.isTest) {
+        // Contar comercios referidos activos del promotor (excluyendo isTest)
         const activeClientsCount = await queryRunner.manager.count(Tenant, {
           where: {
             promoterId: savedTenant.promoterId,
             status: TenantStatus.ACTIVE,
+            isTest: false,
           },
         });
 
@@ -919,6 +926,12 @@ export class SuperAdminService implements OnModuleInit {
     }
     if (!data.reference || !data.reference.trim()) {
       throw new BadRequestException('La referencia de pago es obligatoria');
+    }
+
+    // Blindaje demo: Nunca permitir reportar pagos reales sobre negocios de prueba
+    const currentTenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (currentTenant?.isTest) {
+      throw new BadRequestException('Esta es una cuenta de prueba/demostración. No requiere reportar pagos de suscripción reales.');
     }
 
     const cleanReference = data.reference.trim();
@@ -1133,7 +1146,10 @@ export class SuperAdminService implements OnModuleInit {
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
     return promoters.map((promoter) => {
-      const commissions = promoter.commissions || [];
+      // Regla de Aislamiento: Excluir estrictamente negocios de prueba y comisiones demo
+      const realTenants = (promoter.tenants || []).filter((t) => !t.isTest && t.name !== 'FinoWork Central');
+      const commissions = (promoter.commissions || []).filter((c) => !c.tenant?.isTest);
+
       const monthlyActivations = commissions.filter((c) => {
         const cDate = new Date(c.createdAt);
         return (
@@ -1143,7 +1159,7 @@ export class SuperAdminService implements OnModuleInit {
         );
       }).length;
 
-      const activeClientsCount = (promoter.tenants || []).filter(
+      const activeClientsCount = realTenants.filter(
         (t) => t.status === TenantStatus.ACTIVE && (!t.current_period_ends_at || new Date(t.current_period_ends_at) >= now),
       ).length;
 
@@ -1186,9 +1202,9 @@ export class SuperAdminService implements OnModuleInit {
           createdAt: new Date(c.createdAt).toISOString(),
         }));
 
-      // Map affiliated tenants with individual statistics
+      // Map affiliated tenants with individual statistics (solo comercios reales)
       const nowMs = Date.now();
-      const affiliatedTenantsDto: PromoterAffiliatedTenantDTO[] = (promoter.tenants || []).map((t) => {
+      const affiliatedTenantsDto: PromoterAffiliatedTenantDTO[] = realTenants.map((t) => {
         const tenantComms = commissions.filter((c) => c.tenantId === t.id);
         const actComm = tenantComms.find((c) => c.type === PromoterCommissionType.ACTIVATION);
         const recComms = tenantComms.filter((c) => c.type === PromoterCommissionType.RECURRING);
@@ -1621,7 +1637,7 @@ export class SuperAdminService implements OnModuleInit {
       .createQueryBuilder('p')
       .innerJoin('p.tenant', 't')
       .where('p.status = :status', { status: SaaSPaymentStatus.APPROVED })
-      .andWhere('t.is_test = false')
+      .andWhere('(t.is_test = false OR t.is_test IS NULL)')
       .getMany();
 
     let grossRevenueUSD = 0;
@@ -1647,7 +1663,7 @@ export class SuperAdminService implements OnModuleInit {
     const commissions = await this.commissionRepo
       .createQueryBuilder('c')
       .leftJoin(Tenant, 't', 't.id = c.tenantId')
-      .where('(t.is_test = false OR t.id IS NULL)')
+      .where('((t.is_test = false OR t.is_test IS NULL) OR t.id IS NULL)')
       .getMany();
     let totalPromotersDebtUSD = 0;
     let totalPromotersPaidUSD = 0;

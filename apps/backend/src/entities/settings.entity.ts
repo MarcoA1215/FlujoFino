@@ -179,6 +179,9 @@ export class Settings {
   @Column('boolean', { default: true })
   bookingAllowStaffSelection: boolean;
 
+  @Column('boolean', { default: false })
+  allowSimultaneousServices: boolean;
+
   // --- Booking Configuration ---
   @Column('jsonb', { nullable: true })
   businessHours: any;
