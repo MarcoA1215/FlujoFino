@@ -18,7 +18,7 @@ import {
   IonSpinner,
   useIonToast,
   IonButtons,
-  IonMenuButton,
+
   IonProgressBar,
   IonItem,
   IonLabel,
@@ -29,7 +29,7 @@ import {
 import {
   copyOutline,
   logoWhatsapp,
-  refreshOutline,
+
   businessOutline,
   ribbonOutline,
   settingsOutline,
@@ -57,6 +57,7 @@ import {
 import { BankSelect } from '../components/BankSelect';
 import { getPublicBaseUrl } from '../utils/public-url';
 import { PromoterTermsContent } from './PromoterTermsAndConditions';
+import AppHeader from '../components/AppHeader';
 
 type TemplateKey = 'SATISFACTION' | 'PAYMENT' | 'TRIAL' | 'RECOVERY' | 'CUSTOM';
 
@@ -344,51 +345,50 @@ const PromoterDashboard: React.FC = () => {
 
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar style={{ '--background': '#0f172a', '--color': '#ffffff' } as any}>
-          <IonButtons slot="start">
-            <IonMenuButton />
-          </IonButtons>
-          <IonTitle style={{ fontWeight: 800 }}>Panel del Promotor</IonTitle>
-          <IonButtons slot="end">
-            <IonButton
-              fill="solid"
-              color="success"
-              size="small"
-              onClick={() => window.open('/manual-promotores.html', '_blank')}
-              style={{ fontWeight: 700 }}
-              title="Abrir Manual de Campo Oficial y Guía de Ventas"
-            >
-              <IonIcon icon={bookOutline} slot="start" />
-              Guía Oficial
-            </IonButton>
-            <IonButton
-              fill="clear"
-              color="light"
-              size="small"
-              onClick={() => setIsTermsModalOpen(true)}
-              style={{ fontWeight: 600 }}
-              title="Ver Términos y Condiciones"
-            >
-              <IonIcon icon={documentTextOutline} slot="start" />
-              Términos
-            </IonButton>
-            <IonButton
-              fill="outline"
-              color="light"
-              size="small"
-              onClick={() => setIsPayoutModalOpen(true)}
-              style={{ fontWeight: 600, marginRight: '8px' }}
-            >
-              <IonIcon icon={settingsOutline} slot="start" />
-              Cuentas de Cobro
-            </IonButton>
-            <IonButton onClick={fetchStats} title="Recargar">
-              <IonIcon icon={refreshOutline} />
-            </IonButton>
-          </IonButtons>
-        </IonToolbar>
-      </IonHeader>
+      <AppHeader
+        title="Panel del Promotor"
+        subtitle={stats?.code ? `Embajador Oficial • ${stats.code}` : 'Embajador Oficial FinoWork'}
+        showCashClose={false}
+        showOfflineToggle={false}
+        showRate={false}
+        onRefresh={fetchStats}
+      >
+        <div className="ff-header-pills-desktop" style={{ gap: '6px', alignItems: 'center' }}>
+          <IonButton
+            fill="solid"
+            color="success"
+            size="small"
+            onClick={() => window.open('/manual-promotores.html', '_blank')}
+            style={{ fontWeight: 700, height: '32px' }}
+            title="Abrir Manual de Campo Oficial y Guía de Ventas"
+          >
+            <IonIcon icon={bookOutline} slot="start" />
+            Guía Oficial
+          </IonButton>
+          <IonButton
+            fill="outline"
+            color="primary"
+            size="small"
+            onClick={() => setIsPayoutModalOpen(true)}
+            style={{ fontWeight: 600, height: '32px' }}
+            title="Configurar Cuentas de Cobro"
+          >
+            <IonIcon icon={settingsOutline} slot="start" />
+            Cuentas de Cobro
+          </IonButton>
+          <IonButton
+            fill="clear"
+            color="medium"
+            size="small"
+            onClick={() => setIsTermsModalOpen(true)}
+            style={{ fontWeight: 600, height: '32px' }}
+            title="Ver Términos y Condiciones"
+          >
+            <IonIcon icon={documentTextOutline} slot="start" />
+            Términos
+          </IonButton>
+        </div>
+      </AppHeader>
 
       <IonContent className="ion-padding" style={{ '--background': '#f8fafc' } as any}>
         {loading && (
@@ -462,6 +462,83 @@ const PromoterDashboard: React.FC = () => {
                   {stats.code}
                 </div>
               </div>
+            </div>
+
+            {/* BARRA DE ACCIONES RÁPIDAS DEL PROMOTOR (Móvil y Escritorio) */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '12px',
+              marginBottom: '20px',
+            }}>
+              <button
+                type="button"
+                onClick={() => window.open('/manual-promotores.html', '_blank')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  border: '1px solid #bbf7d0',
+                  background: '#f0fdf4',
+                  color: '#166534',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                }}
+              >
+                <IonIcon icon={bookOutline} style={{ fontSize: '18px', color: '#16a34a' }} />
+                Guía Oficial de Campo
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsPayoutModalOpen(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  border: '1px solid #bfdbfe',
+                  background: '#eff6ff',
+                  color: '#1e40af',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                }}
+              >
+                <IonIcon icon={settingsOutline} style={{ fontSize: '18px', color: '#2563eb' }} />
+                Cuentas de Cobro
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsTermsModalOpen(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  background: '#ffffff',
+                  color: '#475569',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                }}
+              >
+                <IonIcon icon={documentTextOutline} style={{ fontSize: '18px', color: '#64748b' }} />
+                Términos y Condiciones
+              </button>
             </div>
 
             {/* CAJA DE ENLACE DE AFILIADO */}
