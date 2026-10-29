@@ -221,6 +221,11 @@ const SuperAdminDashboard: React.FC = () => {
   const [platformRates, setPlatformRates] = useState<any>(null);
   const [isSyncingRates, setIsSyncingRates] = useState<boolean>(false);
 
+  // Demo Seed State
+  const [showSeedModal, setShowSeedModal] = useState<boolean>(false);
+  const [isSeedingDemo, setIsSeedingDemo] = useState<boolean>(false);
+  const [seedResult, setSeedResult] = useState<{ message: string; demoTenants?: string[] } | null>(null);
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -295,6 +300,32 @@ const SuperAdminDashboard: React.FC = () => {
       });
     } finally {
       setIsSyncingRates(false);
+    }
+  };
+
+  const handleSeedDemo = async () => {
+    setIsSeedingDemo(true);
+    try {
+      const res = await apiClient.post<any>('/superadmin/seed-demo');
+      setSeedResult(res.data);
+      setShowSeedModal(false);
+      presentToast({
+        message: '🌱 Negocios de prueba sincronizados correctamente (isTest=true). Cuentas reales y SuperAdmin intactos.',
+        duration: 4500,
+        color: 'success',
+        icon: checkmarkCircleOutline,
+      });
+      await loadData();
+    } catch (err: any) {
+      console.error('Error al sembrar negocios demo:', err);
+      presentToast({
+        message: 'Error al sembrar datos demo: ' + (err.response?.data?.message || err.message),
+        duration: 4500,
+        color: 'danger',
+        icon: closeCircleOutline,
+      });
+    } finally {
+      setIsSeedingDemo(false);
     }
   };
 
@@ -2074,6 +2105,29 @@ const SuperAdminDashboard: React.FC = () => {
                 >
                   🧪 Negocios de Prueba ({testTenantsCount})
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSeedModal(true)}
+                  disabled={isSeedingDemo}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid #10b981',
+                    background: '#ecfdf5',
+                    color: '#047857',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: isSeedingDemo ? 'not-allowed' : 'pointer',
+                    opacity: isSeedingDemo ? 0.6 : 1,
+                    marginLeft: 'auto',
+                  }}
+                >
+                  <IonIcon icon={refreshOutline} style={{ fontSize: '14px' }} />
+                  {isSeedingDemo ? 'Sembrando Datos...' : '🌱 Sembrar Negocios Demo (isTest)'}
+                </button>
               </div>
             </div>
 
@@ -2954,6 +3008,52 @@ const SuperAdminDashboard: React.FC = () => {
               </IonButton>
             </div>
 
+            {/* AMBIENTE DE PRUEBAS / NEGOCIOS DEMO */}
+            <div style={{ background: '#ffffff', borderRadius: '16px', padding: '24px', marginTop: '20px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                    🌱
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      Negocios Demo y Simulación de Ventas
+                    </h3>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                      Entorno de prueba aislado para capacitar promotores y simular ventas
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowSeedModal(true)}
+                  disabled={isSeedingDemo}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '9px 18px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    color: '#ffffff',
+                    backgroundColor: isSeedingDemo ? '#94a3b8' : '#059669',
+                    border: 'none',
+                    borderRadius: '10px',
+                    cursor: isSeedingDemo ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 4px rgba(5, 150, 105, 0.25)',
+                  }}
+                >
+                  <IonIcon icon={refreshOutline} style={{ fontSize: '16px' }} />
+                  {isSeedingDemo ? 'Sembrando Datos...' : 'Sembrar / Sincronizar Datos Demo'}
+                </button>
+              </div>
+
+              <p style={{ fontSize: '12px', color: '#475569', margin: '0', lineHeight: '1.5' }}>
+                Ejecuta el sembrado oficial no destructivo de los 6 negocios modelo (Boutique, Panadería, Spa, Auto Lavado, Burger House y Estética Glow). Todos los negocios se etiquetan con <code>isTest = true</code> para no distorsionar las métricas contables ni comisiones de promotores. <strong>Tus clientes piloto y cuenta SuperAdmin no son tocados.</strong>
+              </p>
+            </div>
+
             {/* SECCIÓN SEGURIDAD Y CREDENCIALES DEL SUPERADMIN */}
             <div style={{ background: '#ffffff', borderRadius: '16px', padding: '24px', marginTop: '28px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
@@ -3553,6 +3653,128 @@ const SuperAdminDashboard: React.FC = () => {
             )}
           </div>
         )}
+
+        {/* MODAL: SEMBRAR O ACTUALIZAR NEGOCIOS DEMO */}
+        <IonModal isOpen={showSeedModal} onDidDismiss={() => setShowSeedModal(false)}>
+          <IonHeader>
+            <IonToolbar color="primary">
+              <IonTitle style={{ fontWeight: 700 }}>
+                🌱 Sembrar Negocios Demo (isTest)
+              </IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setShowSeedModal(false)}>Cerrar</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+
+          <IonContent className="ion-padding" style={{ backgroundColor: '#f8fafc' }}>
+            <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+              <div style={{ background: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>
+                    🌱
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      Sembrado Seguro de Negocios de Prueba
+                    </h3>
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0 0' }}>
+                      Datos simulados para capacitación y auditoría comercial
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '14px', marginBottom: '16px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: '#1e40af', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <IonIcon icon={shieldCheckmarkOutline} style={{ fontSize: '18px' }} />
+                    Garantías de Protección y Seguridad
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#1e3a8a', lineHeight: '1.6' }}>
+                    <li><strong>Tus clientes reales y pilotos NO se modifican</strong>: No se borra ni reemplaza ningún negocio activo ni sus transacciones.</li>
+                    <li><strong>Tu cuenta SuperAdmin actual está 100% protegida</strong>: Se preserva exactamente como está configurada.</li>
+                    <li><strong>Métricas reales aisladas</strong>: Los 6 negocios demo llevan la marca <code>isTest = true</code>, quedando excluidos del MRR y finanzas reales.</li>
+                  </ul>
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+                    Negocios que serán creados o actualizados:
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '8px' }}>
+                    {[
+                      { name: 'Boutique Moda Urbana', code: 'demo-retail', desc: 'Variantes de ropa, créditos COP y comprobantes' },
+                      { name: 'Panadería La Espiga', code: 'demo-panaderia', desc: 'Materias primas y fórmulas de producción' },
+                      { name: 'Barbería & Spa Élite', code: 'demo-servicios', desc: 'Citas con turnos de barberos y comisiones' },
+                      { name: 'Auto Lavado Express', code: 'demo-autolavado', desc: 'Bahías de lavado y liquidación de lavadores' },
+                      { name: 'Burger House Gourmet', code: 'demo-gastronomia', desc: 'Cocina, salón y órdenes delivery con propina' },
+                      { name: 'Centro Estético Glow', code: 'demo-estetica', desc: 'Citas estéticas y catálogo de productos' },
+                    ].map((item, idx) => (
+                      <div key={idx} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 12px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '12px', color: '#0f172a' }}>
+                          {item.name} <span style={{ fontSize: '11px', color: '#64748b' }}>({item.code})</span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>{item.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {seedResult && (
+                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px', marginBottom: '16px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '12px', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <IonIcon icon={checkmarkCircleOutline} style={{ fontSize: '16px' }} />
+                      Resultado de la última ejecución:
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#15803d', marginTop: '4px' }}>{seedResult.message}</div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowSeedModal(false)}
+                    disabled={isSeedingDemo}
+                    style={{
+                      padding: '10px 18px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      color: '#475569',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSeedDemo}
+                    disabled={isSeedingDemo}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 22px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: 'var(--theme-primary, #059669)',
+                      color: 'var(--theme-primary-contrast, #ffffff)',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      cursor: isSeedingDemo ? 'not-allowed' : 'pointer',
+                      opacity: isSeedingDemo ? 0.7 : 1,
+                      boxShadow: '0 2px 4px rgba(5, 150, 105, 0.25)',
+                    }}
+                  >
+                    <IonIcon icon={refreshOutline} style={{ fontSize: '16px' }} />
+                    {isSeedingDemo ? 'Sembrando Datos Demo...' : 'Confirmar y Ejecutar Seed'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </IonContent>
+        </IonModal>
 
         {/* MODAL: GESTIONAR PLAN Y EXTENDER DÍAS */}
         <IonModal isOpen={!!selectedTenant} onDidDismiss={() => setSelectedTenant(null)}>

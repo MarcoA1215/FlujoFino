@@ -207,6 +207,12 @@ export class SuperAdminController {
     return await this.superadminService.recordSeniatPayment(body);
   }
 
+  @Post('seed-demo')
+  @UseGuards(SuperAdminGuard)
+  async seedDemoData() {
+    return await this.superadminService.seedDemoData();
+  }
+
   @Delete('finances/expenses/:id')
   @UseGuards(SuperAdminGuard)
   async deleteExpense(@Param('id') id: string) {

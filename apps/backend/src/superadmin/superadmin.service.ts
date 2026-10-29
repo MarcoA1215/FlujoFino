@@ -15,6 +15,7 @@ import { UpdateSuperAdminProfileDto } from './dto/update-superadmin-profile.dto'
 import { CreatePlatformExpenseDto } from './dto/create-platform-expense.dto';
 import { RecordSeniatPaymentDto } from './dto/record-seniat-payment.dto';
 import * as bcrypt from 'bcryptjs';
+import { runDemoSeed } from '../database/seeds/demo-promoters.seed';
 import {
   TenantPlanType,
   TenantStatus,
@@ -1845,6 +1846,15 @@ export class SuperAdminService implements OnModuleInit {
   /**
    * SuperAdmin: Anular/Eliminar un gasto o salida registrado
    */
+  /**
+   * SuperAdmin: Ejecuta el sembrado/actualización seguro de los 6 negocios demo oficiales.
+   * Aísla las métricas reales mediante isTest=true y protege la cuenta SuperAdmin activa.
+   */
+  async seedDemoData() {
+    this.logger.log('Iniciando sembrado seguro de negocios demo desde SuperAdmin...');
+    return await runDemoSeed(this.dataSource, { skipSuperAdmin: true });
+  }
+
   async deleteExpense(id: string): Promise<{ success: boolean; message: string }> {
     const expense = await this.platformExpenseRepo.findOne({ where: { id } });
     if (!expense) {

@@ -39,6 +39,14 @@ import { Investment } from '../../entities/investment.entity';
 import { PushSubscription } from '../../entities/push-subscription.entity';
 import { ProductVariant } from '../../entities/product-variant.entity';
 import { FiscalInvoice } from '../../entities/fiscal-invoice.entity';
+import { AppUpdate } from '../../entities/app-update.entity';
+import { PlatformExpense } from '../../entities/platform-expense.entity';
+
+export interface DemoSeedResult {
+  success: boolean;
+  message: string;
+  demoTenants: string[];
+}
 
 // Enums
 import { 
@@ -54,42 +62,15 @@ import {
   FiscalProviderType,
 } from '@finowork/shared-types';
 
-async function runSeed() {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    console.error('❌ Error: DATABASE_URL no está definida en las variables de entorno.');
-    process.exit(1);
+export async function runDemoSeed(
+  dataSource: DataSource,
+  options: { skipSuperAdmin?: boolean } = {}
+): Promise<DemoSeedResult> {
+  if (!dataSource || !dataSource.isInitialized) {
+    throw new Error("DataSource debe estar inicializado para ejecutar runDemoSeed.");
   }
 
-  const isLocal = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
-
-  // SEGURIDAD PRD: synchronize SIEMPRE en false para garantizar que JAMÁS altere,
-  // reinicie ni borre esquemas o datos existentes en la base de datos.
-  const dataSource = new DataSource({
-    type: 'postgres',
-    url: databaseUrl,
-    ssl: isLocal ? false : { rejectUnauthorized: false },
-    entities: [
-      User, Tenant, UserTenantAccess, Settings, Product, ProductVariant, RawMaterial, RecipeItem,
-      ComboItem, Order, OrderItem, Reservation, DeliveryZone, ProductionBatch,
-      StockMovement, WorkSchedule, OperatingExpense, AccessRequest, Feedback,
-      OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig,
-      Promoter, PromoterCommission, SalaryAdvance, CashExchange, Investment, PushSubscription,
-      FiscalInvoice
-    ],
-    synchronize: false,
-  });
-
-  console.log('🔄 Conectando a la base de datos (synchronize: false)...');
-  try {
-    await dataSource.initialize();
-    console.log('✅ Conexión establecida de forma segura (modo no destructivo).');
-  } catch (initErr) {
-    console.error('❌ Error fatal al inicializar TypeORM DataSource:', initErr);
-    process.exit(1);
-  }
-
-  // Columnas seguras en caso de faltar en esquemas previos
+// Columnas seguras en caso de faltar en esquemas previos
   const safeColumns = [
     `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "companyLogoUrl" character varying;`,
     `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "logoShape" character varying DEFAULT 'ROUNDED';`,
@@ -155,7 +136,15 @@ async function runSeed() {
   try {
     const passwordHash = await bcrypt.hash('123456', 10);
     const superPasswordHash = await bcrypt.hash('SuperAdmin2026!', 10);
-    const tasaActual = 855.66;
+    let tasaActual = 855.66;
+    try {
+      const anySettings = await settingsRepo.findOne({ where: {} });
+      if (anySettings?.exchangeRateBs && Number(anySettings.exchangeRateBs) > 0) {
+        tasaActual = Number(anySettings.exchangeRateBs);
+      }
+    } catch {
+      // fallback
+    }
     const todayIso = new Date().toISOString().split('T')[0];
 
     const tomorrow = new Date();
@@ -632,7 +621,13 @@ async function runSeed() {
     // =========================================================================
     console.log('\n👥 Verificando cuentas de usuarios del sistema...');
     // Cuentas Maestras
-    const superAdmin = await getOrCreateUser('superadmin@finowork.com', 'superadmin', UserRole.SUPERADMIN, 'Super Administrador', superPasswordHash);
+    let superAdmin = await userRepo.findOne({ where: { role: UserRole.SUPERADMIN } });
+    if (!options?.skipSuperAdmin && !superAdmin) {
+      superAdmin = await getOrCreateUser('superadmin@finowork.com', 'superadmin', UserRole.SUPERADMIN, 'Super Administrador', superPasswordHash);
+      console.log(' ✅ [SUPERADMIN NUEVO] Cuenta maestra creada: superadmin@finowork.com');
+    } else if (superAdmin) {
+      console.log(` 🛡️ [SUPERADMIN PRESERVADO] Se preservó la cuenta SuperAdmin existente (${superAdmin.email}). No se creó otra.`);
+    }
     const promoter = await getOrCreateUser('promotor@finowork.com', 'promotor', UserRole.PROMOTOR, 'Promotor Oficial FinoWork');
     if (promoter.role !== UserRole.PROMOTOR) {
       promoter.role = UserRole.PROMOTOR;
@@ -693,8 +688,22 @@ async function runSeed() {
         plan_type: TenantPlanType.PIONEER,
         base_price: 25.00,
         isActive: true,
-        promoterId: promoterProfile.id,
+        isTest: true,
+        promoterId: promoterProfile ? promoterProfile.id : undefined,
       }));
+    } else {
+      let updated = false;
+      if (!tenantRetail.isTest) {
+        tenantRetail.isTest = true;
+        updated = true;
+      }
+      if (promoterProfile && tenantRetail.promoterId !== promoterProfile.id) {
+        tenantRetail.promoterId = promoterProfile.id;
+        updated = true;
+      }
+      if (updated) {
+        tenantRetail = await tenantRepo.save(tenantRetail);
+      }
     }
     // Accesos del equipo Boutique
     await linkAccess(promoter.id, tenantRetail.id, UserRole.ADMIN, 'Gerente General', { compensationType: 'FIJO', salaryAmount: 120.0, salaryPeriod: 'SEMANAL', entryTime: '08:30', exitTime: '17:30' });
@@ -1051,8 +1060,22 @@ async function runSeed() {
         plan_type: TenantPlanType.PIONEER,
         base_price: 25.00,
         isActive: true,
-        promoterId: promoterProfile.id,
+        isTest: true,
+        promoterId: promoterProfile ? promoterProfile.id : undefined,
       }));
+    } else {
+      let updated = false;
+      if (!tenantPan.isTest) {
+        tenantPan.isTest = true;
+        updated = true;
+      }
+      if (promoterProfile && tenantPan.promoterId !== promoterProfile.id) {
+        tenantPan.promoterId = promoterProfile.id;
+        updated = true;
+      }
+      if (updated) {
+        tenantPan = await tenantRepo.save(tenantPan);
+      }
     }
     // Accesos Panadería
     await linkAccess(promoter.id, tenantPan.id, UserRole.ADMIN, 'Gerente', { compensationType: 'FIJO', salaryAmount: 100.0, salaryPeriod: 'SEMANAL' });
@@ -1375,8 +1398,22 @@ async function runSeed() {
         plan_type: TenantPlanType.PIONEER,
         base_price: 25.00,
         isActive: true,
-        promoterId: promoterProfile.id,
+        isTest: true,
+        promoterId: promoterProfile ? promoterProfile.id : undefined,
       }));
+    } else {
+      let updated = false;
+      if (!tenantSpa.isTest) {
+        tenantSpa.isTest = true;
+        updated = true;
+      }
+      if (promoterProfile && tenantSpa.promoterId !== promoterProfile.id) {
+        tenantSpa.promoterId = promoterProfile.id;
+        updated = true;
+      }
+      if (updated) {
+        tenantSpa = await tenantRepo.save(tenantSpa);
+      }
     }
     // Accesos Barbería & Spa
     await linkAccess(promoter.id, tenantSpa.id, UserRole.ADMIN, 'Gerente', { compensationType: 'FIJO', salaryAmount: 100.0, salaryPeriod: 'SEMANAL' });
@@ -1663,8 +1700,22 @@ async function runSeed() {
         plan_type: TenantPlanType.PIONEER,
         base_price: 25.00,
         isActive: true,
-        promoterId: promoterProfile.id,
+        isTest: true,
+        promoterId: promoterProfile ? promoterProfile.id : undefined,
       }));
+    } else {
+      let updated = false;
+      if (!tenantLavado.isTest) {
+        tenantLavado.isTest = true;
+        updated = true;
+      }
+      if (promoterProfile && tenantLavado.promoterId !== promoterProfile.id) {
+        tenantLavado.promoterId = promoterProfile.id;
+        updated = true;
+      }
+      if (updated) {
+        tenantLavado = await tenantRepo.save(tenantLavado);
+      }
     }
     // Accesos Auto Lavado
     await linkAccess(promoter.id, tenantLavado.id, UserRole.ADMIN, 'Gerente', { compensationType: 'FIJO', salaryAmount: 100.0, salaryPeriod: 'SEMANAL' });
@@ -1937,8 +1988,22 @@ async function runSeed() {
         plan_type: TenantPlanType.PIONEER,
         base_price: 25.00,
         isActive: true,
-        promoterId: promoterProfile.id,
+        isTest: true,
+        promoterId: promoterProfile ? promoterProfile.id : undefined,
       }));
+    } else {
+      let updated = false;
+      if (!tenantBurger.isTest) {
+        tenantBurger.isTest = true;
+        updated = true;
+      }
+      if (promoterProfile && tenantBurger.promoterId !== promoterProfile.id) {
+        tenantBurger.promoterId = promoterProfile.id;
+        updated = true;
+      }
+      if (updated) {
+        tenantBurger = await tenantRepo.save(tenantBurger);
+      }
     }
     // Accesos Burger House
     await linkAccess(promoter.id, tenantBurger.id, UserRole.ADMIN, 'Gerente General', { compensationType: 'FIJO', salaryAmount: 120.0, salaryPeriod: 'SEMANAL' });
@@ -2260,8 +2325,22 @@ async function runSeed() {
         plan_type: TenantPlanType.PIONEER,
         base_price: 25.00,
         isActive: true,
-        promoterId: promoterProfile.id,
+        isTest: true,
+        promoterId: promoterProfile ? promoterProfile.id : undefined,
       }));
+    } else {
+      let updated = false;
+      if (!tenantGlow.isTest) {
+        tenantGlow.isTest = true;
+        updated = true;
+      }
+      if (promoterProfile && tenantGlow.promoterId !== promoterProfile.id) {
+        tenantGlow.promoterId = promoterProfile.id;
+        updated = true;
+      }
+      if (updated) {
+        tenantGlow = await tenantRepo.save(tenantGlow);
+      }
     }
     // Accesos Centro Glow
     await linkAccess(promoter.id, tenantGlow.id, UserRole.ADMIN, 'Directora Estética', { compensationType: 'FIJO', salaryAmount: 120.0, salaryPeriod: 'SEMANAL' });
@@ -2643,14 +2722,63 @@ async function runSeed() {
     console.log('6. Centro Estético Glow       (demo-estetica)');
     console.log('==================================================\n');
 
+    return {
+      success: true,
+      message: 'Negocios de prueba sincronizados correctamente con etiqueta isTest=true. Tu cuenta SuperAdmin y negocios activos se mantienen intactos.',
+      demoTenants: [
+        'Boutique Moda Urbana (demo-retail)',
+        'Panadería La Espiga (demo-panaderia)',
+        'Barbería & Spa Élite (demo-servicios)',
+        'Auto Lavado Express (demo-autolavado)',
+        'Burger House Gourmet (demo-gastronomia)',
+        'Centro Estético Glow (demo-estetica)',
+      ],
+    };
   } catch (error) {
     console.error('❌ Error durante la ejecución del seed:', error);
     throw error;
+  }
+}
+
+async function runStandaloneCli() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    console.error('❌ Error: DATABASE_URL no está definida en las variables de entorno.');
+    process.exit(1);
+  }
+
+  const isLocal = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
+
+  const dataSource = new DataSource({
+    type: 'postgres',
+    url: databaseUrl,
+    ssl: isLocal ? false : { rejectUnauthorized: false },
+    entities: [
+      User, Tenant, UserTenantAccess, Settings, Product, ProductVariant, RawMaterial, RecipeItem,
+      ComboItem, Order, OrderItem, Reservation, DeliveryZone, ProductionBatch,
+      StockMovement, WorkSchedule, OperatingExpense, AccessRequest, Feedback,
+      OrderItemMedia, Customer, SaaSPaymentReport, PlatformConfig,
+      Promoter, PromoterCommission, SalaryAdvance, CashExchange, Investment, PushSubscription,
+      FiscalInvoice, AppUpdate, PlatformExpense,
+    ],
+    synchronize: false,
+  });
+
+  console.log('🔄 Conectando a la base de datos (synchronize: false)...');
+  await dataSource.initialize();
+  try {
+    const res = await runDemoSeed(dataSource, { skipSuperAdmin: false });
+    console.log(`✅ ${res.message}`);
   } finally {
     await dataSource.destroy();
   }
 }
 
-runSeed()
-  .then(() => process.exit(0))
-  .catch(() => process.exit(1));
+if (require.main === module) {
+  runStandaloneCli()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}
