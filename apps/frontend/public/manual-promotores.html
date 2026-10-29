@@ -40,6 +40,11 @@
       -webkit-font-smoothing: antialiased;
     }
 
+    html, body {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
     .no-print-bar {
       position: sticky;
       top: 0;
@@ -51,26 +56,69 @@
       align-items: center;
       z-index: 999;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      gap: 12px;
+    }
+
+    .brand-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-bar-logo {
+      height: 24px;
+      width: 24px;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+
+    .brand-name {
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: -0.2px;
+      color: #FFFFFF;
+      flex-shrink: 0;
+    }
+
+    .brand-divider {
+      opacity: 0.35;
+      font-weight: 300;
+    }
+
+    .brand-subtitle {
+      font-weight: 500;
+      font-size: 13px;
+      color: #94A3B8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .btn-print {
       background: var(--primary);
       color: white;
       border: none;
-      padding: 10px 20px;
+      padding: 10px 18px;
       border-radius: 8px;
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13.5px;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 8px;
       transition: all 0.2s ease;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .btn-print:hover {
       background: var(--primary-dark);
       transform: translateY(-1px);
+    }
+
+    .btn-text-mobile {
+      display: none;
     }
 
     .document-container {
@@ -217,6 +265,42 @@
       color: var(--slate-900);
     }
 
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin: 14px 0 22px 0;
+      border: 1px solid var(--slate-200);
+      border-radius: 10px;
+      background: var(--white);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+    }
+
+    .table-responsive::-webkit-scrollbar {
+      height: 6px;
+    }
+    .table-responsive::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 3px;
+    }
+
+    .table-responsive table {
+      width: 100%;
+      margin: 0;
+      border: none;
+      border-radius: 0;
+      min-width: 580px;
+    }
+
+    .table-hint-mobile {
+      display: none;
+      font-size: 11.5px;
+      color: #64748B;
+      margin: -6px 0 8px 0;
+      text-align: right;
+      font-style: italic;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -337,9 +421,144 @@
       font-weight: 500;
     }
 
+    @media (max-width: 768px) {
+      .no-print-bar {
+        padding: 10px 14px;
+      }
+      .brand-divider,
+      .brand-subtitle {
+        display: none !important;
+      }
+      .btn-print {
+        padding: 7px 12px;
+        font-size: 12px;
+        gap: 5px;
+      }
+      .btn-text-desktop {
+        display: none !important;
+      }
+      .btn-text-mobile {
+        display: inline !important;
+      }
+
+      body {
+        background-color: var(--white);
+      }
+      .document-container {
+        margin: 0;
+        border-radius: 0;
+        box-shadow: none;
+        width: 100%;
+        max-width: 100%;
+      }
+      .page {
+        padding: 22px 14px;
+      }
+      .cover-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .cover-title {
+        font-size: 24px;
+        line-height: 1.25;
+        margin-bottom: 10px;
+        letter-spacing: -0.5px;
+      }
+      .cover-subtitle {
+        font-size: 14px;
+        margin-bottom: 18px;
+        line-height: 1.5;
+      }
+      .cover-meta-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 12px;
+      }
+      .meta-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--slate-200);
+        padding-bottom: 8px;
+      }
+      .meta-item:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+      .meta-item h4 {
+        margin-bottom: 0;
+        font-size: 12px;
+      }
+      .meta-item p {
+        font-size: 14px;
+      }
+      h2 {
+        font-size: 20px;
+        line-height: 1.3;
+        margin-bottom: 12px;
+      }
+      h3 {
+        font-size: 15.5px;
+        margin: 18px 0 8px 0;
+        line-height: 1.35;
+      }
+      p {
+        font-size: 14px;
+        margin-bottom: 12px;
+        line-height: 1.55;
+      }
+      .alert-box {
+        padding: 14px;
+        margin: 16px 0;
+        font-size: 13px;
+        border-radius: 8px;
+      }
+      .alert-box h4 {
+        font-size: 13.5px;
+        margin-bottom: 8px;
+      }
+      .alert-box p {
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .table-hint-mobile {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 4px;
+      }
+      th {
+        padding: 10px 12px;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+      td {
+        padding: 10px 12px;
+        font-size: 12.5px;
+      }
+      .steps-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      .flow-grid-2 {
+        grid-template-columns: 1fr;
+        gap: 14px;
+      }
+      .script-box {
+        padding: 14px;
+        font-size: 13.5px;
+      }
+      .page-break {
+        margin: 28px 0;
+        border-bottom: 1px dashed var(--slate-200);
+      }
+    }
+
     @media print {
       body { background: white; }
-      .no-print-bar { display: none !important; }
+      .no-print-bar, .table-hint-mobile { display: none !important; }
       .document-container {
         box-shadow: none;
         margin: 0;
@@ -353,6 +572,16 @@
         margin: 0;
         height: 0;
       }
+      .table-responsive {
+        border: none;
+        overflow: visible;
+        margin: 14px 0;
+        box-shadow: none;
+      }
+      .table-responsive table {
+        min-width: 100%;
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -360,14 +589,20 @@
 
   <!-- Barra de control no imprimible -->
   <div class="no-print-bar">
-    <div style="font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 10px;">
-      <img src="/assets/logo-192.png" alt="FinoWork Logo" style="height: 24px; width: 24px; border-radius: 6px;">
-      <span>FinoWork</span>
-      <span style="opacity: 0.4;">|</span>
-      <span style="font-weight: 500; font-size: 13px;">Manual de Campo Oficial para Promotores y Afiliados</span>
+    <div class="brand-info">
+      <img src="/assets/logo-192.png" alt="FinoWork Logo" class="brand-bar-logo">
+      <span class="brand-name">FinoWork</span>
+      <span class="brand-divider">|</span>
+      <span class="brand-subtitle">Manual de Campo Oficial para Promotores y Afiliados</span>
     </div>
-    <button class="btn-print" onclick="window.print()">
-      Imprimir / Guardar como PDF
+    <button class="btn-print" onclick="window.print()" title="Imprimir o Guardar como PDF">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 9V2h12v7"></path>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+        <rect x="6" y="14" width="12" height="8"></rect>
+      </svg>
+      <span class="btn-text-desktop">Imprimir / Guardar como PDF</span>
+      <span class="btn-text-mobile">Guardar PDF</span>
     </button>
   </div>
 
@@ -433,142 +668,151 @@
       </div>
 
       <h3>Escalera Oficial de Rangos y Recurrencia por Comercio:</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Nivel Oficial</th>
-            <th>Comercios Activos</th>
-            <th>% Comisión Recurrente</th>
-            <th>Recurrente Mensual ($20)</th>
-            <th>Recurrente Anual ($200)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><span class="badge-rank badge-wood">Madera</span></td>
-            <td>0 comercios</td>
-            <td>10%</td>
-            <td>$2.00 USD</td>
-            <td>$20.00 USD</td>
-          </tr>
-          <tr>
-            <td><span class="badge-rank badge-bronze">Bronce</span></td>
-            <td>1 a 49 comercios</td>
-            <td><strong>10%</strong></td>
-            <td><strong>$2.00 USD</strong> / mes</td>
-            <td><strong>$20.00 USD</strong></td>
-          </tr>
-          <tr>
-            <td><span class="badge-rank badge-silver">Plata</span></td>
-            <td>50 a 99 comercios</td>
-            <td><strong>15%</strong></td>
-            <td><strong>$3.00 USD</strong> / mes</td>
-            <td><strong>$30.00 USD</strong></td>
-          </tr>
-          <tr>
-            <td><span class="badge-rank badge-gold">Oro</span></td>
-            <td>100+ comercios</td>
-            <td><strong>20%</strong></td>
-            <td><strong>$4.00 USD</strong> / mes</td>
-            <td><strong>$40.00 USD</strong></td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-hint-mobile">👉 Desliza horizontalmente para ver toda la tabla &rarr;</div>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Nivel Oficial</th>
+              <th>Comercios Activos</th>
+              <th>% Comisión Recurrente</th>
+              <th>Recurrente Mensual ($20)</th>
+              <th>Recurrente Anual ($200)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge-rank badge-wood">Madera</span></td>
+              <td>0 comercios</td>
+              <td>10%</td>
+              <td>$2.00 USD</td>
+              <td>$20.00 USD</td>
+            </tr>
+            <tr>
+              <td><span class="badge-rank badge-bronze">Bronce</span></td>
+              <td>1 a 49 comercios</td>
+              <td><strong>10%</strong></td>
+              <td><strong>$2.00 USD</strong> / mes</td>
+              <td><strong>$20.00 USD</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge-rank badge-silver">Plata</span></td>
+              <td>50 a 99 comercios</td>
+              <td><strong>15%</strong></td>
+              <td><strong>$3.00 USD</strong> / mes</td>
+              <td><strong>$30.00 USD</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge-rank badge-gold">Oro</span></td>
+              <td>100+ comercios</td>
+              <td><strong>20%</strong></td>
+              <td><strong>$4.00 USD</strong> / mes</td>
+              <td><strong>$40.00 USD</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <h3>Metas Históricas de Activación y Bonos en Efectivo (Pago Único):</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Meta Histórica</th>
-            <th>Activaciones Acumuladas</th>
-            <th>Bono en Efectivo Directo</th>
-            <th>Condición de Desbloqueo</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Meta 1</strong></td>
-            <td><strong>5 activaciones</strong></td>
-            <td><strong>+$10.00 USD</strong></td>
-            <td>Alcanzar 5 comercios activados en tu historial</td>
-          </tr>
-          <tr>
-            <td><strong>Meta 2</strong></td>
-            <td><strong>10 activaciones</strong></td>
-            <td><strong>+$25.00 USD</strong></td>
-            <td>Alcanzar 10 comercios activados en tu historial</td>
-          </tr>
-          <tr>
-            <td><strong>Meta 3</strong></td>
-            <td><strong>20 activaciones</strong></td>
-            <td><strong>+$50.00 USD</strong></td>
-            <td>Alcanzar 20 comercios activados en tu historial</td>
-          </tr>
-          <tr>
-            <td><strong>Meta 4</strong></td>
-            <td><strong>50 activaciones</strong></td>
-            <td><strong>+$100.00 USD</strong></td>
-            <td>Alcanzar 50 comercios activados en tu historial</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-hint-mobile">👉 Desliza horizontalmente para ver toda la tabla &rarr;</div>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Meta Histórica</th>
+              <th>Activaciones Acumuladas</th>
+              <th>Bono en Efectivo Directo</th>
+              <th>Condición de Desbloqueo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Meta 1</strong></td>
+              <td><strong>5 activaciones</strong></td>
+              <td><strong>+$10.00 USD</strong></td>
+              <td>Alcanzar 5 comercios activados en tu historial</td>
+            </tr>
+            <tr>
+              <td><strong>Meta 2</strong></td>
+              <td><strong>10 activaciones</strong></td>
+              <td><strong>+$25.00 USD</strong></td>
+              <td>Alcanzar 10 comercios activados en tu historial</td>
+            </tr>
+            <tr>
+              <td><strong>Meta 3</strong></td>
+              <td><strong>20 activaciones</strong></td>
+              <td><strong>+$50.00 USD</strong></td>
+              <td>Alcanzar 20 comercios activados en tu historial</td>
+            </tr>
+            <tr>
+              <td><strong>Meta 4</strong></td>
+              <td><strong>50 activaciones</strong></td>
+              <td><strong>+$100.00 USD</strong></td>
+              <td>Alcanzar 50 comercios activados en tu historial</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <h3>Proyección de Ingresos Recurrentes Mensuales (Comercios en Cuota Mensual):</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Comercios Activos</th>
-            <th>Nivel</th>
-            <th>Cálculo Recurrente</th>
-            <th>Ingreso Mensual Continuo</th>
-            <th>Activaciones Acumuladas Previas</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>10 comercios</strong></td>
-            <td>Bronce (10%)</td>
-            <td>10 x $2.00 USD</td>
-            <td><strong>$20.00 USD / mes</strong></td>
-            <td>+$100.00 USD (50% activación)</td>
-          </tr>
-          <tr>
-            <td><strong>25 comercios</strong></td>
-            <td>Bronce (10%)</td>
-            <td>25 x $2.00 USD</td>
-            <td><strong>$50.00 USD / mes</strong></td>
-            <td>+$250.00 USD (50% activación)</td>
-          </tr>
-          <tr>
-            <td><strong>50 comercios</strong></td>
-            <td>Plata (15%)</td>
-            <td>50 x $3.00 USD + $25 bono</td>
-            <td><strong>$175.00 USD / mes</strong></td>
-            <td>+$500.00 USD (50% activación)</td>
-          </tr>
-          <tr>
-            <td><strong>80 comercios</strong></td>
-            <td>Plata (15%)</td>
-            <td>80 x $3.00 USD</td>
-            <td><strong>$240.00 USD / mes</strong></td>
-            <td>+$800.00 USD (50% activación)</td>
-          </tr>
-          <tr>
-            <td><strong>100 comercios</strong></td>
-            <td>Oro (20%)</td>
-            <td>100 x $4.00 USD + $50 bono</td>
-            <td><strong>$450.00 USD / mes</strong></td>
-            <td>+$1,000.00 USD (50% activación)</td>
-          </tr>
-          <tr>
-            <td><strong>150 comercios</strong></td>
-            <td>Oro (20%)</td>
-            <td>150 x $4.00 USD</td>
-            <td><strong>$600.00 USD / mes</strong></td>
-            <td>+$1,500.00 USD (50% activación)</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-hint-mobile">👉 Desliza horizontalmente para ver toda la tabla &rarr;</div>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Comercios Activos</th>
+              <th>Nivel</th>
+              <th>Cálculo Recurrente</th>
+              <th>Ingreso Mensual Continuo</th>
+              <th>Activaciones Acumuladas Previas</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>10 comercios</strong></td>
+              <td>Bronce (10%)</td>
+              <td>10 x $2.00 USD</td>
+              <td><strong>$20.00 USD / mes</strong></td>
+              <td>+$100.00 USD (50% activación)</td>
+            </tr>
+            <tr>
+              <td><strong>25 comercios</strong></td>
+              <td>Bronce (10%)</td>
+              <td>25 x $2.00 USD</td>
+              <td><strong>$50.00 USD / mes</strong></td>
+              <td>+$250.00 USD (50% activación)</td>
+            </tr>
+            <tr>
+              <td><strong>50 comercios</strong></td>
+              <td>Plata (15%)</td>
+              <td>50 x $3.00 USD + $25 bono</td>
+              <td><strong>$175.00 USD / mes</strong></td>
+              <td>+$500.00 USD (50% activación)</td>
+            </tr>
+            <tr>
+              <td><strong>80 comercios</strong></td>
+              <td>Plata (15%)</td>
+              <td>80 x $3.00 USD</td>
+              <td><strong>$240.00 USD / mes</strong></td>
+              <td>+$800.00 USD (50% activación)</td>
+            </tr>
+            <tr>
+              <td><strong>100 comercios</strong></td>
+              <td>Oro (20%)</td>
+              <td>100 x $4.00 USD + $50 bono</td>
+              <td><strong>$450.00 USD / mes</strong></td>
+              <td>+$1,000.00 USD (50% activación)</td>
+            </tr>
+            <tr>
+              <td><strong>150 comercios</strong></td>
+              <td>Oro (20%)</td>
+              <td>150 x $4.00 USD</td>
+              <td><strong>$600.00 USD / mes</strong></td>
+              <td>+$1,500.00 USD (50% activación)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <div class="alert-box blue">
         <h4>Canales de Liquidación</h4>
