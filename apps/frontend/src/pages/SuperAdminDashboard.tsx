@@ -2444,6 +2444,72 @@ const SuperAdminDashboard: React.FC = () => {
         {/* TAB: PROMOTORES Y COMISIONES */}
         {activeTab === 'promoters' && (
           <div>
+            {/* Acceso Rápido y Difusión de la Guía Oficial */}
+            <div style={{
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: '14px',
+              padding: '14px 18px',
+              marginBottom: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 300px' }}>
+                <span style={{ fontSize: '24px' }}>📖</span>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '14px', color: '#166534' }}>
+                    Guía de Campo Oficial y Manual de Promotores (PDF)
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#15803d' }}>
+                    Manual ilustrado con el guion de venta, escalera de comisiones (50% en activación y 10% a 20% recurrente), bonos por metas y flujos del sistema listos para compartir con promotores y prospectos.
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => window.open('/manual-promotores.html', '_blank')}
+                  style={{
+                    background: '#16a34a',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '8px 14px',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  Ver Guía Oficial
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = window.location.origin + '/manual-promotores.html';
+                    navigator.clipboard.writeText(url);
+                    presentToast({ message: '¡Enlace de la guía copiado al portapapeles!', duration: 2500, color: 'success' });
+                  }}
+                  style={{
+                    background: '#ffffff',
+                    color: '#166534',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '8px',
+                    padding: '8px 14px',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Copiar Enlace
+                </button>
+              </div>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '14px' }}>
               <div style={{ background: totalPromoterPendingUSD > 0 ? '#fff7ed' : '#ffffff', border: totalPromoterPendingUSD > 0 ? '1px solid #fdba74' : '1px solid #e2e8f0', borderRadius: '14px', padding: '16px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 800, color: '#9a3412', textTransform: 'uppercase' }}>Total por liquidar</div>

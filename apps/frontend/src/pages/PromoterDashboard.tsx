@@ -44,6 +44,8 @@ import {
   chatbubbleEllipsesOutline,
   searchOutline,
   timeOutline,
+  bookOutline,
+  openOutline,
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
@@ -350,6 +352,17 @@ const PromoterDashboard: React.FC = () => {
           <IonTitle style={{ fontWeight: 800 }}>Panel del Promotor</IonTitle>
           <IonButtons slot="end">
             <IonButton
+              fill="solid"
+              color="success"
+              size="small"
+              onClick={() => window.open('/manual-promotores.html', '_blank')}
+              style={{ fontWeight: 700 }}
+              title="Abrir Manual de Campo Oficial y Guía de Ventas"
+            >
+              <IonIcon icon={bookOutline} slot="start" />
+              Guía Oficial
+            </IonButton>
+            <IonButton
               fill="clear"
               color="light"
               size="small"
@@ -504,6 +517,72 @@ const PromoterDashboard: React.FC = () => {
                     >
                       <IonIcon icon={logoWhatsapp} slot="start" />
                       Compartir por WhatsApp
+                    </IonButton>
+                  </div>
+                </div>
+              </IonCardContent>
+            </IonCard>
+
+            {/* ACCESO DIRECTO AL MANUAL Y GUÍA DE VENTAS */}
+            <IonCard style={{
+              margin: '0 0 20px 0',
+              borderRadius: '14px',
+              border: '1px solid #e2e8f0',
+              background: 'linear-gradient(to right, #ffffff, #f0fdf4)',
+              borderLeft: '5px solid #10b981',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+              <IonCardContent style={{ padding: '18px 20px' }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '14px'
+                }}>
+                  <div style={{ flex: '1 1 340px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '22px' }}>📖</span>
+                      <span style={{ fontWeight: 800, fontSize: '16px', color: '#0f172a' }}>
+                        Manual de Campo Oficial & Guía de Ventas
+                      </span>
+                      <span style={{
+                        background: '#ecfdf5',
+                        color: '#065f46',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        textTransform: 'uppercase'
+                      }}>
+                        Material de Apoyo
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '13px', color: '#475569', margin: 0, lineHeight: '1.45' }}>
+                      Consulta el guion de venta de 2 minutos para mostrador, la escalera oficial de comisiones (50% en activación y 10% a 20% recurrente), los bonos por metas y capturas paso a paso de los flujos de FinoWork listas para mostrar a los comercios.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <IonButton
+                      color="success"
+                      size="small"
+                      onClick={() => window.open('/manual-promotores.html', '_blank')}
+                      style={{ fontWeight: 700 }}
+                    >
+                      <IonIcon icon={openOutline} slot="start" />
+                      Ver Guía en Línea
+                    </IonButton>
+                    <IonButton
+                      fill="outline"
+                      color="dark"
+                      size="small"
+                      onClick={() => window.open('/manual-promotores.html', '_blank')}
+                      style={{ fontWeight: 600 }}
+                      title="Abrir e imprimir / guardar versión PDF"
+                    >
+                      <IonIcon icon={documentTextOutline} slot="start" />
+                      Guardar PDF
                     </IonButton>
                   </div>
                 </div>

@@ -42,6 +42,7 @@ import {
   shieldCheckmarkOutline,
   medalOutline,
   cloudDownloadOutline,
+  bookOutline,
 } from 'ionicons/icons';
 import { Capacitor } from '@capacitor/core';
 import { useSettings } from '../context/SettingsContext';
@@ -427,6 +428,34 @@ const Menu: React.FC = () => {
 
       <IonFooter className="ion-no-border" style={{ background: '#ffffff', borderTop: '1px solid #e2e8f0', paddingBottom: 'max(8px, env(safe-area-inset-bottom, 8px))' }}>
         <IonToolbar style={{ '--background': '#ffffff' } as any}>
+          {isInPromoterSpace && (
+            <IonMenuToggle autoHide={false}>
+              <a
+                href="/manual-promotores.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  margin: '8px 12px 6px 12px',
+                  padding: '10px 14px',
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '12px',
+                  color: '#166534',
+                  textDecoration: 'none',
+                  fontSize: '13.5px',
+                  fontWeight: 700,
+                  boxShadow: '0 1px 2px rgba(16, 185, 129, 0.08)',
+                  cursor: 'pointer'
+                }}
+              >
+                <IonIcon icon={bookOutline} style={{ fontSize: '20px', color: '#10b981' }} />
+                <span>Guía de Campo Oficial</span>
+              </a>
+            </IonMenuToggle>
+          )}
           {!isNativeApp && (
             <IonMenuToggle autoHide={false}>
               <a
