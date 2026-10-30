@@ -1462,6 +1462,7 @@ export async function runDemoSeed(
         themeHeaderColor: '#fdf2f8',
         bookingRequireService: true,
         bookingAllowStaffSelection: true,
+        allowSimultaneousServices: true,
         slotInterval: 30,
         initialCashUSD: 100.00,
         initialBankBs: 140000.00,

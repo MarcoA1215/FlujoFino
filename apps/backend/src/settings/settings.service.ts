@@ -619,6 +619,7 @@ export class SettingsService implements OnModuleInit {
     if (payload.allowNegativeStock !== undefined) settings.allowNegativeStock = payload.allowNegativeStock;
     if (payload.bookingRequireService !== undefined) settings.bookingRequireService = payload.bookingRequireService;
     if (payload.bookingAllowStaffSelection !== undefined) settings.bookingAllowStaffSelection = payload.bookingAllowStaffSelection;
+    if (payload.allowSimultaneousServices !== undefined) settings.allowSimultaneousServices = Boolean(payload.allowSimultaneousServices);
     if (payload.requireApprovalAlways !== undefined) settings.requireApprovalAlways = payload.requireApprovalAlways;
 
     if (payload.featureFiscalSupport !== undefined) settings.featureFiscalSupport = payload.featureFiscalSupport;

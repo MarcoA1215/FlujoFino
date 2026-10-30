@@ -74,8 +74,43 @@ const PublicBooking: React.FC = () => {
   };
 
   const isSimultaneousMode = useMemo(() => {
-    return Boolean(tenantInfo?.allowSimultaneousServices && selectedServices.length > 1 && !selectedStaff);
-  }, [tenantInfo?.allowSimultaneousServices, selectedServices.length, selectedStaff]);
+    if (!tenantInfo?.allowSimultaneousServices || selectedServices.length < 2 || selectedStaff) {
+      return false;
+    }
+
+    const allStaff = Array.isArray(tenantInfo?.staff) ? tenantInfo.staff : [];
+    if (allStaff.length === 1) return false;
+
+    if (allStaff.length > 1) {
+      const pools: string[][] = selectedServices.map((svc: any) => {
+        const assigned = svc.assignedStaffIds;
+        if (!assigned || (Array.isArray(assigned) && assigned.length === 0) || (typeof assigned === 'string' && !assigned.trim())) {
+          return allStaff.map((st: any) => String(st.id));
+        }
+        const ids = Array.isArray(assigned) ? assigned : String(assigned).split(',').map((s: string) => s.trim());
+        const valid = allStaff.filter((st: any) => ids.includes(String(st.id))).map((st: any) => String(st.id));
+        return valid.length > 0 ? valid : allStaff.map((st: any) => String(st.id));
+      });
+
+      const canAssignDistinct = (idx: number, used: Set<string>): boolean => {
+        if (idx === pools.length) return true;
+        for (const sid of pools[idx]) {
+          if (!used.has(sid)) {
+            used.add(sid);
+            if (canAssignDistinct(idx + 1, used)) return true;
+            used.delete(sid);
+          }
+        }
+        return false;
+      };
+
+      if (!canAssignDistinct(0, new Set<string>())) {
+        return false;
+      }
+    }
+
+    return true;
+  }, [tenantInfo?.allowSimultaneousServices, tenantInfo?.staff, selectedServices, selectedStaff]);
 
   const totalDurationMinutes = useMemo(() => {
     if (isSimultaneousMode) {
@@ -894,7 +929,7 @@ const PublicBooking: React.FC = () => {
                   {selectedServices.length > 0 && (
                     <>
                       <p style={{ margin: '4px 0', wordBreak: 'break-word', overflowWrap: 'anywhere' }}><b style={{ color: '#334155' }}>Servicio(s):</b> {selectedServiceNames}</p>
-                      <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Duración estimada:</b> {totalDurationMinutes} min</p>
+                      <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Duración estimada:</b> {isSimultaneousMode ? <>⚡ {totalDurationMinutes} min <span style={{ color: '#047857', fontWeight: 600 }}>(A 4 manos)</span></> : `${totalDurationMinutes} min`}</p>
                       <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Total:</b> <span style={{ color: primaryReadable, fontWeight: 700 }}>${totalServicePrice.toFixed(2)}</span></p>
                       {bookingPaymentMethod === 'ON_ARRIVAL' && (
                         <p style={{ margin: '4px 0' }}><b style={{ color: '#334155' }}>Modalidad:</b> <span style={{ color: primaryReadable, fontWeight: 600 }}>Por pagar al asistir (Cuenta abierta)</span></p>
@@ -1471,25 +1506,45 @@ const PublicBooking: React.FC = () => {
                         </div>
                       )}
 
-                      {/* Info box when staff selection is enabled, but no single specialist performs ALL selected services */}
-                      {selectedServices.length > 1 && tenantInfo?.bookingAllowStaffSelection !== false && availableStaffForService.length === 0 && (
-                        <div style={{
-                          marginTop: '16px',
-                          marginBottom: '8px',
-                          backgroundColor: '#f8fafc',
-                          padding: '14px',
-                          borderRadius: '12px',
-                          border: '1px solid #e2e8f0',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
-                        }}>
-                          <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <IonIcon icon={sparklesOutline} color="primary" />
-                            👥 Atención Coordinada por el Equipo
+                      {/* Info box for Simultaneous 4-Hands mode or Coordinated team */}
+                      {selectedServices.length > 1 && (
+                        isSimultaneousMode ? (
+                          <div style={{
+                            marginTop: '16px',
+                            marginBottom: '8px',
+                            backgroundColor: '#ecfdf5',
+                            padding: '14px',
+                            borderRadius: '12px',
+                            border: '1px solid #a7f3d0',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                          }}>
+                            <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#065f46', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '16px' }}>⚡</span>
+                              Atención Simultánea a 4 Manos
+                            </div>
+                            <p style={{ margin: 0, fontSize: '12px', color: '#047857', lineHeight: '1.4' }}>
+                              ¡Tus servicios serán atendidos al mismo tiempo por especialistas distintos de nuestro equipo! Tu tiempo total de estadía se optimiza a <b>{totalDurationMinutes} min</b> en lugar de {sequentialDurationMinutes} min.
+                            </p>
                           </div>
-                          <p style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>
-                            Los servicios seleccionados cuentan con especialistas específicos en nuestro equipo. Tu cita se reservará en un solo bloque continuo y el personal coordinará tu atención al momento de tu llegada.
-                          </p>
-                        </div>
+                        ) : (tenantInfo?.bookingAllowStaffSelection !== false && availableStaffForService.length === 0) ? (
+                          <div style={{
+                            marginTop: '16px',
+                            marginBottom: '8px',
+                            backgroundColor: '#f8fafc',
+                            padding: '14px',
+                            borderRadius: '12px',
+                            border: '1px solid #e2e8f0',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                          }}>
+                            <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <IonIcon icon={sparklesOutline} color="primary" />
+                              👥 Atención Coordinada por el Equipo
+                            </div>
+                            <p style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>
+                              Los servicios seleccionados cuentan con especialistas específicos en nuestro equipo. Tu cita se reservará en un solo bloque continuo y el personal coordinará tu atención al momento de tu llegada.
+                            </p>
+                          </div>
+                        ) : null
                       )}
 
                       <button
@@ -1603,7 +1658,7 @@ const PublicBooking: React.FC = () => {
                   {selectedServices.length > 0 && (
                     <div style={{ backgroundColor: '#f1f5f9', padding: '10px 14px', borderRadius: '12px', marginBottom: '16px', fontSize: '13px', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #e2e8f0', gap: '12px' }}>
                       <div style={{ minWidth: 0, flex: '1 1 auto', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                        <b>{selectedServiceNames}</b> • ⏱️ {totalDurationMinutes} min
+                        <b>{selectedServiceNames}</b> • {isSimultaneousMode ? <>⚡ <b>{totalDurationMinutes} min</b> <span style={{ color: '#047857' }}>(A 4 manos)</span></> : <>⏱️ {totalDurationMinutes} min</>}
                         {selectedStaff && <div><span style={{ color: '#64748b' }}>Especialista:</span> <b>{formatStaffName(selectedStaff.name)}</b></div>}
                       </div>
                       <div style={{ fontWeight: 'bold', color: primaryColor, fontSize: '15px', flexShrink: 0, whiteSpace: 'nowrap' }}>
@@ -1934,7 +1989,7 @@ const PublicBooking: React.FC = () => {
                 <div>
                   <h3 style={{fontWeight: 'bold', marginBottom: '6px', textAlign: 'center'}}>Horas Disponibles</h3>
                   <div style={{textAlign: 'center', marginBottom: '14px', color: '#64748b', fontSize: '13px'}}>
-                    Para el <b>{selectedDate ? selectedDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : ''}</b> {selectedServices.length > 0 ? `(${totalDurationMinutes} min)` : ''}
+                    Para el <b>{selectedDate ? selectedDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : ''}</b> {selectedServices.length > 0 ? (isSimultaneousMode ? `(⚡ ${totalDurationMinutes} min a 4 manos)` : `(${totalDurationMinutes} min)`) : ''}
                     {selectedStaff && ` con ${formatStaffName(selectedStaff.name)}`}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
@@ -1953,7 +2008,7 @@ const PublicBooking: React.FC = () => {
                         <p style={{ margin: '0 0 6px 0', fontWeight: 600, color: '#334155', fontSize: '14px' }}>
                           No hay horarios disponibles para este día
                         </p>
-                        {selectedServices.length > 1 && totalDurationMinutes > 120 && (
+                        {selectedServices.length > 1 && totalDurationMinutes > 120 && !isSimultaneousMode && (
                           <p style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: 1.4 }}>
                             La duración combinada es de <b>{totalDurationMinutes} min</b>. Si los turnos del negocio son más cortos o ya están ocupados, prueba otra fecha o agenda cada servicio por separado.
                           </p>
@@ -1995,7 +2050,7 @@ const PublicBooking: React.FC = () => {
                       📅 <b>Fecha:</b> {selectedDate?.toLocaleDateString()} a las {formatTime12h(selectedTime)}<br/>
                       {selectedServices.length > 0 && (
                         <>
-                          💅 <b>Servicio(s):</b> <span style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{selectedServiceNames}</span> (⏱️ {totalDurationMinutes} min)<br/>
+                          💅 <b>Servicio(s):</b> <span style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{selectedServiceNames}</span> ({isSimultaneousMode ? `⚡ ${totalDurationMinutes} min a 4 manos` : `⏱️ ${totalDurationMinutes} min`})<br/>
                           💰 <b>Inversión:</b> ${totalServicePrice.toFixed(2)}<br/>
                         </>
                       )}

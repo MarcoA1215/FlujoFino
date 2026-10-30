@@ -601,6 +601,7 @@ const Reservations: React.FC = () => {
     setTotalAmount(0);
     setNotes('');
     setAvailableSlots([]);
+    setIsSimultaneous(Boolean(settings?.allowSimultaneousServices));
     setShowModal(true);
   };
 

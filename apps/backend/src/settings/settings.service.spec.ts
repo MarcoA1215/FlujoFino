@@ -225,6 +225,7 @@ describe('SettingsService (Unit Tests)', () => {
 
       await service.updateSettings(TENANT_1_ID, {
         featureDelivery: false,
+        allowSimultaneousServices: true,
         bookingRequireDeposit: true,
         bookingDepositPercentage: 40,
         bookingMaxAdvanceDays: 60,
@@ -233,6 +234,7 @@ describe('SettingsService (Unit Tests)', () => {
       expect(mockSettingsRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
           featureDelivery: false,
+        allowSimultaneousServices: true,
           bookingRequireDeposit: true,
           bookingDepositPercentage: 40,
           bookingMaxAdvanceDays: 60,
