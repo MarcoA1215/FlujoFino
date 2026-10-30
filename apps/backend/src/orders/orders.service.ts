@@ -265,7 +265,32 @@ export class CreateOrderDto {
   strictStockCheck?: boolean;
 }
 
+export class UpdateDiscountDto {
+  @IsOptional()
+  @IsString()
+  discountType?: 'FIXED' | 'PERCENTAGE';
+
+  @IsOptional()
+  @IsNumber()
+  discountValue?: number;
+
+  @IsOptional()
+  @IsNumber()
+  discountAmount?: number;
+}
+
 export class UpdatePaymentDto {
+  @IsOptional()
+  @IsString()
+  discountType?: 'FIXED' | 'PERCENTAGE';
+
+  @IsOptional()
+  @IsNumber()
+  discountValue?: number;
+
+  @IsOptional()
+  @IsNumber()
+  discountAmount?: number;
   @IsOptional()
   @IsEnum(PaymentStatus)
   status?: PaymentStatus;
@@ -444,15 +469,63 @@ export class OrdersService implements OnModuleInit {
     }
   }
 
-  async addAbono(tenantId: string, orderId: string, amount: number, method?: string, ref?: string, bank?: string, nextAbonoDueDate?: string) {
-    if (amount <= 0) throw new BadRequestException('El monto debe ser mayor a 0');
-    const order = await this.dataSource.getRepository(Order).findOne({ where: { tenantId, id: orderId } });
+  async addAbono(
+    tenantId: string, 
+    orderId: string, 
+    amount: number, 
+    method?: string, 
+    ref?: string, 
+    bank?: string, 
+    nextAbonoDueDate?: string,
+    discountType?: 'FIXED' | 'PERCENTAGE',
+    discountValue?: number
+  ) {
+    const orderRepo = this.dataSource.getRepository(Order);
+    const order = await orderRepo.findOne({ 
+      where: { tenantId, id: orderId },
+      relations: { items: true }
+    });
     if (!order) throw new NotFoundException('Orden no encontrada');
+
+    if (discountValue !== undefined && Number(discountValue) >= 0) {
+      const itemsSubtotal = (order.items || []).reduce(
+        (acc, item) => acc + (Number(item.subtotal) || (Number(item.unitPrice || 0) * Number(item.quantity || 1))),
+        0
+      );
+      const effectiveTotal = itemsSubtotal > 0 ? (itemsSubtotal + Number(order.deliveryFee || 0)) : (Number(order.totalAmount || 0) + Number(order.discountAmount || 0));
+      
+      let effectiveDiscount = 0;
+      if (discountType === 'PERCENTAGE') {
+        effectiveDiscount = (itemsSubtotal > 0 ? itemsSubtotal : effectiveTotal) * (Number(discountValue) / 100);
+      } else {
+        effectiveDiscount = Number(discountValue);
+      }
+      const cappedDiscount = Math.min(Math.max(0, effectiveDiscount), effectiveTotal);
+      const newTotal = Math.max(0, roundCurrency(effectiveTotal - cappedDiscount));
+      const yaAbonadoPrev = Number(order.abonosTotal || 0);
+      if (yaAbonadoPrev > 0 && newTotal < yaAbonadoPrev - 0.05) {
+        throw new BadRequestException('El descuento reduciria el total ($' + newTotal.toFixed(2) + ') por debajo de lo ya abonado ($' + yaAbonadoPrev.toFixed(2) + ')');
+      }
+      order.discountAmount = cappedDiscount;
+      order.discountType = cappedDiscount > 0 ? (discountType || 'FIXED') : null as any;
+      order.discountValue = cappedDiscount > 0 ? Number(discountValue) : null as any;
+      order.totalAmount = newTotal;
+      order.netProfit = order.totalAmount - Number(order.deliveryFee || 0) - Number(order.totalCost || 0);
+    }
+
+    if (amount <= 0) {
+      if (order.totalAmount === 0 && order.discountAmount > 0) {
+        order.paymentStatus = PaymentStatus.PAID;
+        order.nextAbonoDueDate = null;
+        return orderRepo.save(order);
+      }
+      throw new BadRequestException('El monto debe ser mayor a 0');
+    }
 
     const restante = Math.max(0, Number((order.totalAmount - (order.abonosTotal || 0)).toFixed(2)));
     // Si no es una cuenta abierta de mesa en curso, no permitir superar el total pendiente
     if (!order.tableNumber && amount > restante + 0.05) {
-      throw new BadRequestException(`El abono ($${amount.toFixed(2)}) supera el saldo restante ($${restante.toFixed(2)})`);
+      throw new BadRequestException('El abono ($' + amount.toFixed(2) + ') supera el saldo restante ($' + restante.toFixed(2) + ')');
     }
 
     const history = order.abonosHistory || [];
@@ -485,7 +558,7 @@ export class OrdersService implements OnModuleInit {
       order.paymentStatus = PaymentStatus.PENDING;
     }
     
-    const saved = await this.dataSource.getRepository(Order).save(order);
+    const saved = await orderRepo.save(order);
     if (!wasPaid && saved.paymentStatus === PaymentStatus.PAID && saved.customerId) {
       await this.customersService.incrementVisits(tenantId, saved.customerId);
     }
@@ -495,6 +568,7 @@ export class OrdersService implements OnModuleInit {
         const resRepo = this.dataSource.getRepository(Reservation);
         const res = await resRepo.findOne({ where: { id: order.linkedReservationId, tenantId } });
         if (res) {
+          res.totalAmount = saved.totalAmount;
           res.abonosTotal = saved.abonosTotal;
           res.abonosHistory = saved.abonosHistory;
           res.paymentStatus = saved.paymentStatus;
@@ -518,6 +592,88 @@ export class OrdersService implements OnModuleInit {
       order.nextAbonoDueDate = null;
     }
     return repo.save(order);
+  }
+
+  async updateDiscount(tenantId: string, orderId: string, dto: UpdateDiscountDto) {
+    const orderRepo = this.dataSource.getRepository(Order);
+    const order = await orderRepo.findOne({ 
+      where: { tenantId, id: orderId },
+      relations: { items: true }
+    });
+    if (!order) throw new NotFoundException('Orden no encontrada');
+    if (order.status === OrderStatus.CANCELED) {
+      throw new BadRequestException('No se puede aplicar descuento a un pedido cancelado');
+    }
+
+    const itemsSubtotal = (order.items || []).reduce(
+      (acc, item) => acc + (Number(item.subtotal) || (Number(item.unitPrice || 0) * Number(item.quantity || 1))),
+      0
+    );
+    const effectiveTotal = itemsSubtotal > 0 ? (itemsSubtotal + Number(order.deliveryFee || 0)) : (Number(order.totalAmount || 0) + Number(order.discountAmount || 0));
+
+    let effectiveDiscount = 0;
+    if (dto.discountValue !== undefined && Number(dto.discountValue) > 0) {
+      if (dto.discountType === 'PERCENTAGE') {
+        effectiveDiscount = (itemsSubtotal > 0 ? itemsSubtotal : effectiveTotal) * (Number(dto.discountValue) / 100);
+      } else {
+        effectiveDiscount = Number(dto.discountValue);
+      }
+    } else if (dto.discountAmount !== undefined && Number(dto.discountAmount) >= 0) {
+      effectiveDiscount = Number(dto.discountAmount);
+    } else {
+      effectiveDiscount = 0;
+    }
+
+    if (effectiveDiscount < 0) {
+      throw new BadRequestException('El descuento no puede ser negativo');
+    }
+
+    const cappedDiscount = Math.min(effectiveDiscount, effectiveTotal);
+    const newTotalAmount = Math.max(0, roundCurrency(effectiveTotal - cappedDiscount));
+    const yaAbonado = Number(order.abonosTotal || 0);
+
+    if (yaAbonado > 0 && newTotalAmount < yaAbonado - 0.05) {
+      throw new BadRequestException('El descuento reduciria el total ($' + newTotalAmount.toFixed(2) + ') por debajo de lo ya abonado ($' + yaAbonado.toFixed(2) + ')');
+    }
+
+    order.discountAmount = cappedDiscount;
+    order.discountType = cappedDiscount > 0 ? (dto.discountType || 'FIXED') : null as any;
+    order.discountValue = cappedDiscount > 0 ? (dto.discountValue !== undefined ? Number(dto.discountValue) : cappedDiscount) : null as any;
+    order.totalAmount = newTotalAmount;
+    order.netProfit = order.totalAmount - Number(order.deliveryFee || 0) - Number(order.totalCost || 0);
+
+    const roundedAbonos = roundCurrency(order.abonosTotal || 0);
+    const roundedTotal = roundCurrency(order.totalAmount);
+
+    if (roundedAbonos >= roundedTotal && roundedTotal > 0) {
+      order.paymentStatus = PaymentStatus.PAID;
+      order.nextAbonoDueDate = null;
+    } else if (newTotalAmount === 0 && cappedDiscount >= effectiveTotal && effectiveTotal > 0) {
+      order.paymentStatus = PaymentStatus.PAID;
+      order.nextAbonoDueDate = null;
+    } else if (roundedAbonos > 0) {
+      order.paymentStatus = PaymentStatus.PARTIAL;
+    } else {
+      order.paymentStatus = PaymentStatus.PENDING;
+    }
+
+    const saved = await orderRepo.save(order);
+
+    if (order.linkedReservationId) {
+      try {
+        const resRepo = this.dataSource.getRepository(Reservation);
+        const res = await resRepo.findOne({ where: { id: order.linkedReservationId, tenantId } });
+        if (res) {
+          res.totalAmount = saved.totalAmount;
+          res.paymentStatus = saved.paymentStatus;
+          await resRepo.save(res);
+        }
+      } catch (err) {
+        console.error('Error sincronizando Reservation al actualizar descuento:', err);
+      }
+    }
+
+    return saved;
   }
 
   async registerFondoCaja(tenantId: string, amount: number, description?: string, currency: 'USD' | 'BS' = 'USD') {
@@ -3312,5 +3468,4 @@ export class OrdersService implements OnModuleInit {
     return BOM + [headers.join(';'), ...rows].join('\r\n');
   }
 }
-
 

@@ -1,7 +1,7 @@
 import { Controller, Request, Get, Post, Body, Param, Patch, Delete, Put, UseInterceptors, UploadedFile, BadRequestException, Query, UseGuards, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { OrdersService, CreateOrderDto, UpdatePaymentDto } from './orders.service';
+import { OrdersService, CreateOrderDto, UpdatePaymentDto, UpdateDiscountDto } from './orders.service';
 import { StorageService } from '../storage/storage.service';
 import { safeImageUploadOptions } from '../common/utils/multer-options';
 import { OrderStatus, UserRole } from '@finowork/shared-types';
@@ -19,9 +19,21 @@ export class OrdersController {
     @Body('method') method?: string,
     @Body('ref') ref?: string,
     @Body('bank') bank?: string,
-    @Body('nextAbonoDueDate') nextAbonoDueDate?: string
+    @Body('nextAbonoDueDate') nextAbonoDueDate?: string,
+    @Body('discountType') discountType?: 'FIXED' | 'PERCENTAGE',
+    @Body('discountValue') discountValue?: number,
   ) {
-    return this.ordersService.addAbono(req.user.tenantId, id, amount, method, ref, bank, nextAbonoDueDate);
+    return this.ordersService.addAbono(req.user.tenantId, id, amount, method, ref, bank, nextAbonoDueDate, discountType, discountValue);
+  }
+
+  @Patch(':id/discount')
+  @Roles(UserRole.ADMIN, UserRole.POS)
+  updateDiscount(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateDiscountDto
+  ) {
+    return this.ordersService.updateDiscount(req.user.tenantId, id, dto);
   }
 
   @Patch(':id/due-date')

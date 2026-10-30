@@ -166,6 +166,9 @@ export interface OrderDTO {
   deliveryMethod?: DeliveryMethod;
   deliveryZoneId?: string;
   deliveryFee?: number;
+  discountAmount?: number;
+  discountType?: 'FIXED' | 'PERCENTAGE';
+  discountValue?: number;
   totalAmount: number;
   subtotalExempt?: number;
   taxableBase?: number;
@@ -205,6 +208,12 @@ export interface OrderDTO {
   exchangeRate?: number;
   abonosTotal?: number;
   abonosHistory?: any[];
+}
+
+export interface UpdateDiscountDTO {
+  discountType?: 'FIXED' | 'PERCENTAGE';
+  discountValue?: number;
+  discountAmount?: number;
 }
 
 export interface EmployeeDTO {
@@ -741,6 +750,9 @@ export interface FiscalInvoiceDTO {
   taxableBase: number;
   taxRate: number;
   taxAmount: number;
+  discountAmount?: number;
+  discountType?: 'FIXED' | 'PERCENTAGE';
+  discountValue?: number;
   totalAmount: number;
   amountBs: number;
   exchangeRate: number;

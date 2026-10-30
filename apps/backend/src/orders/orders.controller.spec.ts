@@ -15,6 +15,7 @@ describe('OrdersController', () => {
       syncOfflineOrders: jest.fn().mockResolvedValue({ success: true }),
       revertAbono: jest.fn().mockResolvedValue({ id: 'ord-1' }),
       addAbono: jest.fn().mockResolvedValue({ id: 'ord-1' }),
+      updateDiscount: jest.fn().mockResolvedValue({ id: 'ord-1' }),
     };
 
     mockStorageService = {
@@ -58,6 +59,15 @@ describe('OrdersController', () => {
 
       await controller.syncOffline(req, orders);
       expect(mockOrdersService.syncOfflineOrders).toHaveBeenCalledWith('tenant-1', orders, 'usr-1', UserRole.POS);
+    });
+  });
+
+  describe('updateDiscount', () => {
+    it('debe propagar el tenantId y el dto de descuento a updateDiscount', async () => {
+      const req = { user: { tenantId: 'tenant-1' } };
+      const dto = { discountType: 'FIXED' as const, discountValue: 5 };
+      await controller.updateDiscount(req, 'ord-1', dto);
+      expect(mockOrdersService.updateDiscount).toHaveBeenCalledWith('tenant-1', 'ord-1', dto);
     });
   });
 

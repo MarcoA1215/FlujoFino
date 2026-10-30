@@ -168,6 +168,48 @@ const Orders: React.FC = () => {
   const [abonoRef, setAbonoRef] = useState<string>('');
   const [abonoBank, setAbonoBank] = useState<string>('');
   const [abonoNextDueDate, setAbonoNextDueDate] = useState<string>('');
+
+  // Estados para Descuento en Abono
+  const [abonoDiscountType, setAbonoDiscountType] = useState<'FIXED' | 'PERCENTAGE'>('FIXED');
+  const [abonoDiscountValue, setAbonoDiscountValue] = useState<string>('');
+
+  // Estados para Descuento en Cobro Directo
+  const [cobroDiscountType, setCobroDiscountType] = useState<'FIXED' | 'PERCENTAGE'>('FIXED');
+  const [cobroDiscountValue, setCobroDiscountValue] = useState<string>('');
+
+  // Estados para Descuento en Detalle de Orden
+  const [isEditingDetailsDiscount, setIsEditingDetailsDiscount] = useState<boolean>(false);
+  const [detailsDiscountType, setDetailsDiscountType] = useState<'FIXED' | 'PERCENTAGE'>('FIXED');
+  const [detailsDiscountValue, setDetailsDiscountValue] = useState<string>('');
+  const [isSavingDetailsDiscount, setIsSavingDetailsDiscount] = useState<boolean>(false);
+
+  const openAbonoModal = (order: Order | any) => {
+    setSelectedOrderForAbono(order);
+    setAbonoAmount('');
+    setAbonoCurrency('USD');
+    setAbonoMethod('USD');
+    setAbonoRef('');
+    setAbonoBank('');
+    const nextD = new Date();
+    nextD.setDate(nextD.getDate() + Math.max(1, Number(systemSettings?.abonoDefaultDueDays || 7)));
+    const yyyy = nextD.getFullYear();
+    const mm = String(nextD.getMonth() + 1).padStart(2, '0');
+    const dd = String(nextD.getDate()).padStart(2, '0');
+    setAbonoNextDueDate(`${yyyy}-${mm}-${dd}`);
+    
+    if (order.discountAmount && Number(order.discountAmount) > 0) {
+      if (order.discountType && order.discountValue) {
+        setAbonoDiscountType(order.discountType as any);
+        setAbonoDiscountValue(Number(order.discountValue).toString());
+      } else {
+        setAbonoDiscountType('FIXED');
+        setAbonoDiscountValue(Number(order.discountAmount).toString());
+      }
+    } else {
+      setAbonoDiscountType('FIXED');
+      setAbonoDiscountValue('');
+    }
+  };
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('');
 
@@ -1345,16 +1387,7 @@ const Orders: React.FC = () => {
                         )}
                         <button
                           type="button"
-                          onClick={() => {
-                            setSelectedOrderForAbono(order);
-                            setAbonoAmount('');
-                            setAbonoMethod('USD');
-                            setAbonoRef('');
-                            setAbonoBank('');
-                            const nextD = new Date();
-                            nextD.setDate(nextD.getDate() + Math.max(1, Number(systemSettings?.abonoDefaultDueDays || 7)));
-                            setAbonoNextDueDate(`${nextD.getFullYear()}-${String(nextD.getMonth() + 1).padStart(2, '0')}-${String(nextD.getDate()).padStart(2, '0')}`);
-                          }}
+                          onClick={() => openAbonoModal(order)}
                           style={{
                             flex: 1,
                             padding: '8px 10px',
@@ -1652,10 +1685,209 @@ const Orders: React.FC = () => {
                         </div>
                       );
                     })}
-                    {!isKitchen && Number(selectedOrderForDetails.discountAmount || 0) > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #EEF2F6', fontSize: '13px', color: '#DC2626', fontWeight: '700' }}>
-                        <span>🏷️ Descuento Especial:</span>
-                        <span>-${Number(selectedOrderForDetails.discountAmount).toFixed(2)}</span>
+                    {!isKitchen && (
+                      <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '12px', marginTop: '10px', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#334155' }}>
+                            🏷️ Descuento Especial:
+                          </span>
+                          {!isEditingDetailsDiscount && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {Number(selectedOrderForDetails.discountAmount || 0) > 0 ? (
+                                <span style={{ fontSize: '13px', fontWeight: '800', color: '#DC2626' }}>
+                                  -${Number(selectedOrderForDetails.discountAmount).toFixed(2)}
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '12px', color: '#94A3B8', fontStyle: 'italic' }}>
+                                  Sin descuento
+                                </span>
+                              )}
+                              {selectedOrderForDetails.status !== OrderStatus.CANCELED && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsEditingDetailsDiscount(true);
+                                    if (selectedOrderForDetails.discountAmount && Number(selectedOrderForDetails.discountAmount) > 0) {
+                                      if (selectedOrderForDetails.discountType && selectedOrderForDetails.discountValue) {
+                                        setDetailsDiscountType(selectedOrderForDetails.discountType as any);
+                                        setDetailsDiscountValue(Number(selectedOrderForDetails.discountValue).toString());
+                                      } else {
+                                        setDetailsDiscountType('FIXED');
+                                        setDetailsDiscountValue(Number(selectedOrderForDetails.discountAmount).toString());
+                                      }
+                                    } else {
+                                      setDetailsDiscountType('FIXED');
+                                      setDetailsDiscountValue('');
+                                    }
+                                  }}
+                                  style={{
+                                    background: '#FFFFFF',
+                                    border: '1px solid #CBD5E1',
+                                    borderRadius: '6px',
+                                    padding: '4px 8px',
+                                    fontSize: '11px',
+                                    fontWeight: '700',
+                                    color: '#334155',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {Number(selectedOrderForDetails.discountAmount || 0) > 0 ? '✏️ Modificar' : '➕ Aplicar'}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {isEditingDetailsDiscount && (
+                          <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #E2E8F0' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
+                              <div style={{ display: 'flex', borderRadius: '8px', border: '1px solid #CBD5E1', overflow: 'hidden', background: '#FFFFFF', flexShrink: 0 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setDetailsDiscountType('FIXED')}
+                                  style={{
+                                    padding: '6px 10px',
+                                    border: 'none',
+                                    background: detailsDiscountType === 'FIXED' ? 'var(--theme-primary, #10B981)' : '#ffffff',
+                                    color: detailsDiscountType === 'FIXED' ? 'var(--theme-primary-contrast, #ffffff)' : '#475569',
+                                    fontWeight: '700',
+                                    fontSize: '11px',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  $ Fijo
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDetailsDiscountType('PERCENTAGE')}
+                                  style={{
+                                    padding: '6px 10px',
+                                    border: 'none',
+                                    background: detailsDiscountType === 'PERCENTAGE' ? 'var(--theme-primary, #10B981)' : '#ffffff',
+                                    color: detailsDiscountType === 'PERCENTAGE' ? 'var(--theme-primary-contrast, #ffffff)' : '#475569',
+                                    fontWeight: '700',
+                                    fontSize: '11px',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  % Porc.
+                                </button>
+                              </div>
+                              <input
+                                type="number"
+                                min="0"
+                                max={detailsDiscountType === 'PERCENTAGE' ? '100' : undefined}
+                                step="any"
+                                value={detailsDiscountValue}
+                                onChange={e => {
+                                  const v = e.target.value;
+                                  if (detailsDiscountType === 'PERCENTAGE' && Number(v) > 100) {
+                                    setDetailsDiscountValue('100');
+                                  } else {
+                                    setDetailsDiscountValue(v);
+                                  }
+                                }}
+                                placeholder={detailsDiscountType === 'FIXED' ? 'Monto ($)' : 'Porcentaje (%)'}
+                                style={{
+                                  flex: 1,
+                                  minWidth: '0',
+                                  padding: '7px 10px',
+                                  borderRadius: '8px',
+                                  border: '1px solid #CBD5E1',
+                                  fontSize: '12px',
+                                  background: '#ffffff',
+                                  color: '#0F172A'
+                                }}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                              {Number(selectedOrderForDetails.discountAmount || 0) > 0 && (
+                                <button
+                                  type="button"
+                                  disabled={isSavingDetailsDiscount}
+                                  onClick={async () => {
+                                    setIsSavingDetailsDiscount(true);
+                                    try {
+                                      const res = await apiClient.patch(`/orders/${selectedOrderForDetails.id}/discount`, {
+                                        discountValue: 0,
+                                        discountAmount: 0
+                                      });
+                                      presentToast({ message: 'Descuento eliminado', duration: 2000, color: 'success' });
+                                      setSelectedOrderForDetails((prev: any) => ({ ...prev, ...res.data }));
+                                      setIsEditingDetailsDiscount(false);
+                                      setDetailsDiscountValue('');
+                                      fetchOrders();
+                                    } catch (err: any) {
+                                      presentToast({ message: 'Error: ' + (err.response?.data?.message || err.message), duration: 3000, color: 'danger' });
+                                    } finally {
+                                      setIsSavingDetailsDiscount(false);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '6px 10px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #FCA5A5',
+                                    background: '#FEF2F2',
+                                    color: '#DC2626',
+                                    fontSize: '11px',
+                                    fontWeight: '700',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Quitar Descuento
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                disabled={isSavingDetailsDiscount}
+                                onClick={() => setIsEditingDetailsDiscount(false)}
+                                style={{
+                                  padding: '6px 10px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #CBD5E1',
+                                  background: '#FFFFFF',
+                                  color: '#475569',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isSavingDetailsDiscount}
+                                onClick={async () => {
+                                  const valNum = parseFloat(detailsDiscountValue) || 0;
+                                  setIsSavingDetailsDiscount(true);
+                                  try {
+                                    const res = await apiClient.patch(`/orders/${selectedOrderForDetails.id}/discount`, {
+                                      discountType: detailsDiscountType,
+                                      discountValue: valNum
+                                    });
+                                    presentToast({ message: '✓ Descuento actualizado con éxito', duration: 2500, color: 'success' });
+                                    setSelectedOrderForDetails((prev: any) => ({ ...prev, ...res.data }));
+                                    setIsEditingDetailsDiscount(false);
+                                    fetchOrders();
+                                  } catch (err: any) {
+                                    presentToast({ message: 'Error: ' + (err.response?.data?.message || err.message), duration: 3000, color: 'danger' });
+                                  } finally {
+                                    setIsSavingDetailsDiscount(false);
+                                  }
+                                }}
+                                className="ff-btn-primary"
+                                style={{
+                                  padding: '6px 12px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: '800'
+                                }}
+                              >
+                                {isSavingDetailsDiscount ? 'Guardando...' : 'Guardar Descuento'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                     {!isKitchen && (
@@ -1967,14 +2199,7 @@ const Orders: React.FC = () => {
                                 onClick={() => {
                                   const ord = selectedOrderForDetails;
                                   setSelectedOrderForDetails(null);
-                                  setSelectedOrderForAbono(ord);
-                                  setAbonoAmount('');
-                                  setAbonoMethod('USD');
-                                  setAbonoRef('');
-                                  setAbonoBank('');
-                                  const nextD = new Date();
-                                  nextD.setDate(nextD.getDate() + Math.max(1, Number(systemSettings?.abonoDefaultDueDays || 7)));
-                                  setAbonoNextDueDate(`${nextD.getFullYear()}-${String(nextD.getMonth() + 1).padStart(2, '0')}-${String(nextD.getDate()).padStart(2, '0')}`);
+                                  openAbonoModal(ord);
                                 }}
                                 style={{
                                   padding: '12px',
@@ -2253,7 +2478,21 @@ const Orders: React.FC = () => {
           {selectedOrderForAbono && (() => {
             const abonoItems = Array.isArray(selectedOrderForAbono.items) ? selectedOrderForAbono.items : [];
             const abonoItemsSum = abonoItems.reduce((acc: number, it: any) => acc + (Number(it.subtotal) || (Number(it.unitPrice || 0) * Number(it.quantity || 1))), 0);
-            const total = Number(selectedOrderForAbono.totalAmount || 0) > 0 ? Number(selectedOrderForAbono.totalAmount) : abonoItemsSum;
+            const deliveryFee = Number(selectedOrderForAbono.deliveryFee || 0);
+            const grossTotal = abonoItemsSum > 0 ? (abonoItemsSum + deliveryFee) : (Number(selectedOrderForAbono.totalAmount || 0) + Number(selectedOrderForAbono.discountAmount || 0));
+
+            const parsedDiscVal = parseFloat(abonoDiscountValue) || 0;
+            let computedDiscountAmount = 0;
+            if (parsedDiscVal > 0) {
+              if (abonoDiscountType === 'PERCENTAGE') {
+                computedDiscountAmount = (abonoItemsSum > 0 ? abonoItemsSum : grossTotal) * (parsedDiscVal / 100);
+              } else {
+                computedDiscountAmount = parsedDiscVal;
+              }
+            }
+            computedDiscountAmount = Math.min(grossTotal, Math.max(0, computedDiscountAmount));
+
+            const total = Math.max(0, grossTotal - computedDiscountAmount);
             const yaAbonado = Number(selectedOrderForAbono.abonosTotal || 0);
             const restante = Math.max(0, total - yaAbonado);
             const effectiveOrderRate = Number(selectedOrderForAbono.exchangeRate) > 0 ? Number(selectedOrderForAbono.exchangeRate) : (Number(exchangeRate) || 40);
@@ -2262,13 +2501,30 @@ const Orders: React.FC = () => {
             const effectiveUsd = abonoCurrency === 'VES' ? (parsedAmount / effectiveOrderRate) : parsedAmount;
 
             const handleConfirmAbono = async () => {
+              if (restante <= 0.001 && computedDiscountAmount > 0 && effectiveUsd <= 0) {
+                try {
+                  await apiClient.patch(`/orders/${selectedOrderForAbono.id}/discount`, {
+                    discountType: abonoDiscountType,
+                    discountValue: parsedDiscVal > 0 ? parsedDiscVal : 0,
+                    discountAmount: computedDiscountAmount
+                  });
+                  presentToast({ message: '✓ Descuento aplicado y orden liquidada con éxito', duration: 2500, color: 'success' });
+                  setSelectedOrderForAbono(null);
+                  fetchOrders();
+                  return;
+                } catch (err: any) {
+                  presentToast({ message: 'Error: ' + (err.response?.data?.message || err.message), duration: 3000, color: 'danger' });
+                  return;
+                }
+              }
+
               if (effectiveUsd <= 0) {
                 presentToast({ message: 'Ingresa un monto válido para el abono', duration: 2500, color: 'warning' });
                 return;
               }
               const isTableTab = Boolean(selectedOrderForAbono.tableNumber);
               if (effectiveUsd > restante + 0.05 && !isTableTab) {
-                presentToast({ message: `El abono no puede superar el saldo restante ($${restante.toFixed(2)})`, duration: 3000, color: 'warning' });
+                presentToast({ message: `El abono no puede superar el saldo restante (${restante.toFixed(2)})`, duration: 3000, color: 'warning' });
                 return;
               }
               if (abonoMethod === 'PAGO_MOVIL' && !abonoRef.trim()) {
@@ -2290,14 +2546,31 @@ const Orders: React.FC = () => {
                   method: abonoMethod,
                   ref: abonoRef.trim() || undefined,
                   bank: normalizeBankName(abonoBank) || undefined,
-                  nextAbonoDueDate: abonoNextDueDate || undefined
+                  nextAbonoDueDate: abonoNextDueDate || undefined,
+                  discountType: parsedDiscVal > 0 ? abonoDiscountType : undefined,
+                  discountValue: parsedDiscVal > 0 ? parsedDiscVal : (abonoDiscountValue === '0' ? 0 : undefined),
                 });
-                presentToast({ message: `✓ ¡Abono de $${effectiveUsd.toFixed(2)} registrado con éxito!`, duration: 2500, color: 'success' });
+                presentToast({ message: `✓ ¡Abono de ${effectiveUsd.toFixed(2)} registrado con éxito!`, duration: 2500, color: 'success' });
                 setSelectedOrderForAbono(null);
                 fetchOrders();
               } catch (err: any) {
                 console.error(err);
                 presentToast({ message: 'Error registrando abono: ' + (err.response?.data?.message || err.message), duration: 3000, color: 'danger' });
+              }
+            };
+
+            const handleSaveDiscountOnly = async () => {
+              try {
+                await apiClient.patch(`/orders/${selectedOrderForAbono.id}/discount`, {
+                  discountType: abonoDiscountType,
+                  discountValue: parsedDiscVal > 0 ? parsedDiscVal : 0,
+                  discountAmount: computedDiscountAmount
+                });
+                presentToast({ message: '✓ Descuento guardado correctamente', duration: 2500, color: 'success' });
+                setSelectedOrderForAbono(null);
+                fetchOrders();
+              } catch (err: any) {
+                presentToast({ message: 'Error guardando descuento: ' + (err.response?.data?.message || err.message), duration: 3000, color: 'danger' });
               }
             };
 
@@ -2318,7 +2591,7 @@ const Orders: React.FC = () => {
 
                 <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
                   {/* Summary Card */}
-                  <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
+                  <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '14px' }}>
                     <div style={{ fontSize: '15px', fontWeight: '800', color: '#0F172A', marginBottom: '4px' }}>
                       {selectedOrderForAbono.customerName || 'Cliente General'}
                     </div>
@@ -2329,6 +2602,11 @@ const Orders: React.FC = () => {
                       <div style={{ background: '#ffffff', padding: '8px', borderRadius: '10px', border: '1px solid #EEF2F6' }}>
                         <span style={{ fontSize: '10px', color: '#64748B', display: 'block', fontWeight: '600' }}>Total</span>
                         <b style={{ fontSize: '13px', color: '#0F172A' }}>${total.toFixed(2)}</b>
+                        {computedDiscountAmount > 0 && (
+                          <span style={{ fontSize: '9px', color: '#10B981', display: 'block', fontWeight: '700' }}>
+                            (Desc. -${computedDiscountAmount.toFixed(2)})
+                          </span>
+                        )}
                       </div>
                       <div style={{ background: '#ffffff', padding: '8px', borderRadius: '10px', border: '1px solid #EEF2F6' }}>
                         <span style={{ fontSize: '10px', color: '#64748B', display: 'block', fontWeight: '600' }}>Abonado</span>
@@ -2342,6 +2620,123 @@ const Orders: React.FC = () => {
                     <div style={{ textAlign: 'right', marginTop: '6px', fontSize: '11px', color: '#92400E', fontWeight: '700' }}>
                       Resta en {currencySymbol}: {formatLocalAmount(restanteBs)}
                     </div>
+                  </div>
+
+                  {/* Sección Descuento Especial */}
+                  <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '12px 14px', marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        🏷️ Descuento Especial (Opcional)
+                      </span>
+                      {computedDiscountAmount > 0 && (
+                        <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--theme-primary, #10B981)' }}>
+                          - ${computedDiscountAmount.toFixed(2)} USD
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', borderRadius: '8px', border: '1px solid #CBD5E1', overflow: 'hidden', background: '#FFFFFF', flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          onClick={() => setAbonoDiscountType('FIXED')}
+                          style={{
+                            padding: '8px 12px',
+                            border: 'none',
+                            background: abonoDiscountType === 'FIXED' ? 'var(--theme-primary, #10B981)' : '#ffffff',
+                            color: abonoDiscountType === 'FIXED' ? 'var(--theme-primary-contrast, #ffffff)' : '#475569',
+                            fontWeight: '700',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          $ Fijo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAbonoDiscountType('PERCENTAGE')}
+                          style={{
+                            padding: '8px 12px',
+                            border: 'none',
+                            background: abonoDiscountType === 'PERCENTAGE' ? 'var(--theme-primary, #10B981)' : '#ffffff',
+                            color: abonoDiscountType === 'PERCENTAGE' ? 'var(--theme-primary-contrast, #ffffff)' : '#475569',
+                            fontWeight: '700',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          % Porc.
+                        </button>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        max={abonoDiscountType === 'PERCENTAGE' ? '100' : undefined}
+                        step="any"
+                        value={abonoDiscountValue}
+                        onChange={e => {
+                          const v = e.target.value;
+                          if (abonoDiscountType === 'PERCENTAGE' && Number(v) > 100) {
+                            setAbonoDiscountValue('100');
+                          } else {
+                            setAbonoDiscountValue(v);
+                          }
+                        }}
+                        placeholder={abonoDiscountType === 'FIXED' ? 'Monto ($)' : 'Porcentaje (%)'}
+                        style={{
+                          flex: 1,
+                          minWidth: '0',
+                          padding: '9px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #CBD5E1',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          background: '#ffffff',
+                          color: '#0F172A',
+                          outline: 'none'
+                        }}
+                      />
+                      {abonoDiscountValue && (
+                        <button
+                          type="button"
+                          onClick={() => setAbonoDiscountValue('')}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #E2E8F0',
+                            background: '#FFFFFF',
+                            color: '#64748B',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          title="Quitar descuento"
+                        >
+                          <IonIcon icon={closeOutline} />
+                        </button>
+                      )}
+                    </div>
+                    {computedDiscountAmount > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', fontSize: '11px', color: '#64748B' }}>
+                        <span>Subtotal original: <b>${grossTotal.toFixed(2)}</b></span>
+                        <button
+                          type="button"
+                          onClick={handleSaveDiscountOnly}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--theme-primary-readable, #065F46)',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                            padding: 0,
+                            fontSize: '11px'
+                          }}
+                        >
+                          💾 Guardar sólo descuento
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Currency Toggle */}
@@ -2541,13 +2936,33 @@ const Orders: React.FC = () => {
           {selectedOrderForCobro && (() => {
             const cobroItems = Array.isArray(selectedOrderForCobro.items) ? selectedOrderForCobro.items : [];
             const cobroItemsSum = cobroItems.reduce((acc: number, it: any) => acc + (Number(it.subtotal) || (Number(it.unitPrice || 0) * Number(it.quantity || 1))), 0);
-            const total = Number(selectedOrderForCobro.totalAmount || 0) > 0 ? Number(selectedOrderForCobro.totalAmount) : cobroItemsSum;
+            const deliveryFee = Number(selectedOrderForCobro.deliveryFee || 0);
+            const grossTotal = cobroItemsSum > 0 ? (cobroItemsSum + deliveryFee) : (Number(selectedOrderForCobro.totalAmount || 0) + Number(selectedOrderForCobro.discountAmount || 0));
+
+            const parsedDiscVal = parseFloat(cobroDiscountValue) || 0;
+            let computedDiscountAmount = 0;
+            if (parsedDiscVal > 0) {
+              if (cobroDiscountType === 'PERCENTAGE') {
+                computedDiscountAmount = (cobroItemsSum > 0 ? cobroItemsSum : grossTotal) * (parsedDiscVal / 100);
+              } else {
+                computedDiscountAmount = parsedDiscVal;
+              }
+            }
+            computedDiscountAmount = Math.min(grossTotal, Math.max(0, computedDiscountAmount));
+
+            const total = Math.max(0, grossTotal - computedDiscountAmount);
             const yaAbonado = Number(selectedOrderForCobro.abonosTotal || 0);
             const restante = Math.max(0, total - yaAbonado);
             const effectiveOrderRate = Number(selectedOrderForCobro.exchangeRate) > 0 ? Number(selectedOrderForCobro.exchangeRate) : (Number(exchangeRate) || 40);
             const restanteBs = Number((restante * effectiveOrderRate).toFixed(2));
 
             const handleConfirmCobro = async () => {
+              const discountPayload = {
+                discountType: parsedDiscVal > 0 ? cobroDiscountType : undefined,
+                discountValue: parsedDiscVal > 0 ? parsedDiscVal : (cobroDiscountValue === '0' ? 0 : undefined),
+                discountAmount: computedDiscountAmount
+              };
+
               if (cobroMethod === 'USD') {
                 const received = parseFloat(cobroUsdReceived);
                 if (!received || received < restante) {
@@ -2564,7 +2979,8 @@ const Orders: React.FC = () => {
                     changeAmount: changeUsd > 0 ? changeUsd : undefined,
                     changeAmountBs: changeBs > 0 ? changeBs : undefined,
                     changeMethod: changeUsd > 0 ? 'CASH_BS' : undefined,
-                    notes: (selectedOrderForCobro.notes ? selectedOrderForCobro.notes + '\n' : '') + `Pago USD: $${restante.toFixed(2)} | Recibido: $${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
+                    ...discountPayload,
+                    notes: (selectedOrderForCobro.notes ? selectedOrderForCobro.notes + '\n' : '') + `Pago USD: ${restante.toFixed(2)} | Recibido: ${received.toFixed(2)} | Vuelto: Bs. ${changeBs.toFixed(2)}`
                   });
                   presentToast({ message: 'Pago en USD registrado', duration: 2000, color: 'success' });
                   setSelectedOrderForCobro(null);
@@ -2584,7 +3000,8 @@ const Orders: React.FC = () => {
                     pagoMovilRef: cobroRef.trim(),
                     pagoMovilBank: normalizeBankName(cobroBank) || 'Pago Móvil',
                     amountBs: restanteBs,
-                    exchangeRate: effectiveOrderRate
+                    exchangeRate: effectiveOrderRate,
+                    ...discountPayload
                   });
                   presentToast({ message: 'Pago móvil registrado con éxito', duration: 2000, color: 'success' });
                   setSelectedOrderForCobro(null);
@@ -2606,7 +3023,8 @@ const Orders: React.FC = () => {
                     pagoMovilRef: cobroRef.trim(),
                     pagoMovilBank: normalizeBankName(cobroBank) || 'Punto de Venta',
                     amountBs: restanteBs,
-                    exchangeRate: effectiveOrderRate
+                    exchangeRate: effectiveOrderRate,
+                    ...discountPayload
                   });
                   presentToast({ message: 'Pago por Punto de Venta registrado', duration: 2000, color: 'success' });
                   setSelectedOrderForCobro(null);
@@ -2626,7 +3044,8 @@ const Orders: React.FC = () => {
                     transferRef: cobroRef.trim(),
                     transferBank: normalizeBankName(cobroBank) || 'Transferencia',
                     amountBs: restanteBs,
-                    exchangeRate: effectiveOrderRate
+                    exchangeRate: effectiveOrderRate,
+                    ...discountPayload
                   });
                   presentToast({ message: 'Transferencia registrada con éxito', duration: 2000, color: 'success' });
                   setSelectedOrderForCobro(null);
@@ -2663,7 +3082,7 @@ const Orders: React.FC = () => {
 
                 <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '20px' }}>
                   {/* Total Banner */}
-                  <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '14px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '14px', marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontSize: '11px', color: '#64748B', fontWeight: '600' }}>SALDO RESTANTE</div>
                       <div style={{ fontSize: '22px', fontWeight: '900', color: '#10B981' }}>${restante.toFixed(2)}</div>
@@ -2672,6 +3091,107 @@ const Orders: React.FC = () => {
                       <div style={{ fontSize: '11px', color: '#64748B', fontWeight: '600' }}>EN MONEDA LOCAL</div>
                       <div style={{ fontSize: '16px', fontWeight: '800', color: '#0F172A' }}>{currencySymbol} {restanteBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
                     </div>
+                  </div>
+
+                  {/* Sección Descuento Especial */}
+                  <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '12px 14px', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        🏷️ Descuento Especial (Opcional)
+                      </span>
+                      {computedDiscountAmount > 0 && (
+                        <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--theme-primary, #10B981)' }}>
+                          - ${computedDiscountAmount.toFixed(2)} USD
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', borderRadius: '8px', border: '1px solid #CBD5E1', overflow: 'hidden', background: '#FFFFFF', flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          onClick={() => setCobroDiscountType('FIXED')}
+                          style={{
+                            padding: '8px 12px',
+                            border: 'none',
+                            background: cobroDiscountType === 'FIXED' ? 'var(--theme-primary, #10B981)' : '#ffffff',
+                            color: cobroDiscountType === 'FIXED' ? 'var(--theme-primary-contrast, #ffffff)' : '#475569',
+                            fontWeight: '700',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          $ Fijo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCobroDiscountType('PERCENTAGE')}
+                          style={{
+                            padding: '8px 12px',
+                            border: 'none',
+                            background: cobroDiscountType === 'PERCENTAGE' ? 'var(--theme-primary, #10B981)' : '#ffffff',
+                            color: cobroDiscountType === 'PERCENTAGE' ? 'var(--theme-primary-contrast, #ffffff)' : '#475569',
+                            fontWeight: '700',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          % Porc.
+                        </button>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        max={cobroDiscountType === 'PERCENTAGE' ? '100' : undefined}
+                        step="any"
+                        value={cobroDiscountValue}
+                        onChange={e => {
+                          const v = e.target.value;
+                          if (cobroDiscountType === 'PERCENTAGE' && Number(v) > 100) {
+                            setCobroDiscountValue('100');
+                          } else {
+                            setCobroDiscountValue(v);
+                          }
+                        }}
+                        placeholder={cobroDiscountType === 'FIXED' ? 'Monto ($)' : 'Porcentaje (%)'}
+                        style={{
+                          flex: 1,
+                          minWidth: '0',
+                          padding: '9px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #CBD5E1',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          background: '#ffffff',
+                          color: '#0F172A',
+                          outline: 'none'
+                        }}
+                      />
+                      {cobroDiscountValue && (
+                        <button
+                          type="button"
+                          onClick={() => setCobroDiscountValue('')}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #E2E8F0',
+                            background: '#FFFFFF',
+                            color: '#64748B',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          title="Quitar descuento"
+                        >
+                          <IonIcon icon={closeOutline} />
+                        </button>
+                      )}
+                    </div>
+                    {computedDiscountAmount > 0 && (
+                      <div style={{ marginTop: '6px', fontSize: '11px', color: '#64748B' }}>
+                        Subtotal original: <b>${grossTotal.toFixed(2)}</b> (Descuento de ${computedDiscountAmount.toFixed(2)} aplicado)
+                      </div>
+                    )}
                   </div>
 
                   {/* Método Selector */}
@@ -2762,11 +3282,7 @@ const Orders: React.FC = () => {
                       onClick={() => {
                         const ord = selectedOrderForCobro;
                         setSelectedOrderForCobro(null);
-                        setSelectedOrderForAbono(ord);
-                        setAbonoAmount('');
-                        setAbonoMethod('USD');
-                        setAbonoRef('');
-                        setAbonoBank('');
+                        openAbonoModal(ord);
                       }}
                       style={{
                         padding: '12px',
