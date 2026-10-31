@@ -11,19 +11,21 @@ import {
 } from '@ionic/react';
 import { arrowBackOutline, lockClosedOutline, printOutline } from 'ionicons/icons';
 import { LegalPrintHeader } from '../components/legal/LegalPrintHeader';
+import { printLegalContainer } from '../utils/printLegalDocument';
 import { useNavigate } from 'react-router-dom';
 
 export const PrivacyContent: React.FC = () => {
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', color: '#334155', lineHeight: '1.7', fontSize: '15px' }}>
+    <div id="privacy-content" className="ff-legal-document" style={{ maxWidth: '800px', margin: '0 auto', color: '#334155', lineHeight: '1.7', fontSize: '15px' }}>
       <LegalPrintHeader
         title="POLÍTICA DE PRIVACIDAD Y PROTECCIÓN DE DATOS PERSONALES"
         version="2.0"
         lastUpdated="Noviembre 2026"
         referenceCode="FW-PRIVACY-V2.0-SECURE"
         precedenceUrl="/privacy"
+        containerId="privacy-content"
       />
-      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+      <div className="ff-no-print" style={{ textAlign: 'center', marginBottom: '32px' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#ecfdf5', color: '#065f46', padding: '6px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 700, marginBottom: '12px' }}>
           <IonIcon icon={lockClosedOutline} /> Privacidad y Protección de Datos
         </div>
@@ -183,7 +185,7 @@ export const PrivacyContent: React.FC = () => {
           Para cualquier consulta, reclamo o ejercicio de derechos sobre privacidad y datos personales, comuníquese con nuestro canal oficial de soporte a través de WhatsApp o mediante el correo oficial de atención de FinoWork.
         </p>
 
-        <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
+        <div className="ff-no-print" style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
           © 2026 Marco David Avila Pinto (C.I. V-31.075.846) • Todos los derechos reservados • Plataforma FinoWork
         </div>
       </div>
@@ -207,7 +209,7 @@ const PrivacyPolicy: React.FC = () => {
             Política de Privacidad
           </IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={() => window.print()} style={{ color: '#0f172a' }} title="Descargar PDF / Imprimir">
+            <IonButton onClick={() => printLegalContainer('privacy-content', { title: 'POLÍTICA DE PRIVACIDAD Y PROTECCIÓN DE DATOS PERSONALES', version: '2.0', lastUpdated: 'Noviembre 2026', referenceCode: 'FW-PRIVACY-V2.0-SECURE', precedenceUrl: '/privacy' })} style={{ color: '#0f172a' }} title="Descargar PDF / Imprimir">
               <IonIcon slot="icon-only" icon={printOutline} />
             </IonButton>
           </IonButtons>

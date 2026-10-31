@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { IonButton, IonIcon } from '@ionic/react';
 import { printOutline, shieldCheckmarkOutline } from 'ionicons/icons';
+import { printLegalContainer, printLegalDocument } from '../../utils/printLegalDocument';
 
 interface LegalPrintHeaderProps {
   title: string;
@@ -8,6 +9,7 @@ interface LegalPrintHeaderProps {
   lastUpdated?: string;
   referenceCode?: string;
   precedenceUrl?: string;
+  containerId?: string;
 }
 
 export const LegalPrintHeader: React.FC<LegalPrintHeaderProps> = ({
@@ -16,6 +18,7 @@ export const LegalPrintHeader: React.FC<LegalPrintHeaderProps> = ({
   lastUpdated = 'Noviembre 2026',
   referenceCode = 'FW-LEGAL-V2.0-SENIAT-SECURE',
   precedenceUrl = '/terms',
+  containerId,
 }) => {
   const [currentTimestamp, setCurrentTimestamp] = useState<string>('');
 
@@ -26,31 +29,69 @@ export const LegalPrintHeader: React.FC<LegalPrintHeaderProps> = ({
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
-      }) + ' ' +
-      now.toLocaleTimeString('es-VE', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })
+      }) +
+        ' ' +
+        now.toLocaleTimeString('es-VE', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        })
     );
   }, []);
 
-  const handlePrint = () => {
-    // Refresh timestamp right before printing/saving to PDF
+  const handlePrint = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+
+    // Actualizar marca temporal
     const now = new Date();
     setCurrentTimestamp(
       now.toLocaleDateString('es-VE', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
-      }) + ' ' +
-      now.toLocaleTimeString('es-VE', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })
+      }) +
+        ' ' +
+        now.toLocaleTimeString('es-VE', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        })
     );
-    window.print();
+
+    let targetEl: HTMLElement | null = null;
+    if (containerId) {
+      targetEl = document.getElementById(containerId);
+    }
+
+    if (!targetEl) {
+      const buttonEl = e?.currentTarget as HTMLElement | undefined;
+      targetEl =
+        buttonEl?.closest('.ff-legal-document') as HTMLElement | null ||
+        document.querySelector('.ff-legal-document') as HTMLElement | null ||
+        document.querySelector('.ff-card') as HTMLElement | null;
+    }
+
+    if (targetEl) {
+      printLegalDocument({
+        title,
+        version,
+        lastUpdated,
+        referenceCode,
+        precedenceUrl,
+        contentHtml: targetEl.innerHTML,
+      });
+    } else if (containerId) {
+      printLegalContainer(containerId, {
+        title,
+        version,
+        lastUpdated,
+        referenceCode,
+        precedenceUrl,
+      });
+    } else {
+      window.print();
+    }
   };
 
   return (
@@ -101,22 +142,24 @@ export const LegalPrintHeader: React.FC<LegalPrintHeaderProps> = ({
         <IonButton
           fill="outline"
           onClick={handlePrint}
-          style={{
-            '--color': '#0f172a',
-            '--border-color': '#cbd5e1',
-            '--border-radius': '10px',
-            fontWeight: 700,
-            fontSize: '13px',
-            height: '38px',
-            margin: 0,
-          } as any}
+          style={
+            {
+              '--color': '#0f172a',
+              '--border-color': '#cbd5e1',
+              '--border-radius': '10px',
+              fontWeight: 700,
+              fontSize: '13px',
+              height: '38px',
+              margin: 0,
+            } as any
+          }
         >
           <IonIcon slot="start" icon={printOutline} />
           Descargar PDF / Imprimir
         </IonButton>
       </div>
 
-      {/* 2. EXCLUSIVO PARA IMPRESIÓN / GUARDAR COMO PDF: Encabezado Membretado Oficial */}
+      {/* 2. EXCLUSIVO PARA IMPRESIÓN DIRECTA DEL NAVEGADOR (CTRL + P): Encabezado Membretado Oficial */}
       <div
         className="ff-print-header"
         style={{
@@ -126,12 +169,34 @@ export const LegalPrintHeader: React.FC<LegalPrintHeaderProps> = ({
           fontFamily: 'system-ui, -apple-system, sans-serif',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '12px',
+          }}
+        >
           <div>
-            <div style={{ fontSize: '20px', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.5px' }}>
+            <div
+              style={{
+                fontSize: '20px',
+                fontWeight: 900,
+                color: '#0f172a',
+                letterSpacing: '-0.5px',
+              }}
+            >
               FINOWORK SAAS
             </div>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div
+              style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#475569',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}
+            >
               Plataforma de Gestión Comercial y Punto de Venta
             </div>
             <div style={{ fontSize: '11px', color: '#64748b' }}>
@@ -139,14 +204,30 @@ export const LegalPrintHeader: React.FC<LegalPrintHeaderProps> = ({
             </div>
           </div>
           <div style={{ textAlign: 'right', fontSize: '11px', color: '#475569' }}>
-            <div><strong>Versión Documento:</strong> {version}</div>
-            <div><strong>Última Revisión:</strong> {lastUpdated}</div>
-            <div><strong>Fecha de Emisión:</strong> {currentTimestamp}</div>
-            <div><strong>Código de Control:</strong> {referenceCode}</div>
+            <div>
+              <strong>Versión Documento:</strong> {version}
+            </div>
+            <div>
+              <strong>Última Revisión:</strong> {lastUpdated}
+            </div>
+            <div>
+              <strong>Fecha de Emisión:</strong> {currentTimestamp}
+            </div>
+            <div>
+              <strong>Código de Control:</strong> {referenceCode}
+            </div>
           </div>
         </div>
 
-        <h1 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: '14px 0 6px 0', textAlign: 'center' }}>
+        <h1
+          style={{
+            fontSize: '18px',
+            fontWeight: 800,
+            color: '#0f172a',
+            margin: '14px 0 6px 0',
+            textAlign: 'center',
+          }}
+        >
           {title}
         </h1>
 
@@ -163,8 +244,16 @@ export const LegalPrintHeader: React.FC<LegalPrintHeaderProps> = ({
             color: '#334155',
           }}
         >
-          <strong>AVISO DE VALIDEZ Y PREVALENCIA LEGAL:</strong> El presente documento descargado o impreso certifica las condiciones contractuales y términos de servicio vigentes al momento exacto de su expedición ({currentTimestamp}). De conformidad con lo estipulado en este acuerdo, FinoWork se reserva el derecho de actualizar sus términos y políticas para reflejar mejoras operativas o adecuar su funcionamiento a la normativa tributaria y legal aplicable (incluyendo directrices del SENIAT). La versión más reciente y legalmente vinculante estará siempre publicada y accesible en tiempo real en{' '}
-          <strong>https://finowork.com{precedenceUrl}</strong>, la cual prevalecerá legalmente ante cualquier discrepancia o modificación posterior con respecto a copias impresas o archivos digitales descargados con anterioridad.
+          <strong>AVISO DE VALIDEZ Y PREVALENCIA LEGAL:</strong> El presente documento descargado o
+          impreso certifica las condiciones contractuales y términos de servicio vigentes al momento
+          exacto de su expedición ({currentTimestamp}). De conformidad con lo estipulado en este
+          acuerdo, FinoWork se reserva el derecho de actualizar sus términos y políticas para reflejar
+          mejoras operativas o adecuar su funcionamiento a la normativa tributaria y legal aplicable
+          (incluyendo directrices del SENIAT). La versión más reciente y legalmente vinculante estará
+          siempre publicada y accesible en tiempo real en{' '}
+          <strong>https://finowork.com{precedenceUrl}</strong>, la cual prevalecerá legalmente ante
+          cualquier discrepancia o modificación posterior con respecto a copias impresas o archivos
+          digitales descargados con anterioridad.
         </div>
       </div>
     </>

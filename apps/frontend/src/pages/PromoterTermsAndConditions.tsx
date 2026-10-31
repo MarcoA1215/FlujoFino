@@ -11,19 +11,21 @@ import {
 } from '@ionic/react';
 import { arrowBackOutline, shieldCheckmarkOutline, cashOutline, lockClosedOutline, printOutline } from 'ionicons/icons';
 import { LegalPrintHeader } from '../components/legal/LegalPrintHeader';
+import { printLegalContainer } from '../utils/printLegalDocument';
 import { useNavigate } from 'react-router-dom';
 
 export const PromoterTermsContent: React.FC = () => {
   return (
-    <div style={{ maxWidth: '850px', margin: '0 auto', color: '#334155', lineHeight: '1.7', fontSize: '14px' }}>
+    <div id="promoter-terms-content" className="ff-legal-document" style={{ maxWidth: '850px', margin: '0 auto', color: '#334155', lineHeight: '1.7', fontSize: '14px' }}>
       <LegalPrintHeader
         title="TÉRMINOS, CONDICIONES Y POLÍTICA DEL PROGRAMA DE PROMOTORES"
         version="2.0"
         lastUpdated="Noviembre 2026"
         referenceCode="FW-PROMOTER-V2.0-COMMERCIAL"
         precedenceUrl="/promoter/terms"
+        containerId="promoter-terms-content"
       />
-      <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+      <div className="ff-no-print" style={{ textAlign: 'center', marginBottom: '28px' }}>
         <div style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -46,7 +48,7 @@ export const PromoterTermsContent: React.FC = () => {
         </p>
       </div>
 
-      <div style={{ background: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.04)', marginBottom: '20px' }}>
+      <div className="ff-card" style={{ background: '#ffffff', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.04)', marginBottom: '20px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginTop: 0 }}>
           1. Partes Contratantes y Marco General
         </h2>
@@ -247,7 +249,7 @@ export const PromoterTermsAndConditions: React.FC = () => {
             Términos y Política de Promotores
           </IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={() => window.print()} style={{ color: '#0f172a' }} title="Descargar PDF / Imprimir">
+            <IonButton onClick={() => printLegalContainer('promoter-terms-content', { title: 'TÉRMINOS, CONDICIONES Y POLÍTICA DEL PROGRAMA DE PROMOTORES', version: '2.0', lastUpdated: 'Noviembre 2026', referenceCode: 'FW-PROMOTER-V2.0-COMMERCIAL', precedenceUrl: '/promoter/terms' })} style={{ color: '#0f172a' }} title="Descargar PDF / Imprimir">
               <IonIcon slot="icon-only" icon={printOutline} />
             </IonButton>
           </IonButtons>
