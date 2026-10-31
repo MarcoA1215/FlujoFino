@@ -18,6 +18,21 @@ export class AppUpdate {
   @Column({ type: 'varchar', length: 50, nullable: true })
   version: string | null;
 
+  @Column({ type: 'int', nullable: true })
+  versionCode: number | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  apkUrl: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  mandatory: boolean;
+
+  @Column({ type: 'int', default: 3 })
+  graceDays: number;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  fileSizeMb: string | null;
+
   @Column({ type: 'text', nullable: true })
   summary: string | null;
 

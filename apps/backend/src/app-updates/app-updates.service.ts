@@ -45,6 +45,11 @@ export class AppUpdatesService {
     const update = this.appUpdateRepo.create({
       title: dto.title.trim(),
       version: dto.version?.trim() || null,
+      versionCode: dto.versionCode ?? null,
+      apkUrl: dto.apkUrl?.trim() || null,
+      mandatory: dto.mandatory ?? false,
+      graceDays: dto.graceDays !== undefined ? dto.graceDays : 3,
+      fileSizeMb: dto.fileSizeMb?.trim() || null,
       summary: dto.summary?.trim() || null,
       changes: Array.isArray(dto.changes) ? dto.changes : [],
       isPublished,
@@ -59,6 +64,11 @@ export class AppUpdatesService {
 
     if (dto.title !== undefined) update.title = dto.title.trim();
     if (dto.version !== undefined) update.version = dto.version?.trim() || null;
+    if (dto.versionCode !== undefined) update.versionCode = dto.versionCode;
+    if (dto.apkUrl !== undefined) update.apkUrl = dto.apkUrl?.trim() || null;
+    if (dto.mandatory !== undefined) update.mandatory = dto.mandatory;
+    if (dto.graceDays !== undefined) update.graceDays = dto.graceDays;
+    if (dto.fileSizeMb !== undefined) update.fileSizeMb = dto.fileSizeMb?.trim() || null;
     if (dto.summary !== undefined) update.summary = dto.summary?.trim() || null;
     if (dto.changes !== undefined) update.changes = Array.isArray(dto.changes) ? dto.changes : [];
 

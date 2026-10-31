@@ -59,6 +59,7 @@ import { getPublicBaseUrl } from '../utils/public-url';
 import { AuthContext } from '../context/AuthContext';
 import { ReportPaymentModal } from '../components/ReportPaymentModal';
 import { LibroVentasModal } from '../components/LibroVentasModal';
+import { useAppUpdater } from '../hooks/useAppUpdater';
 import {
   UserRole,
   TenantPlanType,
@@ -156,6 +157,7 @@ const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<Settings>({});
   const [subscription, setSubscription] = useState<MySubscriptionDTO | null>(null);
   const [presentToast] = useIonToast();
+  const updater = useAppUpdater();
   const { user, updateUser } = useContext(AuthContext);
   const [businessName, setBusinessName] = useState(user?.tenantName || '');
 
@@ -1164,7 +1166,7 @@ const SettingsPage: React.FC = () => {
                       Probar Sonido de Timbre
                     </button>
 
-                    {!Capacitor.isNativePlatform() && (
+                    {!Capacitor.isNativePlatform() ? (
                       <a
                         href="/FinoWork.apk"
                         download="FinoWork.apk"
@@ -1187,6 +1189,40 @@ const SettingsPage: React.FC = () => {
                         <IonIcon icon={cloudDownloadOutline} style={{ fontSize: '18px', color: '#10B981' }} />
                         Descargar App Android (APK)
                       </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (updater.updateAvailable) {
+                            updater.setIsOpen(true);
+                          } else {
+                            updater.checkForUpdates(true);
+                          }
+                        }}
+                        disabled={updater.isChecking}
+                        style={{
+                          backgroundColor: updater.updateAvailable ? '#ECFDF5' : '#F8FAFC',
+                          color: updater.updateAvailable ? '#065F46' : '#0F172A',
+                          border: updater.updateAvailable ? '1.5px solid #10B981' : '1px solid #CBD5E1',
+                          borderRadius: '10px',
+                          padding: '12px 18px',
+                          fontSize: '14px',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          boxShadow: updater.updateAvailable ? '0 2px 4px rgba(16, 185, 129, 0.15)' : 'none',
+                        }}
+                      >
+                        <IonIcon icon={cloudDownloadOutline} style={{ fontSize: '18px', color: '#10B981' }} />
+                        {updater.isChecking
+                          ? 'Buscando actualización...'
+                          : updater.updateAvailable
+                          ? `⚡ Actualizar a la versión ${updater.latestUpdate?.version || 'v' + updater.latestUpdate?.versionCode} ahora`
+                          : `Buscar Actualizaciones (Instalada: v${updater.currentVersion})`}
+                      </button>
                     )}
                   </div>
                 </IonCardContent>

@@ -786,6 +786,11 @@ export interface AppUpdateDTO {
   id: string;
   title: string;
   version?: string | null;
+  versionCode?: number | null;
+  apkUrl?: string | null;
+  mandatory?: boolean;
+  graceDays?: number | null;
+  fileSizeMb?: string | null;
   summary?: string | null;
   changes: AppUpdateItem[];
   isPublished: boolean;
@@ -797,6 +802,11 @@ export interface AppUpdateDTO {
 export interface CreateAppUpdateDTO {
   title: string;
   version?: string;
+  versionCode?: number;
+  apkUrl?: string;
+  mandatory?: boolean;
+  graceDays?: number;
+  fileSizeMb?: string;
   summary?: string;
   changes: AppUpdateItem[];
   isPublished?: boolean;
@@ -805,6 +815,11 @@ export interface CreateAppUpdateDTO {
 export interface UpdateAppUpdateDTO {
   title?: string;
   version?: string;
+  versionCode?: number;
+  apkUrl?: string;
+  mandatory?: boolean;
+  graceDays?: number;
+  fileSizeMb?: string;
   summary?: string;
   changes?: AppUpdateItem[];
   isPublished?: boolean;

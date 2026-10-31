@@ -128,6 +128,11 @@ const SuperAdminDashboard: React.FC = () => {
   const [newChangeType, setNewChangeType] = useState<AppUpdateChangeType>('ADDED');
   const [newChangeText, setNewChangeText] = useState('');
   const [isSavingUpdate, setIsSavingUpdate] = useState(false);
+  const [updateVersionCode, setUpdateVersionCode] = useState<number | undefined>(undefined);
+  const [updateApkUrl, setUpdateApkUrl] = useState('');
+  const [updateFileSizeMb, setUpdateFileSizeMb] = useState('');
+  const [updateMandatory, setUpdateMandatory] = useState(false);
+  const [updateGraceDays, setUpdateGraceDays] = useState(3);
 
   // SaaS Finances, IVA (SENIAT) & Expenses
   const [financeMetrics, setFinanceMetrics] = useState<SuperAdminFinanceMetricsDTO | null>(null);
@@ -489,6 +494,11 @@ const SuperAdminDashboard: React.FC = () => {
     setUpdateChanges([]);
     setNewChangeType('ADDED');
     setNewChangeText('');
+    setUpdateVersionCode(undefined);
+    setUpdateApkUrl('');
+    setUpdateFileSizeMb('');
+    setUpdateMandatory(false);
+    setUpdateGraceDays(3);
     setIsUpdateModalOpen(true);
   };
 
@@ -501,6 +511,11 @@ const SuperAdminDashboard: React.FC = () => {
     setUpdateChanges(Array.isArray(u.changes) ? [...u.changes] : []);
     setNewChangeType('ADDED');
     setNewChangeText('');
+    setUpdateVersionCode(u.versionCode || undefined);
+    setUpdateApkUrl(u.apkUrl || '');
+    setUpdateFileSizeMb(u.fileSizeMb || '');
+    setUpdateMandatory(!!u.mandatory);
+    setUpdateGraceDays(u.graceDays !== undefined && u.graceDays !== null ? u.graceDays : 3);
     setIsUpdateModalOpen(true);
   };
 
@@ -524,6 +539,11 @@ const SuperAdminDashboard: React.FC = () => {
       const payload: CreateAppUpdateDTO = {
         title: updateTitle.trim(),
         version: updateVersion.trim() || undefined,
+        versionCode: updateVersionCode ? Number(updateVersionCode) : undefined,
+        apkUrl: updateApkUrl.trim() || undefined,
+        fileSizeMb: updateFileSizeMb.trim() || undefined,
+        mandatory: updateMandatory,
+        graceDays: Number(updateGraceDays) || 3,
         summary: updateSummary.trim() || undefined,
         isPublished: updateIsPublished,
         changes: updateChanges,
@@ -4611,6 +4631,82 @@ const SuperAdminDashboard: React.FC = () => {
               >
                 📢 <strong>Registro de Novedades:</strong> Los clientes verán estas actualizaciones en la pestaña "Actualizaciones" de Ayuda y Soporte. Registra aquí todo lo que se agregó, implementó, corrigió o eliminó.
               </div>
+
+              {/* Autoactualización de APK (Android) */}
+              <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px', border: '1px solid #bfdbfe', background: '#f8fafc' }}>
+                <IonCardHeader style={{ paddingBottom: '4px' }}>
+                  <IonCardTitle style={{ fontSize: '15px', fontWeight: 800, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📦 Autoactualización y APK (Android)</span>
+                  </IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  <IonRow>
+                    <IonCol size="12" sizeMd="4">
+                      <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '10px', background: '#ffffff' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700, color: '#0f172a' }}>
+                          Build / VersionCode
+                        </IonLabel>
+                        <IonInput
+                          type="number"
+                          placeholder="Ej: 9"
+                          value={updateVersionCode}
+                          onIonInput={(e) => setUpdateVersionCode(e.detail.value ? parseInt(e.detail.value, 10) : undefined)}
+                        />
+                      </IonItem>
+                    </IonCol>
+
+                    <IonCol size="12" sizeMd="8">
+                      <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '10px', background: '#ffffff' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700, color: '#0f172a' }}>
+                          URL del APK Descargable
+                        </IonLabel>
+                        <IonInput
+                          placeholder="https://.../FinoWork-v1.0.8.apk"
+                          value={updateApkUrl}
+                          onIonInput={(e) => setUpdateApkUrl(e.detail.value || '')}
+                        />
+                      </IonItem>
+                    </IonCol>
+
+                    <IonCol size="12" sizeMd="4">
+                      <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '10px', background: '#ffffff' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700, color: '#0f172a' }}>
+                          Tamaño (opcional)
+                        </IonLabel>
+                        <IonInput
+                          placeholder="Ej: 18.2 MB"
+                          value={updateFileSizeMb}
+                          onIonInput={(e) => setUpdateFileSizeMb(e.detail.value || '')}
+                        />
+                      </IonItem>
+                    </IonCol>
+
+                    <IonCol size="12" sizeMd="4">
+                      <IonItem lines="none" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '10px', background: '#ffffff' }}>
+                        <IonLabel position="stacked" style={{ fontWeight: 700, color: '#0f172a' }}>
+                          Días de Gracia (Snooze)
+                        </IonLabel>
+                        <IonInput
+                          type="number"
+                          placeholder="3"
+                          value={updateGraceDays}
+                          onIonInput={(e) => setUpdateGraceDays(e.detail.value ? parseInt(e.detail.value, 10) : 3)}
+                        />
+                      </IonItem>
+                    </IonCol>
+
+                    <IonCol size="12" sizeMd="4">
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px 12px', background: '#ffffff', marginBottom: '10px' }}>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>¿Obligatoria?</div>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>Tras días de gracia</div>
+                        </div>
+                        <IonToggle checked={updateMandatory} onIonChange={(e) => setUpdateMandatory(e.detail.checked)} />
+                      </div>
+                    </IonCol>
+                  </IonRow>
+                </IonCardContent>
+              </IonCard>
 
               <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                 <IonCardHeader style={{ paddingBottom: '4px' }}>

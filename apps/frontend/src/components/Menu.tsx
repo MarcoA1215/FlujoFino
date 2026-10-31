@@ -46,6 +46,7 @@ import {
 } from 'ionicons/icons';
 import { Capacitor } from '@capacitor/core';
 import { useSettings } from '../context/SettingsContext';
+import { useAppUpdater } from '../hooks/useAppUpdater';
 import { apiClient } from '../api/client';
 
 interface WorkModeOption {
@@ -100,6 +101,7 @@ const Menu: React.FC = () => {
   const [presentToast] = useIonToast();
   const { user, logout, switchWorkspace, switchMode, isAuthenticated } = useContext(AuthContext);
   const { settings } = useSettings();
+  const { updateAvailable, setIsOpen: setUpdateModalOpen, latestUpdate } = useAppUpdater();
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
   const [workspaces, setWorkspaces] = useState<any[]>(user?.workspaces || []);
@@ -456,6 +458,37 @@ const Menu: React.FC = () => {
               </a>
             </IonMenuToggle>
           )}
+          {isNativeApp && updateAvailable && (
+            <IonMenuToggle autoHide={false}>
+              <div
+                onClick={() => setUpdateModalOpen(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  margin: '8px 12px 6px 12px',
+                  padding: '10px 14px',
+                  background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+                  border: '1.5px solid #10B981',
+                  borderRadius: '12px',
+                  color: '#065F46',
+                  fontSize: '13.5px',
+                  fontWeight: 700,
+                  boxShadow: '0 2px 4px rgba(16, 185, 129, 0.12)',
+                  cursor: 'pointer'
+                }}
+              >
+                <IonIcon icon={cloudDownloadOutline} style={{ fontSize: '22px', color: '#10B981', flexShrink: 0 }} />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span>Actualizar FinoWork</span>
+                  <span style={{ fontSize: '11px', color: '#047857', fontWeight: 600 }}>
+                    Versión ${latestUpdate?.version || 'v' + latestUpdate?.versionCode} disponible
+                  </span>
+                </div>
+              </div>
+            </IonMenuToggle>
+          )}
+
           {!isNativeApp && (
             <IonMenuToggle autoHide={false}>
               <a

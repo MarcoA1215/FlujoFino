@@ -17,8 +17,10 @@ import {
   walletOutline,
   syncOutline,
   refreshOutline,
-  closeOutline
+  closeOutline,
+  cloudDownloadOutline
 } from 'ionicons/icons';
+import { useAppUpdater } from '../hooks/useAppUpdater';
 import { AuthContext } from '../context/AuthContext';
 import { useLoading } from '../context/LoadingContext';
 import { UserRole, APP_NAME } from '@finowork/shared-types';
@@ -96,6 +98,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const [showVerifyModal, setShowVerifyModal] = useState<boolean>(false);
   const [showRateModal, setShowRateModal] = useState<boolean>(false);
   const [pendingAccessCount, setPendingAccessCount] = useState<number>(0);
+  const { updateAvailable, setIsOpen: setUpdateModalOpen, latestUpdate } = useAppUpdater();
 
   const [exchangeRate, setExchangeRate] = useState<number>(() => {
     try {
@@ -717,6 +720,32 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </IonTitle>
 
           <IonButtons slot="end" style={{ gap: '6px', display: 'flex', alignItems: 'center' }}>
+            {/* Botón rápido de actualización si hay versión pendiente */}
+            {updateAvailable && (
+              <button
+                type="button"
+                onClick={() => setUpdateModalOpen(true)}
+                title={`Nueva versión ${latestUpdate?.version || 'disponible'}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '5px 11px',
+                  borderRadius: '20px',
+                  background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 5px rgba(16, 185, 129, 0.3)',
+                }}
+              >
+                <IonIcon icon={cloudDownloadOutline} style={{ fontSize: '15px' }} />
+                <span>Actualizar</span>
+              </button>
+            )}
+
             {/* Desktop pills container */}
             <div className="ff-header-pills-desktop" style={{ gap: '6px', alignItems: 'center' }}>
               {renderPills()}

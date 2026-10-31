@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 import { AppUpdateItem, CreateAppUpdateDTO } from '@finowork/shared-types';
 
 export class CreateAppUpdateDto implements CreateAppUpdateDTO {
@@ -9,6 +9,26 @@ export class CreateAppUpdateDto implements CreateAppUpdateDTO {
   @IsOptional()
   @IsString()
   version?: string;
+
+  @IsOptional()
+  @IsNumber()
+  versionCode?: number;
+
+  @IsOptional()
+  @IsString()
+  apkUrl?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  mandatory?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  graceDays?: number;
+
+  @IsOptional()
+  @IsString()
+  fileSizeMb?: string;
 
   @IsOptional()
   @IsString()

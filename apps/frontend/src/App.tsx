@@ -8,9 +8,11 @@ import { SubscriptionProvider, SubscriptionContext } from './context/Subscriptio
 import { ImageViewerProvider } from './context/ImageViewerContext';
 import { LoadingProvider } from './context/LoadingContext';
 import { SettingsProvider } from './context/SettingsContext';
+import { AppUpdateProvider } from './context/AppUpdateContext';
 import { LoadingOverlay } from './components/common/LoadingOverlay';
 import { ReportPaymentModal } from './components/ReportPaymentModal';
 import { TermsUpdateModal } from './components/TermsUpdateModal';
+import { AppUpdateModal } from './components/AppUpdateModal';
 import { UserRole, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -256,7 +258,8 @@ const App: React.FC = () => {
         <SubscriptionProvider>
           <ImageViewerProvider>
             <LoadingProvider>
-              <IonApp>
+              <AppUpdateProvider>
+                <IonApp>
                 <LoadingOverlay />
                 <IonReactRouter>
                   <ErrorBoundary>
@@ -265,7 +268,8 @@ const App: React.FC = () => {
                     </Suspense>
                   </ErrorBoundary>
                 </IonReactRouter>
-              </IonApp>
+                </IonApp>
+              </AppUpdateProvider>
             </LoadingProvider>
           </ImageViewerProvider>
         </SubscriptionProvider>
@@ -369,6 +373,7 @@ const MainLayout: React.FC = () => {
         onClose={() => setIsReportModalOpen(false)}
       />
       <TermsUpdateModal />
+      <AppUpdateModal />
     </>
   );
 };
