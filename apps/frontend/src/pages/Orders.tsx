@@ -19,6 +19,7 @@ import {
   bicycleOutline,
   storefrontOutline,
   cartOutline,
+  cubeOutline,
   trashOutline,
   copyOutline
 } from 'ionicons/icons';
@@ -32,6 +33,7 @@ import AppHeader from '../components/AppHeader';
 import { formatWhatsAppUrl } from '../utils/whatsapp';
 import { formatTime12h } from '../utils/time';
 import { FiscalReceiptModal } from '../components/FiscalReceiptModal';
+import { PartialDeliveryModal } from '../components/PartialDeliveryModal';
 
 type OrderItem = {
   id: string;
@@ -156,6 +158,7 @@ const Orders: React.FC = () => {
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<any>(null);
+  const [selectedOrderForPartial, setSelectedOrderForPartial] = useState<any>(null);
   const [selectedOrderForAbono, setSelectedOrderForAbono] = useState<any>(null);
   const [selectedOrderForCobro, setSelectedOrderForCobro] = useState<Order | null>(null);
   const [cobroMethod, setCobroMethod] = useState<'USD' | 'PAGO_MOVIL' | 'PUNTO' | 'TRANSFER'>('USD');
@@ -956,6 +959,14 @@ const Orders: React.FC = () => {
                           <span className="ff-pill-dot" style={{ background: '#EF4444' }} />
                           <span>AGOTADO EN PROVEEDOR</span>
                         </div>
+                      ) : order.status === OrderStatus.PARTIALLY_DELIVERED ? (
+                        <div
+                          className="ff-pill"
+                          style={{ fontSize: '11px', padding: '3px 10px', background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1D4ED8', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                        >
+                          <span className="ff-pill-dot" style={{ background: '#3B82F6' }} />
+                          <span>📦 PARCIAL</span>
+                        </div>
                       ) : (
                         <div
                           className={`ff-pill ${isDelivered ? 'ff-pill-online' : (isPreparing ? 'ff-pill-rate' : (isCanceled ? 'ff-pill-danger' : 'ff-pill-sync'))}`}
@@ -1460,6 +1471,33 @@ const Orders: React.FC = () => {
                       </button>
                     )}
 
+                    {/* Botón de Entrega Parcial */}
+                    {order.status !== OrderStatus.DELIVERED && order.status !== OrderStatus.CANCELED && order.status !== OrderStatus.CANCELADO_PROVEEDOR && !isPreorderSolicitud && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderForPartial(order)}
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: '10px',
+                          border: order.status === OrderStatus.PARTIALLY_DELIVERED ? '1px solid #93C5FD' : '1px solid #E2E8F0',
+                          background: order.status === OrderStatus.PARTIALLY_DELIVERED ? '#EFF6FF' : '#F8FAFC',
+                          color: order.status === OrderStatus.PARTIALLY_DELIVERED ? '#1D4ED8' : '#334155',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          whiteSpace: 'nowrap'
+                        }}
+                        title="Despachar físicamente parte de los productos de este pedido"
+                      >
+                        <IonIcon icon={cubeOutline} />
+                        Parcial
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => handleOpenTicket(order)}
@@ -1646,6 +1684,11 @@ const Orders: React.FC = () => {
                               {it.employeeId && (
                                 <span style={{ fontSize: '11px', fontWeight: '700', color: '#047857', background: '#ECFDF5', padding: '2px 8px', borderRadius: '6px' }}>
                                   👤 {employeesMap[it.employeeId] || 'Especialista'}
+                                </span>
+                              )}
+                              {Number(it.deliveredQuantity || 0) > 0 && (
+                                <span style={{ fontSize: '10px', fontWeight: '800', color: Number(it.deliveredQuantity) >= qty ? '#047857' : '#D97706', background: Number(it.deliveredQuantity) >= qty ? '#ECFDF5' : '#FEF3C7', padding: '1px 6px', borderRadius: '4px' }}>
+                                  📦 Entregados: {it.deliveredQuantity}/{qty}
                                 </span>
                               )}
                               {it.hasModifications && (
@@ -2379,6 +2422,34 @@ const Orders: React.FC = () => {
                           }}>
                             ✓ Pedido Entregado y Finalizado
                           </div>
+                        )}
+
+                        {selectedOrderForDetails.status !== OrderStatus.DELIVERED && selectedOrderForDetails.status !== OrderStatus.CANCELED && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const ord = selectedOrderForDetails;
+                              setSelectedOrderForDetails(null);
+                              setSelectedOrderForPartial(ord);
+                            }}
+                            style={{
+                              padding: '12px',
+                              borderRadius: '12px',
+                              border: '1px solid #BAE6FD',
+                              background: '#F0F9FF',
+                              color: '#0369A1',
+                              fontWeight: '700',
+                              fontSize: '13px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            <IonIcon icon={cubeOutline} />
+                            📦 Despacho / Entrega Parcial de Productos
+                          </button>
                         )}
 
                         {selectedOrderForDetails.status !== OrderStatus.CANCELED && (
@@ -3320,6 +3391,15 @@ const Orders: React.FC = () => {
           }}
           invoice={activeFiscalReceipt}
           settings={systemSettings}
+        />
+
+        <PartialDeliveryModal
+          order={selectedOrderForPartial}
+          isOpen={!!selectedOrderForPartial}
+          onClose={() => setSelectedOrderForPartial(null)}
+          onSuccess={() => {
+            fetchOrders();
+          }}
         />
       </IonContent>
     </IonPage>
