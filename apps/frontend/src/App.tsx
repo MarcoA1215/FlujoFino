@@ -10,6 +10,7 @@ import { LoadingProvider } from './context/LoadingContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { LoadingOverlay } from './components/common/LoadingOverlay';
 import { ReportPaymentModal } from './components/ReportPaymentModal';
+import { TermsUpdateModal } from './components/TermsUpdateModal';
 import { UserRole, DEFAULT_SUPERADMIN_EMAIL } from '@finowork/shared-types';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -367,6 +368,7 @@ const MainLayout: React.FC = () => {
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
       />
+      <TermsUpdateModal />
     </>
   );
 };

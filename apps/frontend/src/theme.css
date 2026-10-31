@@ -644,3 +644,57 @@ ion-alert [role="destructive"].alert-button {
   color: #ef4444 !important;
 }
 
+
+/* ==========================================================================
+   PRINT / PDF EXPORT STYLES (Legal Documents & Invoices)
+   ========================================================================== */
+@media print {
+  ion-header,
+  ion-toolbar,
+  ion-buttons,
+  ion-menu,
+  .ff-bottom-nav,
+  .no-print,
+  .ff-no-print {
+    display: none !important;
+  }
+
+  body, ion-app, ion-page, ion-content {
+    background: #ffffff !important;
+    --background: #ffffff !important;
+    color: #0f172a !important;
+    overflow: visible !important;
+    position: static !important;
+    height: auto !important;
+  }
+
+  .ff-print-header {
+    display: block !important;
+  }
+
+  .ff-print-footer {
+    display: block !important;
+  }
+
+  .ff-card {
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+    page-break-inside: auto;
+  }
+
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+
+  p, li {
+    page-break-inside: avoid;
+  }
+}
+
+.ff-print-header {
+  display: none;
+}
+
+.ff-print-footer {
+  display: none;
+}

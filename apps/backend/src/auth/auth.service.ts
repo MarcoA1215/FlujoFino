@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
+import { invalidateSessionCache } from './jwt.strategy';
 import * as bcrypt from 'bcryptjs';
 import { DataSource } from 'typeorm';
 import { Settings } from '../entities/settings.entity';
@@ -531,6 +532,8 @@ export class AuthService {
       roles: effectiveRoles,
       tenantId: tenantId,
       tenantName: tenantName || DEFAULT_TENANT_NAME,
+      termsAcceptedVersion: user.termsAcceptedVersion || null,
+      privacyAcceptedVersion: user.privacyAcceptedVersion || null,
     };
     return {
       access_token: this.jwtService.sign(payload),
@@ -713,6 +716,9 @@ export class AuthService {
         passwordHash: hashedPassword,
         role: UserRole.ADMIN, // Global role
         isEmailVerified: false,
+        termsAcceptedVersion: '2.0',
+        termsAcceptedAt: new Date(),
+        privacyAcceptedVersion: '2.0',
       });
       const savedUser: any = await queryRunner.manager.save(user);
 
@@ -1052,6 +1058,43 @@ export class AuthService {
     return {
       success: true,
       message: 'Tu cuenta y todos tus datos personales han sido eliminados de la plataforma de manera permanente.',
+    };
+  }
+
+  async acceptTerms(userId: string, version: string = '2.0'): Promise<{ success: boolean; termsAcceptedVersion: string; termsAcceptedAt: Date }> {
+    const userRepo = this.dataSource.getRepository(User);
+    const user = await userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    const now = new Date();
+    user.termsAcceptedVersion = version;
+    user.termsAcceptedAt = now;
+    user.privacyAcceptedVersion = version;
+    await userRepo.save(user);
+
+    // Invalidate session cache so next request picks up new version immediately
+    invalidateSessionCache(userId);
+
+    // If user is also a promoter, sync promoter record too
+    try {
+      const promoterRepo = this.dataSource.getRepository(Promoter);
+      const promoter = await promoterRepo.findOne({ where: { userId } });
+      if (promoter) {
+        promoter.termsAccepted = true;
+        promoter.termsAcceptedAt = now;
+        promoter.termsAcceptedVersion = version;
+        await promoterRepo.save(promoter);
+      }
+    } catch (e) {
+      console.warn('[authService.acceptTerms] Error updating promoter terms:', e);
+    }
+
+    return {
+      success: true,
+      termsAcceptedVersion: version,
+      termsAcceptedAt: now,
     };
   }
 }

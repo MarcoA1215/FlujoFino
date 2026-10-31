@@ -50,6 +50,9 @@ export class Promoter {
   @Column({ type: 'timestamp', nullable: true })
   termsAcceptedAt: Date | null;
 
+  @Column({ name: 'terms_accepted_version', type: 'varchar', length: 20, nullable: true })
+  termsAcceptedVersion: string | null;
+
   @OneToMany(() => Tenant, (tenant) => tenant.promoter)
   tenants: Tenant[];
 

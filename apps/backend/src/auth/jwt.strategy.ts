@@ -97,12 +97,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       if (isValidUUID(userId)) {
         user = await this.dataSource.getRepository(User).findOne({
           where: { id: userId },
-          select: { id: true, username: true, email: true, role: true, identification: true, phone: true, isEmailVerified: true },
+          select: { id: true, username: true, email: true, role: true, identification: true, phone: true, isEmailVerified: true, termsAcceptedVersion: true, privacyAcceptedVersion: true },
         });
       } else if (payload.username) {
         user = await this.dataSource.getRepository(User).findOne({
           where: { username: payload.username },
-          select: { id: true, username: true, email: true, role: true, identification: true, phone: true, isEmailVerified: true },
+          select: { id: true, username: true, email: true, role: true, identification: true, phone: true, isEmailVerified: true, termsAcceptedVersion: true, privacyAcceptedVersion: true },
         });
       }
 
@@ -233,6 +233,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         roles: effectiveRoles,
         tenantId: payload.tenantId,
         tenantName: payload.tenantName,
+        termsAcceptedVersion: user.termsAcceptedVersion || payload.termsAcceptedVersion || null,
+        privacyAcceptedVersion: user.privacyAcceptedVersion || payload.privacyAcceptedVersion || null,
       };
     }
 
@@ -247,6 +249,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       roles: payload.roles,
       tenantId: payload.tenantId,
       tenantName: payload.tenantName,
+      termsAcceptedVersion: payload.termsAcceptedVersion || null,
+      privacyAcceptedVersion: payload.privacyAcceptedVersion || null,
     };
   }
 }

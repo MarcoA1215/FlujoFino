@@ -9,12 +9,20 @@ import {
   IonButton,
   IonIcon,
 } from '@ionic/react';
-import { arrowBackOutline, shieldCheckmarkOutline } from 'ionicons/icons';
+import { arrowBackOutline, shieldCheckmarkOutline, printOutline } from 'ionicons/icons';
+import { LegalPrintHeader } from '../components/legal/LegalPrintHeader';
 import { useNavigate } from 'react-router-dom';
 
 export const TermsContent: React.FC = () => {
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', color: '#334155', lineHeight: '1.7', fontSize: '15px' }}>
+      <LegalPrintHeader
+        title="TÉRMINOS Y CONDICIONES GENERALES DEL SERVICIO SAAS"
+        version="2.0"
+        lastUpdated="Noviembre 2026"
+        referenceCode="FW-TERMS-V2.0-SENIAT-SECURE"
+        precedenceUrl="/terms"
+      />
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#ecfdf5', color: '#065f46', padding: '6px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 700, marginBottom: '12px' }}>
           <IonIcon icon={shieldCheckmarkOutline} /> Documento Legal Oficial
@@ -309,6 +317,11 @@ const TermsAndConditions: React.FC = () => {
           <IonTitle style={{ color: '#0f172a', fontWeight: 800, fontSize: '17px' }}>
             Términos y Condiciones
           </IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={() => window.print()} style={{ color: '#0f172a' }} title="Descargar PDF / Imprimir">
+              <IonIcon slot="icon-only" icon={printOutline} />
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
 

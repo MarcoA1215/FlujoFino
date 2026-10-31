@@ -134,4 +134,11 @@ export class AuthController {
   async deleteMyAccount(@Request() req: any) {
     return this.authService.deleteMyAccount(req.user.id);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('accept-terms')
+  async acceptTerms(@Request() req: any, @Body() body?: { version?: string }) {
+    const userId = req.user.id || req.user.sub;
+    return this.authService.acceptTerms(userId, body?.version || '2.0');
+  }
 }

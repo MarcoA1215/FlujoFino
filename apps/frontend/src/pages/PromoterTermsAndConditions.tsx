@@ -9,12 +9,20 @@ import {
   IonButton,
   IonIcon,
 } from '@ionic/react';
-import { arrowBackOutline, shieldCheckmarkOutline, cashOutline, lockClosedOutline } from 'ionicons/icons';
+import { arrowBackOutline, shieldCheckmarkOutline, cashOutline, lockClosedOutline, printOutline } from 'ionicons/icons';
+import { LegalPrintHeader } from '../components/legal/LegalPrintHeader';
 import { useNavigate } from 'react-router-dom';
 
 export const PromoterTermsContent: React.FC = () => {
   return (
     <div style={{ maxWidth: '850px', margin: '0 auto', color: '#334155', lineHeight: '1.7', fontSize: '14px' }}>
+      <LegalPrintHeader
+        title="TÉRMINOS, CONDICIONES Y POLÍTICA DEL PROGRAMA DE PROMOTORES"
+        version="2.0"
+        lastUpdated="Noviembre 2026"
+        referenceCode="FW-PROMOTER-V2.0-COMMERCIAL"
+        precedenceUrl="/promoter/terms"
+      />
       <div style={{ textAlign: 'center', marginBottom: '28px' }}>
         <div style={{
           display: 'inline-flex',
@@ -238,6 +246,11 @@ export const PromoterTermsAndConditions: React.FC = () => {
           <IonTitle style={{ color: '#0f172a', fontWeight: 800, fontSize: '16px' }}>
             Términos y Política de Promotores
           </IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={() => window.print()} style={{ color: '#0f172a' }} title="Descargar PDF / Imprimir">
+              <IonIcon slot="icon-only" icon={printOutline} />
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
 

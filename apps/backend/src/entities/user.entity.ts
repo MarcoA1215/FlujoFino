@@ -37,6 +37,15 @@ export class User {
   @Column({ name: 'email_verification_expires_at', type: 'timestamp', nullable: true })
   emailVerificationExpiresAt: Date | null;
 
+  @Column({ name: 'terms_accepted_version', type: 'varchar', length: 20, nullable: true })
+  termsAcceptedVersion: string | null;
+
+  @Column({ name: 'terms_accepted_at', type: 'timestamp', nullable: true })
+  termsAcceptedAt: Date | null;
+
+  @Column({ name: 'privacy_accepted_version', type: 'varchar', length: 20, nullable: true })
+  privacyAcceptedVersion: string | null;
+
   @Column({ nullable: true })
   resetPasswordCode: string;
 

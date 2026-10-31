@@ -20,6 +20,9 @@ interface User {
   tenantName?: string;
   isPromoter?: boolean;
   workspaces?: any[];
+  termsAcceptedVersion?: string | null;
+  termsAcceptedAt?: string | null;
+  privacyAcceptedVersion?: string | null;
 }
 
 interface AuthContextType {
@@ -54,7 +57,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           apiClient.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
 
           // Verificación proactiva de sesión con el servidor en segundo plano:
-          apiClient.get('/auth/me').catch(() => {
+          apiClient.get('/auth/me').then((res) => {
+            if (res?.data) {
+              const updated = { ...parsedUser, ...res.data };
+              setUser(updated);
+              Preferences.set({ key: 'user', value: JSON.stringify(updated) });
+            }
+          }).catch(() => {
             // Si no hay conexión (offline), no hacemos nada para permitir uso sin conexión.
           });
         } catch (e) {

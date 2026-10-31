@@ -5,6 +5,8 @@ import { Promoter } from '../entities/promoter.entity';
 import { PromoterCommission } from '../entities/promoter-commission.entity';
 import { Tenant } from '../entities/tenant.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
+import { User } from '../entities/user.entity';
+import { invalidateSessionCache } from '../auth/jwt.strategy';
 import {
   PromoterCommissionType,
   PromoterCommissionStatus,
@@ -30,6 +32,8 @@ export class PromotersService {
     private readonly tenantRepo: Repository<Tenant>,
     @InjectRepository(UserTenantAccess)
     private readonly userAccessRepo: Repository<UserTenantAccess>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
   ) {}
 
   /**
@@ -393,6 +397,7 @@ export class PromotersService {
       commissionPercentage: rankInfo.commissionPercentage,
       termsAccepted: !!promoter.termsAccepted,
       termsAcceptedAt: promoter.termsAcceptedAt ? new Date(promoter.termsAcceptedAt).toISOString() : null,
+      termsAcceptedVersion: promoter.termsAcceptedVersion || null,
       rankBonusUSD: Math.round(totalBonusCommissionsUSD * 100) / 100,
       totalBonusCommissionsUSD: Math.round(totalBonusCommissionsUSD * 100) / 100,
       nextMilestone,
@@ -421,7 +426,21 @@ export class PromotersService {
 
     promoter.termsAccepted = true;
     promoter.termsAcceptedAt = new Date();
+    promoter.termsAcceptedVersion = '2.0';
     await this.promoterRepo.save(promoter);
+
+    if (promoter.userId) {
+      try {
+        await this.userRepo.update(promoter.userId, {
+          termsAcceptedVersion: '2.0',
+          termsAcceptedAt: promoter.termsAcceptedAt,
+          privacyAcceptedVersion: '2.0',
+        });
+        invalidateSessionCache(promoter.userId);
+      } catch (err) {
+        console.warn('[promoters.service.acceptTerms] Error syncing user:', err);
+      }
+    }
 
     return {
       success: true,
