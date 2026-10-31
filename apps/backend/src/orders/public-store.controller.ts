@@ -435,7 +435,8 @@ export class PublicStoreController {
   }
 
   private async findOrderByIdOrPrefix(orderIdOrPrefix: string, tenantId?: string): Promise<Order | null> {
-    const clean = (orderIdOrPrefix || '').trim().replace(/^#/, '');
+    let clean = (orderIdOrPrefix || '').trim().replace(/^#/, '');
+    clean = clean.replace(/^(ord|ped)[-_]?/i, '').trim();
     if (!clean) return null;
 
     if (this.isUuid(clean)) {
@@ -454,7 +455,10 @@ export class PublicStoreController {
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
-        .where('LOWER(CAST(order.id AS TEXT)) LIKE :prefix', { prefix: `${cleanLower}%` });
+        .where('(LOWER(CAST(order.id AS TEXT)) LIKE :prefix OR LOWER(CAST(order.id AS TEXT)) LIKE :suffix)', {
+          prefix: `${cleanLower}%`,
+          suffix: `%${cleanLower}`,
+        });
 
       if (tenantId) {
         qb.andWhere('order.tenantId = :tenantId', { tenantId });
@@ -620,12 +624,13 @@ export class PublicStoreController {
       throw new NotFoundException('Tienda no encontrada');
     }
 
-    const cleanCode = (body.orderCode || '').trim().replace(/^#/, '').toLowerCase();
+    const rawCode = (body.orderCode || '').trim();
+    const cleanCode = rawCode.replace(/^#/, '').replace(/^(ord|ped)[-_]?/i, '').trim().toLowerCase();
     const rawIdentifier = (body.phone || body.cedula || '').trim();
     const cleanDigits = rawIdentifier.replace(/\D/g, '');
 
     if (!cleanCode || cleanCode.length < 6) {
-      throw new BadRequestException('Ingresa un código de pedido válido de al menos 6 u 8 caracteres (ej: #A1B2C3D4)');
+      throw new BadRequestException('Ingresa un código de pedido válido de al menos 6 u 8 caracteres (ej: #ORD-4F7380 o 4F7380)');
     }
 
     if (!cleanDigits || cleanDigits.length < 4) {
@@ -641,11 +646,18 @@ export class PublicStoreController {
     const orderPhoneDigits = (order.customerPhone || '').replace(/\D/g, '');
     const orderCedulaDigits = (order.identification || order.pagoMovilCedula || '').replace(/\D/g, '');
 
+    const cleanDigitsNoLeadingZero = cleanDigits.replace(/^0+/, '');
+    const orderPhoneNoLeadingZero = orderPhoneDigits.replace(/^0+/, '');
+
     const matchesPhone =
       Boolean(orderPhoneDigits) &&
       (orderPhoneDigits.endsWith(cleanDigits) ||
         orderPhoneDigits.includes(cleanDigits) ||
-        cleanDigits.endsWith(orderPhoneDigits));
+        cleanDigits.endsWith(orderPhoneDigits) ||
+        (cleanDigitsNoLeadingZero.length >= 4 &&
+          (orderPhoneNoLeadingZero.endsWith(cleanDigitsNoLeadingZero) ||
+            cleanDigitsNoLeadingZero.endsWith(orderPhoneNoLeadingZero) ||
+            orderPhoneNoLeadingZero.includes(cleanDigitsNoLeadingZero))));
 
     const matchesCedula =
       Boolean(orderCedulaDigits) &&

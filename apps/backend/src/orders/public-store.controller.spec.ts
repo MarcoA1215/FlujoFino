@@ -221,8 +221,9 @@ describe('PublicStoreController', () => {
       });
 
       expect(mockOrderRepo.findOne).not.toHaveBeenCalled();
-      expect(mockQb.where).toHaveBeenCalledWith('LOWER(CAST(order.id AS TEXT)) LIKE :prefix', {
+      expect(mockQb.where).toHaveBeenCalledWith('(LOWER(CAST(order.id AS TEXT)) LIKE :prefix OR LOWER(CAST(order.id AS TEXT)) LIKE :suffix)', {
         prefix: '3a4b5c6d%',
+        suffix: '%3a4b5c6d',
       });
       expect(resByCedula.orderNumber).toBe('3A4B5C6D');
 

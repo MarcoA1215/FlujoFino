@@ -182,11 +182,12 @@ const PublicStore: React.FC = () => {
 
   const handleTrackOrder = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const cleanCode = trackOrderCode.trim();
+    const rawCode = trackOrderCode.trim();
+    const cleanCode = rawCode.replace(/^#/, '').replace(/^(ord|ped)[-_]?/i, '').trim();
     const cleanPh = trackPhone.trim();
 
     if (!cleanCode) {
-      setTrackError('Por favor ingresa tu código de pedido (ej: #3A4B5C6D)');
+      setTrackError('Por favor ingresa tu código de pedido (ej: #ORD-4F7380 o 4F7380)');
       return;
     }
     if (!cleanPh) {
@@ -3741,7 +3742,7 @@ const PublicStore: React.FC = () => {
                       }}
                     />
                     <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                      Los 8 caracteres de tu comprobante o WhatsApp (ej. 3A4B5C6D).
+                      El código de tu comprobante o WhatsApp (ej. #ORD-4F7380 o 4F7380).
                     </span>
                   </div>
 

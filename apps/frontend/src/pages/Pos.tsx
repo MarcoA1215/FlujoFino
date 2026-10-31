@@ -1169,7 +1169,7 @@ const Pos: React.FC = () => {
     };
 
     const buildSaleCopySummary = (orderIdStr: string) => {
-      const code = `#ORD-${orderIdStr.slice(-6).toUpperCase()}`;
+      const code = `#ORD-${(orderIdStr.startsWith('off_') ? orderIdStr.slice(-6) : orderIdStr.slice(0, 6)).toUpperCase()}`;
       const itemsLines = cart
         .map(it => `• ${it.quantity}x ${it.product.name}${it.variantName ? ` (${it.variantName})` : ''} - $${((it.unitPrice || it.product.salePrice) * it.quantity).toFixed(2)}`)
         .join('\n');
@@ -1279,7 +1279,7 @@ const Pos: React.FC = () => {
 
           const orderIdForCopy = createdOrUpdatedOrder?.id || editingOrderId || String(Date.now());
           const summaryToCopy = buildSaleCopySummary(orderIdForCopy);
-          const shortCode = `#ORD-${orderIdForCopy.slice(-6).toUpperCase()}`;
+          const shortCode = `#ORD-${(orderIdForCopy.startsWith('off_') ? orderIdForCopy.slice(-6) : orderIdForCopy.slice(0, 6)).toUpperCase()}`;
 
           presentToast({
             message: editingOrderId ? `Pedido ${shortCode} actualizado` : `✓ ¡Venta ${shortCode} registrada!`,
