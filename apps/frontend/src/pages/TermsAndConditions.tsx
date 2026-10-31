@@ -23,7 +23,7 @@ export const TermsContent: React.FC = () => {
           Términos y Condiciones del Servicio
         </h1>
         <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>
-          Última actualización: Octubre 2026 • Plataforma SaaS FinoWork
+          Última actualización: Noviembre 2026 • Plataforma SaaS FinoWork
         </p>
       </div>
 
@@ -53,6 +53,9 @@ export const TermsContent: React.FC = () => {
           <li>Gestión de despacho, zonas de entrega, tarifas de flete y asignación de repartidores para delivery.</li>
           <li>Cálculo de equivalencia multimoneda y reportes financieros operativos.</li>
           <li>Gestión de clientes, historial de consumo y seguimiento de cuentas pendientes.</li>
+          <li>
+            <strong>Módulo de Asistencia y Gestión Fiscal:</strong> Emisión de facturas y notas de crédito con correlativos legales internos y números de control, cálculo y discriminación de impuestos (IVA general, reducido, adicional, exento e IGTF en divisas), parametrización de datos del contribuyente (RIF y razón social) y generación automatizada de Libros de Ventas mensuales auditables y exportables.
+          </li>
         </ul>
         <p>
           FinoWork otorga al Usuario una licencia limitada, revocable, no exclusiva e intransferible para acceder y hacer uso de las funciones contratadas durante la vigencia de su suscripción activa o período de prueba.
@@ -102,7 +105,7 @@ export const TermsContent: React.FC = () => {
           5. Propiedad y Responsabilidad del Contenido Multimedia e Imágenes Subidas
         </h2>
         <p>
-          <strong>El Negocio es el único y exclusivo propietario de sus datos y contenidos:</strong> catálogo de productos, recetas, precios, datos de clientes, historiales de ventas, logotipos e imágenes ilustrativas.
+          <strong>El Negocio es el único y exclusivo propietario de sus datos y contenidos:</strong> catálogo de productos, recetas, precios, datos de clientes, historiales de ventas, registros fiscales, logotipos e imágenes ilustrativas.
         </p>
         <p>
           El Comercio declara y garantiza que posee los derechos, licencias y autorizaciones necesarias sobre cualquier fotografía, imagen de marca, logotipo o descripción que cargue a su tienda online o catálogo digital. El Usuario mantendrá indemne a FinoWork frente a cualquier reclamación de terceros por infracción de derechos de autor, marcas registradas o propiedad intelectual derivada de los contenidos que haya publicado en la Plataforma.
@@ -182,21 +185,34 @@ export const TermsContent: React.FC = () => {
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          12. Responsabilidad Operativa, Comercial y Comprobantes Fiscales
+          12. Responsabilidad Operativa, Comercial, Asistencia Fiscal y Libro de Ventas
         </h2>
         <p>
-          El Usuario reconoce y acepta que FinoWork es una herramienta tecnológica de asistencia operativa y administrativa. El Negocio es el único y exclusivo responsable de:
+          El Usuario reconoce y acepta de forma expresa que FinoWork es una plataforma tecnológica de asistencia operativa, administrativa y de facilitación de cálculos. En relación con las obligaciones tributarias y legales del Comercio:
         </p>
         <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
-          <li><strong>Carácter No Fiscal de los Comprobantes:</strong> Salvo integración expresa y certificada con hardware o impresoras fiscales homologadas, los tickets, recibos y comandas emitidos por FinoWork son comprobantes de control interno y <strong>no sustituyen las facturas fiscales, máquinas fiscales ni los requisitos formales exigidos por la administración tributaria (ej. SENIAT en Venezuela)</strong>. El Comercio asume la obligación de emitir sus facturas fiscales correspondientes.</li>
-          <li>Cumplir con las normativas tributarias, fiscales, mercantiles y de facturación fiscal vigentes en su respectivo país o jurisdicción.</li>
-          <li>La exactitud de los precios, cobros y vuelto entregados a sus clientes finales.</li>
-          <li>La calidad, idoneidad, higiene y salubridad de los productos o alimentos manufacturados y despachados.</li>
-          <li>El resguardo de sus credenciales de acceso (usuario y contraseña) asignadas a su personal y colaboradores.</li>
+          <li>
+            <strong>Condición Exclusiva de Sujeto Pasivo y Contribuyente:</strong> FinoWork <strong>NO</strong> es sujeto pasivo, contribuyente tributario, agente de retención ni responsable solidario de las obligaciones fiscales del Comercio. La condición de contribuyente (ordinario, especial o formal) ante el Servicio Nacional Integrado de Administración Aduanera y Tributaria (SENIAT en Venezuela) o ante la autoridad tributaria correspondiente en su jurisdicción recae de forma exclusiva, personal e indelegable en el Comercio titular.
+          </li>
+          <li>
+            <strong>Distinción entre Comprobantes Operativos y Fiscales:</strong> Los tickets de comanda, notas de entrega y recibos de control de caja emitidos por el módulo POS tradicional son comprobantes de organización interna que <strong>no constituyen factura fiscal</strong>. Únicamente los comprobantes emitidos a través del módulo fiscal de FinoWork con serie asignada, número de control y correlativo formal configurado por el usuario tienen carácter de documento fiscal digital, debiendo cumplir con las disposiciones de la providencia administrativa correspondiente.
+          </li>
+          <li>
+            <strong>Veracidad de Datos Fiscales, RIF y Parámetros de Facturación:</strong> El Comercio es el único y exclusivo responsable de la exactitud, veracidad y vigencia de la información fiscal cargada en el sistema: Registro Único de Información Fiscal (RIF), Razón Social oficial, Domicilio Fiscal declarado, numeración correlativa autorizada, series y números de control. Asimismo, es obligación del Comercio clasificar correctamente cada producto o servicio según su condición tributaria (bienes gravados con alícuota general, reducida, adicional o exentos/exonerados). FinoWork no valida la autenticidad jurídica del RIF ni responderá por errores de cálculo derivados de una configuración impositiva errónea por parte del usuario.
+          </li>
+          <li>
+            <strong>Libro de Ventas y Declaraciones Tributarias:</strong> El módulo de Libro de Ventas mensual consolida automáticamente las transacciones registradas por el Comercio. Dicho reporte constituye una herramienta de asistencia y apoyo contable. Corresponde al Comercio y a sus contadores públicos colegiados o asesores tributarios revisar, auditar, conciliar y validar dichos libros con sus extractos bancarios y declaraciones formales antes de su presentación y pago periódico ante el fisco. FinoWork no garantiza la ausencia de reparos fiscales y queda expresamente exonerada e indemnizada de cualquier multa, sanción, intereses moratorios, clausuras o medidas cautelares tributarias que el fisco imponga al Comercio.
+          </li>
+          <li>
+            <strong>Integración con Proveedores de Facturación Electrónica Homologados:</strong> Cuando el Comercio habilite la integración con proveedores autorizados de facturación electrónica (como UniDigital u homólogos autorizados por la administración tributaria), el Comercio es responsable de mantener activas sus resoluciones de autorización, credenciales de conexión y contratos directos con dicho proveedor externo. FinoWork actúa como canal técnico de enlace sin asumir responsabilidad por interrupciones en los servidores de la pasarela o del ente tributario.
+          </li>
+          <li>
+            <strong>Obligación Legal de Custodia y Archivo Histórico Fiscal:</strong> De conformidad con el Código Orgánico Tributario y la legislación mercantil aplicable, todo contribuyente tiene la obligación jurídica de custodiar y respaldar sus facturas, comprobantes y libros de ventas durante los lapsos legales de prescripción (mínimo de 6 a 10 años). FinoWork no ofrece un servicio de custodia notarial indefinida; es obligación estricta del Comercio descargar, respaldar y archivar periódicamente sus Libros de Ventas y comprobantes en sus propios medios de almacenamiento local o físico.
+          </li>
+          <li>
+            <strong>Tasas de Cambio Referenciales e Impuesto IGTF en Divisas:</strong> FinoWork provee cotizaciones referenciales de tasas de cambio (BCV, Paralelo, COP). El Comercio es el único responsable de validar y aplicar la tasa oficial del día exigida por las autoridades monetarias y de aplicar, cuando corresponda, el Impuesto a las Grandes Transacciones Financieras (IGTF) en pagos recibidos en divisas o criptoactivos, asumiendo toda responsabilidad ante organismos como la SUNDDE o el SENIAT.
+          </li>
         </ul>
-        <p>
-          FinoWork provee herramientas de cálculo y sincronización de tasas de cambio (ej. BCV, Paralelo) de manera estrictamente referencial. El Comercio es única y exclusivamente responsable de verificar, aprobar y aplicar la tasa de cambio final en sus cobros, asumiendo toda responsabilidad legal, penal o administrativa ante las autoridades competentes (ej. SUNDDE) por la fijación de precios.
-        </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
           13. Control de Empleados, Roles de Usuario y Prevención de Fraude Interno

@@ -23,7 +23,7 @@ export const PrivacyContent: React.FC = () => {
           Política de Privacidad
         </h1>
         <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>
-          Última actualización: Octubre 2026 • Plataforma SaaS FinoWork
+          Última actualización: Noviembre 2026 • Plataforma SaaS FinoWork
         </p>
       </div>
 
@@ -39,7 +39,7 @@ export const PrivacyContent: React.FC = () => {
         </p>
         <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
           <li><strong>Como Responsable del Tratamiento:</strong> FinoWork gestiona directamente los datos de cuenta, facturación y contacto de los comercios suscritos, sus administradores, usuarios de personal y promotores de calle.</li>
-          <li><strong>Como Encargado del Tratamiento (Procesador Técnico):</strong> FinoWork proporciona la infraestructura técnica para que el Comercio gestione las ventas de su catálogo público, tienda online y citas de reserva. El Comercio es el responsable primario de los datos de sus clientes finales y consumidores.</li>
+          <li><strong>Como Encargado del Tratamiento (Procesador Técnico):</strong> FinoWork proporciona la infraestructura técnica para que el Comercio gestione las ventas de su catálogo público, tienda online, caja registradora, emisión de facturas fiscales y citas de reserva. El Comercio es el responsable primario de los datos de sus clientes finales y consumidores.</li>
         </ul>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
@@ -50,8 +50,11 @@ export const PrivacyContent: React.FC = () => {
         </p>
         <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
           <li><strong>Datos del Negocio y Administradores:</strong> Razón social o nombre comercial, nombre de contacto, correo electrónico, número telefónico o WhatsApp, contraseña cifrada, tipo de comercio y configuración de monedas.</li>
+          <li>
+            <strong>Datos Fiscales y Tributarios del Negocio y sus Clientes:</strong> Registro Único de Información Fiscal (RIF), Razón Social oficial registrada, dirección fiscal declarada, números de facturas y notas de crédito, series correlativas, números de control fiscal, discriminación de montos exentos y gravados con IVA, alícuotas impositivas aplicadas, impuestos liquidados (IVA e IGTF), comprobantes fiscales emitidos y datos agregados para la conformación del Libro de Ventas mensual.
+          </li>
           <li><strong>Datos de Empleados y Personal Operativo:</strong> Nombres, nombres de usuario, contraseñas cifradas y asignación de roles (cajero, cocinero, repartidor, inventario).</li>
-          <li><strong>Datos de Clientes Finales (Tienda Online, Catálogo Público y Reservas):</strong> Nombre o seudónimo del comprador, número de WhatsApp/teléfono, dirección física o geolocalización de entrega para delivery, referencias de domicilio, fecha y hora de citas reservadas, notas de pedido y comprobantes o capturas de pago bancario adjuntadas para validar la compra.</li>
+          <li><strong>Datos de Clientes Finales (Tienda Online, Catálogo Público y Reservas):</strong> Nombre o seudónimo del comprador, número de WhatsApp/teléfono, cédula o RIF para identificación y facturación, dirección física o geolocalización de entrega para delivery, referencias de domicilio, fecha y hora de citas reservadas, notas de pedido y comprobantes o capturas de pago bancario adjuntadas para validar la compra.</li>
           <li><strong>Datos de Promotores de Calle:</strong> Nombre, teléfono, canal de contacto y datos de cuenta bancaria o pago móvil requeridos exclusivamente para la liquidación de sus comisiones por comercios referidos.</li>
           <li><strong>Archivos Multimedia y Contenidos:</strong> Fotografías de productos, logotipos comerciales, imágenes de insumos y capturas de transferencias bancarias o Pago Móvil cargadas voluntariamente a los servidores.</li>
         </ul>
@@ -66,6 +69,12 @@ export const PrivacyContent: React.FC = () => {
           <li>Habilitar la recepción, procesamiento y despacho de pedidos generados en el catálogo digital y tienda online pública.</li>
           <li>Gestionar la disponibilidad de citas y reservas en el calendario autogestionado del Comercio.</li>
           <li>Operar los módulos de caja registradora (POS), recetas, producción, inventario y asignación de despachos a repartidores.</li>
+          <li>
+            Facilitar la emisión de comprobantes fiscales digitales y notas de crédito con numeración correlativa y cálculo automatizado de bases imponibles e impuestos, y consolidar automáticamente los Libros de Ventas mensuales requeridos para el control contable del negocio.
+          </li>
+          <li>
+            Facilitar la interoperabilidad técnica y transmisión cifrada hacia proveedores autorizados de facturación electrónica homologados cuando el Comercio active voluntariamente dicha pasarela.
+          </li>
           <li>Enviar notificaciones operativas en tiempo real (vía Web Push) sobre pedidos entrantes, estados de comanda en cocina y pedidos en camino.</li>
           <li>Verificar los pagos de suscripción mensual al software y liquidar las comisiones del programa de promotores.</li>
           <li>Brindar soporte técnico directo solicitado por el Comercio.</li>
@@ -94,13 +103,19 @@ export const PrivacyContent: React.FC = () => {
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          6. Prohibición Absoluta de Venta de Datos y Proveedores de Infraestructura
+          6. Confidencialidad Fiscal, Prohibición de Venta de Datos y Proveedores
         </h2>
         <p>
           <strong>FinoWork no comercializa, no alquila, no monetiza ni transfiere bases de datos a agencias de marketing ni a redes publicitarias de terceros bajo ninguna circunstancia.</strong> Los datos comerciales pertenecen al Comercio y a sus respectivos titulares.
         </p>
         <p>
-          <strong>Proveedores de Servicios Tecnológicos:</strong> Para operar el servicio, FinoWork utiliza proveedores de infraestructura en la nube de primer nivel (servidores de base de datos PostgreSQL, almacenamiento seguro de archivos en la nube y servicios de pasarela de notificaciones push de Google Firebase/VAPID). Estos proveedores actúan como subprocesadores técnicos bajo estrictos acuerdos de seguridad y confidencialidad.
+          <strong>Estricta Confidencialidad de la Información Comercial y Fiscal:</strong> FinoWork garantiza que los montos facturados, libros de ventas, costos, márgenes de ganancia y reportes impositivos tienen carácter de secreto comercial e información estrictamente confidencial. FinoWork no realiza minería de datos comerciales de sus clientes para comercializarla con competidores ni entidades financieras.
+        </p>
+        <p>
+          <strong>Transmisión a Autoridades Públicas:</strong> La información fiscal o comercial únicamente podrá ser divulgada o transmitida ante autoridades tributarias o judiciales cuando medie una orden judicial motivada, mandamiento vinculante o requerimiento legal fundado expedido por autoridad competente en el marco estricto del ordenamiento jurídico aplicable.
+        </p>
+        <p>
+          <strong>Proveedores de Servicios Tecnológicos:</strong> Para operar el servicio, FinoWork utiliza proveedores de infraestructura en la nube de primer nivel (servidores de base de datos PostgreSQL, almacenamiento seguro de archivos en la nube y servicios de pasarela de notificaciones push de Google Firebase/VAPID). En caso de activación de proveedores autorizados de facturación electrónica (como UniDigital), los datos requeridos por la ley tributaria se transmiten mediante canales API seguros y cifrados. Todos los proveedores actúan como subprocesadores técnicos bajo estrictos acuerdos de seguridad y confidencialidad.
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
@@ -128,12 +143,13 @@ export const PrivacyContent: React.FC = () => {
         </ul>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          9. Plazos de Retención y Supresión de Datos
+          9. Plazos de Retención, Exportación y Supresión de Datos
         </h2>
         <p>
           Los datos se conservan mientras el Comercio mantenga activa su suscripción al servicio:
         </p>
         <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
+          <li><strong>Disponibilidad de Exportación de Información Fiscal:</strong> Durante la vigencia de la suscripción, el Comercio dispone de herramientas en la plataforma para exportar en formatos estándar (PDF, Excel, CSV) todos sus Libros de Ventas, facturas emitidas y reportes contables para el cumplimiento de sus deberes formales de archivo y custodia tributaria a largo plazo.</li>
           <li><strong>Período de Gracia tras Vencimiento:</strong> Al suspenderse una cuenta por impago, FinoWork conservará la base de datos por un lapso de cortesía de <strong>45 días calendario</strong> para permitir la reactivación o exportación de la información, tras lo cual podrá ser depurada definitivamente.</li>
           <li><strong>Copias de Seguridad (Backups):</strong> Ante una solicitud formal de supresión de cuenta, los datos activos se borran de inmediato de los servidores de producción, pudiendo permanecer copias residuales en respaldos cifrados por un plazo máximo de 30 días antes de su eliminación física definitiva.</li>
         </ul>

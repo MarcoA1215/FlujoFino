@@ -34,7 +34,7 @@ export const PromoterTermsContent: React.FC = () => {
           Términos y Condiciones del Programa de Promotores y Política de Privacidad
         </h1>
         <p style={{ color: '#64748b', fontSize: '13px', margin: 0 }}>
-          Última actualización: Octubre 2026 • Plataforma SaaS FinoWork
+          Última actualización: Noviembre 2026 • Plataforma SaaS FinoWork
         </p>
       </div>
 
@@ -167,13 +167,16 @@ export const PromoterTermsContent: React.FC = () => {
         </ul>
 
         <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-          6. Buenas Prácticas y Prohibición de Fraude
+          6. Buenas Prácticas, Ética Comercial y Límites en la Promoción Fiscal
         </h2>
         <p>
           El Promotor se compromete a actuar con ética, lealtad y veracidad en la captación de negocios:
         </p>
         <ul style={{ paddingLeft: '20px', margin: '6px 0' }}>
           <li><strong>PROHIBICIÓN ESTRICTA DE RECAUDAR DINERO EN MANO:</strong> El Promotor <strong>TIENE TERMINANTEMENTE PROHIBIDO</strong> cobrar o recibir pagos en efectivo, transferencias personales o depósitos directos de los comercios para el pago de la suscripción SaaS. Todos los pagos deben ser transferidos por el comercio directamente a las cuentas oficiales de FinoWork y reportados en el sistema.</li>
+          <li>
+            <strong>Límites Estrictos en la Promoción del Módulo Fiscal:</strong> El Promotor <strong>NO es asesor contable, fiscal ni gestor tributario</strong> de FinoWork ni de los comercios afiliados. Queda terminantemente prohibido al Promotor realizar afirmaciones falsas o engañosas a clientes potenciales, tales como prometer que <em>"con FinoWork ya no necesitan contador"</em>, que <em>"el software evita o evade impuestos"</em> o que <em>"FinoWork asume las obligaciones fiscales del comercio frente al SENIAT"</em>. El Promotor debe comunicar con total transparencia que FinoWork es una herramienta tecnológica de software para asistencia administrativa, control de inventarios, facturación y libros de ventas, siendo el Comercio y sus contadores los únicos responsables de su declaración y cumplimiento ante el fisco.
+          </li>
           <li><strong>Prohibición de Spam y Publicidad Engañosa:</strong> No se permite el envío masivo de correos no deseados ni mensajes intrusivos en redes sociales o grupos de mensajería sin consentimiento. Queda prohibido ofrecer descuentos, condiciones o promesas funcionales que no existan formalmente en FinoWork.</li>
           <li><strong>Prohibición de Autofraude:</strong> El Promotor no puede crear comercios ficticios ni auto-referirse cuentas personales con la única finalidad de cobrar comisiones de forma indebida.</li>
         </ul>
