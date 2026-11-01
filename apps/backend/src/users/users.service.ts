@@ -560,7 +560,9 @@ export class UsersService implements OnModuleInit {
           })
           .execute();
       } else if (data.periodStart && data.periodEnd) {
-        const userSearch = `%"employeeId":"${userId}"%`;
+        const userSearch1 = `%"employeeId":"${userId}"%`;
+        const userSearch2 = `%"employeeId": "${userId}"%`;
+        const userSearchAny = `%"${userId}"%`;
         await manager.createQueryBuilder()
           .update(Reservation)
           .set({
@@ -569,7 +571,7 @@ export class UsersService implements OnModuleInit {
             payrollExpenseId: expense.id,
           })
           .where('"tenantId" = :tenantId', { tenantId })
-          .andWhere('(CAST("employeeId" AS text) = :userId OR ("serviceSpecialists" IS NOT NULL AND CAST("serviceSpecialists" AS text) LIKE :userSearch))', { userId, userSearch })
+          .andWhere('(CAST("employeeId" AS text) = :userId OR ("serviceSpecialists" IS NOT NULL AND (CAST("serviceSpecialists" AS text) LIKE :userSearch1 OR CAST("serviceSpecialists" AS text) LIKE :userSearch2 OR CAST("serviceSpecialists" AS text) LIKE :userSearchAny)))', { userId, userSearch1, userSearch2, userSearchAny })
           .andWhere('date >= :periodStart AND date <= :periodEnd', { periodStart: data.periodStart, periodEnd: data.periodEnd })
           .andWhere('"commissionPaid" = false')
           .execute();
@@ -727,8 +729,14 @@ export class UsersService implements OnModuleInit {
     const reservationQuery = this.usersRepo.manager.createQueryBuilder(Reservation, 'res')
       .where('res.tenantId = :tenantId', { tenantId })
       .andWhere(
-        '(CAST(res.employeeId AS text) = :userId OR (res."serviceSpecialists" IS NOT NULL AND CAST(res."serviceSpecialists" AS text) LIKE :userSearch))',
-        { tenantId, userId, userSearch: `%"employeeId":"${userId}"%` }
+        '(CAST(res.employeeId AS text) = :userId OR (res."serviceSpecialists" IS NOT NULL AND (CAST(res."serviceSpecialists" AS text) LIKE :userSearch1 OR CAST(res."serviceSpecialists" AS text) LIKE :userSearch2 OR CAST(res."serviceSpecialists" AS text) LIKE :userSearchAny)))',
+        {
+          tenantId,
+          userId,
+          userSearch1: `%"employeeId":"${userId}"%`,
+          userSearch2: `%"employeeId": "${userId}"%`,
+          userSearchAny: `%"${userId}"%`,
+        }
       )
       .andWhere('(res.status = :resStatus OR EXISTS (SELECT 1 FROM "order" ord_link WHERE (CAST(ord_link.id AS text) = res."orderId" OR ord_link."linkedReservationId" = CAST(res.id AS text)) AND CAST(ord_link.status AS text) = :ordDelivered))', {
         resStatus: ReservationStatus.COMPLETED,
@@ -1042,7 +1050,12 @@ export class UsersService implements OnModuleInit {
         }
       }
       const pending = Math.max(0, amt - paid);
-      const isAlreadySettled = Boolean(r.commissionPaid);
+      const userSpecialist = Array.isArray(r.serviceSpecialists)
+        ? (r.serviceSpecialists.find((s: any) => s.employeeId === userId) as any)
+        : null;
+      const isAlreadySettled = userSpecialist && userSpecialist.commissionPaid !== undefined
+        ? Boolean(userSpecialist.commissionPaid)
+        : Boolean(r.commissionPaid);
 
       totalPaidBilled += paid;
       totalPendingBilled += pending;
@@ -1183,6 +1196,15 @@ export class UsersService implements OnModuleInit {
 
     const workItems = [
       ...processedReservations.map(r => {
+        const userSpecialist = Array.isArray(r.serviceSpecialists)
+          ? (r.serviceSpecialists.find((s: any) => s.employeeId === userId) as any)
+          : null;
+        const isSettled = userSpecialist && userSpecialist.commissionPaid !== undefined
+          ? Boolean(userSpecialist.commissionPaid)
+          : Boolean(r.commissionPaid);
+        const settledAt = userSpecialist && userSpecialist.commissionPaidAt !== undefined
+          ? userSpecialist.commissionPaidAt
+          : r.commissionPaidAt;
         const calcComm = Number(((r.calcPaid * (commissionPercentage || 0)) / 100).toFixed(2));
         return {
           type: 'RESERVATION' as const,
@@ -1196,9 +1218,9 @@ export class UsersService implements OnModuleInit {
           pendingAmount: r.calcPending,
           isPaid: r.isPaidEffective,
           paymentStatus: r.calcPaymentStatus,
-          commissionPaid: Boolean(r.commissionPaid),
-          commissionPaidAt: r.commissionPaidAt ? new Date(r.commissionPaidAt).toISOString() : null,
-          commissionAmount: r.commissionPaid ? 0 : calcComm,
+          commissionPaid: isSettled,
+          commissionPaidAt: settledAt ? new Date(settledAt).toISOString() : null,
+          commissionAmount: isSettled ? 0 : calcComm,
           historicalCommission: calcComm,
         };
       }),

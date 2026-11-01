@@ -112,6 +112,9 @@ export class Reservation {
     employeeName?: string;
     durationMinutes?: number;
     price?: number;
+    commissionPaid?: boolean;
+    commissionPaidAt?: string | Date | null;
+    payrollExpenseId?: string | null;
   }>;
 
   @Column({ type: 'text', nullable: true })

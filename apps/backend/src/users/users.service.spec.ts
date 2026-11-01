@@ -515,6 +515,14 @@ describe('UsersService', () => {
       expect(summary.commissionEarned).toBe(12); // 40% de $30 = $12
       expect(summary.workItems[0].amount).toBe(30);
       expect(summary.workItems[0].description).toBe('Corte');
+      expect(reservationQb.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining('serviceSpecialists'),
+        expect.objectContaining({
+          userSearch1: '%"employeeId":"emp-1"%',
+          userSearch2: '%"employeeId": "emp-1"%',
+          userSearchAny: '%"emp-1"%',
+        }),
+      );
     });
 
     it('debe calcular la comisión en ventas de Compra-Venta sobre la ganancia neta (precio venta - costo) y no sobre el monto bruto', async () => {

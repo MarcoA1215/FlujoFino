@@ -257,6 +257,9 @@ export interface ReservationServiceSpecialistDTO {
   employeeName?: string;
   durationMinutes?: number;
   price?: number;
+  commissionPaid?: boolean;
+  commissionPaidAt?: string | null;
+  payrollExpenseId?: string | null;
 }
 
 export interface ReservationDTO {
