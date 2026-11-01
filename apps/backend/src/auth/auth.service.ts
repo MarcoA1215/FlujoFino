@@ -14,6 +14,73 @@ import { PlatformConfig } from '../entities/platform-config.entity';
 import { Promoter } from '../entities/promoter.entity';
 import { Tenant } from '../entities/tenant.entity';
 
+export type OnboardingBusinessProfile = 'SERVICES' | 'RETAIL' | 'FOOD_PRODUCTION' | 'CUSTOM';
+
+export function resolveOnboardingFlags(body: any) {
+  const profile: OnboardingBusinessProfile | undefined = body?.businessProfile;
+
+  let featureCustomerSchedules = false;
+  let featureBuySell = false;
+  let featureRecipes = false;
+  let featureProduction = false;
+  let featureDelivery = false;
+  let featureShowCatalog = true;
+
+  if (profile === 'SERVICES') {
+    featureCustomerSchedules = true;
+    featureBuySell = false;
+    featureRecipes = false;
+    featureProduction = false;
+    featureDelivery = false;
+    featureShowCatalog = true;
+  } else if (profile === 'RETAIL') {
+    featureCustomerSchedules = false;
+    featureBuySell = true;
+    featureRecipes = false;
+    featureProduction = false;
+    featureDelivery = true;
+    featureShowCatalog = true;
+  } else if (profile === 'FOOD_PRODUCTION') {
+    featureCustomerSchedules = false;
+    featureBuySell = false;
+    featureRecipes = true;
+    featureProduction = true;
+    featureDelivery = true;
+    featureShowCatalog = true;
+  } else {
+    featureCustomerSchedules = Boolean(body?.featureCustomerSchedules);
+    featureBuySell = Boolean(body?.featureBuySell);
+    featureRecipes = Boolean(body?.featureRecipes);
+    featureProduction = body?.featureProduction !== undefined
+      ? Boolean(body.featureProduction)
+      : featureRecipes;
+    featureDelivery = body?.featureDelivery !== undefined
+      ? Boolean(body.featureDelivery)
+      : (featureBuySell || featureRecipes);
+    featureShowCatalog = body?.featureShowCatalog !== undefined
+      ? Boolean(body.featureShowCatalog)
+      : true;
+  }
+
+  if (profile && profile !== 'CUSTOM') {
+    if (typeof body?.featureCustomerSchedules === 'boolean') featureCustomerSchedules = body.featureCustomerSchedules;
+    if (typeof body?.featureBuySell === 'boolean') featureBuySell = body.featureBuySell;
+    if (typeof body?.featureRecipes === 'boolean') featureRecipes = body.featureRecipes;
+    if (typeof body?.featureProduction === 'boolean') featureProduction = body.featureProduction;
+    if (typeof body?.featureDelivery === 'boolean') featureDelivery = body.featureDelivery;
+    if (typeof body?.featureShowCatalog === 'boolean') featureShowCatalog = body.featureShowCatalog;
+  }
+
+  return {
+    featureCustomerSchedules,
+    featureBuySell,
+    featureRecipes,
+    featureProduction,
+    featureDelivery,
+    featureShowCatalog,
+  };
+}
+
 function toMinutes(hhmm: string): number {
   const parts = hhmm.split(':');
   return (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
@@ -737,12 +804,11 @@ export class AuthService {
 
       // 4. Create Settings with Onboarding Flags
       const { randomUUID } = require('crypto');
+      const onboardingFlags = resolveOnboardingFlags(body);
       const settings = queryRunner.manager.create('Settings', {
         id: randomUUID(),
         tenant: savedTenant,
-        featureCustomerSchedules: body.featureCustomerSchedules || false,
-        featureRecipes: body.featureRecipes || false,
-        featureBuySell: body.featureBuySell || false,
+        ...onboardingFlags,
       });
       await queryRunner.manager.save(settings);
 
