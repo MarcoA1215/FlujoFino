@@ -1707,6 +1707,53 @@ const Dashboard: React.FC = () => {
               <IonIcon icon={downloadOutline} style={{ fontSize: '18px' }} />
               <span>{exportingExcel ? 'Generando archivo Excel...' : 'Descargar Excel (.xls)'}</span>
             </button>
+
+            {!settings?.featureFiscalSupport && (
+              <div
+                style={{
+                  marginTop: '16px',
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ fontSize: '12px', fontWeight: 800, color: '#0F172A' }}>
+                  🧾 ¿Necesitas el Libro de Ventas con desglose de IVA (16% / Exento) para tu contador?
+                </div>
+                <div style={{ fontSize: '11px', color: '#64748B', lineHeight: '1.4' }}>
+                  También tienes incluido sin costo adicional el <b>Módulo de Desglose de IVA y Apoyo Contable</b>. Puedes activarlo cuando lo necesites desde Configuración.
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowExcelModal(false);
+                      navigate('/settings');
+                    }}
+                    style={{
+                      background: '#FFFFFF',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: '8px',
+                      padding: '6px 12px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: 'var(--theme-primary-readable, #065F46)',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                    }}
+                  >
+                    <IonIcon icon={settingsOutline} style={{ fontSize: '13px' }} />
+                    <span>Ir a Configuración &gt; Módulos</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </IonModal>

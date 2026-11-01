@@ -71,6 +71,8 @@ export function resolveOnboardingFlags(body: any) {
     if (typeof body?.featureShowCatalog === 'boolean') featureShowCatalog = body.featureShowCatalog;
   }
 
+  const featureFiscalSupport = Boolean(body?.featureFiscalSupport);
+
   return {
     featureCustomerSchedules,
     featureBuySell,
@@ -78,6 +80,7 @@ export function resolveOnboardingFlags(body: any) {
     featureProduction,
     featureDelivery,
     featureShowCatalog,
+    featureFiscalSupport,
   };
 }
 

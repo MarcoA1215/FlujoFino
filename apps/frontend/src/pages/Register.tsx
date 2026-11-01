@@ -138,6 +138,7 @@ const Register: React.FC = () => {
   const [featureProduction, setFeatureProduction] = useState(false);
   const [featureDelivery, setFeatureDelivery] = useState(false);
   const [featureShowCatalog, setFeatureShowCatalog] = useState(true);
+  const [featureFiscalSupport, setFeatureFiscalSupport] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -231,6 +232,7 @@ const Register: React.FC = () => {
         featureProduction,
         featureDelivery,
         featureShowCatalog,
+        featureFiscalSupport,
         acceptedTerms: true,
         acceptedPrivacy: true,
       });
@@ -418,6 +420,48 @@ const Register: React.FC = () => {
                         </div>
                       );
                     })}
+                  </div>
+
+                  {/* Opción Independiente de IVA y Libro de Ventas para Contador */}
+                  <div
+                    style={{
+                      marginBottom: '12px',
+                      padding: '11px 14px',
+                      borderRadius: '12px',
+                      backgroundColor: featureFiscalSupport ? '#F0FDF4' : '#F8FAFC',
+                      border: featureFiscalSupport ? '1px solid #86EFAC' : '1px solid #E2E8F0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span>🧾 ¿Manejas IVA (16%) y Libro de Ventas para Contador?</span>
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            padding: '1px 7px',
+                            borderRadius: '999px',
+                            backgroundColor: '#E2E8F0',
+                            color: '#475569',
+                          }}
+                        >
+                          Opcional
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748B', marginTop: '3px', lineHeight: '1.35' }}>
+                        Actívalo si necesitas desglosar Base Imponible / Exento y exportar el Libro de Ventas. Si vendes a precio neto cerrado, déjalo apagado.
+                      </div>
+                    </div>
+                    <IonToggle
+                      data-testid="toggle-fiscal-support"
+                      checked={featureFiscalSupport}
+                      onIonChange={e => setFeatureFiscalSupport(e.detail.checked)}
+                    />
                   </div>
 
                   {/* Botón Desplegable para Personalización Manual (Negocios Mixtos) */}

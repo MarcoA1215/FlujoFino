@@ -320,6 +320,7 @@ describe('AuthService - Seguridad, Multi-Tenant y Verificación', () => {
         featureProduction: false,
         featureDelivery: false,
         featureShowCatalog: true,
+        featureFiscalSupport: false,
       });
     });
 
@@ -332,6 +333,7 @@ describe('AuthService - Seguridad, Multi-Tenant y Verificación', () => {
         featureProduction: false,
         featureDelivery: true,
         featureShowCatalog: true,
+        featureFiscalSupport: false,
       });
     });
 
@@ -344,6 +346,23 @@ describe('AuthService - Seguridad, Multi-Tenant y Verificación', () => {
         featureProduction: true,
         featureDelivery: true,
         featureShowCatalog: true,
+        featureFiscalSupport: false,
+      });
+    });
+
+    it('permite activar opcionalmente featureFiscalSupport (IVA / Libro de Ventas) en cualquier arquetipo', () => {
+      const flags = resolveOnboardingFlags({
+        businessProfile: 'RETAIL',
+        featureFiscalSupport: true,
+      });
+      expect(flags).toEqual({
+        featureCustomerSchedules: false,
+        featureBuySell: true,
+        featureRecipes: false,
+        featureProduction: false,
+        featureDelivery: true,
+        featureShowCatalog: true,
+        featureFiscalSupport: true,
       });
     });
 
@@ -364,6 +383,7 @@ describe('AuthService - Seguridad, Multi-Tenant y Verificación', () => {
         featureProduction: false,
         featureDelivery: true,
         featureShowCatalog: true,
+        featureFiscalSupport: false,
       });
     });
 
