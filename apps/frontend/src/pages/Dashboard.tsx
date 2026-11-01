@@ -1732,7 +1732,7 @@ const Dashboard: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setShowExcelModal(false);
-                      navigate('/settings');
+                      navigate('/settings?tab=modules');
                     }}
                     style={{
                       background: '#FFFFFF',

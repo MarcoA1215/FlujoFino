@@ -96,6 +96,9 @@ export const FinoColorPicker: React.FC<FinoColorPickerProps> = ({
           transition: 'all 0.15s ease',
           boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
           minHeight: '44px',
+          width: '100%',
+          maxWidth: '100%',
+          boxSizing: 'border-box',
         }}
       >
         <span
@@ -110,9 +113,9 @@ export const FinoColorPicker: React.FC<FinoColorPickerProps> = ({
             flexShrink: 0,
           }}
         />
-        <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
           {label && (
-            <span style={{ fontSize: '10px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '10px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', lineHeight: 1.2 }}>
               {label}
             </span>
           )}
@@ -120,7 +123,7 @@ export const FinoColorPicker: React.FC<FinoColorPickerProps> = ({
             {normalizedCurrent}
           </span>
         </div>
-        <IonIcon icon={colorPaletteOutline} style={{ fontSize: '16px', color: '#64748B', marginLeft: 'auto' }} />
+        <IonIcon icon={colorPaletteOutline} style={{ fontSize: '16px', color: '#64748B', marginLeft: 'auto', flexShrink: 0 }} />
       </button>
 
       {/* Modal Bottom Sheet Oficial FinoWork */}
@@ -193,7 +196,7 @@ export const FinoColorPicker: React.FC<FinoColorPickerProps> = ({
               </div>
               {isLight && (
                 <div style={{ marginTop: '8px', fontSize: '11px', color: '#B45309', background: '#FFFBEB', padding: '6px 10px', borderRadius: '8px', border: '1px solid #FDE68A' }}>
-                  ⚠️ Color claro: FinoWork usará texto oscuro para proteger la legibilidad.
+                  Color claro: FinoWork usará texto oscuro para proteger la legibilidad.
                 </div>
               )}
             </div>

@@ -6,8 +6,6 @@ import {
   IonCardContent, 
   IonItem, 
   IonLabel, 
-  IonSelect, 
-  IonSelectOption, 
   IonButton, 
   IonIcon, 
   IonRow, 
@@ -21,7 +19,8 @@ import {
   addOutline, 
   trashOutline 
 } from 'ionicons/icons';
-import { formatTime12h } from '../utils/time';
+import { FinoTimePicker } from './ui/FinoTimePicker';
+import { FinoSelect } from './ui/FinoSelect';
 
 const DAYS_OF_WEEK = [
   { id: '1', name: 'Lunes' },
@@ -92,40 +91,52 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
     <>
       <IonRow>
         <IonCol size="12">
-          <IonCard>
+          <IonCard style={{ margin: '0 0 12px 0', borderRadius: '16px', overflow: 'hidden' }}>
             <IonCardHeader>
-              <IonCardTitle>Configuración de Reservaciones</IonCardTitle>
+              <IonCardTitle style={{ fontSize: '17px', fontWeight: 800, color: '#0F172A' }}>
+                Configuración de Reservaciones
+              </IonCardTitle>
             </IonCardHeader>
             <IonCardContent>
-              <IonItem lines="none" style={{ backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '8px' }}>
-                <IonLabel>Intervalos de Horario de Citas</IonLabel>
-                <IonSelect value={slotInterval} onIonChange={e => setSettings({...settings, slotInterval: e.detail.value})}>
-                  <IonSelectOption value={15}>Cada 15 minutos</IonSelectOption>
-                  <IonSelectOption value={30}>Cada 30 minutos (Recomendado)</IonSelectOption>
-                  <IonSelectOption value={45}>Cada 45 minutos</IonSelectOption>
-                  <IonSelectOption value={60}>Cada 1 hora</IonSelectOption>
-                  <IonSelectOption value={120}>Cada 2 horas</IonSelectOption>
-                </IonSelect>
-              </IonItem>
-              <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 8px 16px 8px' }}>
-                Esto define los bloques de turno en tu calendario (ej. si eliges 30 mins, las citas solo se agendarán a las 8:00, 8:30, 9:00, etc.).
-              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '12px', marginBottom: '12px' }}>
+                <div style={{ minWidth: 0 }}>
+                  <FinoSelect
+                    label="Intervalos de Horario de Citas"
+                    value={String(slotInterval)}
+                    onChange={val => setSettings({ ...settings, slotInterval: Number(val) })}
+                    options={[
+                      { value: '15', label: 'Cada 15 minutos' },
+                      { value: '30', label: 'Cada 30 minutos (Recomendado)' },
+                      { value: '45', label: 'Cada 45 minutos' },
+                      { value: '60', label: 'Cada 1 hora' },
+                      { value: '120', label: 'Cada 2 horas' },
+                    ]}
+                  />
+                  <p style={{ fontSize: '12px', color: '#64748b', margin: '6px 2px 0 2px', lineHeight: 1.4 }}>
+                    Define los bloques de turno en tu calendario (ej. 8:00, 8:30, 9:00).
+                  </p>
+                </div>
 
-              <IonItem lines="none" style={{ backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '8px' }}>
-                <IonLabel>Anticipación Máxima de Reservas</IonLabel>
-                <IonSelect value={settings.bookingMaxAdvanceDays ?? 365} onIonChange={e => setSettings({...settings, bookingMaxAdvanceDays: e.detail.value})}>
-                  <IonSelectOption value={15}>Hasta 15 días</IonSelectOption>
-                  <IonSelectOption value={30}>Hasta 30 días (1 mes)</IonSelectOption>
-                  <IonSelectOption value={60}>Hasta 60 días (2 meses)</IonSelectOption>
-                  <IonSelectOption value={90}>Hasta 90 días (3 meses)</IonSelectOption>
-                  <IonSelectOption value={180}>Hasta 180 días (6 meses)</IonSelectOption>
-                  <IonSelectOption value={365}>Hasta 1 año (Recomendado)</IonSelectOption>
-                  <IonSelectOption value={730}>Hasta 2 años</IonSelectOption>
-                </IonSelect>
-              </IonItem>
-              <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 8px 16px 8px' }}>
-                Define con cuánta antelación pueden agendar tus clientes (ej. si deseas permitir que reserven con meses de anticipación para eventos, diciembre o temporadas especiales).
-              </p>
+                <div style={{ minWidth: 0 }}>
+                  <FinoSelect
+                    label="Anticipación Máxima de Reservas"
+                    value={String(settings.bookingMaxAdvanceDays ?? 365)}
+                    onChange={val => setSettings({ ...settings, bookingMaxAdvanceDays: Number(val) })}
+                    options={[
+                      { value: '15', label: 'Hasta 15 días' },
+                      { value: '30', label: 'Hasta 30 días (1 mes)' },
+                      { value: '60', label: 'Hasta 60 días (2 meses)' },
+                      { value: '90', label: 'Hasta 90 días (3 meses)' },
+                      { value: '180', label: 'Hasta 180 días (6 meses)' },
+                      { value: '365', label: 'Hasta 1 año (Recomendado)' },
+                      { value: '730', label: 'Hasta 2 años' },
+                    ]}
+                  />
+                  <p style={{ fontSize: '12px', color: '#64748b', margin: '6px 2px 0 2px', lineHeight: 1.4 }}>
+                    Define con cuánta antelación pueden agendar tus clientes.
+                  </p>
+                </div>
+              </div>
 
               <IonItem lines="none" style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
                 <IonLabel className="ion-text-wrap">
@@ -161,7 +172,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                 <IonLabel className="ion-text-wrap">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <h2 style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                      ⚡ Atención Simultánea (Modo a Cuatro Manos)
+                      Atención Simultánea (Modo a Cuatro Manos)
                     </h2>
                     <span style={{ fontSize: '10px', background: 'rgba(16, 185, 129, 0.12)', color: 'var(--theme-primary-readable, #065F46)', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
                       NUEVO
@@ -220,6 +231,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                       fontSize: '14px',
                       background: '#ffffff',
                       color: '#0f172a',
+                      boxSizing: 'border-box',
                     }}
                     placeholder="Ej. 30"
                   />
@@ -235,9 +247,11 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
 
       <IonRow>
         <IonCol size="12">
-          <IonCard>
+          <IonCard style={{ margin: '0 0 12px 0', borderRadius: '16px', overflow: 'hidden' }}>
             <IonCardHeader>
-              <IonCardTitle>Horario de Trabajo y Apertura del Negocio</IonCardTitle>
+              <IonCardTitle style={{ fontSize: '17px', fontWeight: 800, color: '#0F172A' }}>
+                Horario de Trabajo y Apertura del Negocio
+              </IonCardTitle>
             </IonCardHeader>
             <IonCardContent>
               <p style={{ marginBottom: '16px', fontSize: '14px', color: '#64748b' }}>
@@ -249,8 +263,9 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                 backgroundColor: '#f8fafc',
                 border: '1px solid #e2e8f0',
                 borderRadius: '14px',
-                padding: '16px',
-                marginBottom: '20px'
+                padding: '14px',
+                marginBottom: '20px',
+                boxSizing: 'border-box',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
                   <div style={{
@@ -266,7 +281,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                   }}>
                     <IonIcon icon={flashOutline} style={{ fontSize: '18px' }} />
                   </div>
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
                       Ajuste Rápido de Horario
                     </div>
@@ -282,54 +297,25 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                     backgroundColor: '#ffffff',
                     border: '1px solid #e2e8f0',
                     borderRadius: '10px',
-                    padding: '12px'
+                    padding: '12px',
+                    boxSizing: 'border-box',
                   }}>
                     <div style={{ fontSize: '11px', fontWeight: 700, color: '#0369a1', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>
                       Turno Principal (T1)
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
-                          Apertura {bulkStart ? <span style={{ color: '#0369a1', fontWeight: 700 }}>({formatTime12h(bulkStart)})</span> : ''}
-                        </label>
-                        <input 
-                          type="time" 
-                          value={bulkStart} 
-                          onChange={e => setBulkStart(e.target.value)} 
-                          style={{
-                            width: '100%',
-                            height: '38px',
-                            padding: '6px 10px',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            color: '#0f172a',
-                            backgroundColor: '#f8fafc',
-                            boxSizing: 'border-box'
-                          }}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '10px' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <FinoTimePicker
+                          label="Apertura"
+                          value={bulkStart}
+                          onChange={val => setBulkStart(val)}
                         />
                       </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
-                          Cierre {bulkEnd ? <span style={{ color: '#0369a1', fontWeight: 700 }}>({formatTime12h(bulkEnd)})</span> : ''}
-                        </label>
-                        <input 
-                          type="time" 
-                          value={bulkEnd} 
-                          onChange={e => setBulkEnd(e.target.value)} 
-                          style={{
-                            width: '100%',
-                            height: '38px',
-                            padding: '6px 10px',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            color: '#0f172a',
-                            backgroundColor: '#f8fafc',
-                            boxSizing: 'border-box'
-                          }}
+                      <div style={{ minWidth: 0 }}>
+                        <FinoTimePicker
+                          label="Cierre"
+                          value={bulkEnd}
+                          onChange={val => setBulkEnd(val)}
                         />
                       </div>
                     </div>
@@ -341,9 +327,10 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                       backgroundColor: '#ffffff',
                       border: '1px solid #fde68a',
                       borderRadius: '10px',
-                      padding: '12px'
+                      padding: '12px',
+                      boxSizing: 'border-box',
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
                         <span style={{ fontSize: '11px', fontWeight: 700, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                           Segundo Turno (T2)
                         </span>
@@ -366,49 +353,19 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                           <IonIcon icon={trashOutline} /> Quitar 2do turno
                         </button>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
-                            Apertura {bulkSecondStart ? <span style={{ color: '#b45309', fontWeight: 700 }}>({formatTime12h(bulkSecondStart)})</span> : ''}
-                          </label>
-                          <input 
-                            type="time" 
-                            value={bulkSecondStart} 
-                            onChange={e => setBulkSecondStart(e.target.value)} 
-                            style={{
-                              width: '100%',
-                              height: '38px',
-                              padding: '6px 10px',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '8px',
-                              fontSize: '13px',
-                              fontWeight: 600,
-                              color: '#0f172a',
-                              backgroundColor: '#f8fafc',
-                              boxSizing: 'border-box'
-                            }}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '10px' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <FinoTimePicker
+                            label="Apertura T2"
+                            value={bulkSecondStart}
+                            onChange={val => setBulkSecondStart(val)}
                           />
                         </div>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
-                            Cierre {bulkSecondEnd ? <span style={{ color: '#b45309', fontWeight: 700 }}>({formatTime12h(bulkSecondEnd)})</span> : ''}
-                          </label>
-                          <input 
-                            type="time" 
-                            value={bulkSecondEnd} 
-                            onChange={e => setBulkSecondEnd(e.target.value)} 
-                            style={{
-                              width: '100%',
-                              height: '38px',
-                              padding: '6px 10px',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '8px',
-                              fontSize: '13px',
-                              fontWeight: 600,
-                              color: '#0f172a',
-                              backgroundColor: '#f8fafc',
-                              boxSizing: 'border-box'
-                            }}
+                        <div style={{ minWidth: 0 }}>
+                          <FinoTimePicker
+                            label="Cierre T2"
+                            value={bulkSecondEnd}
+                            onChange={val => setBulkSecondEnd(val)}
                           />
                         </div>
                       </div>
@@ -430,7 +387,8 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '6px'
+                        gap: '6px',
+                        boxSizing: 'border-box',
                       }}
                     >
                       <IonIcon icon={addOutline} style={{ fontSize: '16px', color: '#b45309' }} />
@@ -462,7 +420,7 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                 </span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))', gap: '12px' }}>
                 {DAYS_OF_WEEK.map(day => {
                   const dayData = businessHours[day.id] || { isOpen: false, startTime: '08:00', endTime: '18:00' };
                   const isOpen = !!dayData.isOpen;
@@ -472,20 +430,22 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                       key={day.id} 
                       className="ff-card"
                       style={{
-                        padding: '14px 16px',
+                        padding: '14px',
                         backgroundColor: isOpen ? '#ffffff' : '#f8fafc',
                         border: isOpen ? '1px solid #e2e8f0' : '1px solid #f1f5f9',
                         borderRadius: '14px',
                         boxShadow: isOpen ? 'var(--ff-shadow-sm)' : 'none',
                         display: 'flex',
                         flexDirection: 'column',
-                        justifyContent: 'space-between'
+                        justifyContent: 'space-between',
+                        minWidth: 0,
+                        boxSizing: 'border-box',
                       }}
                     >
                       <div>
                         {/* Cabecera del día */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isOpen ? '12px' : '4px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isOpen ? '12px' : '4px', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '15px', fontWeight: 800, color: isOpen ? '#0f172a' : '#64748b' }}>
                               {day.name}
                             </span>
@@ -522,54 +482,25 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                               backgroundColor: '#f8fafc',
                               border: '1px solid #e2e8f0',
                               borderRadius: '10px',
-                              padding: '10px 12px'
+                              padding: '10px',
+                              boxSizing: 'border-box',
                             }}>
                               <div style={{ fontSize: '10px', fontWeight: 700, color: '#0369a1', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.05em' }}>
                                 Turno 1
                               </div>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                                <div>
-                                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '3px' }}>
-                                    Abre {dayData.startTime ? <span style={{ color: '#0369a1', fontWeight: 700 }}>({formatTime12h(dayData.startTime)})</span> : ''}
-                                  </label>
-                                  <input 
-                                    type="time" 
-                                    value={dayData.startTime || '08:00'} 
-                                    onChange={e => handleDayChange(day.id, 'startTime', e.target.value)} 
-                                    style={{
-                                      width: '100%',
-                                      height: '36px',
-                                      padding: '4px 8px',
-                                      border: '1px solid #cbd5e1',
-                                      borderRadius: '8px',
-                                      fontSize: '13px',
-                                      fontWeight: 600,
-                                      color: '#0f172a',
-                                      backgroundColor: '#ffffff',
-                                      boxSizing: 'border-box'
-                                    }}
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 115px), 1fr))', gap: '8px' }}>
+                                <div style={{ minWidth: 0 }}>
+                                  <FinoTimePicker
+                                    label="Abre"
+                                    value={dayData.startTime || '08:00'}
+                                    onChange={val => handleDayChange(day.id, 'startTime', val)}
                                   />
                                 </div>
-                                <div>
-                                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '3px' }}>
-                                    Cierra {dayData.endTime ? <span style={{ color: '#0369a1', fontWeight: 700 }}>({formatTime12h(dayData.endTime)})</span> : ''}
-                                  </label>
-                                  <input 
-                                    type="time" 
-                                    value={dayData.endTime || '12:00'} 
-                                    onChange={e => handleDayChange(day.id, 'endTime', e.target.value)} 
-                                    style={{
-                                      width: '100%',
-                                      height: '36px',
-                                      padding: '4px 8px',
-                                      border: '1px solid #cbd5e1',
-                                      borderRadius: '8px',
-                                      fontSize: '13px',
-                                      fontWeight: 600,
-                                      color: '#0f172a',
-                                      backgroundColor: '#ffffff',
-                                      boxSizing: 'border-box'
-                                    }}
+                                <div style={{ minWidth: 0 }}>
+                                  <FinoTimePicker
+                                    label="Cierra"
+                                    value={dayData.endTime || '12:00'}
+                                    onChange={val => handleDayChange(day.id, 'endTime', val)}
                                   />
                                 </div>
                               </div>
@@ -581,9 +512,10 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                                 backgroundColor: '#fffbeb',
                                 border: '1px solid #fde68a',
                                 borderRadius: '10px',
-                                padding: '10px 12px'
+                                padding: '10px',
+                                boxSizing: 'border-box',
                               }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', gap: '6px' }}>
                                   <span style={{ fontSize: '10px', fontWeight: 700, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                     Turno 2
                                   </span>
@@ -613,49 +545,19 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                                     <IonIcon icon={trashOutline} /> Quitar
                                   </button>
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                                  <div>
-                                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '3px' }}>
-                                      Abre {dayData.secondStartTime ? <span style={{ color: '#b45309', fontWeight: 700 }}>({formatTime12h(dayData.secondStartTime)})</span> : ''}
-                                    </label>
-                                    <input 
-                                      type="time" 
-                                      value={dayData.secondStartTime || '14:00'} 
-                                      onChange={e => handleDayChange(day.id, 'secondStartTime', e.target.value)} 
-                                      style={{
-                                        width: '100%',
-                                        height: '36px',
-                                        padding: '4px 8px',
-                                        border: '1px solid #cbd5e1',
-                                        borderRadius: '8px',
-                                        fontSize: '13px',
-                                        fontWeight: 600,
-                                        color: '#0f172a',
-                                        backgroundColor: '#ffffff',
-                                        boxSizing: 'border-box'
-                                      }}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 115px), 1fr))', gap: '8px' }}>
+                                  <div style={{ minWidth: 0 }}>
+                                    <FinoTimePicker
+                                      label="Abre"
+                                      value={dayData.secondStartTime || '14:00'}
+                                      onChange={val => handleDayChange(day.id, 'secondStartTime', val)}
                                     />
                                   </div>
-                                  <div>
-                                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '3px' }}>
-                                      Cierra {dayData.secondEndTime ? <span style={{ color: '#b45309', fontWeight: 700 }}>({formatTime12h(dayData.secondEndTime)})</span> : ''}
-                                    </label>
-                                    <input 
-                                      type="time" 
-                                      value={dayData.secondEndTime || '18:00'} 
-                                      onChange={e => handleDayChange(day.id, 'secondEndTime', e.target.value)} 
-                                      style={{
-                                        width: '100%',
-                                        height: '36px',
-                                        padding: '4px 8px',
-                                        border: '1px solid #cbd5e1',
-                                        borderRadius: '8px',
-                                        fontSize: '13px',
-                                        fontWeight: 600,
-                                        color: '#0f172a',
-                                        backgroundColor: '#ffffff',
-                                        boxSizing: 'border-box'
-                                      }}
+                                  <div style={{ minWidth: 0 }}>
+                                    <FinoTimePicker
+                                      label="Cierra"
+                                      value={dayData.secondEndTime || '18:00'}
+                                      onChange={val => handleDayChange(day.id, 'secondEndTime', val)}
                                     />
                                   </div>
                                 </div>
@@ -686,7 +588,8 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  gap: '4px'
+                                  gap: '4px',
+                                  boxSizing: 'border-box',
                                 }}
                               >
                                 <IonIcon icon={addOutline} style={{ color: '#0284c7' }} />
@@ -707,4 +610,3 @@ export const BookingSettings: React.FC<BookingSettingsProps> = ({ settings, setS
     </>
   );
 };
-

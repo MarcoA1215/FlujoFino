@@ -34,10 +34,24 @@ createRoot(document.getElementById('root')!).render(
 )
 
 if ('serviceWorker' in navigator) {
-  const registerSW = () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
-      console.warn('SW registration failed:', err);
+  // En desarrollo local (Vite dev server), limpiar el caché viejo de sw.js para que no sirva componentes antiguos
+  if (import.meta.env.DEV && typeof caches !== 'undefined') {
+    caches.keys().then((keys) => {
+      keys.forEach((k) => caches.delete(k));
     });
+  }
+
+  const registerSW = () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((reg) => {
+        if (import.meta.env.DEV) {
+          reg.update();
+        }
+      })
+      .catch((err) => {
+        console.warn('SW registration failed:', err);
+      });
   };
 
   if (document.readyState === 'complete') {

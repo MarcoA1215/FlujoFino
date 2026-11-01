@@ -23,13 +23,14 @@ export class RolesGuard implements CanActivate {
     );
     if (isMasterEmail) return true;
 
-    // If endpoint strictly requires SUPERADMIN and user is not superadmin, deny
-    if (requiredRoles.includes(UserRole.SUPERADMIN)) {
+    // If endpoint strictly requires ONLY SUPERADMIN, deny non-superadmins
+    if (requiredRoles.length === 1 && requiredRoles[0] === UserRole.SUPERADMIN) {
       return false;
     }
 
-    // Admin has access to all standard routes
+    // Admin has access to all standard routes (and routes listing ADMIN + SUPERADMIN)
     if (user?.role === UserRole.ADMIN) return true;
+
     if (requiredRoles.includes(user?.role)) return true;
     if (user?.roles && Array.isArray(user.roles) && user.roles.some((r: any) => requiredRoles.includes(r))) return true;
     if (requiredRoles.includes(UserRole.PROMOTOR) && (user?.isPromoter || user?.role === UserRole.PROMOTOR)) return true;

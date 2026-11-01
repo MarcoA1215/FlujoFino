@@ -76,6 +76,15 @@ describe('RolesGuard - Control de Acceso Basado en Roles (RBAC)', () => {
     expect(canActivate).toBe(false);
   });
 
+  it('debe permitir acceso a ADMIN si la ruta acepta [UserRole.ADMIN, UserRole.SUPERADMIN]', () => {
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.ADMIN, UserRole.SUPERADMIN]);
+    const context = createMockExecutionContext({ role: UserRole.ADMIN, email: 'admin@tienda.com' });
+
+    const canActivate = guard.canActivate(context);
+
+    expect(canActivate).toBe(true);
+  });
+
   it('debe permitir acceso incondicional si el usuario posee rol SUPERADMIN', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.SUPERADMIN]);
     const context = createMockExecutionContext({ role: UserRole.SUPERADMIN });
