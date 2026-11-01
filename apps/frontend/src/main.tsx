@@ -41,13 +41,19 @@ if ('serviceWorker' in navigator) {
     });
   }
 
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true;
+      window.location.reload();
+    }
+  });
+
   const registerSW = () => {
     navigator.serviceWorker
-      .register('/sw.js')
+      .register('/sw.js', { updateViaCache: 'none' })
       .then((reg) => {
-        if (import.meta.env.DEV) {
-          reg.update();
-        }
+        reg.update();
       })
       .catch((err) => {
         console.warn('SW registration failed:', err);

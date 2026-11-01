@@ -1,4 +1,4 @@
-const CACHE_NAME = 'finowork-pwa-v2';
+const CACHE_NAME = 'finowork-pwa-v3';
 const PRECACHE_URLS = ['/', '/index.html'];
 
 self.addEventListener('install', (event) => {
@@ -62,23 +62,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Assets estáticos (JS, CSS, imágenes): Cache first o Stale-While-Revalidate
+  // Assets estáticos (JS, CSS, imágenes): Network-first con fallback a caché para que al desplegar a producción siempre se sirva la versión más reciente
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
         }
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
         return networkResponse;
-      }).catch(() => {
-        // En offline para peticiones de imagen u otros recursos retorna null o vacío
-      });
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });
 
