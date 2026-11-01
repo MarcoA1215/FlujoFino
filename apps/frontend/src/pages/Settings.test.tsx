@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -112,6 +111,9 @@ describe('SettingsPage - Menú Desplegable, Suscripción y Persistencia de Paylo
             logout: vi.fn(),
             updateUser: vi.fn(),
             switchWorkspace: vi.fn(),
+            switchMode: vi.fn(),
+            isAuthenticated: true,
+            isLoading: false,
           }}
         >
           <SubscriptionContext.Provider
@@ -119,7 +121,11 @@ describe('SettingsPage - Menú Desplegable, Suscripción y Persistencia de Paylo
               subscription: mockSubscriptionData as any,
               platformConfig: null,
               exchangeRate: 889.26,
-              loading: false,
+              isLoading: false,
+              isExpired: false,
+              daysLeft: 30,
+              isReportModalOpen: false,
+              setIsReportModalOpen: vi.fn(),
               refreshSubscription: vi.fn(),
             }}
           >
