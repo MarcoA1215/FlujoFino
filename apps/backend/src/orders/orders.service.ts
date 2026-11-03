@@ -688,10 +688,13 @@ export class OrdersService implements OnModuleInit {
       ? `Fondo de Caja: Bs. ${Number(amount).toFixed(2)} (equiv. $${amtUSD.toFixed(2)})`
       : `Fondo de Caja: $${Number(amount).toFixed(2)}`);
 
+    const amtBS = currency === 'BS' ? Number(amount) : Number((amtUSD * rate).toFixed(2));
     const repo = this.dataSource.getRepository(OperatingExpense);
     const expense = repo.create({
       tenantId,
       amount: Number(amtUSD.toFixed(2)),
+      amountBs: amtBS,
+      exchangeRate: rate,
       description: desc,
       category: 'FONDO_CAJA',
       paymentMethod: currency === 'BS' ? 'CASH_BS' : 'CASH_USD',

@@ -5,6 +5,7 @@ import { Promoter } from '../entities/promoter.entity';
 import { PromoterCommission } from '../entities/promoter-commission.entity';
 import { Tenant } from '../entities/tenant.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
+import { User } from '../entities/user.entity';
 import {
   PromoterCommissionType,
   PromoterCommissionStatus,
@@ -19,6 +20,7 @@ describe('PromotersService', () => {
   let commissionRepo: any;
   let tenantRepo: any;
   let userAccessRepo: any;
+  let userRepo: any;
 
   beforeEach(async () => {
     promoterRepo = {
@@ -32,6 +34,7 @@ describe('PromotersService', () => {
     tenantRepo = {
       find: jest.fn(),
     };
+    userRepo = { findOne: jest.fn(), save: jest.fn() };
     userAccessRepo = {
       find: jest.fn().mockResolvedValue([
         {
@@ -66,6 +69,10 @@ describe('PromotersService', () => {
         {
           provide: getRepositoryToken(UserTenantAccess),
           useValue: userAccessRepo,
+        },
+        {
+          provide: getRepositoryToken(User),
+          useValue: userRepo,
         },
       ],
     }).compile();

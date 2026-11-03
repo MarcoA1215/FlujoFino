@@ -728,6 +728,10 @@ Gastos operativos (OPEX), compras de insumos, pagos de nómina y salidas de caja
 | `tenantId` | `tenantId` | `uuid` (FK) | Sí | `NULL` | Referencia a `tenant.id` (`ON DELETE CASCADE`). |
 | `description` | `description` | `varchar` | No | — | Concepto del gasto. |
 | `amount` | `amount` | `decimal(12,2)` | No | `0` | Monto del egreso expresado en USD. |
+| `amountBs` | `amountBs` | `decimal(14,2)` | Sí | `NULL` | Monto equivalente congelado en Bolívares (VES) al momento del gasto. |
+| `exchangeRate` | `exchangeRate` | `decimal(12,4)` | Sí | `NULL` | Tasa de cambio VES/USD aplicada en el registro. |
+| `amountCop` | `amountCop` | `decimal(14,2)` | Sí | `NULL` | Monto equivalente congelado en Pesos Colombianos (COP) al momento del gasto. |
+| `exchangeRateCop` | `exchangeRateCop` | `decimal(12,4)` | Sí | `NULL` | Tasa de cambio COP/USD aplicada en el registro. |
 | `paymentMethod` | `paymentMethod` | `varchar` | Sí | `NULL` | Caja/Fondo de donde salió el dinero (`CASH_USD`, `PAGO_MOVIL`, `TRANSFER`, `BINANCE`, `CASH_BS`, `CASH_COP`, etc.). |
 | `category` | `category` | `varchar` | No | `'GENERAL'` | Categoría (`GENERAL`, `NOMINA`, `ADELANTO_SUELDO`, `INSUMOS`, `SERVICIOS`, etc.). |
 | `createdAt` | `createdAt` | `timestamp` | No | `now()` | Fecha y hora del egreso. |

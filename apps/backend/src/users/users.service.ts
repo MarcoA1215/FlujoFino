@@ -4,6 +4,7 @@ import { Repository, Not, Like } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { UserTenantAccess } from '../entities/user-tenant-access.entity';
 import { Tenant } from '../entities/tenant.entity';
+import { Settings } from '../entities/settings.entity';
 import { AccessRequest, AccessRequestStatus } from '../entities/access-request.entity';
 import { OperatingExpense } from '../entities/operating-expense.entity';
 import { SalaryAdvance, SalaryAdvanceStatus } from '../entities/salary-advance.entity';
@@ -509,10 +510,21 @@ export class UsersService implements OnModuleInit {
     
     await this.usersRepo.manager.transaction(async manager => {
       // 1. Create expense in box / operating expenses
+      const tenantSettings = typeof manager.findOne === "function" ? await manager.findOne(Settings, { where: { tenantId } }) : null;
+      const payRate = Number(tenantSettings?.exchangeRateBs || 40.0);
+      const payRateCop = Number(tenantSettings?.exchangeRateCop || 4000.0);
+      const payAmountUSD = Number(data.amount);
+      const payAmountBs = Number((payAmountUSD * payRate).toFixed(2));
+      const payAmountCop = Number((payAmountUSD * payRateCop).toFixed(2));
+
       const expense = manager.create(OperatingExpense, {
         tenantId,
         description: `Pago de Nómina - Empleado ${data.username || userId}`,
-        amount: Number(data.amount),
+        amount: payAmountUSD,
+        amountBs: payAmountBs,
+        exchangeRate: payRate,
+        amountCop: payAmountCop,
+        exchangeRateCop: payRateCop,
         paymentMethod: data.method || 'CASH',
         category: 'PAYROLL',
         createdAt: data.date ? new Date(data.date) : new Date()

@@ -1294,16 +1294,25 @@ export class DashboardService {
       const cat = (exp.category || '').toUpperCase();
       const norm = normalizePaymentMethod(exp.paymentMethod || '');
 
+      const expRate = Number(exp.exchangeRate) > 0 ? Number(exp.exchangeRate) : rate;
+      const expBs = (exp.amountBs !== undefined && exp.amountBs !== null && Number(exp.amountBs) > 0)
+        ? Number(exp.amountBs)
+        : Number((amt * expRate).toFixed(2));
+      const expRateCop = Number((exp as any).exchangeRateCop) > 0 ? Number((exp as any).exchangeRateCop) : rateCop;
+      const expCop = ((exp as any).amountCop !== undefined && (exp as any).amountCop !== null && Number((exp as any).amountCop) > 0)
+        ? Number((exp as any).amountCop)
+        : Number((amt * expRateCop).toFixed(2));
+
       // Las bases de fondo de caja NO son gastos operativos: son liquidez base para dar vuelto
       if (cat === 'FONDO_CAJA') {
         if (norm === 'CASH_COP') {
-          baseFondoCajaCashCop += (amt * rateCop);
+          baseFondoCajaCashCop += expCop;
         } else if (norm === 'BANK_COP') {
-          baseFondoCajaBankCop += (amt * rateCop);
+          baseFondoCajaBankCop += expCop;
         } else if (norm === 'CASH_BS') {
-          baseFondoCajaCashBs += (amt * rate);
+          baseFondoCajaCashBs += expBs;
         } else if (['PAGO_MOVIL', 'TRANSFER', 'PUNTO'].includes(norm)) {
-          baseFondoCajaBankBs += (amt * rate);
+          baseFondoCajaBankBs += expBs;
         } else {
           baseFondoCajaUSD += amt;
         }
@@ -1311,13 +1320,13 @@ export class DashboardService {
       }
 
       if (norm === 'CASH_COP') {
-        cashExpensesCop += (amt * rateCop);
+        cashExpensesCop += expCop;
       } else if (norm === 'BANK_COP') {
-        bankExpensesCop += (amt * rateCop);
+        bankExpensesCop += expCop;
       } else if (norm === 'CASH_BS') {
-        cashExpensesBs += (amt * rate);
+        cashExpensesBs += expBs;
       } else if (['PAGO_MOVIL', 'TRANSFER', 'PUNTO'].includes(norm)) {
-        bankExpensesBs += (amt * rate);
+        bankExpensesBs += expBs;
       } else if (norm === 'DIGITAL_USD') {
         digitalExpensesUSD += amt;
       } else {

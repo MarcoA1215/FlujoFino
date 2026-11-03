@@ -15,6 +15,18 @@ export class OperatingExpense {
   @Column('decimal', { precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
   amount: number;
 
+  @Column('decimal', { precision: 14, scale: 2, nullable: true, transformer: new ColumnNumericTransformer() })
+  amountBs?: number | null;
+
+  @Column('decimal', { precision: 12, scale: 4, nullable: true, transformer: new ColumnNumericTransformer() })
+  exchangeRate?: number | null;
+
+  @Column('decimal', { precision: 14, scale: 2, nullable: true, transformer: new ColumnNumericTransformer() })
+  amountCop?: number | null;
+
+  @Column('decimal', { precision: 12, scale: 4, nullable: true, transformer: new ColumnNumericTransformer() })
+  exchangeRateCop?: number | null;
+
   @Column({ nullable: true })
   paymentMethod: string;
 

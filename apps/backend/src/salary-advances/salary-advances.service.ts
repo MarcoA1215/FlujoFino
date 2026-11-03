@@ -91,8 +91,10 @@ export class SalaryAdvancesService implements OnModuleInit {
 
       const expense = manager.create(OperatingExpense, {
         tenantId,
-        description: `Vale Empleado${methodLabel}: ${dto.reason || 'Anticipo'} - ${user.username} ($${amountUSD.toFixed(2)} / Bs. ${amountBS.toFixed(2)})`,
+        description: `Vale Empleado${methodLabel}: ${dto.reason || 'Anticipo'} - ${user.username} (${amountUSD.toFixed(2)} / Bs. ${amountBS.toFixed(2)})`,
         amount: amountUSD,
+        amountBs: amountBS,
+        exchangeRate: rate,
         paymentMethod,
         category: 'VALE_EMPLEADO',
         createdAt: expenseCreatedAt,
