@@ -35,8 +35,8 @@ export const AppUpdateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isChecking, setIsChecking] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [latestUpdate, setLatestUpdate] = useState<AppUpdateDTO | null>(null);
-  const [currentVersion, setCurrentVersion] = useState<string>('1.0.8');
-  const [currentBuild, setCurrentBuild] = useState<number>(9);
+  const [currentVersion, setCurrentVersion] = useState<string>('1.0.9');
+  const [currentBuild, setCurrentBuild] = useState<number>(10);
   const [isOpen, setIsOpen] = useState(false);
   const [canPostpone, setCanPostpone] = useState(true);
   const [daysRemaining, setDaysRemaining] = useState(3);
@@ -65,8 +65,8 @@ export const AppUpdateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setErrorMessage(null);
 
       const appInfo = await CapacitorApp.getInfo();
-      const localVersion = appInfo.version || '1.0.7';
-      const localBuild = parseInt(appInfo.build || '8', 10);
+      const localVersion = appInfo.version || '1.0.9';
+      const localBuild = parseInt(appInfo.build || '10', 10);
 
       setCurrentVersion(localVersion);
       setCurrentBuild(localBuild);
