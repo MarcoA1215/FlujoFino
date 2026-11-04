@@ -807,7 +807,11 @@ const SettingsPage: React.FC = () => {
                           <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 400 }}> / mes</span>
                         </div>
                         <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px', fontWeight: 600 }}>
-                          {subscription.finalFee === 0 ? '🎉 100% Bonificado' : '$20 mensualidad + IVA (16%)'}
+                          {subscription.finalFee === 0
+                            ? '🎉 100% Bonificado'
+                            : (subscription.ivaPercentage && subscription.ivaPercentage > 0)
+                              ? `$${(subscription.subtotalFee ?? 20).toFixed(0)} mensualidad + IVA (${subscription.ivaPercentage}%)`
+                              : 'Tarifa mensual fija'}
                         </div>
                       </div>
                     </div>
@@ -888,7 +892,10 @@ const SettingsPage: React.FC = () => {
                     >
                       <div style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>
-                          Planes con IVA incluido: <strong>1 Mes</strong> (${subscription.finalFee.toFixed(2)}) • <strong>3 Meses</strong> (${(subscription.finalFee * 3).toFixed(2)}) • <strong>1 Año</strong> (${(subscription.finalFee * 10).toFixed(2)}) • <span style={{ color: '#059669', fontWeight: 600 }}>$20 mensualidad + IVA (16%)</span>
+                          Planes disponibles: <strong>1 Mes</strong> (${subscription.finalFee.toFixed(2)}) • <strong>3 Meses</strong> (${(subscription.finalFee * 3).toFixed(2)}) • <strong>1 Año</strong> (${(subscription.finalFee * 10).toFixed(2)})
+                          {subscription.ivaPercentage && subscription.ivaPercentage > 0 ? (
+                            <> • <span style={{ color: '#059669', fontWeight: 600 }}>IVA ({subscription.ivaPercentage}%) incluido</span></>
+                          ) : null}
                         </span>
                       </div>
                       <span style={{ background: '#fef08a', color: '#854d0e', fontWeight: 800, padding: '3px 8px', borderRadius: '6px', fontSize: '11px' }}>

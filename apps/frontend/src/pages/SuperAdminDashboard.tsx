@@ -193,6 +193,8 @@ const SuperAdminDashboard: React.FC = () => {
     binanceEmail: '',
     defaultMonthlyPrice: 20,
     defaultTrialDays: 15,
+    chargeIva: false,
+    ivaPercentage: 16,
   });
   const [isSavingConfig, setIsSavingConfig] = useState(false);
 
@@ -396,10 +398,11 @@ const SuperAdminDashboard: React.FC = () => {
       const { id, updatedAt, ...cleanConfig } = platformConfig as any;
       await apiClient.put('/superadmin/platform-config', cleanConfig);
       presentToast({
-        message: 'Cuentas de cobro SaaS actualizadas con éxito.',
+        message: 'Configuración y cuentas de cobro SaaS actualizadas con éxito.',
         duration: 2500,
         color: 'success',
       });
+      await loadData();
     } catch (err: any) {
       presentToast({
         message: 'Error al guardar cuentas: ' + (err.response?.data?.message || err.message),
@@ -1299,7 +1302,7 @@ const SuperAdminDashboard: React.FC = () => {
                   Control Financiero de Mi Negocio (SaaS)
                 </h2>
                 <p style={{ margin: 0, fontSize: '13px', color: '#cbd5e1', lineHeight: 1.4 }}>
-                  Administra tus ingresos reales, el IVA retenido para el SENIAT, la deuda viva con tus promotores, pagos de servidores, reinversión y tus retiros de utilidad.
+                  Administra tus ingresos reales, la deuda viva con tus promotores, pagos de servidores, reinversión y tus retiros de utilidad.
                 </p>
               </div>
 
@@ -1370,27 +1373,29 @@ const SuperAdminDashboard: React.FC = () => {
                   + Pagarme a Mí (Retiro)
                 </button>
 
-                <button
-                  type="button"
-                  onClick={handleOpenSeniatModal}
-                  style={{
-                    background: '#6366f1',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '10px',
-                    padding: '10px 14px',
-                    fontSize: '12px',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: '0 2px 6px rgba(99, 102, 241, 0.35)',
-                  }}
-                >
-                  <IonIcon icon={receiptOutline} style={{ fontSize: '16px' }} />
-                  Declarar / Pagar IVA al SENIAT
-                </button>
+                {platformConfig.chargeIva && (
+                  <button
+                    type="button"
+                    onClick={handleOpenSeniatModal}
+                    style={{
+                      background: '#6366f1',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '10px 14px',
+                      fontSize: '12px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 6px rgba(99, 102, 241, 0.35)',
+                    }}
+                  >
+                    <IonIcon icon={receiptOutline} style={{ fontSize: '16px' }} />
+                    Declarar / Pagar IVA al SENIAT
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1415,7 +1420,7 @@ const SuperAdminDashboard: React.FC = () => {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-                    Ingresos Brutos (Con IVA)
+                    {platformConfig.chargeIva ? 'Ingresos Brutos (Con IVA)' : 'Ingresos Totales Cobrados'}
                   </span>
                   <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <IonIcon icon={trendingUpOutline} style={{ fontSize: '18px' }} />
@@ -1432,7 +1437,7 @@ const SuperAdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* 2. Ingresos Netos del Negocio (Sin IVA) */}
+              {/* 2. Ingresos Netos del Negocio */}
               <div
                 style={{
                   background: '#ffffff',
@@ -1444,7 +1449,7 @@ const SuperAdminDashboard: React.FC = () => {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-                    Ingreso Neto (Sin IVA)
+                    {platformConfig.chargeIva ? 'Ingreso Neto (Sin IVA)' : 'Ingreso Neto del Sistema'}
                   </span>
                   <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <IonIcon icon={cashOutline} style={{ fontSize: '18px' }} />
@@ -1454,60 +1459,62 @@ const SuperAdminDashboard: React.FC = () => {
                   ${(financeMetrics?.netRevenueUSD || 0).toFixed(2)} <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748b' }}>USD</span>
                 </div>
                 <div style={{ fontSize: '12px', color: '#475569', fontWeight: 600, marginTop: '4px' }}>
-                  Base imponible libre de impuesto IVA (16%).
+                  {platformConfig.chargeIva ? `Base imponible libre de impuesto IVA (${platformConfig.ivaPercentage ?? 16}%).` : 'Ingresos netos por acuerdos directos (0% IVA).'}
                 </div>
                 <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>
                   Utilidad Operativa: <strong style={{ color: '#0f172a' }}>${(financeMetrics?.netOperatingProfitUSD || 0).toFixed(2)} USD</strong>
                 </div>
               </div>
 
-              {/* 3. IVA Recaudado & Pendiente SENIAT */}
-              <div
-                style={{
-                  background: (financeMetrics?.pendingIVASeniatUSD || 0) > 0 ? '#eef2ff' : '#ffffff',
-                  borderRadius: '14px',
-                  border: (financeMetrics?.pendingIVASeniatUSD || 0) > 0 ? '1.5px solid #818cf8' : '1px solid #e2e8f0',
-                  padding: '16px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#4338ca', textTransform: 'uppercase' }}>
-                    IVA Por Pagar al SENIAT (16%)
-                  </span>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#e0e7ff', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <IonIcon icon={receiptOutline} style={{ fontSize: '18px' }} />
-                  </div>
-                </div>
-                <div style={{ fontSize: '26px', fontWeight: 900, color: '#3730a3' }}>
-                  ${(financeMetrics?.pendingIVASeniatUSD || 0).toFixed(2)} <span style={{ fontSize: '12px', fontWeight: 700 }}>USD</span>
-                </div>
-                <div style={{ fontSize: '12px', color: '#4338ca', fontWeight: 700, marginTop: '2px' }}>
-                  ≈ Bs. {((financeMetrics?.pendingIVASeniatUSD || 0) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#475569', marginTop: '6px' }}>
-                  <span>IVA Cobrado: <strong>${(financeMetrics?.totalIVACollectedUSD || 0).toFixed(2)}</strong></span>
-                  <span>Ya Pagado: <strong>${(financeMetrics?.totalIVAPaidSeniatUSD || 0).toFixed(2)}</strong></span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleOpenSeniatModal}
+              {/* 3. IVA Recaudado & Pendiente SENIAT (Visible solo si chargeIva está activo) */}
+              {platformConfig.chargeIva && (
+                <div
                   style={{
-                    marginTop: '10px',
-                    width: '100%',
-                    background: '#4f46e5',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '7px 10px',
-                    fontSize: '11px',
-                    fontWeight: 800,
-                    cursor: 'pointer',
+                    background: (financeMetrics?.pendingIVASeniatUSD || 0) > 0 ? '#eef2ff' : '#ffffff',
+                    borderRadius: '14px',
+                    border: (financeMetrics?.pendingIVASeniatUSD || 0) > 0 ? '1.5px solid #818cf8' : '1px solid #e2e8f0',
+                    padding: '16px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                   }}
                 >
-                  ✓ Marcar "Ya lo pagué al SENIAT"
-                </button>
-              </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: '#4338ca', textTransform: 'uppercase' }}>
+                      IVA Por Pagar al SENIAT ({platformConfig.ivaPercentage ?? 16}%)
+                    </span>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#e0e7ff', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <IonIcon icon={receiptOutline} style={{ fontSize: '18px' }} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#3730a3' }}>
+                    ${(financeMetrics?.pendingIVASeniatUSD || 0).toFixed(2)} <span style={{ fontSize: '12px', fontWeight: 700 }}>USD</span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#4338ca', fontWeight: 700, marginTop: '2px' }}>
+                    ≈ Bs. {((financeMetrics?.pendingIVASeniatUSD || 0) * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#475569', marginTop: '6px' }}>
+                    <span>IVA Cobrado: <strong>${(financeMetrics?.totalIVACollectedUSD || 0).toFixed(2)}</strong></span>
+                    <span>Ya Pagado: <strong>${(financeMetrics?.totalIVAPaidSeniatUSD || 0).toFixed(2)}</strong></span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenSeniatModal}
+                    style={{
+                      marginTop: '10px',
+                      width: '100%',
+                      background: '#4f46e5',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '7px 10px',
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✓ Marcar "Ya lo pagué al SENIAT"
+                  </button>
+                </div>
+              )}
 
               {/* 4. Dinero que le debo a Promotores */}
               <div
@@ -1790,7 +1797,8 @@ const SuperAdminDashboard: React.FC = () => {
               )}
             </div>
 
-            {/* SECCIÓN B: CONTROL DE IVA Y DECLARACIONES AL SENIAT */}
+            {/* SECCIÓN B: CONTROL DE IVA Y DECLARACIONES AL SENIAT (Visible cuando chargeIva está activo o si hay historial previo) */}
+            {(platformConfig.chargeIva || seniatHistory.length > 0) && (
             <div
               style={{
                 background: '#ffffff',
@@ -1804,10 +1812,10 @@ const SuperAdminDashboard: React.FC = () => {
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    🏛️ Control de Impuestos (IVA 16% SENIAT)
+                    🏛️ Control de Impuestos (IVA {platformConfig.ivaPercentage ?? 16}% SENIAT)
                   </h3>
                   <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b' }}>
-                    Del total cobrado en suscripciones, el sistema separa automáticamente el 16% de IVA para que sepas cuánto retener y puedas marcar cuando ya lo pagaste al SENIAT.
+                    Del total cobrado en suscripciones, el sistema separa automáticamente el {platformConfig.ivaPercentage ?? 16}% de IVA para que sepas cuánto retener y puedas marcar cuando ya lo pagaste al SENIAT.
                   </p>
                 </div>
                 <button
@@ -1892,6 +1900,7 @@ const SuperAdminDashboard: React.FC = () => {
                 </div>
               )}
             </div>
+            )}
 
             {/* SECCIÓN C: HISTORIAL COMPLETO DE SALIDAS OPERATIVAS, INVERSIONES Y RETIROS */}
             <div
@@ -2970,12 +2979,12 @@ const SuperAdminDashboard: React.FC = () => {
                   </IonCard>
                 </IonCol>
 
-                {/* Valores SaaS por Defecto */}
+                {/* Valores SaaS por Defecto e IVA Configurable */}
                 <IonCol size="12">
                   <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px', borderLeft: '4px solid #8b5cf6' }}>
                     <IonCardHeader style={{ paddingBottom: '8px' }}>
                       <IonCardTitle style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-                        ⚙️ Parámetros Globales de Suscripción
+                        ⚙️ Parámetros Globales de Suscripción e IVA
                       </IonCardTitle>
                     </IonCardHeader>
                     <IonCardContent>
@@ -3005,6 +3014,74 @@ const SuperAdminDashboard: React.FC = () => {
                           </IonItem>
                         </IonCol>
                       </IonRow>
+
+                      {/* Interruptor de Cobro de IVA en Suscripciones SaaS */}
+                      <div
+                        style={{
+                          marginTop: '8px',
+                          padding: '14px 16px',
+                          borderRadius: '12px',
+                          background: platformConfig.chargeIva ? '#eef2ff' : '#f8fafc',
+                          border: `1px solid ${platformConfig.chargeIva ? '#818cf8' : '#e2e8f0'}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <div style={{ flex: '1 1 260px' }}>
+                          <div style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>🧾 Cobrar IVA en Suscripciones de FinoWork</span>
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                fontWeight: 800,
+                                background: platformConfig.chargeIva ? '#4f46e5' : '#e2e8f0',
+                                color: platformConfig.chargeIva ? '#ffffff' : '#475569',
+                              }}
+                            >
+                              {platformConfig.chargeIva ? `ACTIVO (+${platformConfig.ivaPercentage ?? 16}%)` : 'DESACTIVADO ($0 IVA)'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', lineHeight: 1.4 }}>
+                            Mantén esta opción <strong>desactivada</strong> mientras operes a título personal sin RIF jurídico o S.A. registrada. Al activarla en el futuro, el sistema sumará el IVA a la cuota mensual y habilitará el control de declaraciones SENIAT.
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          {platformConfig.chargeIva && (
+                            <div style={{ width: '95px' }}>
+                              <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#4338ca', marginBottom: '2px' }}>
+                                % Alícuota IVA
+                              </label>
+                              <IonInput
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.5"
+                                value={platformConfig.ivaPercentage ?? 16}
+                                onIonInput={(e) => setPlatformConfig({ ...platformConfig, ivaPercentage: parseFloat(e.detail.value || '16') })}
+                                style={{
+                                  border: '1px solid #818cf8',
+                                  borderRadius: '8px',
+                                  background: '#ffffff',
+                                  padding: '4px 8px',
+                                  fontWeight: 800,
+                                  fontSize: '13px',
+                                }}
+                              />
+                            </div>
+                          )}
+                          <IonToggle
+                            checked={Boolean(platformConfig.chargeIva)}
+                            onIonChange={(e) => setPlatformConfig({ ...platformConfig, chargeIva: e.detail.checked })}
+                            color="primary"
+                          />
+                        </div>
+                      </div>
                     </IonCardContent>
                   </IonCard>
                 </IonCol>

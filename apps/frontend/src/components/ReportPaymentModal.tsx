@@ -38,14 +38,17 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
   const { platformConfig, exchangeRate, subscription, refreshSubscription } =
     useContext(SubscriptionContext);
 
+  const isChargingIva = Boolean(platformConfig?.chargeIva || (subscription?.ivaPercentage && subscription.ivaPercentage > 0));
+  const ivaRate = platformConfig?.ivaPercentage ?? subscription?.ivaPercentage ?? 16;
+
   const calculateAmountForMonths = (m: number) => {
     // La mensualidad base es de $20 (o el subtotal con descuento de referidos)
     const monthlyBase = initialAmountUsd
-      ? Math.round((initialAmountUsd / 1.16) * 100) / 100
-      : (subscription?.subtotalFee ?? (subscription?.finalFee ? Math.round((subscription.finalFee / 1.16) * 100) / 100 : 20));
+      ? (isChargingIva ? Math.round((initialAmountUsd / (1 + ivaRate / 100)) * 100) / 100 : initialAmountUsd)
+      : (subscription?.subtotalFee ?? subscription?.finalFee ?? platformConfig?.defaultMonthlyPrice ?? 20);
     const paidMonths = m === 12 ? 10 : m;
     const subtotal = Math.round(monthlyBase * paidMonths * 100) / 100;
-    const iva = subtotal > 0 ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
+    const iva = isChargingIva && subtotal > 0 ? Math.round(subtotal * (ivaRate / 100) * 100) / 100 : 0;
     const total = Math.round((subtotal + iva) * 100) / 100;
     return { paidMonths, subtotal, iva, total };
   };
@@ -73,13 +76,13 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
       setReportReference('');
       setReportBank('');
     }
-  }, [isOpen, initialAmountUsd, subscription?.finalFee, subscription?.subtotalFee, exchangeRate]);
+  }, [isOpen, initialAmountUsd, subscription?.finalFee, subscription?.subtotalFee, platformConfig?.chargeIva, platformConfig?.ivaPercentage, exchangeRate]);
 
   useEffect(() => {
     const calc = calculateAmountForMonths(selectedMonths);
     setReportAmountUsd(calc.total);
     setReportAmountBs(Math.round(calc.total * exchangeRate * 100) / 100);
-  }, [selectedMonths, initialAmountUsd, subscription?.finalFee, subscription?.subtotalFee, exchangeRate]);
+  }, [selectedMonths, initialAmountUsd, subscription?.finalFee, subscription?.subtotalFee, platformConfig?.chargeIva, platformConfig?.ivaPercentage, exchangeRate]);
 
   const copyField = (text?: string, label?: string) => {
     if (!text) return;
@@ -184,7 +187,7 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                     border: '1px solid #bbf7d0',
                   }}
                 >
-                  $20 mensualidad + IVA (16%)
+                  {isChargingIva ? `$${(subscription?.subtotalFee ?? 20).toFixed(0)} mensualidad + IVA (${ivaRate}%)` : `$${(subscription?.finalFee ?? 20).toFixed(2)} USD / mes`}
                 </span>
               </div>
               <span
@@ -214,7 +217,7 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
             >
               <div>
                 <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, display: 'block' }}>
-                  MONTO EN BOLÍVARES (BS) CON IVA
+                  {isChargingIva ? 'MONTO EN BOLÍVARES (BS) CON IVA' : 'MONTO EN BOLÍVARES (BS)'}
                 </span>
                 <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e3a8a' }}>
                   Bs. {reportAmountBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -222,7 +225,7 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
               </div>
               <div>
                 <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, display: 'block' }}>
-                  TOTAL EN USD (CON IVA INCLUIDO)
+                  {isChargingIva ? 'TOTAL EN USD (CON IVA INCLUIDO)' : 'TOTAL EN USD'}
                 </span>
                 <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#16a34a' }}>
                   ${Number(reportAmountUsd).toFixed(2)} USD
@@ -230,7 +233,7 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
               </div>
             </div>
 
-            {/* Desglose Transparente: Mensualidad + IVA 16% */}
+            {/* Desglose Transparente */}
             <div
               style={{
                 marginTop: '12px',
@@ -249,7 +252,15 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
               <div style={{ color: '#334155', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '15px' }}>🧾</span>
                 <span>
-                  Desglose: <strong>Mensualidad ({selectedMonths === 12 ? '10 meses pagados / 2 gratis' : `${selectedMonths} mes${selectedMonths > 1 ? 'es' : ''}`}):</strong> ${calculateAmountForMonths(selectedMonths).subtotal.toFixed(2)} USD + <strong>IVA (16%):</strong> ${calculateAmountForMonths(selectedMonths).iva.toFixed(2)} USD
+                  {isChargingIva ? (
+                    <>
+                      Desglose: <strong>Mensualidad ({selectedMonths === 12 ? '10 meses pagados / 2 gratis' : `${selectedMonths} mes${selectedMonths > 1 ? 'es' : ''}`}):</strong> ${calculateAmountForMonths(selectedMonths).subtotal.toFixed(2)} USD + <strong>IVA ({ivaRate}%):</strong> ${calculateAmountForMonths(selectedMonths).iva.toFixed(2)} USD
+                    </>
+                  ) : (
+                    <>
+                      Plan seleccionado: <strong>{selectedMonths === 12 ? 'Anual (10 meses pagados / 2 meses gratis)' : `${selectedMonths} mes${selectedMonths > 1 ? 'es' : ''}`}</strong> — Tarifa neta sin recargo de IVA
+                    </>
+                  )}
                 </span>
               </div>
               <span
@@ -471,7 +482,9 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                     ${calculateAmountForMonths(1).total.toFixed(2)} USD
                   </div>
                   <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                    $20.00 base + $3.20 IVA (16%)
+                    {isChargingIva
+                      ? `$${calculateAmountForMonths(1).subtotal.toFixed(2)} base + $${calculateAmountForMonths(1).iva.toFixed(2)} IVA (${ivaRate}%)`
+                      : '30 días de servicio continuo'}
                   </div>
                 </div>
 
@@ -493,7 +506,9 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                     ${calculateAmountForMonths(3).total.toFixed(2)} USD
                   </div>
                   <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                    $60.00 base + $9.60 IVA (16%)
+                    {isChargingIva
+                      ? `$${calculateAmountForMonths(3).subtotal.toFixed(2)} base + $${calculateAmountForMonths(3).iva.toFixed(2)} IVA (${ivaRate}%)`
+                      : '90 días de servicio continuo'}
                   </div>
                 </div>
 
@@ -523,7 +538,9 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                     </span>
                   </div>
                   <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                    $200.00 base + $32.00 IVA (16%)
+                    {isChargingIva
+                      ? `$${calculateAmountForMonths(12).subtotal.toFixed(2)} base + $${calculateAmountForMonths(12).iva.toFixed(2)} IVA (${ivaRate}%)`
+                      : '365 días (Pagas 10 meses)'}
                   </div>
                 </div>
               </div>
@@ -565,11 +582,11 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                     Bs. {reportAmountBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   <span style={{ fontSize: '12px', fontWeight: 700, color: '#059669', backgroundColor: '#ecfdf5', padding: '3px 8px', borderRadius: '6px' }}>
-                    ${reportAmountUsd.toFixed(2)} USD con IVA
+                    ${reportAmountUsd.toFixed(2)} USD
                   </span>
                 </div>
                 <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-                  💡 Cuota con IVA (16%) incluido. Mensualidad base $20.00 + IVA $3.20 = $23.20 USD calculados a Tasa Oficial de <strong>Bs. {exchangeRate.toFixed(2)}</strong>.
+                  💡 Equivalente a <strong>${reportAmountUsd.toFixed(2)} USD</strong> calculados a Tasa Oficial de <strong>Bs. {exchangeRate.toFixed(2)}</strong>.
                 </div>
               </div>
             ) : (
@@ -592,11 +609,11 @@ export const ReportPaymentModal: React.FC<ReportPaymentModalProps> = ({
                     ${reportAmountUsd.toFixed(2)} USDT
                   </span>
                   <span style={{ fontSize: '12px', fontWeight: 700, color: '#854d0e', backgroundColor: '#fef9c3', padding: '3px 8px', borderRadius: '6px' }}>
-                    IVA 16% Incluido
+                    {isChargingIva ? `IVA ${ivaRate}% Incluido` : 'Tarifa Fija USD'}
                   </span>
                 </div>
                 <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-                  💡 Cuota con IVA (16%) incluido. Mensualidad base $20.00 + IVA $3.20 = $23.20 USDT cuota fija.
+                  💡 Monto neto a transferir: <strong>${reportAmountUsd.toFixed(2)} USDT</strong>.
                 </div>
               </div>
             )}

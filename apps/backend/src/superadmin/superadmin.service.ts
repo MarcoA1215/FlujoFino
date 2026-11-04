@@ -52,6 +52,9 @@ export class SuperAdminService implements OnModuleInit {
         ALTER TABLE "saas_payment_reports" ADD COLUMN IF NOT EXISTS "subtotal" numeric(10, 2);
         ALTER TABLE "saas_payment_reports" ADD COLUMN IF NOT EXISTS "iva_amount" numeric(10, 2);
 
+        ALTER TABLE "platform_config" ADD COLUMN IF NOT EXISTS "charge_iva" boolean NOT NULL DEFAULT false;
+        ALTER TABLE "platform_config" ADD COLUMN IF NOT EXISTS "iva_percentage" numeric(5, 2) NOT NULL DEFAULT 16.00;
+
         CREATE TABLE IF NOT EXISTS "platform_expenses" (
           "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
           "type" character varying(50) NOT NULL,
@@ -74,12 +77,6 @@ export class SuperAdminService implements OnModuleInit {
         CREATE INDEX IF NOT EXISTS "IDX_platform_expenses_type" ON "platform_expenses" ("type");
         CREATE INDEX IF NOT EXISTS "IDX_platform_expenses_expense_date" ON "platform_expenses" ("expense_date");
         CREATE INDEX IF NOT EXISTS "IDX_platform_expenses_category" ON "platform_expenses" ("category");
-
-        UPDATE "saas_payment_reports"
-        SET
-          "subtotal" = ROUND("amount" / 1.16, 2),
-          "iva_amount" = ROUND("amount" - ROUND("amount" / 1.16, 2), 2)
-        WHERE "subtotal" IS NULL;
       `);
     } catch (err: any) {
       this.logger.warn(`Nota de auto-healing para saas_payment_reports / platform_expenses: ${err?.message || err}`);
@@ -205,8 +202,20 @@ export class SuperAdminService implements OnModuleInit {
       subtotalFee = Math.max(minAllowedFee, Math.round(discounted * 100) / 100);
     }
 
-    const ivaPercentage = 16;
-    const ivaAmount = subtotalFee > 0 ? Math.round(subtotalFee * 0.16 * 100) / 100 : 0;
+    let chargeIva = false;
+    let configuredRate = 16;
+    try {
+      const config = await this.platformConfigRepo.findOne({ where: { id: 'default' } });
+      if (config && config.chargeIva === true) {
+        chargeIva = true;
+        configuredRate = Number(config.ivaPercentage) > 0 ? Number(config.ivaPercentage) : 16;
+      }
+    } catch {
+      // Sin IVA por defecto
+    }
+
+    const ivaPercentage = chargeIva ? configuredRate : 0;
+    const ivaAmount = chargeIva && subtotalFee > 0 ? Math.round(subtotalFee * (ivaPercentage / 100) * 100) / 100 : 0;
     const finalFee = Math.round((subtotalFee + ivaAmount) * 100) / 100;
 
     return {
@@ -237,7 +246,7 @@ export class SuperAdminService implements OnModuleInit {
         totalReferrals: 0,
         discountPercentage: 0,
         subtotalFee: 0,
-        ivaPercentage: 16,
+        ivaPercentage: 0,
         ivaAmount: 0,
         finalFee: 0,
         trialDaysLeft: 999,
@@ -669,8 +678,8 @@ export class SuperAdminService implements OnModuleInit {
       status: r.status,
       rejectReason: r.reject_reason || undefined,
       months: r.months || 1,
-      subtotal: r.subtotal ? Number(r.subtotal) : Math.round((Number(r.amount) / 1.16) * 100) / 100,
-      ivaAmount: r.iva_amount ? Number(r.iva_amount) : Math.round((Number(r.amount) - (Number(r.amount) / 1.16)) * 100) / 100,
+      subtotal: r.subtotal !== null && r.subtotal !== undefined ? Number(r.subtotal) : Number(r.amount),
+      ivaAmount: r.iva_amount !== null && r.iva_amount !== undefined ? Number(r.iva_amount) : 0,
       isTest: Boolean(r.tenant?.isTest),
       createdAt: new Date(r.created_at).toISOString(),
     }));
@@ -951,8 +960,25 @@ export class SuperAdminService implements OnModuleInit {
     }
 
     const months = data.months && data.months > 0 ? Number(data.months) : 1;
-    const subtotal = Math.round((Number(data.amount) / 1.16) * 100) / 100;
-    const iva_amount = Math.round((Number(data.amount) - subtotal) * 100) / 100;
+    let chargeIva = false;
+    let ivaRate = 16;
+    try {
+      const config = await this.platformConfigRepo.findOne({ where: { id: 'default' } });
+      if (config && config.chargeIva === true) {
+        chargeIva = true;
+        ivaRate = Number(config.ivaPercentage) > 0 ? Number(config.ivaPercentage) : 16;
+      }
+    } catch {
+      // Sin IVA por defecto
+    }
+
+    const totalAmount = Number(data.amount);
+    const subtotal = chargeIva
+      ? Math.round((totalAmount / (1 + ivaRate / 100)) * 100) / 100
+      : totalAmount;
+    const iva_amount = chargeIva
+      ? Math.round((totalAmount - subtotal) * 100) / 100
+      : 0;
 
     const report = this.paymentReportRepo.create({
       tenant_id: tenantId,
@@ -1026,6 +1052,8 @@ export class SuperAdminService implements OnModuleInit {
         binanceEmail: 'pagos@finowork.com',
         defaultMonthlyPrice: 20.0,
         defaultTrialDays: 15,
+        chargeIva: false,
+        ivaPercentage: 16.0,
       });
       await this.platformConfigRepo.save(config);
     }
@@ -1643,15 +1671,15 @@ export class SuperAdminService implements OnModuleInit {
     let grossRevenueUSD = 0;
     let totalIVACollectedUSD = 0;
 
+    const config = await this.platformConfigRepo.findOne({ where: { id: 'default' } });
+    const isChargingIva = config?.chargeIva === true;
+
     for (const p of approvedPayments) {
       const amt = Number(p.amount) || 0;
       grossRevenueUSD += amt;
 
-      if (p.iva_amount !== null && p.iva_amount !== undefined) {
+      if (isChargingIva && p.iva_amount !== null && p.iva_amount !== undefined) {
         totalIVACollectedUSD += Number(p.iva_amount) || 0;
-      } else {
-        const sub = Math.round((amt / 1.16) * 100) / 100;
-        totalIVACollectedUSD += Math.round((amt - sub) * 100) / 100;
       }
     }
 

@@ -539,6 +539,8 @@ export interface PlatformConfigDTO {
   binanceEmail?: string;
   defaultMonthlyPrice?: number;
   defaultTrialDays?: number;
+  chargeIva?: boolean;
+  ivaPercentage?: number;
 }
 
 export enum InvestmentType {

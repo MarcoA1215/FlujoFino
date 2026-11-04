@@ -1,5 +1,5 @@
 import { PlatformConfigDTO } from '@finowork/shared-types';
-import { IsOptional, IsString, IsNumber, MaxLength, Min, Max } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsBoolean, MaxLength, Min, Max } from 'class-validator';
 
 export class UpdatePlatformConfigDto implements PlatformConfigDTO {
   @IsOptional()
@@ -54,4 +54,14 @@ export class UpdatePlatformConfigDto implements PlatformConfigDTO {
   @Min(0)
   @Max(365)
   defaultTrialDays?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  chargeIva?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  ivaPercentage?: number;
 }

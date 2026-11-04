@@ -160,7 +160,7 @@ describe('SuperAdminService', () => {
   });
 
   describe('calculateMonthlyFee', () => {
-    it('validates that a PIONEER tenant with 0 or 1 active referrals pays full price ($20 + 16% IVA = $23.20)', async () => {
+    it('validates that a PIONEER tenant with 0 or 1 active referrals pays full base price ($20.00 sin IVA por defecto)', async () => {
       const mockTenant0 = {
         id: 'tenant-p0',
         name: 'Pioneer Zero',
@@ -182,9 +182,9 @@ describe('SuperAdminService', () => {
       expect(fee0.activeReferrals).toBe(0);
       expect(fee0.discountPercentage).toBe(0);
       expect(fee0.subtotalFee).toBe(20.0);
-      expect(fee0.ivaPercentage).toBe(16);
-      expect(fee0.ivaAmount).toBe(3.20);
-      expect(fee0.finalFee).toBe(23.20);
+      expect(fee0.ivaPercentage).toBe(0);
+      expect(fee0.ivaAmount).toBe(0);
+      expect(fee0.finalFee).toBe(20.0);
 
       const mockTenant1 = {
         id: 'tenant-p1',
@@ -207,9 +207,9 @@ describe('SuperAdminService', () => {
       expect(fee1.activeReferrals).toBe(1);
       expect(fee1.discountPercentage).toBe(0);
       expect(fee1.subtotalFee).toBe(20.0);
-      expect(fee1.ivaPercentage).toBe(16);
-      expect(fee1.ivaAmount).toBe(3.20);
-      expect(fee1.finalFee).toBe(23.20);
+      expect(fee1.ivaPercentage).toBe(0);
+      expect(fee1.ivaAmount).toBe(0);
+      expect(fee1.finalFee).toBe(20.0);
     });
 
     it('validates that a PIONEER tenant with >= 2 active referrals gets 100% discount ($0) and auto-activates', async () => {
@@ -253,7 +253,7 @@ describe('SuperAdminService', () => {
       expect(diffDays).toBe(30);
     });
 
-    it('validates that a REGULAR tenant gets 10% per referral topado al 50% y con piso dinámico basePrice * 0.5 + 16% IVA (probando 5, 8 y 10 referidos)', async () => {
+    it('validates that a REGULAR tenant gets 10% per referral topado al 50% y con piso dinámico basePrice * 0.5 (probando 5, 8 y 10 referidos)', async () => {
       const mockTenant = {
         id: 'tenant-3',
         name: 'Regular Store',
@@ -263,7 +263,7 @@ describe('SuperAdminService', () => {
       };
       tenantRepo.findOne.mockResolvedValue(mockTenant);
 
-      // 1. Con 5 referidos: 50% descuento -> subtotal $15.00 + IVA $2.40 = $17.40
+      // 1. Con 5 referidos: 50% descuento -> subtotal $15.00 sin IVA = $15.00
       const qbMock5 = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -275,10 +275,10 @@ describe('SuperAdminService', () => {
       expect(fee5.activeReferrals).toBe(5);
       expect(fee5.discountPercentage).toBe(50);
       expect(fee5.subtotalFee).toBe(15.0);
-      expect(fee5.ivaAmount).toBe(2.40);
-      expect(fee5.finalFee).toBe(17.40);
+      expect(fee5.ivaAmount).toBe(0);
+      expect(fee5.finalFee).toBe(15.0);
 
-      // 2. Con 8 referidos: topado al 50% -> subtotal $15.00 + IVA $2.40 = $17.40
+      // 2. Con 8 referidos: topado al 50% -> subtotal $15.00 sin IVA = $15.00
       const qbMock8 = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -290,10 +290,10 @@ describe('SuperAdminService', () => {
       expect(fee8.activeReferrals).toBe(8);
       expect(fee8.discountPercentage).toBe(50);
       expect(fee8.subtotalFee).toBe(15.0);
-      expect(fee8.ivaAmount).toBe(2.40);
-      expect(fee8.finalFee).toBe(17.40);
+      expect(fee8.ivaAmount).toBe(0);
+      expect(fee8.finalFee).toBe(15.0);
 
-      // 3. Con 10 referidos: topado al 50% -> subtotal $15.00 + IVA $2.40 = $17.40
+      // 3. Con 10 referidos: topado al 50% -> subtotal $15.00 sin IVA = $15.00
       const qbMock10 = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -305,8 +305,16 @@ describe('SuperAdminService', () => {
       expect(fee10.activeReferrals).toBe(10);
       expect(fee10.discountPercentage).toBe(50);
       expect(fee10.subtotalFee).toBe(15.0);
-      expect(fee10.ivaAmount).toBe(2.40);
-      expect(fee10.finalFee).toBe(17.40);
+      expect(fee10.ivaAmount).toBe(0);
+      expect(fee10.finalFee).toBe(15.0);
+
+      // 4. Cuando SuperAdmin activa chargeIva = true (16%), calcula el IVA ($15.00 + $2.40 = $17.40)
+      platformConfigRepo.findOne.mockResolvedValue({ chargeIva: true, ivaPercentage: 16 });
+      const feeWithIva = await service.calculateMonthlyFee('tenant-3');
+      expect(feeWithIva.subtotalFee).toBe(15.0);
+      expect(feeWithIva.ivaPercentage).toBe(16);
+      expect(feeWithIva.ivaAmount).toBe(2.40);
+      expect(feeWithIva.finalFee).toBe(17.40);
     });
 
     it('validates that query builder correctly queries referrals in ACTIVE status or unexpired TRIAL', async () => {

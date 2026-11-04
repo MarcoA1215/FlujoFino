@@ -33,6 +33,18 @@ export class PlatformConfig {
   @Column({ type: 'int', default: 15 })
   defaultTrialDays: number;
 
+  @Column({ name: 'charge_iva', type: 'boolean', default: false })
+  chargeIva: boolean;
+
+  @Column('decimal', {
+    name: 'iva_percentage',
+    precision: 5,
+    scale: 2,
+    default: 16.0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  ivaPercentage: number;
+
   @UpdateDateColumn()
   updatedAt: Date;
 }

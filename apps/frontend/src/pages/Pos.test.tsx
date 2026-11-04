@@ -14,6 +14,23 @@ vi.mock('../api/client', () => ({
   }
 }));
 
+vi.mock('../context/AppUpdateContext', () => ({
+  useAppUpdater: () => ({
+    isOpen: false,
+    setIsOpen: vi.fn(),
+    updateAvailable: false,
+    latestUpdate: null,
+    currentVersion: '1.0.0',
+    currentVersionCode: 1,
+    isMandatoryNow: false,
+    daysRemainingInGrace: null,
+    isChecking: false,
+    checkForUpdates: vi.fn(),
+    snoozeUpdate: vi.fn(),
+    triggerDownload: vi.fn(),
+  }),
+}));
+
 describe('Caja Registradora (POS) - Lógica de Rentabilidad y Descuentos', () => {
   it('Debe inicializar y consultar productos al montar', async () => {
     const mockProducts = [
