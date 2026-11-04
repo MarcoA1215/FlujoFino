@@ -83,6 +83,41 @@ Este documento sincroniza el contexto arquitectónico, reglas de negocio, diseñ
    - Todos los DTOs recibidos por `@Body()` deben tener decoradores de `class-validator` (`@IsString()`, `@IsNumber()`, `@IsOptional()`, etc.) porque el `ValidationPipe` global tiene `whitelist: true` y `forbidNonWhitelisted: true`.
    - En operaciones que descuenten stock (`Product`, `ProductVariant`, `RawMaterial`) o emitan correlativos fiscales (`FiscalInvoice`), utiliza transacciones (`dataSource.transaction`) con bloqueo pesimista (`pessimistic_write`) o locks transaccionales para prevenir condiciones de carrera.
 
+---
+
+## 5. 📱 REGLA ESTRICTA DE DESPLIEGUE A PRODUCCIÓN Y COMPILACIÓN DE APK (CI/CD & AUTO-UPDATER)
+
+Cada vez que el usuario solicite subir cambios a producción o a la rama `main` de GitHub, es **OBLIGATORIO** ejecutar el ciclo completo de compilación de APK y publicación en el auto-updater:
+
+1. **Incremento de Versión**:
+   - Incrementar `versionCode` (+1) y `versionName` en `apps/frontend/android/app/build.gradle`.
+   - Actualizar los valores por defecto de `currentVersion` y `currentBuild` en `apps/frontend/src/context/AppUpdateContext.tsx`.
+
+2. **Compilación de Assets Web y Capacitor Sync**:
+   - `yarn build:frontend` (compila en `apps/frontend/dist`).
+   - `yarn cap sync android` en `apps/frontend` (sincroniza los assets web en `android/app/src/main/assets/public`).
+
+3. **Compilación del APK Release y Publicación Web**:
+   - En `apps/frontend/android`: ejecutar `.\gradlew.bat assembleRelease`.
+   - Copiar `apps/frontend/android/app/build/outputs/apk/release/app-release.apk` a `apps/frontend/public/FinoWork.apk`. Esto asegura que las descargas desde la Landing Page, Login, Menú Lateral, Dashboard y Settings sirvan siempre el instalador más reciente.
+
+4. **Registro Obligatorio en Base de Datos (`app_updates`)**:
+   - Registrar la nueva versión en la tabla `app_updates` de PostgreSQL (vía SuperAdmin API o SQL directo) con:
+     - `version`: `'vX.Y.Z'`
+     - `versionCode`: número entero correspondiente al build
+     - `apkUrl`: `'https://www.finowork.com/FinoWork.apk'`
+     - `mandatory`: `false` (o `true` si es crítica)
+     - `fileSizeMb`: tamaño en MB (ej. `'24.6'`)
+     - `summary`: resumen en español de las mejoras introducidas
+     - `changes`: array JSON de cambios (`ADDED`, `IMPLEMENTED`, `FIXED`)
+     - `isPublished`: `true`
+     - `publishedAt`: `NOW()`
+   - *Sin este paso, el actualizador interno del APK (`AppUpdateModal`) no notificará a los usuarios en sus teléfonos*.
+
+5. **Commit y Sincronización en Git**:
+   - Incluir en el commit el binario `apps/frontend/public/FinoWork.apk` y los archivos de versión.
+   - Sincronizar y pushear a `origin/dev` y `origin/main` para desplegar en Vercel (web y APK público) y Railway (backend API).
+
 <!-- # REGLA CAVEMAN (AHORRO ESTRICTO DE TOKENS)
 - Sé extremadamente conciso y directo (habla como cavernícola: frases telegráficas cortas).
 - Elimina saludos, introducciones amables, conclusiones y cortesías ("¡Claro!", "Con gusto te ayudo", etc.).
