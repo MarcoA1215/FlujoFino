@@ -4,6 +4,7 @@ import { notificationsOutline, closeOutline, checkmarkCircleOutline, alertCircle
 import { AuthContext } from '../context/AuthContext';
 import {
   getNotificationPermission,
+  checkNotificationPermissionAsync,
   registerPushNotifications,
   type NotificationPermissionState,
 } from '../services/push-notification.service';
@@ -23,12 +24,17 @@ export const NotificationPermissionBanner: React.FC = () => {
   const [isActivating, setIsActivating] = useState<boolean>(false);
 
   useEffect(() => {
-    const updatePerm = () => {
-      setPermissionState(getNotificationPermission());
+    let isMounted = true;
+    const updatePerm = async () => {
+      const p = await checkNotificationPermissionAsync();
+      if (isMounted) setPermissionState(p);
     };
     updatePerm();
     window.addEventListener('focus', updatePerm);
-    return () => window.removeEventListener('focus', updatePerm);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('focus', updatePerm);
+    };
   }, []);
 
   // Solo mostrar si el usuario está autenticado, no está dismiss, y el permiso aún es 'default'
@@ -52,7 +58,7 @@ export const NotificationPermissionBanner: React.FC = () => {
 
     try {
       const result = await registerPushNotifications(identifier, user.tenantId, role, true);
-      const newPerm = getNotificationPermission();
+      const newPerm = await checkNotificationPermissionAsync();
       setPermissionState(newPerm);
 
       if (newPerm === 'granted' || result.success) {

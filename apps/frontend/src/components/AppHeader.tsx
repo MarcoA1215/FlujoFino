@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   IonHeader,
   IonToolbar,
@@ -18,7 +19,8 @@ import {
   syncOutline,
   refreshOutline,
   closeOutline,
-  cloudDownloadOutline
+  cloudDownloadOutline,
+  helpCircleOutline
 } from 'ionicons/icons';
 import { useAppUpdater } from '../hooks/useAppUpdater';
 import { AuthContext } from '../context/AuthContext';
@@ -29,6 +31,15 @@ import { offlineDb } from '../services/offline-db';
 import { DailyCashCloseModal } from './DailyCashCloseModal';
 import { EmailVerificationModal } from './EmailVerificationModal';
 import { SubscriptionWarningBanner } from './SubscriptionWarningBanner';
+import { ModuleGuideModal } from './common/ModuleGuideModal';
+import {
+  MODULE_GUIDES,
+  getGuideForRoute,
+} from '../constants/moduleGuides';
+import type {
+  ModuleGuideKey,
+  ModuleGuideContent,
+} from '../constants/moduleGuides';
 
 interface AppHeaderProps {
   title?: string;
@@ -36,6 +47,8 @@ interface AppHeaderProps {
   showRate?: boolean;
   showOfflineToggle?: boolean;
   showCashClose?: boolean;
+  showGuide?: boolean;
+  guideKey?: ModuleGuideKey;
   onRefresh?: () => void | Promise<unknown>;
   children?: React.ReactNode;
 }
@@ -48,6 +61,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   showRate = true,
   showOfflineToggle = true,
   showCashClose = true,
+  showGuide = true,
+  guideKey,
   onRefresh,
   children
 }) => {
@@ -97,6 +112,29 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const [showCashCloseModal, setShowCashCloseModal] = useState<boolean>(false);
   const [showVerifyModal, setShowVerifyModal] = useState<boolean>(false);
   const [showRateModal, setShowRateModal] = useState<boolean>(false);
+  const [showGuideModal, setShowGuideModal] = useState<boolean>(false);
+  const [hasUnreadGuide, setHasUnreadGuide] = useState<boolean>(false);
+  const location = useLocation();
+
+  const activeGuide: ModuleGuideContent | null = useMemo(() => {
+    if (guideKey && MODULE_GUIDES[guideKey]) {
+      return MODULE_GUIDES[guideKey];
+    }
+    return getGuideForRoute(location?.pathname || '');
+  }, [guideKey, location?.pathname]);
+
+  useEffect(() => {
+    if (activeGuide) {
+      try {
+        const isRead = localStorage.getItem(`finowork_guide_read_${activeGuide.key}`) === 'true';
+        setHasUnreadGuide(!isRead);
+      } catch {
+        setHasUnreadGuide(false);
+      }
+    } else {
+      setHasUnreadGuide(false);
+    }
+  }, [activeGuide, showGuideModal]);
   const [pendingAccessCount, setPendingAccessCount] = useState<number>(0);
   const { updateAvailable, setIsOpen: setUpdateModalOpen, latestUpdate } = useAppUpdater();
 
@@ -751,6 +789,43 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               {renderPills()}
             </div>
 
+            {/* Boton de Guia Contextual del Modulo */}
+            {showGuide && activeGuide && (
+              <IonButton
+                fill="clear"
+                onClick={() => {
+                  setShowGuideModal(true);
+                  setHasUnreadGuide(false);
+                }}
+                title={`Guía: ¿Cómo funciona ${activeGuide.title}?`}
+                style={{
+                  '--padding-start': '4px',
+                  '--padding-end': '4px',
+                  height: '36px',
+                  color: 'var(--theme-header-contrast, #0F172A)',
+                  position: 'relative',
+                }}
+              >
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <IonIcon icon={helpCircleOutline} style={{ fontSize: '21px' }} />
+                  {hasUnreadGuide && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '-2px',
+                        right: '-2px',
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        backgroundColor: 'var(--theme-primary, #10B981)',
+                        boxShadow: '0 0 0 2px var(--theme-header, #ffffff)',
+                      }}
+                    />
+                  )}
+                </div>
+              </IonButton>
+            )}
+
             {/* Cash Close Button */}
             {showCashClose && canViewCashClose && (
               <IonButton
@@ -1182,6 +1257,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </div>
         </div>
       </IonModal>
+      )}
+
+      {/* Modal de Guía Rápida por Módulo */}
+      {showGuide && activeGuide && (
+        <ModuleGuideModal
+          isOpen={showGuideModal}
+          onClose={() => setShowGuideModal(false)}
+          guide={activeGuide}
+        />
       )}
     </>
   );

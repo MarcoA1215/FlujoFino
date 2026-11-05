@@ -206,7 +206,7 @@ const SuperAdminDashboard: React.FC = () => {
   const [extendDaysToAdd, setExtendDaysToAdd] = useState<number>(0);
   const [editReferredByTenantId, setEditReferredByTenantId] = useState<string | null>(null);
   const [editIsTest, setEditIsTest] = useState<boolean>(false);
-  const [tenantFilterType, setTenantFilterType] = useState<'all' | 'real' | 'test'>('all');
+  const [tenantFilterType, setTenantFilterType] = useState<'all' | 'real' | 'test'>('real');
   const [isSavingPlan, setIsSavingPlan] = useState(false);
 
   // Reject payment modal
@@ -945,19 +945,31 @@ const SuperAdminDashboard: React.FC = () => {
     );
   });
 
+  const isTestTenant = (t: SuperAdminTenantDTO) =>
+    Boolean(t.isTest) ||
+    t.name === 'FinoWork Central' ||
+    t.name?.toLowerCase().includes('demo') ||
+    t.name?.toLowerCase().includes('prueba');
+
+  const realTenants = safeTenants.filter((t) => !isTestTenant(t));
+  const testTenants = safeTenants.filter((t) => isTestTenant(t));
+
   const totalTenants = safeTenants.length;
-  const activeTenants = safeTenants.filter((t) => !t.isTest && t.status === TenantStatus.ACTIVE).length;
-  const trialTenants = safeTenants.filter((t) => !t.isTest && t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) > 0).length;
-  const testTenantsCount = safeTenants.filter((t) => t.isTest).length;
-  const pendingCount = safePendingPayments.length;
-  const estimatedRevenue = safeTenants
-    .filter((t) => !t.isTest && (t.status === TenantStatus.ACTIVE || (t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) > 0)))
+  const realTenantsCount = realTenants.length;
+  const testTenantsCount = testTenants.length;
+
+  const activeTenants = realTenants.filter((t) => t.status === TenantStatus.ACTIVE).length;
+  const trialTenants = realTenants.filter((t) => t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) > 0).length;
+  const pendingCount = safePendingPayments.filter((p) => !p.isTest).length;
+  const estimatedRevenue = realTenants
+    .filter((t) => t.status === TenantStatus.ACTIVE || (t.status === TenantStatus.TRIAL && (t.trialDaysLeft ?? 0) > 0))
     .reduce((sum, t) => sum + (t.finalFee || 0), 0);
 
   // Filtered tenants
   const filteredTenants = safeTenants.filter((t) => {
-    if (tenantFilterType === 'real' && t.isTest) return false;
-    if (tenantFilterType === 'test' && !t.isTest) return false;
+    const isTest = isTestTenant(t);
+    if (tenantFilterType === 'real' && isTest) return false;
+    if (tenantFilterType === 'test' && !isTest) return false;
 
     const q = searchTerm.toLowerCase().trim();
     if (!q) return true;
@@ -1052,14 +1064,21 @@ const SuperAdminDashboard: React.FC = () => {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Total Negocios
+                    Negocios Reales
                   </span>
                   <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#eff6ff', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <IonIcon icon={businessOutline} style={{ fontSize: '16px' }} />
                   </div>
                 </div>
-                <div style={{ fontSize: '26px', fontWeight: 900, color: '#0f172a' }}>
-                  {totalTenants}
+                <div>
+                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#0f172a' }}>
+                    {realTenantsCount}
+                  </div>
+                  {testTenantsCount > 0 && (
+                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+                      +{testTenantsCount} de prueba
+                    </div>
+                  )}
                 </div>
               </div>
             </IonCol>
@@ -1210,7 +1229,12 @@ const SuperAdminDashboard: React.FC = () => {
             <IonSegmentButton value="tenants">
               <IonLabel style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <IonIcon icon={businessOutline} />
-                Negocios ({totalTenants})
+                Negocios ({realTenantsCount})
+                {testTenantsCount > 0 && (
+                  <span style={{ fontSize: '10px', background: '#fef3c7', color: '#92400e', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
+                    {testTenantsCount} test
+                  </span>
+                )}
               </IonLabel>
             </IonSegmentButton>
             <IonSegmentButton value="payments">
@@ -2085,23 +2109,6 @@ const SuperAdminDashboard: React.FC = () => {
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
                 <button
                   type="button"
-                  onClick={() => setTenantFilterType('all')}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '20px',
-                    border: '1px solid',
-                    borderColor: tenantFilterType === 'all' ? 'var(--theme-primary, #059669)' : '#cbd5e1',
-                    background: tenantFilterType === 'all' ? 'var(--theme-primary, #059669)' : '#ffffff',
-                    color: tenantFilterType === 'all' ? 'var(--theme-primary-contrast, #ffffff)' : '#475569',
-                    fontWeight: 700,
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Todos ({totalTenants})
-                </button>
-                <button
-                  type="button"
                   onClick={() => setTenantFilterType('real')}
                   style={{
                     padding: '6px 14px',
@@ -2115,7 +2122,7 @@ const SuperAdminDashboard: React.FC = () => {
                     cursor: 'pointer',
                   }}
                 >
-                  🏢 Clientes Reales ({Math.max(0, totalTenants - testTenantsCount)})
+                  🏢 Clientes Reales ({realTenantsCount})
                 </button>
                 <button
                   type="button"
@@ -2133,6 +2140,23 @@ const SuperAdminDashboard: React.FC = () => {
                   }}
                 >
                   🧪 Negocios de Prueba ({testTenantsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTenantFilterType('all')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid',
+                    borderColor: tenantFilterType === 'all' ? 'var(--theme-primary, #059669)' : '#cbd5e1',
+                    background: tenantFilterType === 'all' ? 'var(--theme-primary, #059669)' : '#ffffff',
+                    color: tenantFilterType === 'all' ? 'var(--theme-primary-contrast, #ffffff)' : '#475569',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Todos ({totalTenants})
                 </button>
                 <button
                   type="button"
@@ -2198,7 +2222,7 @@ const SuperAdminDashboard: React.FC = () => {
                           <td style={{ padding: '14px 16px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                               <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>{t.name}</div>
-                              {t.isTest && (
+                              {isTestTenant(t) && (
                                 <span
                                   style={{
                                     background: '#fef3c7',

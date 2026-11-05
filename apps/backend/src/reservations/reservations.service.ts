@@ -1475,6 +1475,10 @@ export class ReservationsService implements OnModuleInit {
         });
       } catch (err) {}
 
+      try {
+        await this.notificationsService.notifyNewReservation(tenantId, saved);
+      } catch (err) {}
+
       return saved;
     });
   }
@@ -1561,6 +1565,18 @@ export class ReservationsService implements OnModuleInit {
             body: `Tu cita para "${saved.serviceName || 'Servicio'}" ahora es el ${saved.date} a las ${saved.time.substring(0, 5)}. Por favor verifica los detalles en tu enlace.`
           });
         } catch (err) {}
+
+        try {
+          await this.notificationsService.sendNotificationToNegocio(tenantId, {
+            title: '🗓️ Cita Reprogramada',
+            body: `La cita de ${saved.customerName} fue reprogramada para el ${saved.date} a las ${saved.time.substring(0, 5)}.`,
+            data: {
+              url: '/reservations',
+              reservationId: saved.id,
+              type: 'APPOINTMENT_RESCHEDULED',
+            },
+          }, ['ADMIN', 'CAJERO'], saved);
+        } catch (err) {}
       }
 
       return saved;
@@ -1610,6 +1626,18 @@ export class ReservationsService implements OnModuleInit {
           title: '🗓️ Tu Cita ha sido Reprogramada',
           body: `Tu cita fue reprogramada para el ${saved.date} a las ${newTimeStr}.${reasonText}`
         });
+      } catch (err) {}
+
+      try {
+        await this.notificationsService.sendNotificationToNegocio(tenantId, {
+          title: '🗓️ Cita Reprogramada',
+          body: `La cita de ${saved.customerName} fue reprogramada para el ${saved.date} a las ${newTimeStr}.${reasonText}`,
+          data: {
+            url: '/reservations',
+            reservationId: saved.id,
+            type: 'APPOINTMENT_RESCHEDULED',
+          },
+        }, ['ADMIN', 'CAJERO'], saved);
       } catch (err) {}
 
       const baseUrl = this.getFrontendBaseUrl();

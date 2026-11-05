@@ -52,6 +52,7 @@ import {
 } from 'ionicons/icons';
 import {
   getNotificationPermission,
+  checkNotificationPermissionAsync,
   registerPushNotifications,
   testPushNotification,
   playNotificationSound,
@@ -209,7 +210,11 @@ const SettingsPage: React.FC = () => {
   }, [syncCooldown]);
 
   useEffect(() => {
-    const updatePerm = () => setNotificationStatus(getNotificationPermission());
+    const updatePerm = async () => {
+      const p = await checkNotificationPermissionAsync();
+      setNotificationStatus(p);
+    };
+    updatePerm();
     window.addEventListener('focus', updatePerm);
     return () => window.removeEventListener('focus', updatePerm);
   }, []);
@@ -230,7 +235,7 @@ const SettingsPage: React.FC = () => {
 
     try {
       const res = await registerPushNotifications(identifier, user.tenantId, role, true);
-      const perm = getNotificationPermission();
+      const perm = await checkNotificationPermissionAsync();
       setNotificationStatus(perm);
       if (perm === 'granted' || res.success) {
         presentToast({

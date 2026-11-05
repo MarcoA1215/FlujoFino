@@ -130,8 +130,12 @@ export class UsersService implements OnModuleInit {
             isActive: true,
             status: TenantStatus.ACTIVE,
             plan_type: TenantPlanType.REGULAR,
+            isTest: true,
           });
           centralTenant = await tenantRepo.save(centralTenant);
+        } else if (!centralTenant.isTest) {
+          centralTenant.isTest = true;
+          await tenantRepo.save(centralTenant);
         }
 
         const adminUser = await this.usersRepo.findOne({

@@ -1,4 +1,26 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class PushSubscriptionKeysDto {
+  @IsOptional()
+  @IsString()
+  p256dh?: string;
+
+  @IsOptional()
+  @IsString()
+  auth?: string;
+}
+
+export class PushSubscriptionDataDto {
+  @IsNotEmpty()
+  @IsString()
+  endpoint: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PushSubscriptionKeysDto)
+  keys?: PushSubscriptionKeysDto;
+}
 
 export class SubscribePushDto {
   @IsNotEmpty()
@@ -6,13 +28,9 @@ export class SubscribePushDto {
   identifier: string;
 
   @IsNotEmpty()
-  subscription: {
-    endpoint: string;
-    keys: {
-      p256dh: string;
-      auth: string;
-    };
-  };
+  @ValidateNested()
+  @Type(() => PushSubscriptionDataDto)
+  subscription: PushSubscriptionDataDto;
 
   @IsOptional()
   @IsString()
@@ -22,4 +40,3 @@ export class SubscribePushDto {
   @IsString()
   role?: string;
 }
-

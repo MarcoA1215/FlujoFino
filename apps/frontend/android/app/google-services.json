@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "982375362511",
+    "project_id": "finowork-3b757",
+    "storage_bucket": "finowork-3b757.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:982375362511:android:bec51f0df103db46992cba",
+        "android_client_info": {
+          "package_name": "com.flujofino.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAAyRHmnOnAEOb3i5dbHv48zz_rGS2iZPs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

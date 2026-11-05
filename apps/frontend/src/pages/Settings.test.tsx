@@ -18,6 +18,7 @@ vi.mock('../api/client', () => ({
 
 vi.mock('../services/push-notification.service', () => ({
   getNotificationPermission: vi.fn(() => 'granted'),
+  checkNotificationPermissionAsync: vi.fn().mockResolvedValue('granted'),
   registerPushNotifications: vi.fn(),
   testPushNotification: vi.fn(),
   playNotificationSound: vi.fn(),

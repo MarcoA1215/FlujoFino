@@ -61,7 +61,7 @@ export function playNotificationSound(): void {
   }
 }
 
-export const IS_NATIVE_FCM_ENABLED = false;
+export const IS_NATIVE_FCM_ENABLED = true;
 
 export type NotificationPermissionState = 'granted' | 'denied' | 'default' | 'unsupported';
 
@@ -73,6 +73,21 @@ export function getNotificationPermission(): NotificationPermissionState {
     return 'unsupported';
   }
   return Notification.permission as NotificationPermissionState;
+}
+
+export async function checkNotificationPermissionAsync(): Promise<NotificationPermissionState> {
+  if (Capacitor.isNativePlatform()) {
+    if (!IS_NATIVE_FCM_ENABLED) return 'unsupported';
+    try {
+      const status = await PushNotifications.checkPermissions();
+      if (status.receive === 'granted') return 'granted';
+      if (status.receive === 'denied') return 'denied';
+      return 'default';
+    } catch {
+      return 'default';
+    }
+  }
+  return getNotificationPermission();
 }
 
 export async function subscribeWebPush(
@@ -95,8 +110,6 @@ export async function subscribeWebPush(
 
     if (currentPerm === 'default') {
       if (!requestPermissionIfDefault) {
-        // En navegadores modernos (Chrome 80+), solicitar permisos sin un gesto de usuario
-        // provoca que el navegador lo bloquee o silencie automáticamente.
         return { success: false, reason: 'prompt_needed' };
       }
       currentPerm = await Notification.requestPermission();
@@ -105,7 +118,6 @@ export async function subscribeWebPush(
       }
     }
 
-    // Asegurar registro activo del Service Worker
     let registration = await navigator.serviceWorker.getRegistration();
     if (!registration) {
       registration = await navigator.serviceWorker.register('/sw.js');
@@ -158,10 +170,26 @@ export async function registerPushNotifications(
 
   if (Capacitor.isNativePlatform()) {
     if (!IS_NATIVE_FCM_ENABLED) {
-      console.info('[Capacitor Native] Push Notifications nativas desactivadas (requiere google-services.json en Android).');
+      console.info('[Capacitor Native] Push Notifications nativas desactivadas.');
       return { success: false, reason: 'fcm_not_configured' };
     }
     try {
+      // 1. Crear canal de alta prioridad para Android 8.0+
+      try {
+        await PushNotifications.createChannel({
+          id: 'finowork_orders',
+          name: 'Pedidos y Citas FinoWork',
+          description: 'Alertas prioritarias de nuevos pedidos, ventas y citas',
+          importance: 5,
+          visibility: 1,
+          sound: 'default',
+          vibration: true,
+        });
+      } catch (channelErr) {
+        console.warn('[Capacitor Native] Error configurando NotificationChannel:', channelErr);
+      }
+
+      // 2. Verificar y solicitar permisos de notificaciones (Android 13+ / API 33+)
       let permStatus = await PushNotifications.checkPermissions();
       if (permStatus.receive === 'prompt') {
         permStatus = await PushNotifications.requestPermissions();
@@ -186,6 +214,7 @@ export async function registerPushNotifications(
             negocioId,
             role,
           }, { headers });
+          console.log('[Capacitor Native] Token FCM registrado exitosamente en el backend.');
         } catch (err) {
           console.error('[Capacitor Native] Error registrando push token con backend:', err);
         }
@@ -198,16 +227,10 @@ export async function registerPushNotifications(
       PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
         console.log('[Capacitor Native] Notificación recibida:', notification);
         playNotificationSound();
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(notification.title || 'FinoWork', {
-            body: notification.body,
-            icon: '/favicon.svg',
-            data: notification.data,
-          });
-        }
       });
 
       PushNotifications.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
+        console.log('[Capacitor Native] Notificación pulsada:', action);
         const targetUrl = action.notification.data?.url;
         if (targetUrl) {
           window.location.href = targetUrl;
@@ -217,7 +240,7 @@ export async function registerPushNotifications(
       try {
         await PushNotifications.register();
       } catch (fcmErr) {
-        console.warn('[Capacitor Native] FCM no pudo registrarse (requiere google-services.json en Android):', fcmErr);
+        console.warn('[Capacitor Native] Error registrando FCM:', fcmErr);
       }
 
       return { success: true };
@@ -226,7 +249,6 @@ export async function registerPushNotifications(
       return { success: false, reason: error.message };
     }
   } else {
-    // Si ya tiene permiso 'granted', o si el usuario hizo clic explícito (isManualUserGesture)
     const shouldPrompt = isManualUserGesture || (typeof Notification !== 'undefined' && Notification.permission === 'granted');
     return await subscribeWebPush(identifier, negocioId, role, shouldPrompt);
   }
@@ -271,7 +293,7 @@ export async function testPushNotification(
     };
   } catch (err: any) {
     return {
-      success: true, // La local ya sonó y se mostró
+      success: true,
       message: 'Sonido y alerta local emitidos con éxito.',
     };
   }
@@ -298,12 +320,10 @@ export function usePushNotifications(
 
     const role = isSuperAdmin ? 'SUPERADMIN' : (user.role || 'ADMIN');
 
-    // En Capacitor nativo solo registrar si FCM está configurado, para evitar crashes nativos
     if (Capacitor.isNativePlatform() && !IS_NATIVE_FCM_ENABLED) {
       return;
     }
 
-    // Si ya está concedido el permiso en la web, renovar/registrar suscripción automáticamente
     if (Capacitor.isNativePlatform() || (typeof Notification !== 'undefined' && Notification.permission === 'granted')) {
       registerPushNotifications(identifier, user.tenantId, role, false).catch(console.error);
     }

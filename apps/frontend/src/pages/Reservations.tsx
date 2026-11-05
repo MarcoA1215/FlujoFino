@@ -43,6 +43,7 @@ import { offlineDb } from '../services/offline-db';
 import { AuthContext } from '../context/AuthContext';
 import { useImageViewer } from '../context/ImageViewerContext';
 import AppHeader from '../components/AppHeader';
+import { useSettings } from '../context/SettingsContext';
 import { FinoDatePicker, FinoTimePicker, FinoSelect } from '../components/ui';
 import { formatWhatsAppUrl } from '../utils/whatsapp';
 import { formatTime12h } from '../utils/time';
@@ -57,6 +58,8 @@ export const formatDateLocal = (d: Date): string => {
 
 const Reservations: React.FC = () => {
   const { user } = useContext(AuthContext);
+  const { settings: globalSettings } = useSettings();
+  const primaryColor = globalSettings?.themePrimaryColor || '#10B981';
   const { openImage } = useImageViewer();
   const router = useIonRouter();
   const [reservations, setReservations] = useState<any[]>([]);
@@ -939,10 +942,21 @@ const Reservations: React.FC = () => {
     setSelectedDate(formatDateLocal(new Date()));
   };
 
-  // FullCalendar event items for week view
+const formatCompactTime = (timeStr?: string): string => {
+  if (!timeStr) return '';
+  const [hStr, mStr] = timeStr.split(':');
+  const h = parseInt(hStr, 10);
+  if (isNaN(h)) return timeStr;
+  const m = mStr ? mStr.slice(0, 2) : '00';
+  const ampm = h >= 12 ? 'p' : 'a';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return m === '00' ? `${h12}${ampm}` : `${h12}:${m}${ampm}`;
+};
+
+  // FullCalendar event items for week/month view
   const events = useMemo(() => {
     return reservations.map(r => {
-      let color = '#10B981';
+      let color = primaryColor;
       if (r.isBlock) color = '#475569';
       else if (r.status === ReservationStatus.PENDING) color = '#F59E0B';
       else if (r.status === ReservationStatus.CANCELED) color = '#EF4444';
@@ -967,7 +981,94 @@ const Reservations: React.FC = () => {
         extendedProps: { ...r }
       };
     });
-  }, [reservations]);
+  }, [reservations, primaryColor]);
+
+  // Custom renderer so events never bleed or overflow out of day cells in Month/Week view
+  const renderEventContent = useCallback((eventInfo: any) => {
+    const isMonthView = eventInfo.view.type === 'dayGridMonth';
+    const r = eventInfo.event.extendedProps || {};
+    const isBlock = Boolean(r.isBlock);
+    const timeStr = r.time || '';
+    const compactTime = formatCompactTime(timeStr);
+    const customer = r.customerName || eventInfo.event.title || 'Cita';
+    const service = r.serviceName ? ` (${r.serviceName})` : '';
+    const fullTooltip = isBlock
+      ? `🔒 Bloqueo: ${customer}`
+      : `${formatTime12h(timeStr)} - ${customer}${service}`;
+
+    if (isMonthView) {
+      const bgColor = eventInfo.event.backgroundColor || eventInfo.event.color || primaryColor;
+      return (
+        <div
+          className="ff-fc-month-pill"
+          style={{
+            backgroundColor: isBlock ? '#475569' : bgColor,
+            color: '#ffffff',
+            borderRadius: '4px',
+            padding: '1.5px 3px',
+            fontSize: '9.5px',
+            fontWeight: '700',
+            lineHeight: '1.25',
+            width: '100%',
+            maxWidth: '100%',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2px',
+            boxSizing: 'border-box'
+          }}
+          title={fullTooltip}
+        >
+          <span style={{ flexShrink: 0, fontWeight: '800', letterSpacing: '-0.3px' }}>
+            {compactTime}
+          </span>
+          <span
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              fontWeight: '600',
+              opacity: 0.95
+            }}
+          >
+            {isBlock ? '🔒 Bloqueo' : customer}
+          </span>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        style={{
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          width: '100%',
+          maxWidth: '100%',
+          padding: '1px 2px',
+          boxSizing: 'border-box'
+        }}
+        title={fullTooltip}
+      >
+        <div style={{ fontWeight: '800', fontSize: '11px', lineHeight: '1.2' }}>
+          {eventInfo.timeText || formatTime12h(timeStr)}
+        </div>
+        <div
+          style={{
+            fontSize: '10px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            opacity: 0.95
+          }}
+        >
+          {isBlock ? `🔒 ${customer}` : `${customer}${service}`}
+        </div>
+      </div>
+    );
+  }, [primaryColor]);
 
   const servicesList = useMemo(() => {
     return products.filter(p => {
@@ -1161,7 +1262,7 @@ const Reservations: React.FC = () => {
                 className={viewMode === 'day' ? 'bg-theme-primary' : ''}
                 style={{
                   flex: 1,
-                  padding: '8px 16px',
+                  padding: '8px 12px',
                   borderRadius: '999px',
                   border: 'none',
                   background: viewMode === 'day' ? 'var(--theme-primary)' : 'transparent',
@@ -1169,9 +1270,14 @@ const Reservations: React.FC = () => {
                   fontSize: '13px',
                   fontWeight: '700',
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
                 }}
               >
+                <IonIcon icon={timeOutline} style={{ fontSize: '15px' }} />
                 Hoy
               </button>
               <button
@@ -1180,7 +1286,7 @@ const Reservations: React.FC = () => {
                 className={viewMode === 'week' ? 'bg-theme-primary' : ''}
                 style={{
                   flex: 1,
-                  padding: '8px 16px',
+                  padding: '8px 12px',
                   borderRadius: '999px',
                   border: 'none',
                   background: viewMode === 'week' ? 'var(--theme-primary)' : 'transparent',
@@ -1188,10 +1294,15 @@ const Reservations: React.FC = () => {
                   fontSize: '13px',
                   fontWeight: '700',
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
                 }}
               >
-                Semana
+                <IonIcon icon={calendarOutline} style={{ fontSize: '15px' }} />
+                Calendario
               </button>
             </div>
 
@@ -1945,16 +2056,16 @@ const Reservations: React.FC = () => {
             </div>
           )}
 
-          {/* WEEK VIEW (FullCalendar) */}
+          {/* CALENDAR VIEW (FullCalendar Responsive) */}
           {viewMode === 'week' && !search.trim() && (
             <div className="fc-wrapper">
               <FullCalendar
                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
-                initialView="timeGridWeek"
+                initialView={typeof window !== 'undefined' && window.innerWidth < 768 ? 'dayGridMonth' : 'timeGridWeek'}
                 headerToolbar={{
                   left: 'prev,next today',
                   center: 'title',
-                  right: 'timeGridWeek,dayGridMonth'
+                  right: 'dayGridMonth,timeGridWeek,listWeek'
                 }}
                 locales={[esLocale]}
                 locale="es"
@@ -1979,7 +2090,24 @@ const Reservations: React.FC = () => {
                   meridiem: 'short',
                   hour12: true
                 }}
+                views={{
+                  dayGridMonth: {
+                    dayMaxEvents: 2,
+                    moreLinkText: (n) => `+${n} más`
+                  },
+                  timeGridWeek: {
+                    slotMinTime: '07:00:00',
+                    slotMaxTime: '22:00:00',
+                    scrollTime: '08:00:00'
+                  }
+                }}
+                eventDisplay="block"
+                eventContent={renderEventContent}
                 events={events}
+                dateClick={(info) => {
+                  setSelectedDate(info.dateStr);
+                  setViewMode('day');
+                }}
                 eventClick={(info) => {
                   const res = reservations.find(r => r.id === info.event.id);
                   if (res) {

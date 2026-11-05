@@ -82,6 +82,21 @@ export class SuperAdminService implements OnModuleInit {
       this.logger.warn(`Nota de auto-healing para saas_payment_reports / platform_expenses: ${err?.message || err}`);
     }
 
+    try {
+      await this.tenantRepo.query(`
+        UPDATE "tenant"
+        SET "is_test" = true,
+            "promoterId" = NULL
+        WHERE ("referral_code" IN ('demo-retail', 'demo-panaderia', 'demo-servicios', 'demo-autolavado', 'demo-gastronomia', 'demo-estetica', 'FINO-CENTRAL')
+           OR "name" IN ('Boutique Moda Urbana', 'Panadería La Espiga', 'Barbería & Spa Élite', 'Auto Lavado Express', 'Burger House Gourmet', 'Centro Estético Glow', 'FinoWork Central')
+           OR LOWER("name") LIKE '%demo%'
+           OR LOWER("name") LIKE '%prueba%')
+          AND "is_test" = false;
+      `);
+    } catch (err: any) {
+      this.logger.warn(`Nota de auto-healing demo tenants: ${err?.message || err}`);
+    }
+
     if (process.env.NODE_ENV !== 'production') {
       try {
         // Auto-healing para desarrollo local / demo: vincular 'compraventa' a 'negocio prueba' si aplica
@@ -157,6 +172,7 @@ export class SuperAdminService implements OnModuleInit {
     const activeReferrals = await this.tenantRepo.createQueryBuilder('t')
       .where('t.referred_by_tenant_id = :tenantId', { tenantId })
       .andWhere('(t.is_test = false OR t.is_test IS NULL)')
+      .andWhere('t.name != :centralName', { centralName: 'FinoWork Central' })
       .andWhere(
         '(t.status = :active OR (t.status = :trial AND (t.trial_ends_at > :now OR t.trial_ends_at IS NULL)))',
         { active: TenantStatus.ACTIVE, trial: TenantStatus.TRIAL, now: new Date() }
@@ -278,9 +294,11 @@ export class SuperAdminService implements OnModuleInit {
     // Si calculateMonthlyFee actualizó el tenant (por ejemplo, auto-activando Pioneer), recargar estado actualizado
     const updatedTenant = await this.tenantRepo.findOne({ where: { id: tenantId } }) || tenant;
 
-    const totalReferrals = await this.tenantRepo.count({
-      where: { referred_by_tenant_id: tenantId },
-    });
+    const totalReferrals = await this.tenantRepo.createQueryBuilder('t')
+      .where('t.referred_by_tenant_id = :tenantId', { tenantId })
+      .andWhere('(t.is_test = false OR t.is_test IS NULL)')
+      .andWhere('t.name != :centralName', { centralName: 'FinoWork Central' })
+      .getCount();
 
     const now = Date.now();
     let trialDaysLeft = 0;
@@ -449,7 +467,7 @@ export class SuperAdminService implements OnModuleInit {
         ivaPercentage: feeCalc.ivaPercentage,
         ivaAmount: feeCalc.ivaAmount,
         finalFee: feeCalc.finalFee,
-        isTest: Boolean(currentT.isTest),
+        isTest: Boolean(currentT.isTest || currentT.name === 'FinoWork Central' || currentT.name?.toLowerCase().includes('demo') || currentT.name?.toLowerCase().includes('prueba')),
       });
     }
 
@@ -663,6 +681,7 @@ export class SuperAdminService implements OnModuleInit {
       .innerJoinAndSelect('p.tenant', 't')
       .where('p.status = :status', { status: SaaSPaymentStatus.PENDING })
       .andWhere('(t.is_test = false OR t.is_test IS NULL)')
+      .andWhere('t.name != :centralName', { centralName: 'FinoWork Central' })
       .orderBy('p.created_at', 'DESC')
       .getMany();
 
@@ -1175,8 +1194,14 @@ export class SuperAdminService implements OnModuleInit {
 
     return promoters.map((promoter) => {
       // Regla de Aislamiento: Excluir estrictamente negocios de prueba y comisiones demo
-      const realTenants = (promoter.tenants || []).filter((t) => !t.isTest && t.name !== 'FinoWork Central');
-      const commissions = (promoter.commissions || []).filter((c) => !c.tenant?.isTest);
+      const isDemoTenant = (t?: any) =>
+        Boolean(t && (t.isTest === true || t.name === 'FinoWork Central' || t.name?.toLowerCase().includes('demo') || t.name?.toLowerCase().includes('prueba')));
+      const realTenants = (promoter.tenants || []).filter((t) => !isDemoTenant(t));
+      const commissions = (promoter.commissions || []).filter((c) => {
+        const tenant = c.tenant || (promoter.tenants || []).find((t: any) => t.id === c.tenantId);
+        return !isDemoTenant(tenant);
+      });
+
 
       const monthlyActivations = commissions.filter((c) => {
         const cDate = new Date(c.createdAt);
@@ -1666,6 +1691,7 @@ export class SuperAdminService implements OnModuleInit {
       .innerJoin('p.tenant', 't')
       .where('p.status = :status', { status: SaaSPaymentStatus.APPROVED })
       .andWhere('(t.is_test = false OR t.is_test IS NULL)')
+      .andWhere('t.name != :centralName', { centralName: 'FinoWork Central' })
       .getMany();
 
     let grossRevenueUSD = 0;
@@ -1691,7 +1717,7 @@ export class SuperAdminService implements OnModuleInit {
     const commissions = await this.commissionRepo
       .createQueryBuilder('c')
       .leftJoin(Tenant, 't', 't.id = c.tenantId')
-      .where('((t.is_test = false OR t.is_test IS NULL) OR t.id IS NULL)')
+      .where('(c.tenantId IS NULL OR ((t.is_test = false OR t.is_test IS NULL) AND t.name != :centralName))', { centralName: 'FinoWork Central' })
       .getMany();
     let totalPromotersDebtUSD = 0;
     let totalPromotersPaidUSD = 0;

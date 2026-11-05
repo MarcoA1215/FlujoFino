@@ -891,7 +891,7 @@ export class PublicReservationsController {
           reservationId: saved.id,
           type: 'APPOINTMENT_ACCEPTED'
         }
-      }, ['ADMIN', 'CAJERO']);
+      }, ['ADMIN', 'CAJERO'], saved);
     } catch (err) {}
 
     try {
@@ -1091,7 +1091,7 @@ export class PublicReservationsController {
             reservationId: reservation.id,
             type: 'APPOINTMENT_RESCHEDULED'
           }
-        }, ['ADMIN', 'CAJERO']);
+        }, ['ADMIN', 'CAJERO'], saved);
       } catch (err) {}
 
       // Notificar confirmación al cliente
@@ -1172,7 +1172,7 @@ export class PublicReservationsController {
           reservationId: saved.id,
           type: 'APPOINTMENT_CANCELED'
         }
-      }, ['ADMIN', 'CAJERO']);
+      }, ['ADMIN', 'CAJERO'], saved);
     } catch (err) {}
 
     try {

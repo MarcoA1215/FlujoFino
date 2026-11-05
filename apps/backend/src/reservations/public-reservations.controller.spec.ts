@@ -218,6 +218,7 @@ describe('PublicReservationsController Suite', () => {
           body: expect.stringContaining('Manuel Gómez'),
         }),
         expect.arrayContaining(['ADMIN', 'CAJERO']),
+        expect.objectContaining({ id: 'res-accept' }),
       );
 
       // Notificación al cliente
