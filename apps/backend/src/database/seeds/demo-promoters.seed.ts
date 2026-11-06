@@ -337,6 +337,47 @@ export async function runDemoSeed(
       return prod;
     }
 
+    async function seedProductVariants(productId: string, tenantId: string, variantsData: Array<{
+      name: string;
+      sku: string;
+      stockQuantity: number;
+      salePrice: number;
+      cost: number;
+      images: string[];
+      attributes?: Record<string, any>;
+    }>) {
+      for (const vData of variantsData) {
+        let existingVar = await variantRepo.findOne({
+          where: [
+            { productId, tenantId, name: vData.name },
+            ...(vData.sku ? [{ productId, tenantId, sku: vData.sku }] : [])
+          ]
+        });
+        if (existingVar) {
+          existingVar.name = vData.name;
+          existingVar.sku = vData.sku;
+          existingVar.stockQuantity = vData.stockQuantity;
+          existingVar.salePrice = vData.salePrice;
+          existingVar.cost = vData.cost;
+          existingVar.images = vData.images;
+          if (vData.attributes) existingVar.attributes = vData.attributes;
+          await variantRepo.save(existingVar);
+        } else {
+          await variantRepo.save(variantRepo.create({
+            productId,
+            tenantId,
+            name: vData.name,
+            sku: vData.sku,
+            stockQuantity: vData.stockQuantity,
+            salePrice: vData.salePrice,
+            cost: vData.cost,
+            images: vData.images,
+            attributes: vData.attributes
+          }));
+        }
+      }
+    }
+
     async function getOrCreateExpense(tenantId: string, data: Partial<OperatingExpense>) {
       let exp = await expenseRepo.findOne({ where: { tenantId, description: data.description } });
       if (!exp) {
@@ -807,7 +848,7 @@ export async function runDemoSeed(
     const pFranela = await getOrCreateProduct(tenantRetail.id, { name: 'Franela Básica Cuello Redondo', salePrice: 10.0, cost: 4.0, estimatedCost: 4.0, stock: 30, stockQuantity: 30, physicalStock: 30, category: 'Camisetas', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80'] });
     const pCinturon = await getOrCreateProduct(tenantRetail.id, { name: 'Cinturón de Cuero Genuino', salePrice: 12.0, cost: 4.5, estimatedCost: 4.5, stock: 25, stockQuantity: 25, physicalStock: 25, category: 'Accesorios', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1624222247344-550fb60583dc?w=600&auto=format&fit=crop&q=80'] });
 
-    // Producto Estrella con Variantes
+    // Producto Estrella con Variantes: Camisa Oversize Algodón
     let pCamisa = await productRepo.findOne({ where: { tenantId: tenantRetail.id, name: 'Camisa Oversize Algodón' } });
     if (!pCamisa) {
       pCamisa = await productRepo.save(productRepo.create({
@@ -825,12 +866,83 @@ export async function runDemoSeed(
         tenantId: tenantRetail.id,
         images: ['https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=600&auto=format&fit=crop&q=80'],
       }));
+    } else if (!pCamisa.hasVariants) {
+      pCamisa.hasVariants = true;
+      await productRepo.save(pCamisa);
+    }
 
-      await variantRepo.save([
-        variantRepo.create({ productId: pCamisa.id, tenantId: tenantRetail.id, name: 'Blanco / Talla S', sku: 'CAM-WHT-S', stockQuantity: 8, salePrice: 15.0, cost: 7.0, attributes: { color: 'Blanco', talla: 'S' } }),
-        variantRepo.create({ productId: pCamisa.id, tenantId: tenantRetail.id, name: 'Blanco / Talla M', sku: 'CAM-WHT-M', stockQuantity: 12, salePrice: 15.0, cost: 7.0, attributes: { color: 'Blanco', talla: 'M' } }),
-        variantRepo.create({ productId: pCamisa.id, tenantId: tenantRetail.id, name: 'Negro / Talla M', sku: 'CAM-BLK-M', stockQuantity: 10, salePrice: 16.0, cost: 7.5, attributes: { color: 'Negro', talla: 'M' } }),
-        variantRepo.create({ productId: pCamisa.id, tenantId: tenantRetail.id, name: 'Negro / Talla L', sku: 'CAM-BLK-L', stockQuantity: 5, salePrice: 16.0, cost: 7.5, attributes: { color: 'Negro', talla: 'L' } }),
+    await seedProductVariants(pCamisa.id, tenantRetail.id, [
+      {
+        name: 'Blanco / Talla S',
+        sku: 'CAM-WHT-S',
+        stockQuantity: 8,
+        salePrice: 15.0,
+        cost: 7.0,
+        attributes: { color: 'Blanco', talla: 'S' },
+        images: ['https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80']
+      },
+      {
+        name: 'Blanco / Talla M',
+        sku: 'CAM-WHT-M',
+        stockQuantity: 12,
+        salePrice: 15.0,
+        cost: 7.0,
+        attributes: { color: 'Blanco', talla: 'M' },
+        images: ['https://images.unsplash.com/photo-1581655353564-df123a1eb820?w=600&auto=format&fit=crop&q=80']
+      },
+      {
+        name: 'Negro / Talla M',
+        sku: 'CAM-BLK-M',
+        stockQuantity: 10,
+        salePrice: 16.0,
+        cost: 7.5,
+        attributes: { color: 'Negro', talla: 'M' },
+        images: ['https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=600&auto=format&fit=crop&q=80']
+      },
+      {
+        name: 'Negro / Talla L',
+        sku: 'CAM-BLK-L',
+        stockQuantity: 5,
+        salePrice: 16.0,
+        cost: 7.5,
+        attributes: { color: 'Negro', talla: 'L' },
+        images: ['https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=600&auto=format&fit=crop&q=80']
+      },
+    ]);
+
+    // Segundo Producto con Variantes: Franela Básica Cuello Redondo
+    let pFranelaVar = await productRepo.findOne({ where: { tenantId: tenantRetail.id, name: 'Franela Básica Cuello Redondo' } });
+    if (pFranelaVar) {
+      pFranelaVar.hasVariants = true;
+      await productRepo.save(pFranelaVar);
+      await seedProductVariants(pFranelaVar.id, tenantRetail.id, [
+        {
+          name: 'Blanco Puro / Talla M',
+          sku: 'FRA-WHT-M',
+          stockQuantity: 12,
+          salePrice: 10.0,
+          cost: 4.0,
+          attributes: { color: 'Blanco', talla: 'M' },
+          images: ['https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80']
+        },
+        {
+          name: 'Negro Profundo / Talla L',
+          sku: 'FRA-BLK-L',
+          stockQuantity: 10,
+          salePrice: 10.0,
+          cost: 4.0,
+          attributes: { color: 'Negro', talla: 'L' },
+          images: ['https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=600&auto=format&fit=crop&q=80']
+        },
+        {
+          name: 'Gris Jaspe / Talla M',
+          sku: 'FRA-GRY-M',
+          stockQuantity: 8,
+          salePrice: 11.0,
+          cost: 4.5,
+          attributes: { color: 'Gris', talla: 'M' },
+          images: ['https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=600&auto=format&fit=crop&q=80']
+        }
       ]);
     }
 
@@ -1169,7 +1281,31 @@ export async function runDemoSeed(
 
     // Productos Panadería
     let panCampesino = await getOrCreateProduct(tenantPan.id, { name: 'Pan Campesino Tradicional', salePrice: 1.5, cost: 0.6, estimatedCost: 0.6, stock: 40, stockQuantity: 40, physicalStock: 40, category: 'Panadería', is_service: false, product_type: 'FORMULA', isTaxExempt: true, taxRate: 0, images: ['https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&auto=format&fit=crop&q=80'] });
-    let croissant = await getOrCreateProduct(tenantPan.id, { name: 'Croissant Francés de Mantequilla', salePrice: 2.0, cost: 0.8, estimatedCost: 0.8, stock: 30, stockQuantity: 30, physicalStock: 30, category: 'Bollería', is_service: false, product_type: 'FORMULA', isTaxExempt: false, taxRate: 16.0, images: ['https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=600&auto=format&fit=crop&q=80'] });
+    let croissant = await getOrCreateProduct(tenantPan.id, { name: 'Croissant Francés de Mantequilla', salePrice: 2.0, cost: 0.8, estimatedCost: 0.8, stock: 30, stockQuantity: 30, physicalStock: 30, category: 'Bollería', is_service: false, product_type: 'FORMULA', isTaxExempt: false, taxRate: 16.0, hasVariants: true, images: ['https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=600&auto=format&fit=crop&q=80'] });
+    if (!croissant.hasVariants) {
+      croissant.hasVariants = true;
+      await productRepo.save(croissant);
+    }
+    await seedProductVariants(croissant.id, tenantPan.id, [
+      {
+        name: 'Clásico Mantequilla Dorada',
+        sku: 'CRO-CLS-01',
+        stockQuantity: 18,
+        salePrice: 2.0,
+        cost: 0.8,
+        attributes: { tipo: 'Mantequilla' },
+        images: ['https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=600&auto=format&fit=crop&q=80']
+      },
+      {
+        name: 'Relleno de Nutella & Avellanas',
+        sku: 'CRO-NUT-02',
+        stockQuantity: 12,
+        salePrice: 2.75,
+        cost: 1.1,
+        attributes: { tipo: 'Nutella' },
+        images: ['https://images.unsplash.com/photo-1623334044303-241021148842?w=600&auto=format&fit=crop&q=80']
+      }
+    ]);
     let cachito = await getOrCreateProduct(tenantPan.id, { name: 'Cachito Tradicional de Jamón', salePrice: 2.5, cost: 1.1, estimatedCost: 1.1, stock: 25, stockQuantity: 25, physicalStock: 25, category: 'Bollería', is_service: false, product_type: 'FORMULA', isTaxExempt: false, taxRate: 16.0, images: ['https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=600&auto=format&fit=crop&q=80'] });
     let canilla = await getOrCreateProduct(tenantPan.id, { name: 'Pan Canilla Artesanal', salePrice: 1.0, cost: 0.4, estimatedCost: 0.4, stock: 50, stockQuantity: 50, physicalStock: 50, category: 'Panadería', is_service: false, product_type: 'FORMULA', isTaxExempt: true, taxRate: 0, images: ['https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=600&auto=format&fit=crop&q=80'] });
     let tortaChoco = await getOrCreateProduct(tenantPan.id, { name: 'Torta Húmeda de Chocolate', salePrice: 18.0, cost: 7.0, estimatedCost: 7.0, stock: 8, stockQuantity: 8, physicalStock: 8, category: 'Pastelería', is_service: false, product_type: 'FORMULA', isTaxExempt: false, taxRate: 16.0, images: ['https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&auto=format&fit=crop&q=80'] });
@@ -1512,7 +1648,31 @@ export async function runDemoSeed(
     const sFacial = await getOrCreateProduct(tenantSpa.id, { name: 'Limpieza Facial Profunda & Mascarilla Negra', salePrice: 18.0, cost: 3.0, estimatedCost: 3.0, durationMinutes: 60, category: 'Faciales', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=600&auto=format&fit=crop&q=80'] });
     const sAfeitado = await getOrCreateProduct(tenantSpa.id, { name: 'Afeitado Clásico Toalla Caliente', salePrice: 7.0, cost: 0.8, estimatedCost: 0.8, durationMinutes: 30, category: 'Barbería', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1517832606299-7ae9b720a186?w=600&auto=format&fit=crop&q=80'] });
     const sManicura = await getOrCreateProduct(tenantSpa.id, { name: 'Manicura Rusa & Esmaltado', salePrice: 14.0, cost: 2.5, estimatedCost: 2.5, durationMinutes: 50, category: 'Estética', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1604654894610-df63bc536371?w=600&auto=format&fit=crop&q=80'] });
-    const pPomada = await getOrCreateProduct(tenantSpa.id, { name: 'Pomada Fijadora Mate Arcilla 100g', salePrice: 12.0, cost: 5.0, estimatedCost: 5.0, stock: 15, stockQuantity: 15, physicalStock: 15, category: 'Productos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1597854710119-a5a8fc52c28d?w=600&auto=format&fit=crop&q=80'] });
+    const pPomada = await getOrCreateProduct(tenantSpa.id, { name: 'Pomada Fijadora Mate Arcilla 100g', salePrice: 12.0, cost: 5.0, estimatedCost: 5.0, stock: 15, stockQuantity: 15, physicalStock: 15, category: 'Productos', is_service: false, product_type: 'REVENTA', hasVariants: true, images: ['https://images.unsplash.com/photo-1597854710119-a5a8fc52c28d?w=600&auto=format&fit=crop&q=80'] });
+    if (!pPomada.hasVariants) {
+      pPomada.hasVariants = true;
+      await productRepo.save(pPomada);
+    }
+    await seedProductVariants(pPomada.id, tenantSpa.id, [
+      {
+        name: 'Presentación Estándar 100g',
+        sku: 'POM-STD-100',
+        stockQuantity: 10,
+        salePrice: 12.0,
+        cost: 5.0,
+        attributes: { tamano: '100g' },
+        images: ['https://images.unsplash.com/photo-1597854710119-a5a8fc52c28d?w=600&auto=format&fit=crop&q=80']
+      },
+      {
+        name: 'Presentación Pro Barber 150g',
+        sku: 'POM-PRO-150',
+        stockQuantity: 5,
+        salePrice: 16.0,
+        cost: 6.5,
+        attributes: { tamano: '150g' },
+        images: ['https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=600&auto=format&fit=crop&q=80']
+      }
+    ]);
     const pAceite = await getOrCreateProduct(tenantSpa.id, { name: 'Aceite Nutritivo Barba con Gotero', salePrice: 9.0, cost: 3.5, estimatedCost: 3.5, stock: 12, stockQuantity: 12, physicalStock: 12, category: 'Productos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1621607512214-68297480165e?w=600&auto=format&fit=crop&q=80'] });
 
     // Gastos y Fondo Barbería
@@ -2116,7 +2276,31 @@ export async function runDemoSeed(
     // Productos Burger
     let pBurgerDoble = await getOrCreateProduct(tenantBurger.id, { name: 'Hamburguesa Doble Queso', salePrice: 7.5, cost: 2.5, estimatedCost: 2.5, stock: 20, stockQuantity: 20, physicalStock: 20, category: 'Hamburguesas', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80'] });
     let pBurgerEspecial = await getOrCreateProduct(tenantBurger.id, { name: 'Burger House Especial Tocineta', salePrice: 9.5, cost: 3.2, estimatedCost: 3.2, stock: 15, stockQuantity: 15, physicalStock: 15, category: 'Hamburguesas', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1553979459-d2229ba7433b?w=600&auto=format&fit=crop&q=80'] });
-    let pPapas = await getOrCreateProduct(tenantBurger.id, { name: 'Papas Fritas Rústicas con Cheddar', salePrice: 4.0, cost: 1.2, estimatedCost: 1.2, stock: 30, stockQuantity: 30, physicalStock: 30, category: 'Acompañantes', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1576107232684-1279f3908594?w=600&auto=format&fit=crop&q=80'] });
+    let pPapas = await getOrCreateProduct(tenantBurger.id, { name: 'Papas Fritas Rústicas con Cheddar', salePrice: 4.0, cost: 1.2, estimatedCost: 1.2, stock: 30, stockQuantity: 30, physicalStock: 30, category: 'Acompañantes', is_service: false, product_type: 'FORMULA', hasVariants: true, images: ['https://images.unsplash.com/photo-1576107232684-1279f3908594?w=600&auto=format&fit=crop&q=80'] });
+    if (!pPapas.hasVariants) {
+      pPapas.hasVariants = true;
+      await productRepo.save(pPapas);
+    }
+    await seedProductVariants(pPapas.id, tenantBurger.id, [
+      {
+        name: 'Porción Mediana (Sal Marina)',
+        sku: 'PAP-MED-SAL',
+        stockQuantity: 15,
+        salePrice: 3.5,
+        cost: 1.0,
+        attributes: { tamano: 'Mediana' },
+        images: ['https://images.unsplash.com/photo-1576107232684-1279f3908594?w=600&auto=format&fit=crop&q=80']
+      },
+      {
+        name: 'Porción Especial (Cheddar & Bacon)',
+        sku: 'PAP-ESP-BAC',
+        stockQuantity: 15,
+        salePrice: 5.0,
+        cost: 1.5,
+        attributes: { tamano: 'Especial' },
+        images: ['https://images.unsplash.com/photo-1585109649139-366815a0d713?w=600&auto=format&fit=crop&q=80']
+      }
+    ]);
     let pAlitas = await getOrCreateProduct(tenantBurger.id, { name: 'Alitas BBQ Crispy (8 und)', salePrice: 6.5, cost: 2.2, estimatedCost: 2.2, stock: 18, stockQuantity: 18, physicalStock: 18, category: 'Entradas', is_service: false, product_type: 'FORMULA', images: ['https://images.unsplash.com/photo-1567620832903-9fc6debc209f?w=600&auto=format&fit=crop&q=80'] });
     let pCocaCola = await getOrCreateProduct(tenantBurger.id, { name: 'Coca-Cola Sabor Original Lata 355ml', salePrice: 1.5, cost: 0.7, estimatedCost: 0.7, stock: 48, stockQuantity: 48, physicalStock: 48, category: 'Bebidas', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=600&auto=format&fit=crop&q=80'] });
     let pCerveza = await getOrCreateProduct(tenantBurger.id, { name: 'Cerveza Zulia Polar Fría 330ml', salePrice: 2.0, cost: 0.9, estimatedCost: 0.9, stock: 36, stockQuantity: 36, physicalStock: 36, category: 'Bebidas', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1608270586620-248524c67de9?w=600&auto=format&fit=crop&q=80'] });
@@ -2426,7 +2610,31 @@ export async function runDemoSeed(
     const gMasaje = await getOrCreateProduct(tenantGlow.id, { name: 'Masaje Descontracturante 50min', salePrice: 25.0, cost: 4.0, estimatedCost: 4.0, durationMinutes: 50, category: 'Masajes', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=600&auto=format&fit=crop&q=80'] });
     const gHidrafacial = await getOrCreateProduct(tenantGlow.id, { name: 'Limpieza Facial Profunda Hidrafacial', salePrice: 30.0, cost: 5.5, estimatedCost: 5.5, durationMinutes: 60, category: 'Faciales', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=600&auto=format&fit=crop&q=80'] });
     const gDrenaje = await getOrCreateProduct(tenantGlow.id, { name: 'Drenaje Linfático Post-Quirúrgico', salePrice: 28.0, cost: 4.0, estimatedCost: 4.0, durationMinutes: 45, category: 'Terapéutico', is_service: true, product_type: 'SERVICIO', images: ['https://images.unsplash.com/photo-1519823551278-64ac92734fb1?w=600&auto=format&fit=crop&q=80'] });
-    const gSerum = await getOrCreateProduct(tenantGlow.id, { name: 'Sérum Facial Vitamina C 30ml', salePrice: 18.0, cost: 8.0, estimatedCost: 8.0, stock: 15, stockQuantity: 15, physicalStock: 15, category: 'Cosméticos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&auto=format&fit=crop&q=80'] });
+    const gSerum = await getOrCreateProduct(tenantGlow.id, { name: 'Sérum Facial Vitamina C 30ml', salePrice: 18.0, cost: 8.0, estimatedCost: 8.0, stock: 15, stockQuantity: 15, physicalStock: 15, category: 'Cosméticos', is_service: false, product_type: 'REVENTA', hasVariants: true, images: ['https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&auto=format&fit=crop&q=80'] });
+    if (!gSerum.hasVariants) {
+      gSerum.hasVariants = true;
+      await productRepo.save(gSerum);
+    }
+    await seedProductVariants(gSerum.id, tenantGlow.id, [
+      {
+        name: 'Gotero Concentrado 30ml',
+        sku: 'SER-VITC-30',
+        stockQuantity: 10,
+        salePrice: 18.0,
+        cost: 8.0,
+        attributes: { presentacion: '30ml' },
+        images: ['https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&auto=format&fit=crop&q=80']
+      },
+      {
+        name: 'Dosificador Clínico 50ml',
+        sku: 'SER-VITC-50',
+        stockQuantity: 5,
+        salePrice: 26.0,
+        cost: 11.0,
+        attributes: { presentacion: '50ml' },
+        images: ['https://images.unsplash.com/photo-1608248597359-561352136932?w=600&auto=format&fit=crop&q=80']
+      }
+    ]);
     const gSolar = await getOrCreateProduct(tenantGlow.id, { name: 'Protector Solar Toque Seco FPS 50', salePrice: 22.0, cost: 10.0, estimatedCost: 10.0, stock: 12, stockQuantity: 12, physicalStock: 12, category: 'Cosméticos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&auto=format&fit=crop&q=80'] });
     const gAcido = await getOrCreateProduct(tenantGlow.id, { name: 'Ácido Hialurónico Sérum Antiedad 30ml', salePrice: 25.0, cost: 11.0, estimatedCost: 11.0, stock: 10, stockQuantity: 10, physicalStock: 10, category: 'Cosméticos', is_service: false, product_type: 'REVENTA', images: ['https://images.unsplash.com/photo-1608248597359-561352136932?w=600&auto=format&fit=crop&q=80'] });
 

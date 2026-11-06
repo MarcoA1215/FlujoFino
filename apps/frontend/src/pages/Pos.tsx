@@ -33,7 +33,8 @@ import {
   flashOutline,
   calendarOutline,
   bicycleOutline,
-  pricetagOutline
+  pricetagOutline,
+  removeOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
@@ -46,10 +47,12 @@ import { SalaryAdvanceModal } from '../components/SalaryAdvanceModal';
 import { BankSelect } from '../components/BankSelect';
 
 type ProductVariant = {
-  id: string;
+  id?: string;
   name: string;
   sku?: string;
   stockQuantity: number;
+  cost?: number | null;
+  salePrice?: number | null;
   priceOverride?: number | null;
   images?: string[];
 };
@@ -138,6 +141,18 @@ const Pos: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [selectingVariantProduct, setSelectingVariantProduct] = useState<Product | null>(null);
+  const [variantSearchTerm, setVariantSearchTerm] = useState<string>('');
+
+  const getVariantPrice = (variant?: ProductVariant | null, basePrice: number = 0): number => {
+    if (!variant) return Number(basePrice || 0);
+    if (variant.salePrice !== undefined && variant.salePrice !== null && !isNaN(Number(variant.salePrice))) {
+      return Number(variant.salePrice);
+    }
+    if (variant.priceOverride !== undefined && variant.priceOverride !== null && !isNaN(Number(variant.priceOverride))) {
+      return Number(variant.priceOverride);
+    }
+    return Number(basePrice || 0);
+  };
 
   // Raw Materials & Customization (Extras / Retiro de Insumos)
   const [availableRawMaterials, setAvailableRawMaterials] = useState<any[]>([]);
@@ -557,6 +572,8 @@ const Pos: React.FC = () => {
             baseCost: Number(it.product?.baseCost || 0),
             stockQuantity: 999
           },
+          variantId: it.variantId || it.variant?.id || undefined,
+          variantName: it.variantName || it.variant?.name || undefined,
           quantity: it.quantity,
           unitPrice: Number(it.unitPrice || it.product?.salePrice || 0),
           removedIngredients: it.removedIngredients || [],
@@ -759,8 +776,8 @@ const Pos: React.FC = () => {
       return;
     }
 
-    const effectivePrice = chosenVariant && chosenVariant.priceOverride !== undefined && chosenVariant.priceOverride !== null
-      ? Number(chosenVariant.priceOverride)
+    const effectivePrice = chosenVariant
+      ? getVariantPrice(chosenVariant, product.salePrice)
       : product.salePrice;
 
     setCart(prev => {
@@ -794,9 +811,21 @@ const Pos: React.FC = () => {
     });
     const label = chosenVariant ? `${product.name} (${chosenVariant.name})` : product.name;
     presentToast({ message: `+1 ${label}`, duration: 1000, color: 'success', position: 'top' });
-    if (chosenVariant) {
-      setSelectingVariantProduct(null);
-    }
+  };
+
+  const decrementVariantFromCart = (productId: string, variantId?: string) => {
+    setCart(prev => {
+      const match = prev.find(
+        item => item.product.id === productId && (item.variantId || '') === (variantId || '') && !item.hasModifications
+      );
+      if (!match) return prev;
+      if (match.quantity <= 1) {
+        return prev.filter(item => item.cartItemId !== match.cartItemId);
+      }
+      return prev.map(item =>
+        item.cartItemId === match.cartItemId ? { ...item, quantity: item.quantity - 1 } : item
+      );
+    });
   };
 
   const updateQuantity = (cartItemId: string, quantity: number) => {
@@ -870,7 +899,13 @@ const Pos: React.FC = () => {
       }
     });
 
-    const finalUnitPrice = Number((customizingProduct.salePrice + extrasTotal).toFixed(2));
+    const existingCartItem = editingCartItemId ? cart.find(it => it.cartItemId === editingCartItemId) : null;
+    const baseItemPrice = existingCartItem
+      ? (existingCartItem.product.hasVariants && existingCartItem.variantId
+          ? (existingCartItem.product.variants?.find(v => v.id === existingCartItem.variantId)?.salePrice ?? existingCartItem.product.salePrice)
+          : existingCartItem.product.salePrice)
+      : customizingProduct.salePrice;
+    const finalUnitPrice = Number((baseItemPrice + extrasTotal).toFixed(2));
     const hasMods = customRemovedIngredients.length > 0 || selectedExtrasList.length > 0;
 
     if (editingCartItemId) {
@@ -1205,13 +1240,25 @@ const Pos: React.FC = () => {
             // Descontar inmediatamente el stock en memoria y en la base de datos local
             setProducts(prevProducts => {
               const updated = prevProducts.map(p => {
-                const itemInCart = cart.find(ci => (ci.product?.id || (ci as any).productId) === p.id);
-                if (!itemInCart) return p;
-                const qty = Number(itemInCart.quantity) || 1;
+                const itemsInCart = cart.filter(ci => (ci.product?.id || (ci as any).productId) === p.id);
+                if (itemsInCart.length === 0) return p;
+                const totalQty = itemsInCart.reduce((sum, ci) => sum + (Number(ci.quantity) || 1), 0);
                 const allowNegative = Boolean(settings?.allowNegativeStock);
-                const newStock = allowNegative ? ((p.stockQuantity ?? 0) - qty) : Math.max(0, (p.stockQuantity ?? 0) - qty);
-                const newPhysical = allowNegative ? ((p.physicalStock ?? 0) - qty) : Math.max(0, (p.physicalStock ?? 0) - qty);
-                return { ...p, stockQuantity: newStock, physicalStock: newPhysical, tenantId: user?.tenantId || (p as any).tenantId };
+                const newStock = allowNegative ? ((p.stockQuantity ?? 0) - totalQty) : Math.max(0, (p.stockQuantity ?? 0) - totalQty);
+                const newPhysical = allowNegative ? ((p.physicalStock ?? 0) - totalQty) : Math.max(0, (p.physicalStock ?? 0) - totalQty);
+                
+                let updatedVariants = p.variants;
+                if (Array.isArray(p.variants) && p.variants.length > 0) {
+                  updatedVariants = p.variants.map(v => {
+                    const varItem = itemsInCart.find(ci => ci.variantId === v.id);
+                    if (!varItem) return v;
+                    const vQty = Number(varItem.quantity) || 1;
+                    const newVStock = allowNegative ? ((v.stockQuantity ?? 0) - vQty) : Math.max(0, (v.stockQuantity ?? 0) - vQty);
+                    return { ...v, stockQuantity: newVStock };
+                  });
+                }
+
+                return { ...p, stockQuantity: newStock, physicalStock: newPhysical, variants: updatedVariants, tenantId: user?.tenantId || (p as any).tenantId };
               });
               offlineDb.cachedProducts.bulkPut(updated).catch(() => {});
               return updated;
@@ -1351,13 +1398,25 @@ const Pos: React.FC = () => {
             await offlineDb.offlineOrders.add(offlineOrder);
             setProducts(prevProducts => {
               const updated = prevProducts.map(p => {
-                const itemInCart = cart.find(ci => (ci.product?.id || (ci as any).productId) === p.id);
-                if (!itemInCart) return p;
-                const qty = Number(itemInCart.quantity) || 1;
+                const itemsInCart = cart.filter(ci => (ci.product?.id || (ci as any).productId) === p.id);
+                if (itemsInCart.length === 0) return p;
+                const totalQty = itemsInCart.reduce((sum, ci) => sum + (Number(ci.quantity) || 1), 0);
                 const allowNegative = Boolean(settings?.allowNegativeStock);
-                const newStock = allowNegative ? ((p.stockQuantity ?? 0) - qty) : Math.max(0, (p.stockQuantity ?? 0) - qty);
-                const newPhysical = allowNegative ? ((p.physicalStock ?? 0) - qty) : Math.max(0, (p.physicalStock ?? 0) - qty);
-                return { ...p, stockQuantity: newStock, physicalStock: newPhysical, tenantId: user?.tenantId || (p as any).tenantId };
+                const newStock = allowNegative ? ((p.stockQuantity ?? 0) - totalQty) : Math.max(0, (p.stockQuantity ?? 0) - totalQty);
+                const newPhysical = allowNegative ? ((p.physicalStock ?? 0) - totalQty) : Math.max(0, (p.physicalStock ?? 0) - totalQty);
+                
+                let updatedVariants = p.variants;
+                if (Array.isArray(p.variants) && p.variants.length > 0) {
+                  updatedVariants = p.variants.map(v => {
+                    const varItem = itemsInCart.find(ci => ci.variantId === v.id);
+                    if (!varItem) return v;
+                    const vQty = Number(varItem.quantity) || 1;
+                    const newVStock = allowNegative ? ((v.stockQuantity ?? 0) - vQty) : Math.max(0, (v.stockQuantity ?? 0) - vQty);
+                    return { ...v, stockQuantity: newVStock };
+                  });
+                }
+
+                return { ...p, stockQuantity: newStock, physicalStock: newPhysical, variants: updatedVariants, tenantId: user?.tenantId || (p as any).tenantId };
               });
               offlineDb.cachedProducts.bulkPut(updated).catch(() => {});
               return updated;
@@ -1551,7 +1610,18 @@ const Pos: React.FC = () => {
                   ? p.images[p.images.length - 1]
                   : (typeof p.images === 'string' && p.images ? (p.images as string).split(',').pop()?.trim() : null);
 
-                const itemInCart = cart.find(it => it.product.id === p.id);
+                const totalInCartForProduct = cart
+                  .filter(it => it.product.id === p.id)
+                  .reduce((acc, it) => acc + it.quantity, 0);
+
+                const hasVariants = Boolean(p.hasVariants && Array.isArray(p.variants) && p.variants.length > 0);
+                const variantPrices = hasVariants
+                  ? p.variants!.map(v => getVariantPrice(v, p.salePrice)).filter(pr => !isNaN(pr) && pr > 0)
+                  : [];
+                const minVariantPrice = variantPrices.length > 0 ? Math.min(...variantPrices) : p.salePrice;
+                const maxVariantPrice = variantPrices.length > 0 ? Math.max(...variantPrices) : p.salePrice;
+                const hasPriceRange = hasVariants && minVariantPrice !== maxVariantPrice;
+                const displaySalePrice = hasPriceRange ? minVariantPrice : p.salePrice;
 
                 return (
                   <IonCol size="6" sizeSm="4" sizeMd="3" key={p.id} style={{ padding: '6px' }}>
@@ -1596,22 +1666,23 @@ const Pos: React.FC = () => {
                         )}
 
                         {/* In-cart count badge */}
-                        {itemInCart && (
+                        {totalInCartForProduct > 0 && (
                           <div
                             style={{
                               position: 'absolute',
                               top: '8px',
                               left: '8px',
-                              background: '#10B981',
-                              color: '#ffffff',
+                              backgroundColor: 'var(--theme-primary)',
+                              color: 'var(--theme-primary-contrast, #ffffff)',
                               borderRadius: '999px',
                               fontSize: '11px',
                               fontWeight: '800',
                               padding: '2px 8px',
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                              zIndex: 2
                             }}
                           >
-                            {itemInCart.quantity} en carrito
+                            {totalInCartForProduct} en carrito
                           </div>
                         )}
                       </div>
@@ -1626,8 +1697,8 @@ const Pos: React.FC = () => {
                               </span>
                             )}
                             {p.hasVariants && Array.isArray(p.variants) && p.variants.length > 0 && (
-                              <span style={{ fontSize: '9px', fontWeight: '800', color: '#6D28D9', background: '#F3E8FF', padding: '1px 6px', borderRadius: '4px' }}>
-                                {p.variants.length} var.
+                              <span style={{ fontSize: '9px', fontWeight: '800', color: 'var(--theme-primary-readable, #065F46)', background: 'var(--theme-primary-soft, #ECFDF5)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '1px 6px', borderRadius: '4px' }}>
+                                {p.variants.length} opciones
                               </span>
                             )}
                           </div>
@@ -1652,16 +1723,16 @@ const Pos: React.FC = () => {
                         {/* Price Display */}
                         <div style={{ marginTop: 'auto' }}>
                           <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                            <span style={{ fontSize: '16px', fontWeight: '800', color: '#10B981' }}>
-                              ${p.salePrice.toFixed(2)}
+                            <span style={{ fontSize: '15px', fontWeight: '800', color: 'var(--theme-primary-readable, #047857)' }}>
+                              {hasPriceRange ? `Desde $${displaySalePrice.toFixed(2)}` : `$${displaySalePrice.toFixed(2)}`}
                             </span>
                           </div>
                           <div style={{ fontSize: '11px', fontWeight: '500', color: '#64748B', marginTop: '1px' }}>
-                            ({currencySymbol} {currencySymbol === 'COP' ? Number(p.salePrice * exchangeRate).toLocaleString('es-CO') : (p.salePrice * exchangeRate).toFixed(2)})
+                            ({currencySymbol} {currencySymbol === 'COP' ? Number(displaySalePrice * exchangeRate).toLocaleString('es-CO') : (displaySalePrice * exchangeRate).toFixed(2)})
                           </div>
                           {enableCopCurrency && (
                             <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#854D0E', marginTop: '1px' }}>
-                              ${Math.round(p.salePrice * exchangeRateCop).toLocaleString('es-CO')} COP
+                              ${Math.round(displaySalePrice * exchangeRateCop).toLocaleString('es-CO')} COP
                             </div>
                           )}
                         </div>
@@ -3453,129 +3524,465 @@ const Pos: React.FC = () => {
         </IonModal>
 
         {/* Modal Selector de Sub-producto / Variante */}
-        <IonModal isOpen={Boolean(selectingVariantProduct)} onDidDismiss={() => setSelectingVariantProduct(null)}>
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#F8FAFC' }}>
-            <div style={{ background: '#ffffff', padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '11px', fontWeight: '800', color: '#6D28D9', textTransform: 'uppercase' }}>
-                  Seleccionar Variante / Sub-producto
+        <IonModal
+          isOpen={Boolean(selectingVariantProduct)}
+          onDidDismiss={() => {
+            setSelectingVariantProduct(null);
+            setVariantSearchTerm('');
+          }}
+          style={{ '--border-radius': '20px' } as any}
+        >
+          {(() => {
+            if (!selectingVariantProduct) return null;
+            const product = selectingVariantProduct;
+            const productHeaderImg = Array.isArray(product.images) && product.images.length > 0
+              ? product.images[0]
+              : (typeof product.images === 'string' && product.images ? (product.images as string).split(',')[0].trim() : null);
+
+            const allVariants = product.variants || [];
+            const filteredVariantsList = allVariants.filter(v => {
+              if (!variantSearchTerm.trim()) return true;
+              const q = variantSearchTerm.toLowerCase();
+              return (v.name && v.name.toLowerCase().includes(q)) || (v.sku && v.sku.toLowerCase().includes(q));
+            });
+
+            // Resumen de este producto en el carrito
+            const cartItemsOfThisProd = cart.filter(it => it.product.id === product.id);
+            const totalUnitsInCart = cartItemsOfThisProd.reduce((sum, it) => sum + it.quantity, 0);
+            const totalAmountInCart = cartItemsOfThisProd.reduce((sum, it) => sum + ((it.unitPrice || product.salePrice) * it.quantity), 0);
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#F8FAFC' }}>
+                {/* Header Superior del Modal */}
+                <div
+                  style={{
+                    background: '#ffffff',
+                    padding: '16px 20px',
+                    borderBottom: '1px solid #E2E8F0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    flexShrink: 0
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                    {productHeaderImg ? (
+                      <img
+                        src={productHeaderImg}
+                        alt={product.name}
+                        style={{
+                          width: '46px',
+                          height: '46px',
+                          borderRadius: '12px',
+                          objectFit: 'cover',
+                          border: '1px solid #E2E8F0',
+                          flexShrink: 0
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '46px',
+                          height: '46px',
+                          borderRadius: '12px',
+                          background: 'var(--theme-primary-soft, #ECFDF5)',
+                          color: 'var(--theme-primary-readable, #065F46)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        <IonIcon icon={pricetagOutline} style={{ fontSize: '24px' }} />
+                      </div>
+                    )}
+
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: '800',
+                          color: 'var(--theme-primary-readable, #065F46)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <span>Subproductos / Variantes</span>
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            background: '#F1F5F9',
+                            color: '#475569',
+                            padding: '1px 6px',
+                            borderRadius: '999px'
+                          }}
+                        >
+                          {allVariants.length} opción{allVariants.length === 1 ? '' : 'es'}
+                        </span>
+                      </div>
+                      <h3
+                        style={{
+                          margin: '2px 0 0 0',
+                          fontSize: '17px',
+                          fontWeight: '800',
+                          color: '#0F172A',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}
+                      >
+                        {product.name}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectingVariantProduct(null);
+                      setVariantSearchTerm('');
+                    }}
+                    style={{
+                      background: '#F1F5F9',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '36px',
+                      height: '36px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#64748B',
+                      flexShrink: 0,
+                      transition: 'background 0.2s ease'
+                    }}
+                    title="Cerrar ventana"
+                  >
+                    <IonIcon icon={closeOutline} style={{ fontSize: '20px' }} />
+                  </button>
                 </div>
-                <h3 style={{ margin: '2px 0 0 0', fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
-                  {selectingVariantProduct?.name}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectingVariantProduct(null)}
-                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748B' }}
-              >
-                <IonIcon icon={closeOutline} style={{ fontSize: '20px' }} />
-              </button>
-            </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
-                {(selectingVariantProduct?.variants || []).map(v => {
-                  const vPrice = v.priceOverride !== undefined && v.priceOverride !== null
-                    ? Number(v.priceOverride)
-                    : Number(selectingVariantProduct?.salePrice || 0);
-                  const vStock = Number(v.stockQuantity || 0);
-                  const vImg = Array.isArray(v.images) && v.images.length > 0 ? v.images[0] : null;
-                  const inCartCount = cart
-                    .filter(it => it.product.id === selectingVariantProduct?.id && it.variantId === v.id)
-                    .reduce((acc, it) => acc + it.quantity, 0);
-
-                  return (
+                {/* Buscador Rápido de Variantes (si hay 4 o más variantes) */}
+                {allVariants.length >= 4 && (
+                  <div style={{ padding: '12px 20px 4px 20px', background: '#F8FAFC', flexShrink: 0 }}>
                     <div
-                      key={v.id}
-                      onClick={() => {
-                        if (selectingVariantProduct) {
-                          addToCart(selectingVariantProduct, v);
-                        }
-                      }}
-                      className="ff-card ff-card-interactive"
                       style={{
-                        background: '#ffffff',
-                        borderRadius: '14px',
-                        border: inCartCount > 0 ? '2px solid #10B981' : '1px solid #E2E8F0',
-                        padding: '12px',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '12px',
-                        cursor: 'pointer'
+                        gap: '8px',
+                        background: '#ffffff',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '10px',
+                        padding: '6px 12px'
                       }}
                     >
-                      {vImg ? (
-                        <img
-                          src={vImg}
-                          alt={v.name}
-                          onClick={e => {
-                            e.stopPropagation();
-                            openImage(vImg, `${selectingVariantProduct?.name} - ${v.name}`);
-                          }}
-                          style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0, border: '1px solid #E2E8F0' }}
+                      <IonIcon icon={searchOutline} style={{ color: '#64748B', fontSize: '18px' }} />
+                      <input
+                        type="text"
+                        value={variantSearchTerm}
+                        onChange={e => setVariantSearchTerm(e.target.value)}
+                        placeholder="Buscar opción por nombre o #SKU..."
+                        style={{
+                          border: 'none',
+                          outline: 'none',
+                          width: '100%',
+                          fontSize: '13px',
+                          background: 'transparent',
+                          color: '#0F172A'
+                        }}
+                      />
+                      {variantSearchTerm && (
+                        <IonIcon
+                          icon={closeOutline}
+                          onClick={() => setVariantSearchTerm('')}
+                          style={{ color: '#94A3B8', fontSize: '18px', cursor: 'pointer' }}
                         />
-                      ) : (
-                        <div style={{ width: '56px', height: '56px', borderRadius: '10px', background: '#F3E8FF', color: '#6D28D9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '18px', flexShrink: 0 }}>
-                          <IonIcon icon={pricetagOutline} style={{ fontSize: '22px' }} />
-                        </div>
                       )}
-
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '14px', fontWeight: '800', color: '#0F172A' }}>
-                            {v.name}
-                          </span>
-                          {v.sku && (
-                            <span style={{ fontSize: '10px', fontWeight: '700', color: '#64748B', background: '#F1F5F9', padding: '1px 5px', borderRadius: '4px' }}>
-                              #{v.sku}
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: '14px', fontWeight: '800', color: '#10B981', marginTop: '2px' }}>
-                          ${vPrice.toFixed(2)} USD
-                          <span style={{ fontSize: '11px', fontWeight: '600', color: '#64748B', marginLeft: '6px' }}>
-                            ({currencySymbol} {formatLocalAmount(vPrice * exchangeRate)})
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                          <span style={{
-                            fontSize: '10.5px',
-                            fontWeight: '700',
-                            padding: '2px 7px',
-                            borderRadius: '6px',
-                            background: vStock <= 0 ? '#FEF2F2' : '#ECFDF5',
-                            color: vStock <= 0 ? '#DC2626' : '#065F46'
-                          }}>
-                            {vStock <= 0 ? (vStock < 0 ? `Por producir: ${Math.abs(vStock)}` : 'Agotado (0)') : `Stock: ${vStock}`}
-                          </span>
-                          {inCartCount > 0 && (
-                            <span style={{ fontSize: '10.5px', fontWeight: '800', color: '#065F46', background: '#D1FAE5', padding: '2px 7px', borderRadius: '6px' }}>
-                              {inCartCount} en carrito
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div style={{
-                        width: '34px',
-                        height: '34px',
-                        borderRadius: '50%',
-                        background: '#10B981',
-                        color: '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0
-                      }}>
-                        <IonIcon icon={addOutline} style={{ fontSize: '18px' }} />
-                      </div>
                     </div>
-                  );
-                })}
+                  </div>
+                )}
+
+                {/* Lista de Variantes */}
+                <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '16px 20px' }}>
+                  {filteredVariantsList.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px 16px', color: '#64748B' }}>
+                      <p style={{ margin: '0 0 4px 0', fontWeight: '700', fontSize: '14px' }}>
+                        No se encontró ninguna variante coincidente
+                      </p>
+                      <small>Prueba buscando con otro término o limpia el buscador.</small>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                      {filteredVariantsList.map(v => {
+                        const vPrice = getVariantPrice(v, product.salePrice);
+                        const vStock = Number(v.stockQuantity || 0);
+                        const vImg = Array.isArray(v.images) && v.images.length > 0 ? v.images[0] : null;
+
+                        const inCartCount = cart
+                          .filter(it => it.product.id === product.id && it.variantId === v.id)
+                          .reduce((acc, it) => acc + it.quantity, 0);
+
+                        return (
+                          <div
+                            key={v.id}
+                            style={{
+                              background: '#ffffff',
+                              borderRadius: '14px',
+                              border: inCartCount > 0 ? '2px solid var(--theme-primary)' : '1px solid #E2E8F0',
+                              boxShadow: inCartCount > 0 ? '0 4px 12px rgba(0, 0, 0, 0.05)' : 'var(--ff-shadow-sm, 0 1px 3px rgba(0,0,0,0.05))',
+                              padding: '12px 14px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '12px',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {/* Imagen de la variante */}
+                            {vImg ? (
+                              <img
+                                src={vImg}
+                                alt={v.name}
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  openImage(vImg, `${product.name} - ${v.name}`);
+                                }}
+                                title="Toca para ampliar imagen"
+                                style={{
+                                  width: '56px',
+                                  height: '56px',
+                                  borderRadius: '10px',
+                                  objectFit: 'cover',
+                                  flexShrink: 0,
+                                  border: '1px solid #E2E8F0',
+                                  cursor: 'pointer'
+                                }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: '56px',
+                                  height: '56px',
+                                  borderRadius: '10px',
+                                  background: inCartCount > 0 ? 'var(--theme-primary-soft, #ECFDF5)' : '#F1F5F9',
+                                  color: inCartCount > 0 ? 'var(--theme-primary-readable, #065F46)' : '#64748B',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: '800',
+                                  fontSize: '18px',
+                                  flexShrink: 0
+                                }}
+                              >
+                                <IonIcon icon={pricetagOutline} style={{ fontSize: '22px' }} />
+                              </div>
+                            )}
+
+                            {/* Info de la variante */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '14px', fontWeight: '800', color: '#0F172A' }}>
+                                  {v.name}
+                                </span>
+                                {v.sku && (
+                                  <span style={{ fontSize: '10px', fontWeight: '700', color: '#475569', background: '#F1F5F9', padding: '1px 5px', borderRadius: '4px' }}>
+                                    #{v.sku}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--theme-primary-readable, #047857)', marginTop: '2px' }}>
+                                ${vPrice.toFixed(2)} USD
+                                <span style={{ fontSize: '11px', fontWeight: '600', color: '#64748B', marginLeft: '6px' }}>
+                                  ({currencySymbol} {formatLocalAmount(vPrice * exchangeRate)})
+                                </span>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                <span
+                                  style={{
+                                    fontSize: '10.5px',
+                                    fontWeight: '700',
+                                    padding: '2px 7px',
+                                    borderRadius: '6px',
+                                    background: vStock <= 0 ? '#FEF2F2' : (vStock <= 3 ? '#FFFBEB' : '#ECFDF5'),
+                                    color: vStock <= 0 ? '#DC2626' : (vStock <= 3 ? '#B45309' : '#047857'),
+                                    border: vStock <= 0 ? '1px solid #FECACA' : (vStock <= 3 ? '1px solid #FDE68A' : 'none')
+                                  }}
+                                >
+                                  {vStock <= 0 ? (vStock < 0 ? `Por producir: ${Math.abs(vStock)}` : 'Agotado (0)') : `Stock: ${vStock}`}
+                                </span>
+                                {inCartCount > 0 && (
+                                  <span
+                                    style={{
+                                      fontSize: '10.5px',
+                                      fontWeight: '800',
+                                      color: 'var(--theme-primary-readable, #065F46)',
+                                      background: 'var(--theme-primary-soft, #ECFDF5)',
+                                      padding: '2px 7px',
+                                      borderRadius: '6px',
+                                      border: '1px solid rgba(16, 185, 129, 0.2)'
+                                    }}
+                                  >
+                                    {inCartCount} en pedido
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Stepper / Botón Agregar */}
+                            <div style={{ flexShrink: 0 }}>
+                              {inCartCount === 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => addToCart(product, v)}
+                                  className="bg-theme-primary"
+                                  style={{
+                                    padding: '8px 12px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    backgroundColor: 'var(--theme-primary)',
+                                    color: 'var(--theme-primary-contrast, #ffffff)',
+                                    fontWeight: '700',
+                                    fontSize: '12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                  }}
+                                >
+                                  <IonIcon icon={addOutline} style={{ fontSize: '15px' }} />
+                                  <span>Agregar</span>
+                                </button>
+                              ) : (
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    background: '#F8FAFC',
+                                    padding: '3px 4px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #CBD5E1'
+                                  }}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => decrementVariantFromCart(product.id, v.id)}
+                                    style={{
+                                      width: '28px',
+                                      height: '28px',
+                                      borderRadius: '6px',
+                                      border: '1px solid #CBD5E1',
+                                      background: '#ffffff',
+                                      color: '#0F172A',
+                                      fontWeight: '800',
+                                      fontSize: '14px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer'
+                                    }}
+                                    title="Quitar 1 unidad"
+                                  >
+                                    <IonIcon icon={removeOutline} style={{ fontSize: '14px' }} />
+                                  </button>
+                                  <span
+                                    style={{
+                                      minWidth: '22px',
+                                      textAlign: 'center',
+                                      fontSize: '13px',
+                                      fontWeight: '800',
+                                      color: '#0F172A'
+                                    }}
+                                  >
+                                    {inCartCount}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => addToCart(product, v)}
+                                    className="bg-theme-primary"
+                                    style={{
+                                      width: '28px',
+                                      height: '28px',
+                                      borderRadius: '6px',
+                                      border: 'none',
+                                      backgroundColor: 'var(--theme-primary)',
+                                      color: 'var(--theme-primary-contrast, #ffffff)',
+                                      fontWeight: '800',
+                                      fontSize: '14px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer'
+                                    }}
+                                    title="Añadir 1 unidad"
+                                  >
+                                    <IonIcon icon={addOutline} style={{ fontSize: '14px' }} />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer Fijo del Modal */}
+                <div
+                  style={{
+                    background: '#ffffff',
+                    padding: '14px 20px',
+                    borderTop: '1px solid #E2E8F0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.03)',
+                    flexShrink: 0
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#64748B', fontWeight: '600' }}>
+                      {totalUnitsInCart > 0
+                        ? `${totalUnitsInCart} unidad${totalUnitsInCart === 1 ? '' : 'es'} seleccionada${totalUnitsInCart === 1 ? '' : 's'}`
+                        : 'Ninguna unidad seleccionada'}
+                    </div>
+                    <div style={{ fontSize: '17px', fontWeight: '900', color: 'var(--theme-primary-readable, #047857)' }}>
+                      ${totalAmountInCart.toFixed(2)} USD
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748B', marginLeft: '6px' }}>
+                        ({currencySymbol} {formatLocalAmount(totalAmountInCart * exchangeRate)})
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="ff-btn-primary"
+                    onClick={() => {
+                      setSelectingVariantProduct(null);
+                      setVariantSearchTerm('');
+                    }}
+                    style={{
+                      padding: '10px 24px',
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      fontWeight: '800'
+                    }}
+                  >
+                    Listo ✓
+                  </button>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
         </IonModal>
 
         <SalaryAdvanceModal

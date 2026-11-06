@@ -57,6 +57,7 @@ interface StoreProductVariant {
   name: string;
   sku?: string;
   stockQuantity: number;
+  salePrice?: number | null;
   priceOverride?: number | null;
   images?: string[];
   isOutOfStock?: boolean;
@@ -98,6 +99,17 @@ const getAvailableStock = (p: StoreProduct, variant?: StoreProductVariant) => {
     return Math.max(0, Number(variant.stockQuantity || 0));
   }
   return Math.max(0, Number(p.stock !== undefined && p.stock !== null ? p.stock : (p.stockQuantity || 0)));
+};
+
+const getStoreVariantPrice = (product: StoreProduct, variant?: StoreProductVariant | null): number => {
+  if (!variant) return Number(product.salePrice || 0);
+  if (variant.salePrice !== undefined && variant.salePrice !== null && !isNaN(Number(variant.salePrice))) {
+    return Number(variant.salePrice);
+  }
+  if (variant.priceOverride !== undefined && variant.priceOverride !== null && !isNaN(Number(variant.priceOverride))) {
+    return Number(variant.priceOverride);
+  }
+  return Number(product.salePrice || 0);
 };
 
 interface DeliveryZone {
@@ -678,10 +690,7 @@ const PublicStore: React.FC = () => {
       return;
     }
 
-    const effectivePrice =
-      variant && variant.priceOverride !== undefined && variant.priceOverride !== null
-        ? Number(variant.priceOverride)
-        : Number(product.salePrice || 0);
+    const effectivePrice = getStoreVariantPrice(product, variant);
 
     if (existingIndex > -1) {
       const nextCart = [...cart];
@@ -2239,9 +2248,7 @@ const PublicStore: React.FC = () => {
                 ? activeImageByProduct[product.id]
                 : (galleryImages[0] || null);
 
-              const effectivePrice = activeVariant && activeVariant.priceOverride !== undefined && activeVariant.priceOverride !== null
-                ? Number(activeVariant.priceOverride)
-                : Number(product.salePrice || 0);
+              const effectivePrice = getStoreVariantPrice(product, activeVariant);
               const priceBs = effectivePrice * exchangeRate;
               const activeCartKey = activeVariant ? `${product.id}__${activeVariant.id}` : product.id;
               const inCart = cart.find((i) => i.cartKey === activeCartKey);
@@ -2586,6 +2593,9 @@ const PublicStore: React.FC = () => {
                             {product.variants!.map((v) => {
                               const isSelected = activeVariant?.id === v.id;
                               const vStock = Number(v.stockQuantity || 0);
+                              const vCustomPrice = getStoreVariantPrice(product, v);
+                              const priceDiff = vCustomPrice - Number(product.salePrice || 0);
+                              const diffLabel = priceDiff !== 0 ? ` (${priceDiff > 0 ? '+' : ''}$${priceDiff.toFixed(2)})` : '';
                               return (
                                 <button
                                   key={v.id}
@@ -2608,7 +2618,7 @@ const PublicStore: React.FC = () => {
                                     opacity: vStock <= 0 && !isProductMadeToOrder(product) ? 0.65 : 1,
                                   }}
                                 >
-                                  {v.name} {vStock <= 0 && !isProductMadeToOrder(product) ? '(Agotado)' : `(${vStock})`}
+                                  {v.name}{diffLabel} {vStock <= 0 && !isProductMadeToOrder(product) ? '(Agotado)' : `(${vStock})`}
                                 </button>
                               );
                             })}
