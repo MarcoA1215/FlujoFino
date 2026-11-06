@@ -2,6 +2,7 @@ import { IonApp, IonRouterOutlet, IonSplitPane, IonSpinner, setupIonicReact } fr
 import { IonReactRouter } from '@ionic/react-router';
 import { Navigate, Route, useLocation } from 'react-router-dom';
 import { useContext, useEffect, lazy, Suspense } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import Menu from './components/Menu';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { SubscriptionProvider, SubscriptionContext } from './context/SubscriptionContext';
@@ -268,6 +269,7 @@ const App: React.FC = () => {
                     </Suspense>
                   </ErrorBoundary>
                 </IonReactRouter>
+                <Analytics />
                 </IonApp>
               </AppUpdateProvider>
             </LoadingProvider>
