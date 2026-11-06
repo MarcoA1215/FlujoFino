@@ -14,6 +14,7 @@ import {
   bulbOutline,
   logoWhatsapp,
   arrowForwardOutline,
+  arrowBackOutline,
   sparklesOutline,
   informationCircleOutline,
 } from 'ionicons/icons';
@@ -33,6 +34,7 @@ export const ModuleGuideModal: React.FC<ModuleGuideModalProps> = ({
 }) => {
   const navigate = useNavigate();
   const [activeTabId, setActiveTabId] = useState<string>('');
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
   useEffect(() => {
     if (guide?.tabs && guide.tabs.length > 0) {
@@ -44,10 +46,35 @@ export const ModuleGuideModal: React.FC<ModuleGuideModalProps> = ({
 
   if (!guide) return null;
 
+  const currentTabIndex = guide.tabs ? guide.tabs.findIndex((t) => t.id === activeTabId) : -1;
   const currentTab = guide.tabs?.find((t) => t.id === activeTabId) || guide.tabs?.[0];
+  const prevTab = guide.tabs && currentTabIndex > 0 ? guide.tabs[currentTabIndex - 1] : null;
+  const nextTab =
+    guide.tabs && currentTabIndex >= 0 && currentTabIndex < guide.tabs.length - 1
+      ? guide.tabs[currentTabIndex + 1]
+      : null;
+
   const activeSteps = currentTab ? currentTab.steps : guide.steps;
   const activeConcept = currentTab?.concept || guide.concept;
   const activeProTip = currentTab?.proTip || guide.proTip;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null || !guide.tabs || guide.tabs.length <= 1) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX;
+    const swipeThreshold = 50;
+    if (deltaX < -swipeThreshold && nextTab) {
+      // Deslizar izquierda -> siguiente pestaña
+      setActiveTabId(nextTab.id);
+    } else if (deltaX > swipeThreshold && prevTab) {
+      // Deslizar derecha -> pestaña anterior
+      setActiveTabId(prevTab.id);
+    }
+    setTouchStartX(null);
+  };
 
   const handleActionClick = (path: string) => {
     onClose();
@@ -150,6 +177,8 @@ export const ModuleGuideModal: React.FC<ModuleGuideModalProps> = ({
         } as any}
       >
         <div
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
           style={{
             padding: '16px 20px 50px 20px',
             display: 'flex',
@@ -157,16 +186,14 @@ export const ModuleGuideModal: React.FC<ModuleGuideModalProps> = ({
             gap: '14px',
           }}
         >
-          {/* Selector de Pestañas / Sub-Secciones si el módulo tiene varios flujos */}
+          {/* Selector de Pestañas / Sub-Secciones (Envuelto en flex-wrap para visibilidad total sin cortes) */}
           {guide.tabs && guide.tabs.length > 1 && (
             <div
               style={{
                 display: 'flex',
+                flexWrap: 'wrap',
                 gap: '8px',
-                overflowX: 'auto',
-                paddingBottom: '2px',
-                msOverflowStyle: 'none',
-                scrollbarWidth: 'none',
+                alignItems: 'center',
               }}
             >
               {guide.tabs.map((tab) => {
@@ -177,10 +204,13 @@ export const ModuleGuideModal: React.FC<ModuleGuideModalProps> = ({
                     type="button"
                     onClick={() => setActiveTabId(tab.id)}
                     style={{
-                      padding: '7px 14px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 14px',
                       borderRadius: '20px',
                       border: isSelected
-                        ? '1px solid var(--theme-primary, #10B981)'
+                        ? '1.5px solid var(--theme-primary, #10B981)'
                         : '1px solid #CBD5E1',
                       backgroundColor: isSelected
                         ? 'var(--theme-primary, #10B981)'
@@ -189,14 +219,15 @@ export const ModuleGuideModal: React.FC<ModuleGuideModalProps> = ({
                         ? 'var(--theme-primary-contrast, #ffffff)'
                         : '#334155',
                       fontSize: '12px',
-                      fontWeight: 700,
+                      fontWeight: isSelected ? 800 : 600,
                       cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                      boxShadow: isSelected ? '0 2px 4px rgba(16, 185, 129, 0.2)' : 'none',
+                      boxShadow: isSelected
+                        ? '0 2px 6px rgba(16, 185, 129, 0.25)'
+                        : 'var(--ff-shadow-sm)',
                       transition: 'all 0.15s ease',
                     }}
                   >
-                    {tab.label}
+                    <span>{tab.label}</span>
                   </button>
                 );
               })}
@@ -243,7 +274,7 @@ export const ModuleGuideModal: React.FC<ModuleGuideModalProps> = ({
             </div>
           </div>
 
-          {/* Pasos 1-2-3 */}
+          {/* Pasos 1-2-3-4 */}
           <div>
             <div
               style={{
@@ -368,6 +399,79 @@ export const ModuleGuideModal: React.FC<ModuleGuideModalProps> = ({
                 </div>
               ))}
             </div>
+
+            {/* Barra de Navegación entre Pestañas (Anterior / Siguiente) */}
+            {guide.tabs && guide.tabs.length > 1 && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 12px',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '12px',
+                  border: '1px solid #E2E8F0',
+                  marginTop: '12px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                }}
+              >
+                {prevTab ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTabId(prevTab.id)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      backgroundColor: '#F1F5F9',
+                      color: '#1E293B',
+                      border: '1px solid #CBD5E1',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <IonIcon icon={arrowBackOutline} style={{ fontSize: '13px' }} />
+                    <span>{prevTab.label}</span>
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>
+                  Sección {currentTabIndex + 1} de {guide.tabs.length}
+                </span>
+
+                {nextTab ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTabId(nextTab.id)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      backgroundColor: 'var(--theme-primary, #10B981)',
+                      color: 'var(--theme-primary-contrast, #ffffff)',
+                      border: 'none',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)',
+                    }}
+                  >
+                    <span>{nextTab.label}</span>
+                    <IonIcon icon={arrowForwardOutline} style={{ fontSize: '13px' }} />
+                  </button>
+                ) : (
+                  <div />
+                )}
+              </div>
+            )}
           </div>
 
           {/* Tip Pro */}
