@@ -63,6 +63,9 @@ export function playNotificationSound(): void {
 
 export const IS_NATIVE_FCM_ENABLED = true;
 
+let activeNativeRegistrationPromise: Promise<{ success: boolean; reason?: string }> | null = null;
+let lastRegisteredEndpointKey: string | null = null;
+
 export type NotificationPermissionState = 'granted' | 'denied' | 'default' | 'unsupported';
 
 export function getNotificationPermission(): NotificationPermissionState {
@@ -173,81 +176,100 @@ export async function registerPushNotifications(
       console.info('[Capacitor Native] Push Notifications nativas desactivadas.');
       return { success: false, reason: 'fcm_not_configured' };
     }
-    try {
-      // 1. Crear canal de alta prioridad para Android 8.0+
-      try {
-        await PushNotifications.createChannel({
-          id: 'finowork_orders',
-          name: 'Pedidos y Citas FinoWork',
-          description: 'Alertas prioritarias de nuevos pedidos, ventas y citas',
-          importance: 5,
-          visibility: 1,
-          sound: 'default',
-          vibration: true,
-        });
-      } catch (channelErr) {
-        console.warn('[Capacitor Native] Error configurando NotificationChannel:', channelErr);
-      }
 
-      // 2. Verificar y solicitar permisos de notificaciones (Android 13+ / API 33+)
-      let permStatus = await PushNotifications.checkPermissions();
-      if (permStatus.receive === 'prompt') {
-        permStatus = await PushNotifications.requestPermissions();
-      }
-
-      if (permStatus.receive !== 'granted') {
-        console.warn('[Capacitor Native] Permiso de notificaciones no concedido:', permStatus.receive);
-        return { success: false, reason: permStatus.receive };
-      }
-
-      await PushNotifications.removeAllListeners();
-
-      PushNotifications.addListener('registration', async (token: Token) => {
-        try {
-          const headers = await getAuthHeaders();
-          await axios.post(`${apiBase}/notifications/subscribe`, {
-            identifier: identifier.trim().toLowerCase(),
-            subscription: {
-              endpoint: token.value,
-              keys: { p256dh: '', auth: '' },
-            },
-            negocioId,
-            role,
-          }, { headers });
-          console.log('[Capacitor Native] Token FCM registrado exitosamente en el backend.');
-        } catch (err) {
-          console.error('[Capacitor Native] Error registrando push token con backend:', err);
-        }
-      });
-
-      PushNotifications.addListener('registrationError', (error: any) => {
-        console.warn('[Capacitor Native] Advertencia de registro push:', error);
-      });
-
-      PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
-        console.log('[Capacitor Native] Notificación recibida:', notification);
-        playNotificationSound();
-      });
-
-      PushNotifications.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
-        console.log('[Capacitor Native] Notificación pulsada:', action);
-        const targetUrl = action.notification.data?.url;
-        if (targetUrl) {
-          window.location.href = targetUrl;
-        }
-      });
-
-      try {
-        await PushNotifications.register();
-      } catch (fcmErr) {
-        console.warn('[Capacitor Native] Error registrando FCM:', fcmErr);
-      }
-
-      return { success: true };
-    } catch (error: any) {
-      console.warn('[Capacitor Native] Error al inicializar PushNotifications:', error);
-      return { success: false, reason: error.message };
+    // Si ya hay un proceso de registro en vuelo, reutilizar la misma promesa para evitar peticiones duplicadas
+    if (activeNativeRegistrationPromise) {
+      return activeNativeRegistrationPromise;
     }
+
+    activeNativeRegistrationPromise = (async () => {
+      try {
+        // 1. Crear canal de alta prioridad para Android 8.0+
+        try {
+          await PushNotifications.createChannel({
+            id: 'finowork_orders',
+            name: 'Pedidos y Citas FinoWork',
+            description: 'Alertas prioritarias de nuevos pedidos, ventas y citas',
+            importance: 5,
+            visibility: 1,
+            sound: 'default',
+            vibration: true,
+          });
+        } catch (channelErr) {
+          console.warn('[Capacitor Native] Error configurando NotificationChannel:', channelErr);
+        }
+
+        // 2. Verificar y solicitar permisos de notificaciones (Android 13+ / API 33+)
+        let permStatus = await PushNotifications.checkPermissions();
+        // Si no está otorgado (prompt, prompt-with-rationale o default), solicitar explícitamente al sistema
+        if (permStatus.receive !== 'granted') {
+          permStatus = await PushNotifications.requestPermissions();
+        }
+
+        if (permStatus.receive !== 'granted') {
+          console.warn('[Capacitor Native] Permiso de notificaciones no concedido:', permStatus.receive);
+          return { success: false, reason: permStatus.receive };
+        }
+
+        await PushNotifications.removeAllListeners();
+
+        PushNotifications.addListener('registration', async (token: Token) => {
+          const endpointKey = `${identifier.trim().toLowerCase()}:${token.value}:${negocioId || ''}`;
+          if (lastRegisteredEndpointKey === endpointKey) {
+            return;
+          }
+          lastRegisteredEndpointKey = endpointKey;
+
+          try {
+            const headers = await getAuthHeaders();
+            await axios.post(`${apiBase}/notifications/subscribe`, {
+              identifier: identifier.trim().toLowerCase(),
+              subscription: {
+                endpoint: token.value,
+                keys: { p256dh: '', auth: '' },
+              },
+              negocioId,
+              role,
+            }, { headers });
+            console.log('[Capacitor Native] Token FCM registrado exitosamente en el backend.');
+          } catch (err) {
+            console.error('[Capacitor Native] Error registrando push token con backend:', err);
+          }
+        });
+
+        PushNotifications.addListener('registrationError', (error: any) => {
+          console.warn('[Capacitor Native] Advertencia de registro push:', error);
+        });
+
+        PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
+          console.log('[Capacitor Native] Notificación recibida:', notification);
+          playNotificationSound();
+        });
+
+        PushNotifications.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
+          console.log('[Capacitor Native] Notificación pulsada:', action);
+          const targetUrl = action.notification.data?.url;
+          if (targetUrl) {
+            window.location.href = targetUrl;
+          }
+        });
+
+        try {
+          await PushNotifications.register();
+        } catch (fcmErr) {
+          console.warn('[Capacitor Native] Error registrando FCM:', fcmErr);
+        }
+
+        return { success: true };
+      } catch (error: any) {
+        console.warn('[Capacitor Native] Error al inicializar PushNotifications:', error);
+        return { success: false, reason: error.message };
+      } finally {
+        activeNativeRegistrationPromise = null;
+      }
+    })();
+
+    return activeNativeRegistrationPromise;
   } else {
     const shouldPrompt = isManualUserGesture || (typeof Notification !== 'undefined' && Notification.permission === 'granted');
     return await subscribeWebPush(identifier, negocioId, role, shouldPrompt);

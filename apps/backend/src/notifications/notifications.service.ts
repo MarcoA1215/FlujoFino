@@ -130,28 +130,52 @@ export class NotificationsService {
     const p256dh = subscription.keys?.p256dh || '';
     const auth = subscription.keys?.auth || '';
 
-    let existing = await this.pushRepo.findOne({
+    // Buscar todas las suscripciones existentes con este endpoint para prevenir duplicados
+    const existingList = await this.pushRepo.find({
       where: { endpoint },
+      order: { createdAt: 'ASC' },
     });
 
-    if (existing) {
-      existing.identifier = cleanId;
-      existing.p256dh = p256dh;
-      existing.auth = auth;
-      if (negocioId) existing.negocioId = negocioId;
-      if (role) existing.role = role;
-      return this.pushRepo.save(existing);
+    if (existingList && existingList.length > 0) {
+      const primary = existingList[0];
+      primary.identifier = cleanId;
+      primary.p256dh = p256dh;
+      primary.auth = auth;
+      if (negocioId) primary.negocioId = negocioId;
+      if (role) primary.role = role;
+
+      // Si existen filas duplicadas para este mismo endpoint, eliminarlas
+      if (existingList.length > 1) {
+        const duplicateIds = existingList.slice(1).map((s) => s.id);
+        await this.pushRepo.delete(duplicateIds).catch(() => {});
+      }
+
+      return this.pushRepo.save(primary);
     }
 
-    const created = this.pushRepo.create({
-      identifier: cleanId,
-      endpoint,
-      p256dh,
-      auth,
-      negocioId,
-      role: role || 'CUSTOMER',
-    });
-    return this.pushRepo.save(created);
+    try {
+      const created = this.pushRepo.create({
+        identifier: cleanId,
+        endpoint,
+        p256dh,
+        auth,
+        negocioId,
+        role: role || 'CUSTOMER',
+      });
+      return await this.pushRepo.save(created);
+    } catch (saveErr: any) {
+      // Si ocurrió una inserción concurrente simultánea, recuperar la fila y actualizarla
+      const retry = await this.pushRepo.findOne({ where: { endpoint } });
+      if (retry) {
+        retry.identifier = cleanId;
+        retry.p256dh = p256dh;
+        retry.auth = auth;
+        if (negocioId) retry.negocioId = negocioId;
+        if (role) retry.role = role;
+        return await this.pushRepo.save(retry);
+      }
+      throw saveErr;
+    }
   }
 
   private async dispatchToSubscription(
@@ -393,8 +417,16 @@ export class NotificationsService {
       return 0;
     }
 
-    let sent = 0;
+    // Deduplicar suscripciones por endpoint único
+    const uniqueSubsMap = new Map<string, PushSubscription>();
     for (const sub of subs) {
+      if (sub.endpoint && !uniqueSubsMap.has(sub.endpoint)) {
+        uniqueSubsMap.set(sub.endpoint, sub);
+      }
+    }
+
+    let sent = 0;
+    for (const sub of uniqueSubsMap.values()) {
       const ok = await this.dispatchToSubscription(sub, payload);
       if (ok) sent++;
     }
@@ -547,8 +579,16 @@ export class NotificationsService {
       return 0;
     }
 
-    let sent = 0;
+    // Deduplicar suscripciones por endpoint único
+    const uniqueSubsMap = new Map<string, PushSubscription>();
     for (const sub of subs) {
+      if (sub.endpoint && !uniqueSubsMap.has(sub.endpoint)) {
+        uniqueSubsMap.set(sub.endpoint, sub);
+      }
+    }
+
+    let sent = 0;
+    for (const sub of uniqueSubsMap.values()) {
       const ok = await this.dispatchToSubscription(sub, payload);
       if (ok) sent++;
     }
@@ -568,13 +608,54 @@ export class NotificationsService {
       },
     };
 
-    let sent = 0;
+    const targetSubsMap = new Map<string, PushSubscription>();
+
+    // 1. Obtener suscripciones activas del negocio
     if (negocioId) {
-      sent += await this.sendNotificationToNegocio(negocioId, payload, ['ADMIN', 'CAJERO', 'SUPERADMIN']);
+      try {
+        const negocioSubs = await this.pushRepo
+          .createQueryBuilder('sub')
+          .where('sub.negocioId = :negocioId', { negocioId })
+          .andWhere('sub.role IN (:...roles)', { roles: ['ADMIN', 'CAJERO', 'POS', 'SUPERADMIN'] })
+          .getMany();
+
+        for (const s of negocioSubs) {
+          if (s.endpoint) targetSubsMap.set(s.endpoint, s);
+        }
+      } catch (err: any) {
+        this.logger.warn(`Error consultando suscripciones de negocio para prueba: ${err.message}`);
+      }
     }
+
+    // 2. Obtener suscripciones por identificador (email, teléfono, usuario)
     if (identifier) {
-      sent += await this.sendNotificationToIdentifier(identifier, payload);
+      try {
+        const cleanId = identifier.trim().toLowerCase();
+        const digitsOnly = cleanId.replace(/\D/g, '');
+        const query = this.pushRepo
+          .createQueryBuilder('sub')
+          .where('LOWER(sub.identifier) = :cleanId', { cleanId });
+
+        if (digitsOnly.length >= 6) {
+          query.orWhere('sub.identifier LIKE :digits', { digits: `%${digitsOnly}%` });
+        }
+
+        const idSubs = await query.getMany();
+        for (const s of idSubs) {
+          if (s.endpoint) targetSubsMap.set(s.endpoint, s);
+        }
+      } catch (err: any) {
+        this.logger.warn(`Error consultando suscripciones por identificador para prueba: ${err.message}`);
+      }
     }
+
+    const uniqueSubs = Array.from(targetSubsMap.values());
+    let sent = 0;
+    for (const sub of uniqueSubs) {
+      const ok = await this.dispatchToSubscription(sub, payload);
+      if (ok) sent++;
+    }
+
     return {
       sent,
       message: sent > 0
@@ -593,8 +674,15 @@ export class NotificationsService {
       return 0;
     }
 
-    let sent = 0;
+    const uniqueSubsMap = new Map<string, PushSubscription>();
     for (const sub of subs) {
+      if (sub.endpoint && !uniqueSubsMap.has(sub.endpoint)) {
+        uniqueSubsMap.set(sub.endpoint, sub);
+      }
+    }
+
+    let sent = 0;
+    for (const sub of uniqueSubsMap.values()) {
       const ok = await this.dispatchToSubscription(sub, payload);
       if (ok) sent++;
     }
