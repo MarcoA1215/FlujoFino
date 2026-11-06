@@ -53,13 +53,13 @@ export class RegisterAppUpdateV1141793900000000 implements MigrationInterface {
         3,
         '24.7',
         'Optimización completa en la selección y tarificación de variantes en Caja (POS) y Tienda Online, con visualización de fotografías por variante, contadores interactivos y mejoras de inventario.',
-        $1,
+        '${changes.replace(/'/g, "''")}'::jsonb,
         true,
         NOW(),
         NOW(),
         NOW()
       );
-    `, [changes]);
+    `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
