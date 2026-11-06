@@ -124,6 +124,8 @@ const Register: React.FC = () => {
   const [identification, setIdentification] = useState('');
   const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState('');
+  const [isReferredFromUrl, setIsReferredFromUrl] = useState(false);
+  const [trialConfig, setTrialConfig] = useState<{ defaultTrialDays: number; referredTrialDays: number }>({ defaultTrialDays: 7, referredTrialDays: 15 });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -141,10 +143,28 @@ const Register: React.FC = () => {
   const [featureFiscalSupport, setFeatureFiscalSupport] = useState(false);
 
   useEffect(() => {
+    apiClient.get('/auth/trial-config')
+      .then(res => {
+        if (res.data) {
+          setTrialConfig({
+            defaultTrialDays: Number(res.data.defaultTrialDays) || 7,
+            referredTrialDays: Number(res.data.referredTrialDays) || 15,
+          });
+        }
+      })
+      .catch(() => {});
+
     const params = new URLSearchParams(window.location.search);
-    const ref = params.get('ref') || params.get('referral');
-    if (ref) {
-      setReferralCode(ref.trim().toUpperCase());
+    const refFromUrl = params.get('ref') || params.get('referral');
+    const savedRef = sessionStorage.getItem('finowork_referral_code');
+    const activeRef = refFromUrl ? refFromUrl.trim().toUpperCase() : (savedRef ? savedRef.trim().toUpperCase() : '');
+
+    if (activeRef) {
+      setReferralCode(activeRef);
+      setIsReferredFromUrl(true);
+      try {
+        sessionStorage.setItem('finowork_referral_code', activeRef);
+      } catch {}
     }
   }, []);
 
@@ -238,6 +258,7 @@ const Register: React.FC = () => {
       });
 
       localStorage.removeItem('tenant_settings');
+      try { sessionStorage.removeItem('finowork_referral_code'); } catch {}
       login(res.data.access_token, res.data.user, res.data.workspaces);
       presentToast({ message: '¡Negocio registrado con éxito!', duration: 3000, color: 'success' });
       router.push('/dashboard', 'root', 'replace');
@@ -316,21 +337,35 @@ const Register: React.FC = () => {
                     <IonInput type="password" value={password} placeholder="Mínimo 6 caracteres" onIonInput={e => setPassword(e.detail.value!)} />
                   </IonItem>
 
-                  <IonItem lines="full" className="ion-margin-bottom">
+                  <IonItem lines="full" className="ion-margin-bottom" style={isReferredFromUrl ? { opacity: 0.95 } : undefined}>
                     <IonLabel position="stacked" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <IonIcon icon={giftOutline} style={{ color: '#f59e0b' }} />
-                      ¿Tienes un código de referido? (Opcional)
+                      {isReferredFromUrl ? 'Código de Invitación (Vinculado)' : '¿Tienes un código de invitación? (Opcional)'}
                     </IonLabel>
                     <IonInput
                       value={referralCode}
-                      placeholder="Ej. BURG-9X2A"
-                      onIonInput={e => setReferralCode(e.detail.value || '')}
-                      style={{ textTransform: 'uppercase', letterSpacing: '1px' }}
+                      readonly={isReferredFromUrl}
+                      placeholder={`Ej. BURG-9X2A (${trialConfig.referredTrialDays} días de prueba en vez de ${trialConfig.defaultTrialDays})`}
+                      onIonInput={e => !isReferredFromUrl && setReferralCode(e.detail.value || '')}
+                      style={{
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px',
+                        backgroundColor: isReferredFromUrl ? '#F8FAFC' : 'transparent',
+                        cursor: isReferredFromUrl ? 'default' : 'text'
+                      }}
                     />
                   </IonItem>
-                  {referralCode.trim() && (
+                  {isReferredFromUrl ? (
                     <div style={{ margin: '-8px 0 14px 4px', fontSize: '12px', color: 'var(--theme-primary-readable, #065F46)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <IonIcon icon={checkmarkDoneOutline} /> Código de invitación vinculado: <strong>{referralCode.trim().toUpperCase()}</strong>
+                      <IonIcon icon={checkmarkDoneOutline} /> Invitación vinculada: <strong>{referralCode.trim().toUpperCase()}</strong> • Disfrutas de <strong>{trialConfig.referredTrialDays} días de prueba gratis completa</strong>.
+                    </div>
+                  ) : referralCode.trim() ? (
+                    <div style={{ margin: '-8px 0 14px 4px', fontSize: '12px', color: 'var(--theme-primary-readable, #065F46)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <IonIcon icon={checkmarkDoneOutline} /> Código ingresado: <strong>{referralCode.trim().toUpperCase()}</strong> • Activará <strong>{trialConfig.referredTrialDays} días de prueba gratis</strong> al registrarte.
+                    </div>
+                  ) : (
+                    <div style={{ margin: '-8px 0 14px 4px', fontSize: '11px', color: '#64748B', lineHeight: '1.4' }}>
+                      Sin código dispones de <strong>{trialConfig.defaultTrialDays} días de prueba</strong>. Si un promotor o tienda aliada te invitó, ingresa su código para recibir <strong>{trialConfig.referredTrialDays} días</strong>.
                     </div>
                   )}
 

@@ -796,6 +796,11 @@ const SettingsPage: React.FC = () => {
                             <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 500 }}> / 2</span>
                           )}
                         </div>
+                        {subscription.totalReferrals > subscription.activeReferrals && (
+                          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
+                            {subscription.totalReferrals} registrado{subscription.totalReferrals > 1 ? 's' : ''} (en prueba)
+                          </div>
+                        )}
                       </div>
 
                       <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
@@ -869,7 +874,7 @@ const SettingsPage: React.FC = () => {
                           }}
                           onClick={() => {
                             const link = `${getPublicBaseUrl()}/register?ref=${subscription.referralCode}`;
-                            const msg = `¡Hola! Te recomiendo FinoWork para administrar tu negocio (punto de venta, pedidos, inventario y delivery). Regístrate gratis con mi enlace de invitación: ${link}`;
+                            const msg = `¡Hola! Te recomiendo FinoWork para administrar tu negocio (punto de venta, pedidos, inventario y delivery). Regístrate con mi enlace de invitación para recibir 15 días de prueba gratis completa (en vez de 7): ${link}`;
                             window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
                           }}
                         >

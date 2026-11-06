@@ -285,7 +285,7 @@ const PromoterDashboard: React.FC = () => {
   };
 
   const handleShareWhatsApp = () => {
-    const message = `¡Hola! Te invito a digitalizar tu negocio con FinoWork SaaS (POS, Inventario, Reportes y Catálogo Digital). Regístrate usando mi enlace de promotor oficial para activar tu período de prueba gratuito: ${affiliateLink}`;
+    const message = `¡Hola! Te invito a digitalizar tu negocio con FinoWork SaaS (POS, Inventario, Reportes y Catálogo Digital). Regístrate usando mi enlace de promotor oficial para activar 15 días de prueba gratis completa (en vez de los 7 habituales): ${affiliateLink}`;
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };

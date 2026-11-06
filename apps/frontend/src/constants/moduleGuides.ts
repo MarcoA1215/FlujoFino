@@ -1007,21 +1007,26 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       {
         id: 'referrals',
         label: 'Programa de Referidos',
-        concept: 'Gana meses gratis de FinoWork recomendando la plataforma a colegas.',
+        concept: 'Gana meses gratis y descuentos en FinoWork recomendando la plataforma a colegas. ¡Tus invitados reciben 15 días gratis de prueba en vez de 7!',
         steps: [
           {
             stepNumber: 1,
             title: 'Copia tu Enlace Único de Invitación',
-            description: 'En Ajustes > Mi Suscripción encontrarás tu código y enlace personal de recomendación.',
+            description: 'En Ajustes > Mi Suscripción encontrarás tu código y enlace personal. Al abrirlo, el código se vincula e inmoviliza automáticamente en el registro de tu invitado.',
           },
           {
             stepNumber: 2,
-            title: 'Gana Beneficios Automáticos',
-            description: 'Cuando otro comercio se registre con tu enlace y active su suscripción, recibirás meses gratuitos acreditados a tu cuenta.',
+            title: 'Tu Invitado Recibe 15 Días de Prueba Gratis',
+            description: 'Al usar tu invitación, tu referido obtiene 15 días completos de prueba sin costo (en lugar de los 7 días habituales de un registro directo).',
+          },
+          {
+            stepNumber: 3,
+            title: 'Gana Descuentos Recurrentes o Mensualidad Bonificada',
+            description: 'Cuando tu referido active su cuenta con suscripción paga, recibirás hasta un 50% de descuento o el 100% de tu cuota bonificada ($0/mes si eres cuenta Pionera).',
           },
         ],
         proTip:
-          'Muchos de nuestros usuarios disfrutan de FinoWork 100% gratis gracias a sus recomendaciones.',
+          'Utiliza los 15 días gratis como tu carta fuerte de recomendación: tus colegas querrán usar tu enlace para aprovechar el doble de tiempo de prueba.',
       },
     ],
     steps: [

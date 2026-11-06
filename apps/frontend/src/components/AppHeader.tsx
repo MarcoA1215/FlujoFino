@@ -326,13 +326,28 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     if (isAdmin) {
       let isMounted = true;
       const safeFetch = async () => {
-        if (isMounted) await fetchPendingAccessRequests();
+        if (isMounted && (typeof document === 'undefined' || !document.hidden)) {
+          await fetchPendingAccessRequests();
+        }
       };
       safeFetch();
-      const interval = setInterval(safeFetch, 15000);
+
+      const handleVisibilityChange = () => {
+        if (typeof document !== 'undefined' && !document.hidden && isMounted) {
+          safeFetch();
+        }
+      };
+
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+      }
+      const interval = setInterval(safeFetch, 60000);
       return () => {
         isMounted = false;
         clearInterval(interval);
+        if (typeof document !== 'undefined') {
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+        }
       };
     }
   }, [isAdmin]);

@@ -451,5 +451,133 @@ describe('AuthService - Seguridad, Multi-Tenant y Verificación', () => {
         featureShowCatalog: true,
       });
     });
+
+    it('asigna defaultTrialDays (7 días) a un registro orgánico sin referido', async () => {
+      let createdTenantData: any = null;
+      const mockQueryRunner: any = {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        commitTransaction: jest.fn(),
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+        manager: {
+          createQueryBuilder: jest.fn(() => ({
+            where: jest.fn().mockReturnThis(),
+            orWhere: jest.fn().mockReturnThis(),
+            getOne: jest.fn().mockResolvedValue(null),
+          })),
+          findOne: jest.fn().mockResolvedValue({
+            defaultTrialDays: 7,
+            referredTrialDays: 15,
+            defaultMonthlyPrice: 20,
+          }),
+          create: jest.fn((entity: any, data: any) => {
+            if (entity.name === 'Tenant' || data.trial_ends_at !== undefined) {
+              createdTenantData = data;
+            }
+            return { id: 'mock-tenant-id', ...data };
+          }),
+          save: jest.fn((entityOrData: any, maybeData?: any) => {
+            const target = maybeData || entityOrData;
+            return Promise.resolve({ id: 'saved-id', ...target });
+          }),
+        },
+      };
+
+      mockDataSource.createQueryRunner = jest.fn().mockReturnValue(mockQueryRunner);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed_pw');
+
+      const beforeTime = new Date();
+      await service.registerTenant({
+        tenantName: 'Zapatería Orgánica',
+        username: 'zapateria_admin',
+        email: 'zapato@tienda.com',
+        password: 'password123',
+        businessProfile: 'RETAIL',
+        acceptedTerms: true,
+        acceptedPrivacy: true,
+      });
+
+      expect(createdTenantData).toBeDefined();
+      const trialDaysDiff = Math.round(
+        (createdTenantData.trial_ends_at.getTime() - beforeTime.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      expect(trialDaysDiff).toBe(7);
+      expect(createdTenantData.promoterId).toBeNull();
+      expect(createdTenantData.referred_by_tenant_id).toBeNull();
+    });
+
+    it('asigna referredTrialDays (15 días) a un registro con código de referido válido de promotor', async () => {
+      let createdTenantData: any = null;
+      const mockQueryRunner: any = {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        commitTransaction: jest.fn(),
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+        manager: {
+          createQueryBuilder: jest.fn(() => ({
+            where: jest.fn().mockReturnThis(),
+            orWhere: jest.fn().mockReturnThis(),
+            getOne: jest.fn().mockResolvedValue(null),
+          })),
+          findOne: jest.fn((entity: any, opts: any) => {
+            if (entity.name === 'Promoter' || opts?.where?.code === 'PROM-EXACTO') {
+              return Promise.resolve({ id: 'promoter-uuid-1', code: 'PROM-EXACTO' });
+            }
+            return Promise.resolve({
+              defaultTrialDays: 7,
+              referredTrialDays: 15,
+              defaultMonthlyPrice: 20,
+            });
+          }),
+          create: jest.fn((entity: any, data: any) => {
+            if (entity.name === 'Tenant' || data.trial_ends_at !== undefined) {
+              createdTenantData = data;
+            }
+            return { id: 'mock-tenant-id', ...data };
+          }),
+          save: jest.fn((entityOrData: any, maybeData?: any) => {
+            const target = maybeData || entityOrData;
+            return Promise.resolve({ id: 'saved-id', ...target });
+          }),
+        },
+      };
+
+      mockDataSource.createQueryRunner = jest.fn().mockReturnValue(mockQueryRunner);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed_pw');
+
+      const beforeTime = new Date();
+      await service.registerTenant({
+        tenantName: 'Spa Con Promotor',
+        username: 'spa_admin',
+        email: 'spa@belleza.com',
+        password: 'password123',
+        referralCode: 'PROM-EXACTO',
+        businessProfile: 'SERVICES',
+        acceptedTerms: true,
+        acceptedPrivacy: true,
+      });
+
+      expect(createdTenantData).toBeDefined();
+      const trialDaysDiff = Math.round(
+        (createdTenantData.trial_ends_at.getTime() - beforeTime.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      expect(trialDaysDiff).toBe(15);
+      expect(createdTenantData.promoterId).toBe('promoter-uuid-1');
+    });
+
+    it('getTrialConfig retorna los días de prueba configurados para registro orgánico y referido', async () => {
+      const mockPlatformConfigRepo = {
+        findOne: jest.fn().mockResolvedValue({
+          defaultTrialDays: 7,
+          referredTrialDays: 15,
+        }),
+      };
+      mockDataSource.getRepository = jest.fn().mockReturnValue(mockPlatformConfigRepo);
+
+      const config = await service.getTrialConfig();
+      expect(config).toEqual({ defaultTrialDays: 7, referredTrialDays: 15 });
+    });
   });
 });

@@ -215,7 +215,8 @@ Configuración global de cobro y precios de la plataforma FinoWork (registro sin
 | `binancePayId` | `binancePayId` | `varchar` | Sí | `NULL` | Binance Pay ID oficial de FinoWork. |
 | `binanceEmail` | `binanceEmail` | `varchar` | Sí | `NULL` | Correo de Binance de FinoWork. |
 | `defaultMonthlyPrice` | `defaultMonthlyPrice` | `decimal(10,2)` | No | `20.00` | Precio mensual por defecto en USD para nuevos tenants. |
-| `defaultTrialDays` | `defaultTrialDays` | `int` | No | `15` | Días de prueba gratis por defecto. |
+| `defaultTrialDays` | `defaultTrialDays` | `int` | No | `7` | Días de prueba estándar por defecto (registro orgánico/directo). |
+| `referred_trial_days` | `referredTrialDays` | `int` | No | `15` | Días de prueba gratuitos ampliados para negocios invitados con código/enlace de promotor o tienda. |
 | `updatedAt` | `updatedAt` | `timestamp` | No | `now()` | Última modificación. |
 
 ---
@@ -854,6 +855,7 @@ Buzón de sugerencias y calificaciones (tanto de clientes finales hacia el comer
 | 11 | `1792500000000-CreatePlatformExpensesAndAddIvaColumns.ts` | Crea `platform_expenses` y agrega `subtotal` e `iva_amount` a `saas_payment_reports`. |
 | 12 | `1792600000000-CreateFiscalInvoicesAndAddFiscalColumns.ts` | Crea `fiscal_invoices` y agrega columnas de IVA/facturación a `order`, `order_item`, `product`, `product_variant` y `settings`. |
 | 13 | `1792700000000-AddIsTestToTenant.ts` | Agrega el flag `is_test` a `tenant`. |
+| 24 | `1793700000000-AddReferredTrialDaysToPlatformConfig.ts` | Agrega `referred_trial_days` (default 15) a `platform_config` y actualiza `default_trial_days` por defecto a 7. |
 
 ---
 

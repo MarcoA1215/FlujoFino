@@ -133,6 +133,14 @@ export class AuthService {
     private mailService: MailService,
   ) {}
 
+  async getTrialConfig(): Promise<{ defaultTrialDays: number; referredTrialDays: number }> {
+    const config = await this.dataSource.getRepository(PlatformConfig).findOne({ where: { id: 'default' } });
+    return {
+      defaultTrialDays: config?.defaultTrialDays ?? 7,
+      referredTrialDays: config?.referredTrialDays ?? 15,
+    };
+  }
+
   async validateUser(username: string, pass: string, requestedTenantId?: string): Promise<{ user: any, tenantId: string | null, role: string, roles?: UserRole[], tenantName: string, workspaces: any[] } | null> {
     const user = await this.usersService.findByUsername(username);
     if (!user) return null;
@@ -711,12 +719,7 @@ export class AuthService {
 
       // Consultar PlatformConfig ('default') para sincronizar valores globales
       const platformConfig = await queryRunner.manager.findOne(PlatformConfig, { where: { id: 'default' } });
-      const trialDays = platformConfig?.defaultTrialDays ?? 15;
       const basePrice = platformConfig?.defaultMonthlyPrice !== undefined ? Number(platformConfig.defaultMonthlyPrice) : 20.00;
-
-      // 1. Create Tenant with SaaS subscription details
-      const trialEndsAt = new Date();
-      trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
 
       // Generate unique referral code for this new business with 6 random chars and collision check
       const cleanPrefix = (body.tenantName || 'FF')
@@ -764,6 +767,14 @@ export class AuthService {
           }
         }
       }
+
+      // Determinar días de prueba: 15 (o configurado para referidos) con promotor o tienda; 7 (o configurado estándar) si orgánico
+      const isReferred = Boolean(referredByTenantId || promoterId || body.referredByTenantId || body.promoterId);
+      const trialDays = isReferred
+        ? (platformConfig?.referredTrialDays ?? 15)
+        : (platformConfig?.defaultTrialDays ?? 7);
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
 
       const tenant = queryRunner.manager.create(Tenant, {
         name: body.tenantName,

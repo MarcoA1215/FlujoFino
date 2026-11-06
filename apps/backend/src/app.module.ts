@@ -86,9 +86,9 @@ import { SentryModule } from '@sentry/nestjs/setup';
         url: configService.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
         extra: {
-          max: Number(configService.get('DB_POOL_MAX')) || 20,
-          min: Number(configService.get('DB_POOL_MIN')) || 2,
-          idleTimeoutMillis: 30000,
+          max: Number(configService.get('DB_POOL_MAX')) || 10,
+          min: Number(configService.get('DB_POOL_MIN')) || 1,
+          idleTimeoutMillis: 15000,
           connectionTimeoutMillis: 5000,
           keepAlive: true,
           keepAliveInitialDelayMillis: 10000,

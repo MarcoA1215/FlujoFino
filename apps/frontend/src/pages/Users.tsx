@@ -265,7 +265,12 @@ const Users: React.FC = () => {
       fetchAccessRequests();
       fetchPendingAdvances();
       fetchDeliverySummary();
-      const interval = setInterval(fetchAccessRequests, 15000);
+      const safeFetch = () => {
+        if (typeof document === 'undefined' || !document.hidden) {
+          fetchAccessRequests();
+        }
+      };
+      const interval = setInterval(safeFetch, 60000);
       return () => clearInterval(interval);
     }
   }, [user]);

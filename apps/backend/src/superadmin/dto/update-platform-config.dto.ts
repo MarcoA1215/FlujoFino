@@ -56,6 +56,12 @@ export class UpdatePlatformConfigDto implements PlatformConfigDTO {
   defaultTrialDays?: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(365)
+  referredTrialDays?: number;
+
+  @IsOptional()
   @IsBoolean()
   chargeIva?: boolean;
 

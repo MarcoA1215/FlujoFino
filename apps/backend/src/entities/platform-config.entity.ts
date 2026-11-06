@@ -30,8 +30,11 @@ export class PlatformConfig {
   @Column('decimal', { precision: 10, scale: 2, default: 20.00, transformer: new ColumnNumericTransformer() })
   defaultMonthlyPrice: number;
 
-  @Column({ type: 'int', default: 15 })
+  @Column({ type: 'int', default: 7 })
   defaultTrialDays: number;
+
+  @Column({ name: 'referred_trial_days', type: 'int', default: 15 })
+  referredTrialDays: number;
 
   @Column({ name: 'charge_iva', type: 'boolean', default: false })
   chargeIva: boolean;

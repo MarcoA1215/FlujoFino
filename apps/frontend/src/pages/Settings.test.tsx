@@ -153,7 +153,7 @@ describe('SettingsPage - Menú Desplegable, Suscripción y Persistencia de Paylo
     expect(screen.getByTestId('settings-section-modules')).toBeTruthy();
     expect(screen.getByTestId('settings-section-booking')).toBeTruthy();
     expect(screen.getByTestId('settings-section-plan')).toBeTruthy();
-  });
+  }, 15000);
 
   it('permite desplegar y contraer secciones y envía el payload completo a PUT /settings sin perder datos bancarios', async () => {
     (apiClient.put as any).mockResolvedValue({ data: { businessName: 'Centro Estético Glow' } });

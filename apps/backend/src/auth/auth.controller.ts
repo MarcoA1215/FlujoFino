@@ -30,6 +30,12 @@ export class AuthController {
   }
 
   @Public()
+  @Get('trial-config')
+  async getTrialConfig() {
+    return this.authService.getTrialConfig();
+  }
+
+  @Public()
   @Post('register')
   async register(@Body() body: any) {
     return this.authService.registerTenant(body);

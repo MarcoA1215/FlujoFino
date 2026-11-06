@@ -382,12 +382,18 @@ const PublicStore: React.FC = () => {
   useEffect(() => {
     if (!orderResult?.orderId) return;
 
+    const terminalStatuses = ['COMPLETED', 'DELIVERED', 'CANCELADO_PROVEEDOR', 'CANCELLED', 'REJECTED'];
     let isMounted = true;
     let currentStatus = orderResult.status || 'PENDING';
     setLiveOrderStatus(currentStatus);
     setLivePaymentStatus(orderResult.paymentStatus || 'PENDING');
 
+    if (terminalStatuses.includes(currentStatus)) {
+      return;
+    }
+
     const interval = setInterval(async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       try {
         const res = await axios.get(`${apiBase}/public/store/order/${orderResult.orderId}`);
         if (!isMounted) return;
@@ -429,9 +435,12 @@ const PublicStore: React.FC = () => {
             color: 'success',
             position: 'top',
           });
+          if (terminalStatuses.includes(newStatus)) {
+            clearInterval(interval);
+          }
         }
       } catch (err) {}
-    }, 6000);
+    }, 12000);
 
     return () => {
       isMounted = false;

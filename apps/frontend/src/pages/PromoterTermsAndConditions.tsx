@@ -86,7 +86,7 @@ export const PromoterTermsContent: React.FC = () => {
             A. Comisión de Activación (50% del Primer Pago)
           </div>
           <p style={{ margin: 0, fontSize: '13px', color: '#475569' }}>
-            Al concluir los 15 días de prueba gratuita, en el momento en que el comercio procesa su primer pago formal para activar la plataforma, el Promotor recibe de inmediato el <strong>50% del monto total abonado</strong>: <strong>$10.00 USD</strong> en cuota mensual estándar ($20 USD) o <strong>$100.00 USD</strong> en plan anual ($200 USD). La empresa y el promotor comparten dicho primer cobro al 50/50.
+            Al concluir los 15 días de prueba gratuita concedidos al cliente gracias a la invitación del Promotor, en el momento en que el comercio procesa su primer pago formal para activar la plataforma, el Promotor recibe de inmediato el <strong>50% del monto total abonado</strong>: <strong>$10.00 USD</strong> en cuota mensual estándar ($20 USD) o <strong>$100.00 USD</strong> en plan anual ($200 USD). La empresa y el promotor comparten dicho primer cobro al 50/50.
           </p>
         </div>
 
@@ -156,15 +156,16 @@ export const PromoterTermsContent: React.FC = () => {
         </div>
 
         <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-          4. Atribución Automática y Enlace de Referido
+          4. Atribución Automática, Inmutabilidad Técnica y Beneficio Bilateral
         </h2>
         <p>
-          Cada Promotor cuenta con un código alfanumérico exclusivo y un enlace de afiliado único. Para que un comercio sea atribuido a su cuenta:
+          Cada Promotor cuenta con un código alfanumérico exclusivo y un enlace de afiliado único (ejemplo: <code>https://www.finowork.com/register?ref=PROM-XXXX</code>). Para regular la correcta atribución:
         </p>
         <ul style={{ paddingLeft: '20px', margin: '6px 0' }}>
-          <li>El dueño del comercio debe registrarse utilizando directamente el enlace de afiliado del Promotor o ingresar su código al crear la tienda.</li>
-          <li>La vinculación entre el comercio y el promotor es permanente mientras el comercio continúe renovando su suscripción en la plataforma.</li>
-          <li>No se admiten solicitudes de atribución manual retroactiva si un comercio se registró de manera independiente sin usar el código ni el enlace.</li>
+          <li><strong>Incentivo Bilateral (15 días vs 7 días):</strong> El comercio que accede y se registra a través del enlace de un Promotor recibe un período de prueba gratuito ampliado de <strong>15 días consecutivos</strong>, en comparación con los 7 días concedidos al registro orgánico sin invitación. Este diferencial constituye una herramienta de venta formal y un beneficio tangible que el Promotor puede promocionar activamente con sus clientes.</li>
+          <li><strong>Inmutabilidad técnica de atribución:</strong> Al acceder mediante el enlace del Promotor, el código de referido se autocompleta y bloquea de manera inmutable en el formulario de registro. Esto previene que el comercio borre o altere el código por equivocación, asegurando la atribución irrevocable de la comisión al Promotor.</li>
+          <li><strong>Permanencia de la vinculación:</strong> La vinculación entre el comercio y el Promotor es permanente e indisoluble mientras el comercio mantenga su suscripción en la plataforma.</li>
+          <li><strong>No retroactividad:</strong> No se admiten solicitudes de atribución manual retroactiva si un comercio se registró de manera independiente sin usar el código ni el enlace del Promotor.</li>
         </ul>
 
         <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>

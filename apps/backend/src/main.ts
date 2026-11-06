@@ -88,6 +88,7 @@ async function bootstrap() {
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Accept, Authorization, X-Requested-With',
+    maxAge: 86400,
   });
 
   await app.listen(process.env.PORT ?? 3001, '0.0.0.0');

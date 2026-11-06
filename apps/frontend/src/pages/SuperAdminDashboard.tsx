@@ -192,7 +192,8 @@ const SuperAdminDashboard: React.FC = () => {
     binancePayId: '',
     binanceEmail: '',
     defaultMonthlyPrice: 20,
-    defaultTrialDays: 15,
+    defaultTrialDays: 7,
+    referredTrialDays: 15,
     chargeIva: false,
     ivaPercentage: 16,
   });
@@ -2294,6 +2295,11 @@ const SuperAdminDashboard: React.FC = () => {
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
                               <IonIcon icon={peopleOutline} style={{ color: '#3b82f6', fontSize: '16px' }} />
                               <span style={{ fontSize: '14px', color: '#0f172a' }}>{t.activeReferrals}</span>
+                              {t.totalReferrals !== undefined && t.totalReferrals > t.activeReferrals && (
+                                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }} title="Referidos totales registrados">
+                                  ({t.totalReferrals} reg.)
+                                </span>
+                              )}
                             </div>
                             {t.discountPercentage > 0 && (
                               <div style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, marginTop: '2px' }}>
@@ -3026,16 +3032,34 @@ const SuperAdminDashboard: React.FC = () => {
                           </IonItem>
                         </IonCol>
                         <IonCol size="12" sizeMd="6">
-                          <IonItem lines="none" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '10px' }}>
-                            <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Días de Prueba para Nuevos Negocios</IonLabel>
+                          <IonItem lines="none" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '6px' }}>
+                            <IonLabel position="stacked" style={{ fontWeight: 600, color: '#475569' }}>Días de Prueba Estándar (Registro Directo)</IonLabel>
                             <IonInput
                               type="number"
                               min="0"
                               step="1"
-                              value={platformConfig.defaultTrialDays ?? 15}
-                              onIonInput={(e) => setPlatformConfig({ ...platformConfig, defaultTrialDays: parseInt(e.detail.value || '15', 10) })}
+                              value={platformConfig.defaultTrialDays ?? 7}
+                              onIonInput={(e) => setPlatformConfig({ ...platformConfig, defaultTrialDays: parseInt(e.detail.value || '7', 10) })}
                             />
                           </IonItem>
+                          <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '10px', paddingLeft: '4px' }}>
+                            Para nuevos negocios registrados de forma orgánica o sin invitación.
+                          </div>
+                        </IonCol>
+                        <IonCol size="12" sizeMd="6">
+                          <IonItem lines="none" style={{ border: '1px solid #10b981', borderRadius: '8px', marginBottom: '6px', background: '#f0fdf4' }}>
+                            <IonLabel position="stacked" style={{ fontWeight: 700, color: '#065f46' }}>Días de Prueba para Referidos</IonLabel>
+                            <IonInput
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={platformConfig.referredTrialDays ?? 15}
+                              onIonInput={(e) => setPlatformConfig({ ...platformConfig, referredTrialDays: parseInt(e.detail.value || '15', 10) })}
+                            />
+                          </IonItem>
+                          <div style={{ fontSize: '11px', color: '#047857', marginBottom: '10px', paddingLeft: '4px' }}>
+                            Para negocios invitados mediante enlace o código de promotor o tienda.
+                          </div>
                         </IonCol>
                       </IonRow>
 
@@ -4016,7 +4040,7 @@ const SuperAdminDashboard: React.FC = () => {
                     </div>
 
                     <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '12px', color: '#64748b' }}>
-                      <strong>Motor de Referidos:</strong> Este negocio tiene actualmente <strong>{selectedTenant.activeReferrals} referidos activos</strong>.
+                      <strong>Motor de Referidos:</strong> Este negocio tiene actualmente <strong>{selectedTenant.activeReferrals} referidos activos con suscripción</strong>{selectedTenant.totalReferrals !== undefined && selectedTenant.totalReferrals > selectedTenant.activeReferrals && <> ({selectedTenant.totalReferrals} registrados en total, con {selectedTenant.totalReferrals - selectedTenant.activeReferrals} en prueba)</>}.
                       Al asignar el plan {editPlanType === TenantPlanType.PIONEER ? 'PIONERA' : 'REGULAR'}, la cuota calculada se actualizará automáticamente.
                     </div>
 

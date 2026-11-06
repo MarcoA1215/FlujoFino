@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect, useContext, useCallback } fr
 import type { ReactNode } from 'react';
 import { apiClient } from '../api/client';
 import { AuthContext } from './AuthContext';
-import type { MySubscriptionDTO, PlatformConfigDTO } from '@finowork/shared-types';
+import { UserRole, type MySubscriptionDTO, type PlatformConfigDTO } from '@finowork/shared-types';
 
 export interface SubscriptionContextType {
   subscription: MySubscriptionDTO | null;
@@ -43,13 +43,17 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
 
     try {
+      const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERADMIN || (Array.isArray(user?.roles) && (user.roles.includes(UserRole.ADMIN) || user.roles.includes(UserRole.SUPERADMIN)));
+
       const [subRes, confRes] = await Promise.allSettled([
-        apiClient.get<MySubscriptionDTO>('/superadmin/my-subscription'),
+        isAdmin ? apiClient.get<MySubscriptionDTO>('/superadmin/my-subscription') : Promise.resolve({ data: null }),
         apiClient.get<PlatformConfigDTO>('/superadmin/platform-config'),
       ]);
 
-      if (subRes.status === 'fulfilled') {
-        setSubscription(subRes.value.data);
+      if (isAdmin && subRes.status === 'fulfilled' && (subRes.value as any).data) {
+        setSubscription((subRes.value as any).data);
+      } else if (!isAdmin) {
+        setSubscription(null);
       }
       if (confRes.status === 'fulfilled') {
         setPlatformConfig(confRes.value.data);

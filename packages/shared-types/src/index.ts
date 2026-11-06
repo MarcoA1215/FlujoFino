@@ -491,6 +491,7 @@ export interface SuperAdminTenantDTO {
   };
   trialDaysLeft: number;
   activeReferrals: number;
+  totalReferrals?: number;
   discountPercentage: number;
   subtotalFee?: number;
   ivaPercentage?: number;
@@ -539,6 +540,7 @@ export interface PlatformConfigDTO {
   binanceEmail?: string;
   defaultMonthlyPrice?: number;
   defaultTrialDays?: number;
+  referredTrialDays?: number;
   chargeIva?: boolean;
   ivaPercentage?: number;
 }

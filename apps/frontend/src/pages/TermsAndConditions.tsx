@@ -72,19 +72,26 @@ export const TermsContent: React.FC = () => {
         </p>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-          3. Período de Prueba Gratuita y Suscripción Mensual
+          3. Período de Prueba Gratuita, Programa de Invitación y Suscripción Mensual
         </h2>
         <p>
-          Todo nuevo negocio registrado tiene derecho a un <strong>período de prueba gratuito de 15 días consecutivos</strong> sin necesidad de registrar tarjetas de crédito ni realizar depósitos previos.
+          FinoWork pone a disposición de todo nuevo negocio un período de prueba gratuito sin necesidad de registrar tarjetas de crédito ni realizar depósitos bancarios previos:
+        </p>
+        <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
+          <li><strong>Registro Directo u Orgánico:</strong> El comercio cuenta con un <strong>período de prueba gratuito estándar de 7 días consecutivos</strong> (o el fijado en la configuración global de la plataforma).</li>
+          <li><strong>Registro con Enlace o Código de Invitación:</strong> Si el comercio se registra mediante el enlace o código de un Promotor Oficial o de una tienda aliada activa, se le concede un <strong>período de prueba ampliado de 15 días consecutivos</strong> como beneficio exclusivo de bienvenida.</li>
+        </ul>
+        <p>
+          <strong>Inmutabilidad técnica de atribución:</strong> Cuando un usuario accede al formulario de registro a través de un enlace de invitación oficial (<code>?ref=...</code>), el sistema vincula e inmoviliza técnicamente dicho código en modo solo lectura. Esta medida protege tanto el otorgamiento garantizado de los 15 días de prueba al nuevo comercio, como la legítima atribución de comisiones o bonificaciones a la persona promotora o comercio referidor que gestionó la recomendación.
         </p>
         <p>
-          Concluido el período de prueba, para continuar operando en la Plataforma, el Negocio deberá abonar la cuota mensual de suscripción establecida en la plataforma (actualmente $20 USD mensuales o su equivalente según tasa oficial o método acordado como Pago Móvil o Binance Pay).
+          Concluido el período de prueba aplicable (7 o 15 días según corresponda), para continuar operando en la Plataforma, el Negocio deberá abonar la cuota mensual de suscripción establecida en la plataforma (actualmente $20 USD mensuales o su equivalente según tasa oficial o método acordado como Pago Móvil o Binance Pay).
         </p>
         <p>
           En caso de impago o mora tras cumplirse el período de gracia, el acceso a las funciones operativas del negocio quedará pausado preventivamente hasta la regularización de la cuenta, sin que ello implique la pérdida inmediata de su información histórica.
         </p>
         <p>
-          FinoWork ofrece 15 días de prueba gratuita para garantizar que el sistema se adapta a las necesidades del Comercio. Por consiguiente, una vez procesado el pago de la suscripción mensual o anual, no se emitirán reembolsos parciales ni totales por cancelación anticipada o falta de uso del sistema.
+          FinoWork ofrece estos días de prueba gratuitos previos para que el Comercio garantice que el sistema se adapta enteramente a sus requerimientos operativos. Por consiguiente, una vez procesado el pago formal de la suscripción mensual o anual, no se emitirán reembolsos parciales ni totales por cancelación anticipada o falta de uso de la cuenta.
         </p>
         <p>
           FinoWork se reserva el derecho de modificar las tarifas de suscripción (actualmente $20 USD). Cualquier cambio en las tarifas será notificado al Usuario con al menos treinta (30) días de anticipación y aplicará a partir de su siguiente ciclo de facturación.

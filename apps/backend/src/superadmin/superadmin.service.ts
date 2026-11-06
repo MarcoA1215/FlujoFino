@@ -154,6 +154,7 @@ export class SuperAdminService implements OnModuleInit {
   async calculateMonthlyFee(tenantId: string): Promise<{
     basePrice: number;
     activeReferrals: number;
+    totalReferrals: number;
     discountPercentage: number;
     subtotalFee: number;
     ivaPercentage: number;
@@ -168,15 +169,19 @@ export class SuperAdminService implements OnModuleInit {
     const basePrice = Number(tenant.base_price) || 20.00;
     const planType = tenant.plan_type || TenantPlanType.REGULAR;
 
-    // Count how many active tenants or valid trial tenants were referred by this tenant
+    // Count active paying tenants referred by this tenant (must have status ACTIVE)
     const activeReferrals = await this.tenantRepo.createQueryBuilder('t')
       .where('t.referred_by_tenant_id = :tenantId', { tenantId })
       .andWhere('(t.is_test = false OR t.is_test IS NULL)')
       .andWhere('t.name != :centralName', { centralName: 'FinoWork Central' })
-      .andWhere(
-        '(t.status = :active OR (t.status = :trial AND (t.trial_ends_at > :now OR t.trial_ends_at IS NULL)))',
-        { active: TenantStatus.ACTIVE, trial: TenantStatus.TRIAL, now: new Date() }
-      )
+      .andWhere('t.status = :active', { active: TenantStatus.ACTIVE })
+      .getCount();
+
+    // Count all registered referrals regardless of status
+    const totalReferrals = await this.tenantRepo.createQueryBuilder('t')
+      .where('t.referred_by_tenant_id = :tenantId', { tenantId })
+      .andWhere('(t.is_test = false OR t.is_test IS NULL)')
+      .andWhere('t.name != :centralName', { centralName: 'FinoWork Central' })
       .getCount();
 
     let discountPercentage = 0;
@@ -237,6 +242,7 @@ export class SuperAdminService implements OnModuleInit {
     return {
       basePrice,
       activeReferrals,
+      totalReferrals,
       discountPercentage,
       subtotalFee,
       ivaPercentage,
@@ -462,6 +468,7 @@ export class SuperAdminService implements OnModuleInit {
         owner: ownerMap.get(currentT.id),
         trialDaysLeft,
         activeReferrals: feeCalc.activeReferrals,
+        totalReferrals: feeCalc.totalReferrals,
         discountPercentage: feeCalc.discountPercentage,
         subtotalFee: feeCalc.subtotalFee,
         ivaPercentage: feeCalc.ivaPercentage,
@@ -1070,7 +1077,8 @@ export class SuperAdminService implements OnModuleInit {
         binancePayId: '123456789',
         binanceEmail: 'pagos@finowork.com',
         defaultMonthlyPrice: 20.0,
-        defaultTrialDays: 15,
+        defaultTrialDays: 7,
+        referredTrialDays: 15,
         chargeIva: false,
         ivaPercentage: 16.0,
       });

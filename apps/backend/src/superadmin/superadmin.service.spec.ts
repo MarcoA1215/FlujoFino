@@ -317,7 +317,7 @@ describe('SuperAdminService', () => {
       expect(feeWithIva.finalFee).toBe(17.40);
     });
 
-    it('validates that query builder correctly queries referrals in ACTIVE status or unexpired TRIAL', async () => {
+    it('validates that query builder correctly queries referrals strictly in ACTIVE status', async () => {
       const mockTenant = {
         id: 'tenant-ref-check',
         name: 'Check Referrals',
@@ -339,12 +339,8 @@ describe('SuperAdminService', () => {
       expect(tenantRepo.createQueryBuilder).toHaveBeenCalledWith('t');
       expect(qbMock.where).toHaveBeenCalledWith('t.referred_by_tenant_id = :tenantId', { tenantId: 'tenant-ref-check' });
       expect(qbMock.andWhere).toHaveBeenCalledWith(
-        '(t.status = :active OR (t.status = :trial AND (t.trial_ends_at > :now OR t.trial_ends_at IS NULL)))',
-        expect.objectContaining({
-          active: TenantStatus.ACTIVE,
-          trial: TenantStatus.TRIAL,
-          now: expect.any(Date),
-        }),
+        't.status = :active',
+        { active: TenantStatus.ACTIVE },
       );
     });
   });

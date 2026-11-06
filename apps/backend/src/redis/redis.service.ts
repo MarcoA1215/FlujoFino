@@ -136,6 +136,16 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     // Fallback a memoria RAM
     const expiresAt = ttlSeconds && ttlSeconds > 0 ? Date.now() + ttlSeconds * 1000 : 0;
     this.memoryFallback.set(key, { value, expiresAt });
+
+    // Proteccion contra acumulacion de memoria en RAM fallback
+    if (this.memoryFallback.size > 500) {
+      const now = Date.now();
+      for (const [k, v] of this.memoryFallback.entries()) {
+        if (v.expiresAt > 0 && v.expiresAt <= now) {
+          this.memoryFallback.delete(k);
+        }
+      }
+    }
   }
 
   /**

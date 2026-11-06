@@ -67,6 +67,7 @@ export const PrivacyContent: React.FC = () => {
           <li><strong>Datos de Clientes Finales (Tienda Online, Catálogo Público y Reservas):</strong> Nombre o seudónimo del comprador, número de WhatsApp/teléfono, cédula o RIF para identificación y facturación, dirección física o geolocalización de entrega para delivery, referencias de domicilio, fecha y hora de citas reservadas, notas de pedido y comprobantes o capturas de pago bancario adjuntadas para validar la compra.</li>
           <li><strong>Datos de Promotores de Calle:</strong> Nombre, teléfono, canal de contacto y datos de cuenta bancaria o pago móvil requeridos exclusivamente para la liquidación de sus comisiones por comercios referidos.</li>
           <li><strong>Archivos Multimedia y Contenidos:</strong> Fotografías de productos, logotipos comerciales, imágenes de insumos y capturas de transferencias bancarias o Pago Móvil cargadas voluntariamente a los servidores.</li>
+          <li><strong>Datos de Atribución de Enlaces de Invitación:</strong> Identificadores alfanuméricos de referido (código de promotor o tienda aliada) recibidos mediante la URL (<code>?ref=...</code>) y almacenados de forma temporal en la sesión del navegador (<code>sessionStorage</code>) durante el registro del comercio.</li>
         </ul>
 
         <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
@@ -87,6 +88,7 @@ export const PrivacyContent: React.FC = () => {
           </li>
           <li>Enviar notificaciones operativas en tiempo real (vía Web Push) sobre pedidos entrantes, estados de comanda en cocina y pedidos en camino.</li>
           <li>Verificar los pagos de suscripción mensual al software y liquidar las comisiones del programa de promotores.</li>
+          <li>Vincular e inmovilizar técnicamente el código de referido durante el registro del nuevo comercio para garantizar el otorgamiento automático de sus 15 días de prueba gratis completa y asegurar la transparencia en la liquidación de beneficios sin realizar seguimiento de navegación externo ni comercializar datos de afiliación con terceros.</li>
           <li>Brindar soporte técnico directo solicitado por el Comercio.</li>
         </ul>
 

@@ -6,6 +6,8 @@ declare module 'axios' {
   export interface AxiosRequestConfig {
     skipGlobalLoading?: boolean;
     loadingMessage?: string;
+    staleTime?: number;
+    skipCache?: boolean;
   }
 }
 
@@ -89,6 +91,39 @@ export const apiClient = axios.create({
   },
 });
 
+export interface ApiCacheEntry {
+  data: any;
+  status: number;
+  statusText: string;
+  headers: any;
+  staleAt: number;
+}
+
+const apiGetCache = new Map<string, ApiCacheEntry>();
+const inFlightRequests = new Map<string, Promise<any>>();
+
+export function getApiCacheKey(config: any): string {
+  const url = config.url || '';
+  const params = config.params ? JSON.stringify(config.params) : '';
+  return `${url}?${params}`;
+}
+
+export function invalidateApiCache(pattern?: string | RegExp): void {
+  if (!pattern) {
+    apiGetCache.clear();
+    return;
+  }
+  for (const key of apiGetCache.keys()) {
+    if (typeof pattern === 'string' ? key.includes(pattern) : pattern.test(key)) {
+      apiGetCache.delete(key);
+    }
+  }
+}
+
+export function getApiCacheSize(): number {
+  return apiGetCache.size;
+}
+
 const MUTATION_METHODS = ['post', 'put', 'delete', 'patch'];
 
 // Contador interno estricto de peticiones en vuelo con overlay activo
@@ -118,6 +153,76 @@ if (apiClient?.interceptors?.request) {
         activeRequestsCount++;
         getGlobalLoadingHandler()?.show(config.loadingMessage || 'Procesando...');
       }
+
+      // Gestión de Smart Client Cache y Deduplicación en peticiones GET
+      if (method === 'get' && !config.skipCache) {
+        const cacheKey = getApiCacheKey(config);
+        const now = Date.now();
+
+        // 1. Respuesta en caché vigente (staleTime no expirado)
+        const cached = apiGetCache.get(cacheKey);
+        if (cached && cached.staleAt > now) {
+          config.adapter = () => Promise.resolve({
+            data: Array.isArray(cached.data)
+              ? [...cached.data]
+              : (typeof cached.data === 'object' && cached.data !== null ? { ...cached.data } : cached.data),
+            status: cached.status,
+            statusText: cached.statusText,
+            headers: cached.headers,
+            config,
+            request: {},
+          });
+          return config;
+        }
+
+        // 2. Deduplicación de peticiones concurrentes en vuelo
+        if (inFlightRequests.has(cacheKey)) {
+          const sharedPromise = inFlightRequests.get(cacheKey)!;
+          config.adapter = async () => {
+            const sharedRes = await sharedPromise;
+            return { ...sharedRes, config };
+          };
+          return config;
+        }
+
+        // 3. Registro de promesa diferida para llamadas simultáneas
+        let resolveInFlight: (value: any) => void;
+        let rejectInFlight: (reason?: any) => void;
+        const sharedPromise = new Promise((resolve, reject) => {
+          resolveInFlight = resolve;
+          rejectInFlight = reject;
+        });
+        inFlightRequests.set(cacheKey, sharedPromise);
+
+        const baseAdapter = axios.getAdapter(config.adapter || apiClient.defaults.adapter);
+        config.adapter = async (cfg: any) => {
+          try {
+            const res = await baseAdapter(cfg);
+            if (res && res.status >= 200 && res.status < 300) {
+              if (apiGetCache.size > 200) {
+                const first = apiGetCache.keys().next().value;
+                if (first) apiGetCache.delete(first);
+              }
+              const staleTime = typeof cfg.staleTime === 'number' ? cfg.staleTime : 20000;
+              apiGetCache.set(cacheKey, {
+                data: res.data,
+                status: res.status,
+                statusText: res.statusText,
+                headers: res.headers,
+                staleAt: Date.now() + staleTime,
+              });
+            }
+            resolveInFlight(res);
+            return res;
+          } catch (err) {
+            rejectInFlight(err);
+            throw err;
+          } finally {
+            inFlightRequests.delete(cacheKey);
+          }
+        };
+      }
+
       return config;
     },
     (error) => {
@@ -130,11 +235,16 @@ if (apiClient?.interceptors?.response) {
   apiClient.interceptors.response.use(
   (response) => {
     const method = response.config.method?.toLowerCase() || '';
-    if (MUTATION_METHODS.includes(method) && !response.config.skipGlobalLoading) {
-      activeRequestsCount = Math.max(0, activeRequestsCount - 1);
-      if (activeRequestsCount === 0) {
-        getGlobalLoadingHandler()?.hide();
+    if (MUTATION_METHODS.includes(method)) {
+      if (!response.config.skipGlobalLoading) {
+        activeRequestsCount = Math.max(0, activeRequestsCount - 1);
+        if (activeRequestsCount === 0) {
+          getGlobalLoadingHandler()?.hide();
+        }
       }
+      // Invalidar inmediatamente caché de consultas tras cualquier mutación
+      // para garantizar que la próxima lectura financiera refleje números 100% frescos
+      invalidateApiCache();
     }
     // Protección contra respuestas HTML erróneas (por ejemplo, SPA rewrites de Vercel en rutas API inexistentes)
     if (typeof response.data === 'string' && response.data.trim().toLowerCase().startsWith('<!doctype')) {
@@ -161,6 +271,7 @@ if (apiClient?.interceptors?.response) {
           await Preferences.remove({ key: 'token' });
           await Preferences.remove({ key: 'user' });
           delete apiClient.defaults.headers.common['Authorization'];
+          invalidateApiCache();
           window.location.href = '/login';
         }
       }
