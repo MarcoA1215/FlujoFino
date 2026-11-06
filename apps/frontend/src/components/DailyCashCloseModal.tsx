@@ -119,7 +119,7 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
       <IonHeader className="ion-no-border">
         <IonToolbar style={{ '--background': '#ffffff', borderBottom: '1px solid #E2E8F0', padding: '4px 8px' } as any}>
           <IonTitle style={{ fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
-            📊 Arqueo y Cierre de Caja
+            Arqueo y Cierre de Caja
           </IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={fetchDailySummary} color="medium">
@@ -169,7 +169,7 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
               >
                 <div>
                   <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
-                    💵 Base Inicial de Gaveta (Fondo para Cambio)
+                    Base Inicial de Gaveta (Fondo para Cambio)
                   </div>
                   <div style={{ fontSize: '18px', fontWeight: '900', color: Number(cashSummary.baseCash || cashSummary.fondoDeCaja || 0) > 0 ? '#047857' : '#0F172A', marginTop: '1px' }}>
                     ${Number(cashSummary.baseCash || cashSummary.fondoDeCaja || 0).toFixed(2)} USD
@@ -305,7 +305,7 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
                 <div style={{ background: '#ECFDF5', borderRadius: '16px', border: '1px solid #A7F3D0', padding: '14px 16px', marginBottom: '14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <div style={{ fontSize: '13px', fontWeight: '800', color: '#065F46' }}>
-                      💱 Conversión a Divisas Registrada Hoy
+                      Conversión a Divisas Registrada Hoy
                     </div>
                     <span style={{ color: '#047857', fontSize: '13px', fontWeight: '900' }}>
                       +${Number(cashSummary.totalExchangedUSD || 0).toFixed(2)} USD
@@ -322,7 +322,7 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
                 <div style={{ background: '#FEF2F2', borderRadius: '16px', border: '1px solid #FECACA', padding: '14px 16px', marginBottom: '14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                     <div style={{ fontSize: '13px', fontWeight: '800', color: '#991B1B' }}>
-                      💸 Egresos / Vales de Caja (-${Number(cashSummary.totalCashExpensesUSD).toFixed(2)} USD)
+                      Egresos / Vales de Caja (-${Number(cashSummary.totalCashExpensesUSD).toFixed(2)} USD)
                     </div>
                     <small style={{ color: '#B91C1C', fontSize: '11px', fontWeight: '700' }}>
                       {cashSummary.cashExpensesList?.length || 0} salidas
@@ -334,7 +334,7 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
                         <div>
                           <div style={{ fontWeight: '700', color: '#1E293B' }}>{exp.description}</div>
                           <span style={{ display: 'block', color: '#64748B', fontSize: '10px' }}>
-                            {exp.category === 'VALE_EMPLEADO' ? '👤 Vale Empleado' : exp.category} • {formatTime12h(new Date(exp.createdAt))}
+                            {exp.category === 'VALE_EMPLEADO' ? 'Vale Empleado' : exp.category} • {formatTime12h(new Date(exp.createdAt))}
                           </span>
                         </div>
                         <div style={{ textAlign: 'right', fontWeight: '800', color: '#DC2626' }}>
@@ -351,7 +351,7 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
                 <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '14px 16px', marginBottom: '14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                     <div style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A' }}>
-                      💵 Vueltos Entregados en el Día ({cashSummary.vueltosList.length})
+                      Vueltos Entregados en el Día ({cashSummary.vueltosList.length})
                     </div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
@@ -370,7 +370,7 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
                         <div>
                           <b>#{v.orderNumber}</b> - {v.customerName}
                           <span style={{ display: 'block', color: '#64748B', fontSize: '10px' }}>
-                            {v.method === 'PAGO_MOVIL' ? `📱 Pago Móvil (Ref: ${v.ref})` : v.method === 'CASH_BS' ? '🇻🇪 Efectivo Bs' : '💵 Efectivo USD'}
+                            {v.method === 'PAGO_MOVIL' ? `Pago Móvil (Ref: ${v.ref})` : v.method === 'CASH_BS' ? 'Efectivo Bs' : 'Efectivo USD'}
                           </span>
                         </div>
                         <div style={{ textAlign: 'right', fontWeight: '800', color: v.method === 'PAGO_MOVIL' ? '#6D28D9' : '#059669' }}>
@@ -403,7 +403,7 @@ ${cashSummary.vueltosList?.length > 0 ? `\n💵 *VUELTOS REGISTRADOS (${cashSumm
 
               {/* Channels Breakdown */}
               <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '14px 16px', marginBottom: '16px' }}>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A', marginBottom: '10px' }}>📦 Desglose de Canales</div>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A', marginBottom: '10px' }}>Desglose de Canales</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', textAlign: 'center', gap: '6px' }}>
                   <div>
                     <div style={{ fontSize: '16px', fontWeight: '800', color: '#0F172A' }}>{cashSummary.inStoreOrdersCount}</div>

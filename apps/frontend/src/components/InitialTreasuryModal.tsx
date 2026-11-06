@@ -100,7 +100,7 @@ export const InitialTreasuryModal: React.FC<InitialTreasuryModalProps> = ({
       <IonHeader className="ion-no-border">
         <IonToolbar style={{ '--background': '#ffffff', borderBottom: '1px solid #E2E8F0', padding: '4px 8px' } as any}>
           <IonTitle style={{ fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
-            ⚙️ Saldo Inicial de Tesorería
+            Saldo Inicial de Tesorería
           </IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={onClose} color="medium">
@@ -145,7 +145,7 @@ export const InitialTreasuryModal: React.FC<InitialTreasuryModalProps> = ({
             {/* 1. Efectivo Físico USD */}
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px' }}>
-                💵 Efectivo Inicial en Gaveta Física (USD)
+                Efectivo Inicial en Gaveta Física (USD)
               </label>
               <div style={{ position: 'relative' }}>
                 <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '16px', fontWeight: '800', color: '#64748B' }}>$</span>
@@ -180,7 +180,7 @@ export const InitialTreasuryModal: React.FC<InitialTreasuryModalProps> = ({
             {/* 2. Efectivo Físico Bolívares (Gaveta Bs.) */}
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px' }}>
-                💵 Efectivo Inicial en Gaveta Física (Bolívares - Bs.)
+                Efectivo Inicial en Gaveta Física (Bolívares - Bs.)
               </label>
               <div style={{ position: 'relative' }}>
                 <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '13px', fontWeight: '800', color: '#64748B' }}>{currencySymbol}</span>
@@ -214,7 +214,7 @@ export const InitialTreasuryModal: React.FC<InitialTreasuryModalProps> = ({
             {/* 3. Bancos en Bolívares */}
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px' }}>
-                🏦 Saldo Inicial en Bancos Venezuela ({currencySymbol})
+                Saldo Inicial en Bancos Venezuela ({currencySymbol})
               </label>
               <div style={{ position: 'relative' }}>
                 <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '13px', fontWeight: '800', color: '#64748B' }}>{currencySymbol}</span>
@@ -249,7 +249,7 @@ export const InitialTreasuryModal: React.FC<InitialTreasuryModalProps> = ({
             {/* 4. Billetera Digital USDT / Binance */}
             <div style={{ marginBottom: '22px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px' }}>
-                🟡 Saldo Inicial Digital / Binance Pay (USDT / $)
+                Saldo Inicial Digital / Binance Pay (USDT / $)
               </label>
               <div style={{ position: 'relative' }}>
                 <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '16px', fontWeight: '800', color: '#64748B' }}>$</span>
@@ -285,13 +285,13 @@ export const InitialTreasuryModal: React.FC<InitialTreasuryModalProps> = ({
               <>
                 <div style={{ marginBottom: '16px', padding: '12px', borderRadius: '12px', background: '#FFFBEB', border: '1px solid #FDE68A' }}>
                   <div style={{ fontSize: '13px', fontWeight: 800, color: '#92400E', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    🇨🇴 Saldos Iniciales en Pesos Colombianos (COP)
+                    Saldos Iniciales en Pesos Colombianos (COP)
                   </div>
 
                   {/* Efectivo Pesos */}
                   <div style={{ marginBottom: '12px' }}>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#78350F', marginBottom: '4px' }}>
-                      💵 Efectivo Inicial en Gaveta (Billetes COP)
+                      Efectivo Inicial en Gaveta (Billetes COP)
                     </label>
                     <div style={{ position: 'relative' }}>
                       <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '13px', fontWeight: '800', color: '#92400E' }}>$ COP</span>
@@ -325,7 +325,7 @@ export const InitialTreasuryModal: React.FC<InitialTreasuryModalProps> = ({
                   {/* Bancos Colombia */}
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#78350F', marginBottom: '4px' }}>
-                      📲 Saldo Inicial en Bancos Colombia (Nequi / Bancolombia / Daviplata)
+                      Saldo Inicial en Bancos Colombia (Nequi / Bancolombia / Daviplata)
                     </label>
                     <div style={{ position: 'relative' }}>
                       <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '13px', fontWeight: '800', color: '#92400E' }}>$ COP</span>

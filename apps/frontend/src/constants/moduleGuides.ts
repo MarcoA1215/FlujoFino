@@ -72,7 +72,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
     tabs: [
       {
         id: 'services',
-        label: '✨ Servicios / Citas',
+        label: 'Servicios y Citas',
         concept:
           'Los servicios representan atenciones profesionales de mano de obra. No tienen un stock físico que se agote, pero sí tienen duración en minutos y especialistas asignadas para la agenda.',
         steps: [
@@ -111,7 +111,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'retail',
-        label: '📦 Productos Físicos',
+        label: 'Productos Físicos',
         concept:
           'Productos tangibles de reventa directa. Tienen control de stock físico, costo de adquisición, precio de venta y alertas cuando queden pocas unidades.',
         steps: [
@@ -146,7 +146,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'combos',
-        label: '🎁 Combos y Promos',
+        label: 'Combos y Promociones',
         concept:
           'Crea paquetes combinados con un precio promocional especial (ej. "Pack Cejas HD + Bozo" o "Kit Cuidado Facial").',
         steps: [
@@ -201,7 +201,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
     tabs: [
       {
         id: 'agenda',
-        label: '📅 Agenda Diaria',
+        label: 'Agenda Diaria',
         concept:
           'Gestiona el flujo diario de atenciones en tu local. Revisa citas del día, quién atiende y el estado de cada clienta.',
         steps: [
@@ -232,7 +232,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'simultaneous',
-        label: '👥 Citas Simultáneas y Cabinas',
+        label: 'Citas Simultáneas y Cabinas',
         concept:
           'Configura si tu negocio puede atender a varias clientas a la misma hora o si una sola cita ocupa todo el local.',
         steps: [
@@ -257,7 +257,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'public_link',
-        label: '🔗 Auto-Reserva y Autogestión',
+        label: 'Auto-Reserva y Autogestión',
         concept:
           'Deja que tus clientas agenden solas las 24 horas y puedan consultar o reprogramar su cita sin llamarte.',
         steps: [
@@ -286,7 +286,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'deposit',
-        label: '💳 Abonos y Señas Previas',
+        label: 'Abonos y Señas Previas',
         concept:
           'Elimina las inasistencias y cancelaciones de última hora exigiendo un pago anticipado (seña) por Pago Móvil.',
         steps: [
@@ -351,7 +351,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
     tabs: [
       {
         id: 'checkout',
-        label: '💵 Cobro y Descuentos',
+        label: 'Cobro y Descuentos',
         concept: 'Procesa ventas de productos y servicios de forma inmediata.',
         steps: [
           {
@@ -381,7 +381,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'offline',
-        label: '⚡ Modo Sin Conexión (Offline-First)',
+        label: 'Modo Sin Conexión (Offline-First)',
         concept:
           'FinoWork sigue cobrando y registrando ventas aunque se caiga el internet o la luz en tu local.',
         steps: [
@@ -410,7 +410,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'split_payments',
-        label: '💱 Pagos Mixtos y Vueltos Cruzados',
+        label: 'Pagos Mixtos y Vueltos Cruzados',
         concept: 'Maneja la realidad multimoneda sin calculadora ni errores humanos.',
         steps: [
           {
@@ -431,7 +431,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'cash_close',
-        label: '🔒 Fondo y Cierre de Caja',
+        label: 'Fondo y Cierre de Caja',
         concept: 'Concilia tu gaveta física y cuentas bancarias al finalizar cada turno o jornada laboral.',
         steps: [
           {
@@ -488,7 +488,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
     tabs: [
       {
         id: 'abonos',
-        label: '💰 Anticipos y Abonos',
+        label: 'Anticipos y Abonos',
         concept: 'Registra adelantos de dinero y mantén el control exacto de lo que el cliente aún te debe.',
         steps: [
           {
@@ -512,7 +512,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'estados',
-        label: '🔄 Flujo de Producción',
+        label: 'Flujo de Producción',
         concept: 'Mantén a tu equipo de trabajo informado sobre qué órdenes están en proceso.',
         steps: [
           {
@@ -564,7 +564,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
     tabs: [
       {
         id: 'directorio',
-        label: '👥 Directorio y Auto-Registro',
+        label: 'Directorio y Registro',
         concept: 'Base de datos unificada de contactos y compradores.',
         steps: [
           {
@@ -583,7 +583,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'credit',
-        label: '💳 Cuentas por Cobrar (Fiado)',
+        label: 'Cuentas por Cobrar',
         concept: 'Controla el dinero en la calle y registra cobros directos sin errores.',
         steps: [
           {
@@ -603,7 +603,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'whatsapp',
-        label: '📲 WhatsApp Inteligente',
+        label: 'Integración con WhatsApp',
         concept: 'Comunícate al instante sin tener que agregar el número a tu agenda telefónica.',
         steps: [
           {
@@ -655,7 +655,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
     tabs: [
       {
         id: 'treasury',
-        label: '🏦 Tesorería y Fondos Reales',
+        label: 'Tesorería y Fondos Reales',
         concept: 'Arqueo de dinero en tiempo real separado por ubicación física y digital.',
         steps: [
           {
@@ -679,7 +679,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'protect_bs',
-        label: '🛡️ Comprar USD / Proteger Bs',
+        label: 'Comprar USD / Proteger Bs',
         concept: 'Blinda tu negocio contra la inflación cambiando bolívares a dólares.',
         steps: [
           {
@@ -698,7 +698,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'investments',
-        label: '📈 Inyección de Capital',
+        label: 'Inyección de Capital',
         concept: 'Registra aportes de socios o préstamos sin alterar las ventas operativas.',
         steps: [
           {
@@ -750,7 +750,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
     tabs: [
       {
         id: 'insumos',
-        label: '🧪 Insumos y Costos Unitarios',
+        label: 'Insumos y Costos Unitarios',
         concept: 'Lleva el inventario y calcula cuánto cuesta cada gota o gramo de material.',
         steps: [
           {
@@ -774,7 +774,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'mermas',
-        label: '⚠️ Mermas y Ajustes de Stock',
+        label: 'Mermas y Ajustes de Stock',
         concept: 'Registra pérdidas, roturas o vencimientos sin descuadrar la contabilidad.',
         steps: [
           {
@@ -794,7 +794,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'vinculacion',
-        label: '🔗 Consumo en Servicios y Recetas',
+        label: 'Consumo en Servicios y Recetas',
         concept: 'Conecta insumos a servicios o productos terminados.',
         steps: [
           {
@@ -943,7 +943,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
     tabs: [
       {
         id: 'rates',
-        label: '💱 Tasas y Monedas',
+        label: 'Tasas y Monedas',
         concept: 'Define cómo se cotizan los cobros en bolívares y pesos colombianos.',
         steps: [
           {
@@ -968,7 +968,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'bank_data',
-        label: '🏦 Datos Bancarios',
+        label: 'Datos Bancarios',
         concept: 'Información visible para tus clientes en recibos y enlaces de auto-reserva.',
         steps: [
           {
@@ -987,7 +987,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'brand_modules',
-        label: '🎨 Marca y Módulos',
+        label: 'Marca y Módulos',
         concept: 'Personaliza la apariencia y apaga módulos que tu negocio no necesite.',
         steps: [
           {
@@ -1006,7 +1006,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'referrals',
-        label: '🎁 Programa de Referidos',
+        label: 'Programa de Referidos',
         concept: 'Gana meses gratis de FinoWork recomendando la plataforma a colegas.',
         steps: [
           {
@@ -1058,7 +1058,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
     tabs: [
       {
         id: 'roles',
-        label: '🔐 Roles y Seguridad',
+        label: 'Roles y Seguridad',
         concept: 'Protege la privacidad de tus finanzas asignando permisos específicos.',
         steps: [
           {
@@ -1083,7 +1083,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'commissions',
-        label: '💼 Comisiones y Liquidación',
+        label: 'Comisiones y Liquidación',
         concept: 'Calcula automáticamente cuánto debes pagarle a cada colaboradora por sus servicios.',
         steps: [
           {
@@ -1108,7 +1108,7 @@ export const MODULE_GUIDES: Record<ModuleGuideKey, ModuleGuideContent> = {
       },
       {
         id: 'advances',
-        label: '💵 Vales y Adelantos de Sueldo',
+        label: 'Vales y Adelantos de Sueldo',
         concept: 'Controla salidas de dinero por anticipos dados al personal.',
         steps: [
           {

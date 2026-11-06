@@ -31,7 +31,9 @@ import {
   imageOutline,
   arrowForwardOutline,
   flashOutline,
-  calendarOutline
+  calendarOutline,
+  bicycleOutline,
+  pricetagOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
@@ -706,7 +708,7 @@ const Pos: React.FC = () => {
     const hasExtras = availableRawMaterials.some(rm => rm.allowAsExtra);
     const catList = ['Todos', ...Array.from(set)];
     if (hasExtras) {
-      catList.push('🍟 Extras Sueltos');
+      catList.push('Extras Sueltos');
     }
     return catList;
   }, [products, availableRawMaterials]);
@@ -719,14 +721,14 @@ const Pos: React.FC = () => {
 
   // Filtered products
   const filteredProducts = useMemo(() => {
-    if (selectedCategory === '🍟 Extras Sueltos') {
+    if (selectedCategory === 'Extras Sueltos') {
       return availableRawMaterials
         .filter(rm => rm.allowAsExtra)
         .filter(rm => rm.name.toLowerCase().includes(searchTerm.toLowerCase()))
         .map(rm => ({
           id: rm.id,
           name: rm.name,
-          category: '🍟 Extras Sueltos',
+          category: 'Extras Sueltos',
           salePrice: getExtraPrice(rm),
           stockQuantity: Number(rm.stockQuantity || 0),
           baseCost: Number(rm.costPerUnit || 0),
@@ -1222,7 +1224,7 @@ const Pos: React.FC = () => {
               color: 'success',
               buttons: [
                 {
-                  text: '📋 Copiar Código',
+                  text: 'Copiar Código',
                   handler: () => {
                     navigator.clipboard?.writeText(summaryToCopy);
                   }
@@ -1287,7 +1289,7 @@ const Pos: React.FC = () => {
             color: 'success',
             buttons: [
               {
-                text: '📋 Copiar Código',
+                text: 'Copiar Código',
                 handler: () => {
                   navigator.clipboard?.writeText(summaryToCopy);
                 }
@@ -1444,7 +1446,7 @@ const Pos: React.FC = () => {
             }}>
               <div>
                 <span style={{ fontSize: '11px', color: '#1E40AF', fontWeight: '800', display: 'block' }}>
-                  📝 MODIFICANDO CUENTA ABIERTA
+                  MODIFICANDO CUENTA ABIERTA
                 </span>
                 <span style={{ fontSize: '13px', color: '#1E3A8A', fontWeight: '700' }}>
                   Pedido #{editingOrderId.slice(0, 8).toUpperCase()} {customerName ? `• ${customerName}` : ''}
@@ -1625,7 +1627,7 @@ const Pos: React.FC = () => {
                             )}
                             {p.hasVariants && Array.isArray(p.variants) && p.variants.length > 0 && (
                               <span style={{ fontSize: '9px', fontWeight: '800', color: '#6D28D9', background: '#F3E8FF', padding: '1px 6px', borderRadius: '4px' }}>
-                                🎨 {p.variants.length} var.
+                                {p.variants.length} var.
                               </span>
                             )}
                           </div>
@@ -1659,7 +1661,7 @@ const Pos: React.FC = () => {
                           </div>
                           {enableCopCurrency && (
                             <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#854D0E', marginTop: '1px' }}>
-                              🇨🇴 ${Math.round(p.salePrice * exchangeRateCop).toLocaleString('es-CO')} COP
+                              ${Math.round(p.salePrice * exchangeRateCop).toLocaleString('es-CO')} COP
                             </div>
                           )}
                         </div>
@@ -1731,7 +1733,7 @@ const Pos: React.FC = () => {
                 </div>
                 <div style={{ fontSize: '11px', color: '#94A3B8' }}>
                   {currencySymbol} {currencySymbol === 'COP' ? Number(totalCartBs).toLocaleString('es-CO') : totalCartBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  {enableCopCurrency ? ` • 🇨🇴 $${totalCartCop.toLocaleString('es-CO')} COP` : ''}
+                  {enableCopCurrency ? ` • $${totalCartCop.toLocaleString('es-CO')} COP` : ''}
                 </div>
               </div>
             </div>
@@ -1800,17 +1802,17 @@ const Pos: React.FC = () => {
                           <span>{item.quantity}x {item.product.name}</span>
                           {item.variantName && (
                             <span style={{ fontSize: '10px', fontWeight: '800', background: '#F3E8FF', color: '#6D28D9', padding: '1px 6px', borderRadius: '4px' }}>
-                              🎨 {item.variantName}
+                              {item.variantName}
                             </span>
                           )}
                           {item.employeeId && (
                             <span style={{ fontSize: '10px', fontWeight: '700', background: '#ECFDF5', color: '#065F46', padding: '1px 6px', borderRadius: '4px' }}>
-                              👤 {employees.find(e => e.id === item.employeeId)?.name || employees.find(e => e.id === item.employeeId)?.username || 'Especialista'}
+                              {employees.find(e => e.id === item.employeeId)?.name || employees.find(e => e.id === item.employeeId)?.username || 'Especialista'}
                             </span>
                           )}
                           {item.hasModifications && (
                             <span style={{ fontSize: '10px', fontWeight: '800', background: '#FEF3C7', color: '#92400E', padding: '1px 5px', borderRadius: '4px' }}>
-                              ⚠️ Modificado
+                              Modificado
                             </span>
                           )}
                         </div>
@@ -1897,7 +1899,7 @@ const Pos: React.FC = () => {
                       <span style={{ fontSize: '13px', fontWeight: '600', color: '#64748B' }}>Total a Pagar:</span>
                       <div style={{ fontSize: '11px', color: '#64748B' }}>
                         Tasa: {currencySymbol} {currencySymbol === 'COP' ? Number(exchangeRate).toLocaleString('es-CO') : exchangeRate.toFixed(2)}
-                        {enableCopCurrency ? ` • 🇨🇴 $${exchangeRateCop.toLocaleString('es-CO')} COP` : ''}
+                        {enableCopCurrency ? ` • $${exchangeRateCop.toLocaleString('es-CO')} COP` : ''}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -1909,7 +1911,7 @@ const Pos: React.FC = () => {
                       </div>
                       {enableCopCurrency && (
                         <div style={{ fontSize: '12px', fontWeight: '800', color: '#854D0E', marginTop: '2px' }}>
-                          🇨🇴 ${totalCartCop.toLocaleString('es-CO')} COP
+                          $${totalCartCop.toLocaleString('es-CO')} COP
                         </div>
                       )}
                     </div>
@@ -1938,7 +1940,7 @@ const Pos: React.FC = () => {
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      🏪 En Tienda / Mesa
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><IonIcon icon={storefrontOutline} /> En Tienda / Mesa</span>
                     </button>
                     {settings?.featureDelivery !== false && (
                       <button
@@ -1960,7 +1962,7 @@ const Pos: React.FC = () => {
                           transition: 'all 0.15s ease'
                         }}
                       >
-                        🛵 Delivery
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><IonIcon icon={bicycleOutline} /> Delivery</span>
                       </button>
                     )}
                   </div>
@@ -2046,7 +2048,7 @@ const Pos: React.FC = () => {
                       </div>
                       <div style={{ width: '100%' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                          🛵 Repartidor Asignado
+                          Repartidor Asignado
                         </label>
                         <IonSelect
                           interface="popover"
@@ -2073,7 +2075,7 @@ const Pos: React.FC = () => {
                               const roleName = d.jobTitle || 'Repartidor';
                               return (
                                 <IonSelectOption key={d.id} value={d.id}>
-                                  🛵 {d.username || d.name} ({roleName})
+                                  {d.username || d.name} ({roleName})
                                 </IonSelectOption>
                               );
                             })}
@@ -2112,7 +2114,7 @@ const Pos: React.FC = () => {
                 {/* Buscador Rápido de Clientes por Cédula o Teléfono */}
                 <div style={{ marginBottom: '14px', position: 'relative' }}>
                   <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                    <span>🔍 Buscar cliente (Cédula o Teléfono)</span>
+                    <span>Buscar cliente (Cédula o Teléfono)</span>
                     <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: '500' }}>Opcional</span>
                   </label>
                   <div style={{
@@ -2195,12 +2197,12 @@ const Pos: React.FC = () => {
                             <div style={{ fontSize: '11px', color: '#64748B', display: 'flex', gap: '8px', marginTop: '2px' }}>
                               {cust.identification && (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                                  🪪 {cust.identification}
+                                  {cust.identification}
                                 </span>
                               )}
                               {cust.phone && (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                                  📞 {cust.phone}
+                                  {cust.phone}
                                 </span>
                               )}
                             </div>
@@ -2276,7 +2278,7 @@ const Pos: React.FC = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                        🪪 Cédula / RIF (Opcional)
+                        Cédula / RIF (Opcional)
                       </label>
                       <input
                         type="text"
@@ -2288,7 +2290,7 @@ const Pos: React.FC = () => {
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                        📞 Teléfono (Opcional)
+                        Teléfono (Opcional)
                       </label>
                       <input
                         type="tel"
@@ -2305,7 +2307,7 @@ const Pos: React.FC = () => {
                 <div style={{ marginBottom: '16px', background: '#F8FAFC', borderRadius: '12px', padding: '10px 12px', border: '1px solid #E2E8F0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <span style={{ fontSize: '12px', fontWeight: '700', color: '#475569' }}>
-                      🏷️ Descuento Especial
+                      Descuento Especial
                     </span>
                     {discountAmount > 0 && (
                       <span style={{ fontSize: '12px', fontWeight: '800', color: '#10B981' }}>
@@ -2439,7 +2441,7 @@ const Pos: React.FC = () => {
                           textAlign: 'left'
                         }}
                       >
-                        <span style={{ fontSize: '16px' }}>🇨🇴</span>
+                        <IonIcon icon={cashOutline} style={{ fontSize: '18px', color: paymentMethod === 'CASH_COP' ? '#CA8A04' : '#64748B' }} />
                         <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'CASH_COP' ? '#854D0E' : '#0F172A' }}>
                           Efectivo COP
                         </span>
@@ -2463,7 +2465,7 @@ const Pos: React.FC = () => {
                           textAlign: 'left'
                         }}
                       >
-                        <span style={{ fontSize: '16px' }}>📲</span>
+                        <IonIcon icon={phonePortraitOutline} style={{ fontSize: '18px', color: paymentMethod === 'TRANSFER_COP' ? '#CA8A04' : '#64748B' }} />
                         <span style={{ fontSize: '13px', fontWeight: '700', color: paymentMethod === 'TRANSFER_COP' ? '#854D0E' : '#0F172A' }}>
                           {settings?.companyCopBank || 'Nequi / COP'}
                         </span>
@@ -2607,7 +2609,7 @@ const Pos: React.FC = () => {
                   <div style={{ background: '#FEFCE8', borderRadius: '16px', border: '1px solid #FDE047', padding: '14px', marginBottom: '16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                       <label style={{ fontSize: '12px', fontWeight: '800', color: '#854D0E' }}>
-                        🇨🇴 Efectivo Recibido ($ COP)
+                        Efectivo Recibido ($ COP)
                       </label>
                       <span style={{ fontSize: '12px', fontWeight: '900', color: '#0F172A' }}>
                         Total: ${totalCartCop.toLocaleString('es-CO')} COP
@@ -2647,17 +2649,17 @@ const Pos: React.FC = () => {
                     {typeof copReceived === 'number' && copReceived >= totalCartCop && (
                       <div style={{ background: '#ffffff', border: '1px solid #FDE047', borderRadius: '12px', padding: '12px', marginTop: '6px' }}>
                         <div style={{ fontSize: '11px', fontWeight: '800', color: '#854D0E', marginBottom: '4px' }}>
-                          💵 Vuelto a Entregar (Triángulo COP / USD / Bs):
+                          Vuelto a Entregar (Triángulo COP / USD / Bs):
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                           <span style={{ fontSize: '17px', fontWeight: '900', color: '#854D0E' }}>
-                            🇨🇴 ${vueltoCop.toLocaleString('es-CO')} COP
+                            $${vueltoCop.toLocaleString('es-CO')} COP
                           </span>
                           <span style={{ fontSize: '13px', fontWeight: '800', color: '#047857' }}>
-                            💵 ${vueltoUsd.toFixed(2)} USD
+                            $${vueltoUsd.toFixed(2)} USD
                           </span>
                           <span style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A' }}>
-                            🇻🇪 {currencySymbol} {formatLocalAmount(vueltoBs)}
+                            {currencySymbol} {formatLocalAmount(vueltoBs)}
                           </span>
                         </div>
                       </div>
@@ -2670,7 +2672,7 @@ const Pos: React.FC = () => {
                   <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '14px', marginBottom: '16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                       <label style={{ fontSize: '12px', fontWeight: '800', color: '#0F172A' }}>
-                        💵 Efectivo Recibido en Bolívares ({currencySymbol})
+                        Efectivo Recibido en Bolívares ({currencySymbol})
                       </label>
                       <span style={{ fontSize: '12px', fontWeight: '900', color: '#047857' }}>
                         Total: {currencySymbol} {formatLocalAmount(totalCartBs)}
@@ -2711,7 +2713,7 @@ const Pos: React.FC = () => {
                     {typeof bsReceived === 'number' && bsReceived >= (totalCartBs - 0.05) && (
                       <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '14px', padding: '14px', marginTop: '8px' }}>
                         <div style={{ fontSize: '12px', fontWeight: '700', color: '#065F46', marginBottom: '4px' }}>
-                          💵 Vuelto a Entregar
+                          Vuelto a Entregar
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: vueltoBs > 0 ? '12px' : '0' }}>
                           <span style={{ fontSize: '18px', fontWeight: '900', color: '#047857' }}>
@@ -2742,7 +2744,7 @@ const Pos: React.FC = () => {
                                   cursor: 'pointer'
                                 }}
                               >
-                                💵 Efectivo Bs.
+                                Efectivo Bs.
                               </button>
                               <button
                                 type="button"
@@ -2761,7 +2763,7 @@ const Pos: React.FC = () => {
                                   cursor: 'pointer'
                                 }}
                               >
-                                📱 Pago Móvil
+                                Pago Móvil
                               </button>
                               <button
                                 type="button"
@@ -2777,7 +2779,7 @@ const Pos: React.FC = () => {
                                   cursor: 'pointer'
                                 }}
                               >
-                                💵 Divisas ($)
+                                Divisas ($)
                               </button>
                             </div>
                           </div>
@@ -2793,7 +2795,7 @@ const Pos: React.FC = () => {
                     {settings?.companyCopAccountNumber && (
                       <div style={{ background: '#ffffff', borderRadius: '10px', padding: '10px 12px', border: '1px solid #FEF08A', marginBottom: '10px', fontSize: '12px', color: '#0F172A' }}>
                         <div style={{ fontWeight: '800', color: '#854D0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          📲 Enviar ${totalCartCop.toLocaleString('es-CO')} COP a {settings.companyCopBank || 'Bancolombia / Nequi'}:
+                          Transferir ${totalCartCop.toLocaleString('es-CO')} COP a {settings.companyCopBank || 'Bancolombia / Nequi'}:
                         </div>
                         <div style={{ fontWeight: '700', marginTop: '4px' }}>
                           N° Cuenta / Celular: <span style={{ color: '#0F172A' }}>{settings.companyCopAccountNumber}</span>
@@ -2856,7 +2858,7 @@ const Pos: React.FC = () => {
                     {typeof usdReceived === 'number' && usdReceived >= totalCart && (
                       <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '14px', padding: '14px', marginTop: '8px' }}>
                         <div style={{ fontSize: '12px', fontWeight: '700', color: '#065F46', marginBottom: '4px' }}>
-                          💵 Vuelto a Entregar
+                          Vuelto a Entregar
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: vueltoUsd > 0 ? '12px' : '0' }}>
                           <span style={{ fontSize: '20px', fontWeight: '900', color: '#047857' }}>
@@ -2887,7 +2889,7 @@ const Pos: React.FC = () => {
                                   cursor: 'pointer'
                                 }}
                               >
-                                💵 Divisas ($)
+                                Divisas ($)
                               </button>
                               <button
                                 type="button"
@@ -2906,7 +2908,7 @@ const Pos: React.FC = () => {
                                   cursor: 'pointer'
                                 }}
                               >
-                                📱 Pago Móvil
+                                Pago Móvil
                               </button>
                               <button
                                 type="button"
@@ -2922,7 +2924,7 @@ const Pos: React.FC = () => {
                                   cursor: 'pointer'
                                 }}
                               >
-                                🇻🇪 Efectivo {currencySymbol}
+                                Efectivo {currencySymbol}
                               </button>
                             </div>
 
@@ -2930,7 +2932,7 @@ const Pos: React.FC = () => {
                             {changeMethod === 'PAGO_MOVIL' && (
                               <div style={{ background: '#ffffff', border: '1px solid #A7F3D0', borderRadius: '10px', padding: '10px' }}>
                                 <div style={{ fontSize: '11px', fontWeight: '700', color: '#047857', marginBottom: '8px' }}>
-                                  📲 Registra la transferencia de vuelto ({currencySymbol} {formatLocalAmount(vueltoBs)})
+                                  Registra la transferencia de vuelto ({currencySymbol} {formatLocalAmount(vueltoBs)})
                                 </div>
                                 <div style={{ marginBottom: '8px' }}>
                                   <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '2px' }}>
@@ -2993,7 +2995,7 @@ const Pos: React.FC = () => {
 
                             {changeMethod === 'CASH_USD' && (
                               <div style={{ fontSize: '11px', color: '#065F46', background: '#ffffff', padding: '8px 10px', borderRadius: '8px', border: '1px solid #A7F3D0' }}>
-                                💡 Se entregarán <b>${vueltoUsd.toFixed(2)} USD</b> en billetes físicos desde la gaveta.
+                                Se entregarán <b>${vueltoUsd.toFixed(2)} USD</b> en billetes físicos desde la gaveta.
                                 {treasury && treasury.cashUSD !== undefined && vueltoUsd > (treasury.cashUSD + 0.05) && (
                                   <div style={{
                                     marginTop: '6px',
@@ -3005,7 +3007,7 @@ const Pos: React.FC = () => {
                                     color: '#991B1B',
                                     lineHeight: '1.4'
                                   }}>
-                                    ⚠️ <strong>Efectivo insuficiente en Gaveta:</strong> Hay ${treasury.cashUSD.toFixed(2)} USD registrados (Faltan ${(vueltoUsd - treasury.cashUSD).toFixed(2)} USD en billetes).
+                                    <strong>Efectivo insuficiente en Gaveta:</strong> Hay ${treasury.cashUSD.toFixed(2)} USD registrados (Faltan ${(vueltoUsd - treasury.cashUSD).toFixed(2)} USD en billetes).
                                   </div>
                                 )}
                                 {treasury && treasury.cashUSD !== undefined && vueltoUsd <= (treasury.cashUSD + 0.05) && (
@@ -3018,7 +3020,7 @@ const Pos: React.FC = () => {
 
                             {changeMethod === 'CASH_BS' && (
                               <div style={{ fontSize: '11px', color: '#065F46', background: '#ffffff', padding: '8px 10px', borderRadius: '8px', border: '1px solid #A7F3D0' }}>
-                                💡 Se entregarán <b>{currencySymbol} {formatLocalAmount(vueltoBs)}</b> en billetes físicos desde la gaveta.
+                                Se entregarán <b>{currencySymbol} {formatLocalAmount(vueltoBs)}</b> en billetes físicos desde la gaveta.
                                 {treasury && treasury.bankBs !== undefined && vueltoBs > (treasury.bankBs + 0.05) && (
                                   <div style={{
                                     marginTop: '6px',
@@ -3285,7 +3287,7 @@ const Pos: React.FC = () => {
                   {/* Sección 1: Quitar Insumos */}
                   <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
                     <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      🥗 Ingredientes de la Receta (Toca para quitar)
+                      Ingredientes de la Receta (Toca para quitar)
                     </h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {customizingProduct.recipe.map((ri: any) => {
@@ -3319,7 +3321,7 @@ const Pos: React.FC = () => {
                                 {rmName}
                               </div>
                               <div style={{ fontSize: '11px', color: isRemoved ? '#DC2626' : '#64748B', fontWeight: isRemoved ? '700' : '500' }}>
-                                {isRemoved ? '❌ Se quitará de la preparación' : '✓ Incluido'}
+                                {isRemoved ? 'Se quitará de la preparación' : 'Incluido'}
                               </div>
                             </div>
                             <span style={{
@@ -3341,16 +3343,16 @@ const Pos: React.FC = () => {
                   {/* Sección 2: Agregar Extras */}
                   <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
                     <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      ✨ Adicionales / Extras Disponibles
+                      Adicionales / Extras Disponibles
                     </h4>
 
                     {availableRawMaterials.filter(rm => rm.allowAsExtra).length === 0 ? (
                       <div style={{ background: '#FFFBEB', borderRadius: '12px', padding: '14px', border: '1px solid #FDE68A', textAlign: 'center' }}>
                         <div style={{ fontSize: '13px', fontWeight: '800', color: '#92400E', marginBottom: '4px' }}>
-                          ⚠️ No hay adicionales habilitados como Extra
+                          No hay adicionales habilitados como Extra
                         </div>
                         <div style={{ fontSize: '12px', color: '#78350F' }}>
-                          Ve a <strong>Inventario (Insumos)</strong> y activa la opción <strong>"🍔 Vender como Adicional / Extra"</strong> en los insumos que desees ofrecer con recargo (Queso, Tocineta, Salsas, etc.).
+                          Ve a <strong>Inventario (Insumos)</strong> y activa la opción <strong>"Vender como Adicional / Extra"</strong> en los insumos que desees ofrecer con recargo (Queso, Tocineta, Salsas, etc.).
                         </div>
                       </div>
                     ) : (
@@ -3456,7 +3458,7 @@ const Pos: React.FC = () => {
             <div style={{ background: '#ffffff', padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontSize: '11px', fontWeight: '800', color: '#6D28D9', textTransform: 'uppercase' }}>
-                  🎨 Seleccionar Sub-producto / Variante
+                  Seleccionar Variante / Sub-producto
                 </div>
                 <h3 style={{ margin: '2px 0 0 0', fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
                   {selectingVariantProduct?.name}
@@ -3515,7 +3517,7 @@ const Pos: React.FC = () => {
                         />
                       ) : (
                         <div style={{ width: '56px', height: '56px', borderRadius: '10px', background: '#F3E8FF', color: '#6D28D9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '18px', flexShrink: 0 }}>
-                          🎨
+                          <IonIcon icon={pricetagOutline} style={{ fontSize: '22px' }} />
                         </div>
                       )}
 

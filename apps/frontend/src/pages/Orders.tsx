@@ -21,7 +21,10 @@ import {
   cartOutline,
   cubeOutline,
   trashOutline,
-  copyOutline
+  copyOutline,
+  receiptOutline,
+  locationOutline,
+  callOutline
 } from 'ionicons/icons';
 import { apiClient } from '../api/client';
 import { OrderStatus, PaymentStatus, DeliveryMethod, UserRole } from '@finowork/shared-types';
@@ -598,7 +601,7 @@ const Orders: React.FC = () => {
         diffDays,
         formattedDue,
         isoDate,
-        label: `⏳ Vence ${diffDays === 0 ? 'HOY' : 'mañana'} (${formattedDue})`,
+        label: `Vence ${diffDays === 0 ? 'HOY' : 'mañana'} (${formattedDue})`,
         bg: '#FFFBEB',
         border: '#FDE68A',
         color: '#92400E',
@@ -609,7 +612,7 @@ const Orders: React.FC = () => {
         diffDays,
         formattedDue,
         isoDate,
-        label: `📅 Próximo abono: ${formattedDue} (en ${diffDays} días)`,
+        label: `Próximo abono: ${formattedDue} (en ${diffDays} días)`,
         bg: '#ECFDF5',
         border: '#A7F3D0',
         color: '#065F46',
@@ -623,7 +626,7 @@ const Orders: React.FC = () => {
     if (onlyCode) {
       try {
         await navigator.clipboard.writeText(shortCode);
-        presentToast({ message: `📋 Código ${shortCode} copiado al portapapeles`, duration: 2000, color: 'success' });
+        presentToast({ message: `Código ${shortCode} copiado al portapapeles`, duration: 2000, color: 'success' });
       } catch {
         presentToast({ message: `Código: ${shortCode}`, duration: 2500, color: 'primary' });
       }
@@ -662,7 +665,7 @@ const Orders: React.FC = () => {
 
     try {
       await navigator.clipboard.writeText(summaryLines);
-      presentToast({ message: `📋 Resumen y código (${shortCode}) copiados al portapapeles`, duration: 2200, color: 'success' });
+      presentToast({ message: `Resumen y código (${shortCode}) copiados al portapapeles`, duration: 2200, color: 'success' });
     } catch {
       presentToast({ message: 'No se pudo copiar automáticamente', duration: 2500, color: 'warning' });
     }
@@ -965,7 +968,7 @@ const Orders: React.FC = () => {
                           style={{ fontSize: '11px', padding: '3px 10px', background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1D4ED8', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
                         >
                           <span className="ff-pill-dot" style={{ background: '#3B82F6' }} />
-                          <span>📦 PARCIAL</span>
+                          <span>PARCIAL</span>
                         </div>
                       ) : (
                         <div
@@ -985,12 +988,12 @@ const Orders: React.FC = () => {
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
                       {order.fiscalInvoiceId && (
                         <span style={{ fontSize: '11px', fontWeight: '800', padding: '3px 8px', borderRadius: '6px', background: '#ECFDF5', color: '#047857', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid #A7F3D0' }}>
-                          🧾 {order.fiscalStatus === 'CANCELED' ? 'NC Anulada' : 'Comprobante con IVA'}
+                          {order.fiscalStatus === 'CANCELED' ? 'NC Anulada' : 'Comprobante con IVA'}
                         </span>
                       )}
                       {order.linkedReservationId && (
                         <span style={{ fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: '#ECFDF5', color: '#065F46', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid #A7F3D0' }}>
-                          🗓️ Cita Agendada
+                          Cita Agendada
                         </span>
                       )}
                       {order.requestedDeliveryDate && (() => {
@@ -1023,7 +1026,7 @@ const Orders: React.FC = () => {
                             gap: '4px',
                             border: isPast && !isPaid ? '1px solid #FECACA' : 'none'
                           }}>
-                            {isPast && !isPaid ? '⏰ Cita Cumplida:' : '📅 Requerido:'} {displayDate}
+                            {isPast && !isPaid ? 'Cita Cumplida:' : 'Requerido:'} {displayDate}
                           </span>
                         );
                       })()}
@@ -1048,7 +1051,7 @@ const Orders: React.FC = () => {
 
                     {order.deliveryMethod === DeliveryMethod.DELIVERY && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', background: '#F0F9FF', padding: '6px 10px', borderRadius: '10px', border: '1px solid #BAE6FD' }}>
-                        <span style={{ fontSize: '12px', fontWeight: '800', color: '#0284C7' }}>🛵 Repartidor:</span>
+                        <span style={{ fontSize: '12px', fontWeight: '800', color: '#0284C7' }}>Repartidor:</span>
                         <IonSelect
                           interface="popover"
                           value={order.deliveryUserId || ''}
@@ -1080,7 +1083,7 @@ const Orders: React.FC = () => {
                               );
                               return (
                                 <IonSelectOption key={driver.id} value={driver.id}>
-                                  🛵 {driver.username || driver.name} ({roleName})
+                                  {driver.username || driver.name} ({roleName})
                                 </IonSelectOption>
                               );
                             })}
@@ -1097,7 +1100,7 @@ const Orders: React.FC = () => {
                         </div>
                         {order.customerAddress && (
                           <div style={{ marginTop: '2px', color: '#0C4A6E' }}>
-                            📍 <b>Dirección:</b> {order.customerAddress}
+                            <b>Dirección:</b> {order.customerAddress}
                           </div>
                         )}
                       </div>
@@ -1117,12 +1120,12 @@ const Orders: React.FC = () => {
                                 {qty}x {pName}
                                 {it.variantName && (
                                   <span style={{ fontSize: '10px', fontWeight: '800', color: '#1E293B', background: '#E2E8F0', padding: '1px 6px', borderRadius: '4px' }}>
-                                    🎨 {it.variantName}
+                                    {it.variantName}
                                   </span>
                                 )}
                                 {it.employeeId && (
                                   <span style={{ fontSize: '10px', fontWeight: '700', color: '#047857', background: '#ECFDF5', padding: '1px 6px', borderRadius: '4px' }}>
-                                    👤 {employeesMap[it.employeeId] || 'Especialista'}
+                                    {employeesMap[it.employeeId] || 'Especialista'}
                                   </span>
                                 )}
                               </span>
@@ -1136,7 +1139,7 @@ const Orders: React.FC = () => {
                             {it.hasModifications && (
                               <div style={{ marginTop: '2px', paddingLeft: '8px', borderLeft: '2px solid #F59E0B' }}>
                                 <span style={{ fontSize: '10px', fontWeight: '800', background: '#FEF3C7', color: '#92400E', padding: '1px 5px', borderRadius: '4px' }}>
-                                  ⚠️ Modificado
+                                  Modificado
                                 </span>
                                 {Array.isArray(it.removedIngredients) && it.removedIngredients.length > 0 && (
                                   <div style={{ fontSize: '11px', color: '#DC2626', fontWeight: '700', marginTop: '1px' }}>
@@ -1164,7 +1167,7 @@ const Orders: React.FC = () => {
                       )}
                       {!isKitchen && Number(order.discountAmount || 0) > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#DC2626', fontWeight: '700', padding: '4px 0', borderTop: '1px dashed #E2E8F0', marginTop: '4px' }}>
-                          <span>🏷️ Descuento:</span>
+                          <span>Descuento:</span>
                           <span>-${Number(order.discountAmount).toFixed(2)}</span>
                         </div>
                       )}
@@ -1184,7 +1187,7 @@ const Orders: React.FC = () => {
                           background: isPreparing ? '#EFF6FF' : (isPending ? '#FEF3C7' : '#ECFDF5'),
                           color: isPreparing ? '#1D4ED8' : (isPending ? '#92400E' : '#047857')
                         }}>
-                          {isPreparing ? '👨‍🍳 EN PREPARACIÓN' : (isPending ? '⏳ PENDIENTE' : '✓ LISTO / ENTREGADO')}
+                          {isPreparing ? 'EN PREPARACIÓN' : (isPending ? 'PENDIENTE' : 'LISTO / ENTREGADO')}
                         </span>
                       </div>
                     ) : (
@@ -1199,7 +1202,7 @@ const Orders: React.FC = () => {
                             </div>
                             {Boolean(systemSettings?.enableCopCurrency) && (
                               <div style={{ fontSize: '11px', fontWeight: '800', color: '#854D0E' }}>
-                                🇨🇴 ${Math.round(totalUsd * Number((order as any).exchangeRateCop || systemSettings?.exchangeRateCop || 4000)).toLocaleString('es-CO')} COP
+                                ${Math.round(totalUsd * Number((order as any).exchangeRateCop || systemSettings?.exchangeRateCop || 4000)).toLocaleString('es-CO')} COP
                               </div>
                             )}
                           </div>
@@ -1259,7 +1262,7 @@ const Orders: React.FC = () => {
                                           rel="noreferrer"
                                           style={{ color: '#B91C1C', textDecoration: 'underline', fontSize: '10px', fontWeight: '900', whiteSpace: 'nowrap' }}
                                         >
-                                          Recordar 📲
+                                          Recordar
                                         </a>
                                       )}
                                     </div>
@@ -1283,7 +1286,7 @@ const Orders: React.FC = () => {
                             {!isPaid && (Boolean(order.paymentReported) || (Array.isArray(order.abonosHistory) && order.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) && (
                               <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', padding: '10px', marginTop: '8px' }}>
                                 <div style={{ fontSize: '12px', fontWeight: '800', color: '#92400E', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span>📱 PAGO REPORTADO POR VERIFICAR</span>
+                                  <span>PAGO REPORTADO POR VERIFICAR</span>
                                   {order.paymentProofUrl && (
                                     <a
                                       href={order.paymentProofUrl}
@@ -1516,7 +1519,7 @@ const Orders: React.FC = () => {
                       }}
                       title="Ver resumen y ticket de venta imprimible"
                     >
-                      🧾 Ticket
+                      <IonIcon icon={receiptOutline} style={{ marginRight: '4px' }} /> Ticket
                     </button>
 
                     <button
@@ -1581,7 +1584,7 @@ const Orders: React.FC = () => {
                   }}
                   title="Ver resumen y ticket imprimible"
                 >
-                  🧾 Ver Ticket
+                  <IonIcon icon={receiptOutline} style={{ marginRight: '4px' }} /> Ver Ticket
                 </button>
               </div>
               <button
@@ -1607,12 +1610,12 @@ const Orders: React.FC = () => {
                     </div>
                     {selectedOrderForDetails.customerPhone && (
                       <div style={{ fontSize: '13px', color: '#64748B', marginBottom: '4px' }}>
-                        📞 {selectedOrderForDetails.customerPhone}
+                        <IonIcon icon={callOutline} style={{ verticalAlign: 'middle', marginRight: '4px' }} />{selectedOrderForDetails.customerPhone}
                       </div>
                     )}
                     {selectedOrderForDetails.customerAddress && (
                       <div style={{ fontSize: '13px', color: '#64748B', marginBottom: '4px' }}>
-                        📍 {selectedOrderForDetails.customerAddress}
+                        <IonIcon icon={locationOutline} style={{ verticalAlign: 'middle', marginRight: '4px' }} />{selectedOrderForDetails.customerAddress}
                       </div>
                     )}
                     <div style={{ fontSize: '13px', color: '#64748B' }}>
@@ -1623,7 +1626,7 @@ const Orders: React.FC = () => {
                     {selectedOrderForDetails.deliveryMethod === DeliveryMethod.DELIVERY && (
                       <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <label style={{ fontSize: '12px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          🛵 Asignar Repartidor:
+                          Asignar Repartidor:
                         </label>
                         <IonSelect
                           interface="popover"
@@ -1658,7 +1661,7 @@ const Orders: React.FC = () => {
                               );
                               return (
                                 <IonSelectOption key={driver.id} value={driver.id}>
-                                  🛵 {driver.name || driver.username} ({roleName})
+                                  {driver.name || driver.username} ({roleName})
                                 </IonSelectOption>
                               );
                             })}
@@ -1683,17 +1686,17 @@ const Orders: React.FC = () => {
                               {qty}x {pName}
                               {it.employeeId && (
                                 <span style={{ fontSize: '11px', fontWeight: '700', color: '#047857', background: '#ECFDF5', padding: '2px 8px', borderRadius: '6px' }}>
-                                  👤 {employeesMap[it.employeeId] || 'Especialista'}
+                                  {employeesMap[it.employeeId] || 'Especialista'}
                                 </span>
                               )}
                               {Number(it.deliveredQuantity || 0) > 0 && (
                                 <span style={{ fontSize: '10px', fontWeight: '800', color: Number(it.deliveredQuantity) >= qty ? '#047857' : '#D97706', background: Number(it.deliveredQuantity) >= qty ? '#ECFDF5' : '#FEF3C7', padding: '1px 6px', borderRadius: '4px' }}>
-                                  📦 Entregados: {it.deliveredQuantity}/{qty}
+                                  Entregados: {it.deliveredQuantity}/{qty}
                                 </span>
                               )}
                               {it.hasModifications && (
                                 <span style={{ fontSize: '10px', fontWeight: '800', background: '#FEF3C7', color: '#92400E', padding: '1px 5px', borderRadius: '4px' }}>
-                                  ⚠️ Modificado
+                                  Modificado
                                 </span>
                               )}
                             </span>
@@ -1707,7 +1710,7 @@ const Orders: React.FC = () => {
                           {it.hasModifications && (
                             <div style={{ marginTop: '4px', padding: '6px 10px', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #FCD34D' }}>
                               <div style={{ fontSize: '11px', fontWeight: '800', color: '#B45309', marginBottom: '2px' }}>
-                                📝 COMANDA DE COCINA:
+                                Comanda de Preparación:
                               </div>
                               {Array.isArray(it.removedIngredients) && it.removedIngredients.length > 0 && (
                                 <div style={{ fontSize: '12px', color: '#DC2626', fontWeight: '800' }}>
@@ -1732,7 +1735,7 @@ const Orders: React.FC = () => {
                       <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '12px', marginTop: '10px', marginBottom: '8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '13px', fontWeight: '700', color: '#334155' }}>
-                            🏷️ Descuento Especial:
+                            Descuento Especial:
                           </span>
                           {!isEditingDetailsDiscount && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1946,7 +1949,7 @@ const Orders: React.FC = () => {
                     <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '16px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          💳 Información de Pago y Arqueo
+                          Información de Pago y Arqueo
                         </h4>
                         <span style={{
                           fontSize: '11px',
@@ -1964,11 +1967,11 @@ const Orders: React.FC = () => {
                         <div style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
                           <div style={{ fontSize: '11px', color: '#64748B', fontWeight: '600', marginBottom: '2px' }}>Método de Cobro</div>
                           <div style={{ fontWeight: '800', color: '#0F172A' }}>
-                            {selectedOrderForDetails.paymentMethod === 'USD' && '💵 Efectivo Divisas ($)'}
-                            {selectedOrderForDetails.paymentMethod === 'PAGO_MOVIL' && '📱 Pago Móvil (Bs.)'}
-                            {selectedOrderForDetails.paymentMethod === 'PUNTO' && '💳 Punto de Venta'}
-                            {selectedOrderForDetails.paymentMethod === 'BINANCE' && '🟡 Binance Pay'}
-                            {selectedOrderForDetails.paymentMethod === 'TRANSFER' && '🏦 Transferencia'}
+                            {selectedOrderForDetails.paymentMethod === 'USD' && 'Efectivo Divisas ($)'}
+                            {selectedOrderForDetails.paymentMethod === 'PAGO_MOVIL' && 'Pago Móvil (Bs.)'}
+                            {selectedOrderForDetails.paymentMethod === 'PUNTO' && 'Punto de Venta'}
+                            {selectedOrderForDetails.paymentMethod === 'BINANCE' && 'Binance Pay'}
+                            {selectedOrderForDetails.paymentMethod === 'TRANSFER' && 'Transferencia'}
                             {selectedOrderForDetails.paymentMethod === 'PENDING' && '⏳ Cuenta Abierta'}
                             {!['USD','PAGO_MOVIL','PUNTO','BINANCE','TRANSFER','PENDING'].includes(selectedOrderForDetails.paymentMethod) && (selectedOrderForDetails.paymentMethod || 'Efectivo')}
                           </div>
@@ -1987,7 +1990,7 @@ const Orders: React.FC = () => {
                         <div style={{ marginTop: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '14px', padding: '14px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <span style={{ fontSize: '13px', color: '#166534', fontWeight: '700' }}>
-                              {selectedOrderForDetails.paymentStatus === PaymentStatus.PAID ? '💵 Efectivo Recibido:' : '💵 Paga al recibir con:'}
+                              {selectedOrderForDetails.paymentStatus === PaymentStatus.PAID ? 'Efectivo Recibido:' : 'Paga al recibir con:'}
                             </span>
                             <span style={{ fontSize: '16px', fontWeight: '900', color: '#15803D' }}>
                               ${Number(selectedOrderForDetails.usdReceived || detailsTotal).toFixed(2)} USD
@@ -2011,7 +2014,7 @@ const Orders: React.FC = () => {
                               <div style={{ background: '#DCFCE7', padding: '8px 10px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#166534' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <span>Canal de Entrega:</span>
-                                  <b>{selectedOrderForDetails.changeMethod === 'PAGO_MOVIL' ? '📱 Pago Móvil' : selectedOrderForDetails.changeMethod === 'CASH_BS' ? '🇻🇪 Efectivo Bolívares' : '💵 Efectivo Divisas'}</b>
+                                  <b>{selectedOrderForDetails.changeMethod === 'PAGO_MOVIL' ? 'Pago Móvil' : selectedOrderForDetails.changeMethod === 'CASH_BS' ? 'Efectivo Bolívares' : 'Efectivo Divisas'}</b>
                                 </div>
                                 {selectedOrderForDetails.changeRef && (
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2164,7 +2167,7 @@ const Orders: React.FC = () => {
                               cursor: 'pointer'
                             }}
                           >
-                            👨‍🍳 Empezar a Preparar
+                            Empezar a Preparar
                           </button>
                         )}
                         {selectedOrderForDetails.status === OrderStatus.PREPARING && (
@@ -2234,7 +2237,7 @@ const Orders: React.FC = () => {
                               }}
                             >
                               <IonIcon icon={cartOutline} />
-                              🛒 Agregar Productos a la Cuenta (Abrir en POS)
+                              Agregar Productos a la Cuenta (Abrir en POS)
                             </button>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                               <button
@@ -2267,7 +2270,7 @@ const Orders: React.FC = () => {
                                 className="ff-btn-primary"
                                 style={{ padding: '12px', fontSize: '13px', justifyContent: 'center' }}
                               >
-                                💵 Cobrar Total
+                                Cobrar Total
                               </button>
                             </div>
                           </div>
@@ -2292,7 +2295,7 @@ const Orders: React.FC = () => {
                           }}
                         >
                           <IonIcon icon={copyOutline} style={{ fontSize: '16px' }} />
-                          <span>📋 Copiar Código y Resumen de Venta</span>
+                          <span>Copiar Código y Resumen de Venta</span>
                         </button>
 
                         {/* Sección de Facturación Fiscal SENIAT */}
@@ -2309,7 +2312,7 @@ const Orders: React.FC = () => {
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '20px' }}>🧾</span>
+                                <IonIcon icon={receiptOutline} style={{ fontSize: '22px', color: '#64748B' }} />
                                 <div>
                                   <div style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A' }}>
                                     Desglose y Control de IVA
@@ -2361,7 +2364,7 @@ const Orders: React.FC = () => {
                                     gap: '6px'
                                   }}
                                 >
-                                  🖨️ Ver / Imprimir Comprobante
+                                  Ver / Imprimir Comprobante
                                 </button>
                                 {selectedOrderForDetails.fiscalStatus !== 'CANCELED' && (
                                   <button
@@ -2378,7 +2381,7 @@ const Orders: React.FC = () => {
                                       cursor: 'pointer'
                                     }}
                                   >
-                                    🚫 Anular (Ajuste)
+                                    Anular (Ajuste)
                                   </button>
                                 )}
                               </div>
@@ -2403,7 +2406,7 @@ const Orders: React.FC = () => {
                                   gap: '6px'
                                 }}
                               >
-                                {isEmittingFiscal ? 'Generando Comprobante...' : '🧾 Generar Comprobante con IVA'}
+                                {isEmittingFiscal ? 'Generando Comprobante...' : 'Generar Comprobante con IVA'}
                               </button>
                             )}
                           </div>
@@ -2448,7 +2451,7 @@ const Orders: React.FC = () => {
                             }}
                           >
                             <IonIcon icon={cubeOutline} />
-                            📦 Despacho / Entrega Parcial de Productos
+                            Despacho / Entrega Parcial de Productos
                           </button>
                         )}
 
@@ -2697,7 +2700,7 @@ const Orders: React.FC = () => {
                   <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '12px 14px', marginBottom: '14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <span style={{ fontSize: '12px', fontWeight: '800', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        🏷️ Descuento Especial (Opcional)
+                        Descuento Especial (Opcional)
                       </span>
                       {computedDiscountAmount > 0 && (
                         <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--theme-primary, #10B981)' }}>
@@ -2804,7 +2807,7 @@ const Orders: React.FC = () => {
                             fontSize: '11px'
                           }}
                         >
-                          💾 Guardar sólo descuento
+                          Guardar sólo descuento
                         </button>
                       </div>
                     )}
@@ -2835,7 +2838,7 @@ const Orders: React.FC = () => {
                           cursor: 'pointer'
                         }}
                       >
-                        💵 Dólares ($ USD)
+                        Dólares ($ USD)
                       </button>
                       <button
                         type="button"
@@ -2856,7 +2859,7 @@ const Orders: React.FC = () => {
                           cursor: 'pointer'
                         }}
                       >
-                        {currencySymbol === 'COP' ? '🇨🇴 Pesos (COP)' : '🇻🇪 Bolívares (Bs.)'}
+                        {currencySymbol === 'COP' ? 'Pesos (COP)' : 'Bolívares (Bs.)'}
                       </button>
                     </div>
                   </div>
@@ -2916,10 +2919,10 @@ const Orders: React.FC = () => {
                     </label>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '10px' }}>
                       {[
-                        { id: 'USD', label: '💵 Divisas ($)' },
-                        { id: 'PAGO_MOVIL', label: '📱 Pago Móvil' },
-                        { id: 'PUNTO', label: '💳 Punto de Venta' },
-                        { id: 'TRANSFER', label: '🏦 Transferencia' }
+                        { id: 'USD', label: 'Divisas ($)' },
+                        { id: 'PAGO_MOVIL', label: 'Pago Móvil' },
+                        { id: 'PUNTO', label: 'Punto de Venta' },
+                        { id: 'TRANSFER', label: 'Transferencia' }
                       ].map(m => (
                         <button
                           key={m.id}
@@ -3168,7 +3171,7 @@ const Orders: React.FC = () => {
                   <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '12px 14px', marginBottom: '16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <span style={{ fontSize: '12px', fontWeight: '800', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        🏷️ Descuento Especial (Opcional)
+                        Descuento Especial (Opcional)
                       </span>
                       {computedDiscountAmount > 0 && (
                         <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--theme-primary, #10B981)' }}>
@@ -3272,10 +3275,10 @@ const Orders: React.FC = () => {
                     </label>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                       {[
-                        { id: 'USD', label: '💵 Divisas USD' },
-                        { id: 'PAGO_MOVIL', label: '📱 Pago Móvil' },
-                        { id: 'PUNTO', label: '💳 Punto de Venta' },
-                        { id: 'TRANSFER', label: '🏦 Transferencia' }
+                        { id: 'USD', label: 'Divisas USD' },
+                        { id: 'PAGO_MOVIL', label: 'Pago Móvil' },
+                        { id: 'PUNTO', label: 'Punto de Venta' },
+                        { id: 'TRANSFER', label: 'Transferencia' }
                       ].map(m => (
                         <button
                           key={m.id}

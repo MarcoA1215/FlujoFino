@@ -117,7 +117,7 @@ export const BuyUsdModal: React.FC<BuyUsdModalProps> = ({
       <IonHeader className="ion-no-border">
         <IonToolbar style={{ '--background': '#ffffff', borderBottom: '1px solid #E2E8F0', padding: '4px 8px' } as any}>
           <IonTitle style={{ fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
-            💱 Comprar USD / Proteger en Divisas
+            Comprar USD / Proteger en Divisas
           </IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={onClose} color="medium">
@@ -142,7 +142,7 @@ export const BuyUsdModal: React.FC<BuyUsdModalProps> = ({
             }}
           >
             <div style={{ fontSize: '12px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-              🏛️ Saldo Disponible en Bolívares
+              Saldo Disponible en Bolívares
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -300,7 +300,7 @@ export const BuyUsdModal: React.FC<BuyUsdModalProps> = ({
                     gap: '6px',
                   }}
                 >
-                  <span>💵</span> Gaveta Efectivo USD
+                  Gaveta Efectivo USD
                 </button>
                 <button
                   type="button"
@@ -320,7 +320,7 @@ export const BuyUsdModal: React.FC<BuyUsdModalProps> = ({
                     gap: '6px',
                   }}
                 >
-                  <span>🟡</span> Binance / USDT
+                  Binance / USDT
                 </button>
               </div>
             </div>
@@ -402,7 +402,7 @@ export const BuyUsdModal: React.FC<BuyUsdModalProps> = ({
                 onClick={() => setShowHistory(!showHistory)}
               >
                 <div style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>📜</span> Historial de Compras de USD ({treasury.exchangeHistory.length})
+                  Historial de Compras de USD ({treasury.exchangeHistory.length})
                 </div>
                 <span style={{ fontSize: '12px', color: '#10B981', fontWeight: '700' }}>
                   {showHistory ? 'Ocultar ▲' : 'Ver todos ▼'}

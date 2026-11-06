@@ -230,7 +230,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                   backgroundColor: isResale ? '#dcfce7' : isFormula ? '#fef3c7' : '#e0e7ff',
                   color: isResale ? '#166534' : isFormula ? '#92400e' : '#3730a3',
                 }}>
-                  {isResale ? '📦 Reventa' : isFormula ? '🧪 Armable / Fórmula' : '💆 Servicio'}
+                  {isResale ? 'Reventa' : isFormula ? 'Armable / Fórmula' : 'Servicio'}
                 </span>
                 {Array.isArray(p.variants) && p.variants.length > 0 && (
                   <span style={{
@@ -242,7 +242,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                     color: '#065F46',
                     border: '1px solid #A7F3D0'
                   }}>
-                    🎨 {p.variants.length} variante{p.variants.length === 1 ? '' : 's'}
+                    {p.variants.length} variante{p.variants.length === 1 ? '' : 's'}
                   </span>
                 )}
               </div>
@@ -307,17 +307,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                     }}
                     title="Toca para ver o modificar los insumos"
                   >
-                    🧪 {p.recipe.length} insumos
+                    {p.recipe.length} insumos
                   </IonBadge>
                 )}
                 {p.durationMinutes ? (
                   <IonBadge color="light" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal', border: '1px solid #ddd' }}>
-                    ⏱️ {p.durationMinutes} min
+                    {p.durationMinutes} min
                   </IonBadge>
                 ) : null}
                 {p.assignedStaffIds && (Array.isArray(p.assignedStaffIds) ? p.assignedStaffIds.length > 0 : String(p.assignedStaffIds).trim().length > 0) && (
                   <IonBadge color="secondary" style={{ padding: '6px 8px', fontSize: '0.8rem', fontWeight: 'normal' }}>
-                    👤 {(Array.isArray(p.assignedStaffIds) ? p.assignedStaffIds.length : String(p.assignedStaffIds).split(',').filter(Boolean).length)} especial.
+                    {(Array.isArray(p.assignedStaffIds) ? p.assignedStaffIds.length : String(p.assignedStaffIds).split(',').filter(Boolean).length)} asignado(s)
                   </IonBadge>
                 )}
               </div>

@@ -183,7 +183,7 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
       });
 
       presentToast({
-        message: `✅ Vale de $${usd.toFixed(2)} registrado y egreso descontado de ${paymentMethod === 'PAGO_MOVIL' ? 'Bancos' : 'Gaveta'}`,
+        message: `Vale de $${usd.toFixed(2)} registrado y egreso descontado de ${paymentMethod === 'PAGO_MOVIL' ? 'Bancos' : 'Gaveta'}`,
         duration: 3500,
         color: 'success',
       });
@@ -231,7 +231,7 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
         : `$${(usd - (treasury?.cashUSD || 0)).toFixed(2)} USD`;
 
       presentAlert({
-        header: '⚠️ Saldo Insuficiente',
+        header: 'Saldo Insuficiente',
         subHeader: `Cuenta: ${cuentaStr}`,
         message: `El monto del vale supera los fondos registrados en ${cuentaStr} (Faltan ${faltanteStr}).\n\nSi continúas, la cuenta quedará con saldo negativo.\n\n¿Deseas registrar este vale de todas formas?`,
         buttons: [
@@ -304,7 +304,7 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
                   gap: '6px',
                 }}
               >
-                <span>🏦</span> Pago Móvil / Banco (Bs)
+                Pago Móvil / Banco (Bs)
               </button>
               <button
                 type="button"
@@ -324,7 +324,7 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
                   gap: '6px',
                 }}
               >
-                <span>💵</span> Efectivo Gaveta (USD)
+                Efectivo Gaveta (USD)
               </button>
             </div>
           </div>
@@ -342,28 +342,28 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
               {paymentMethod === 'PAGO_MOVIL' ? (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-                    <span style={{ color: '#64748B' }}>🏦 Disponible en Banco:</span>
+                    <span style={{ color: '#64748B' }}>Disponible en Banco:</span>
                     <span style={{ fontWeight: 800, color: (treasury.bankBs || 0) < 0 ? '#DC2626' : '#0F172A' }}>
                       {treasury.currencySymbol || 'Bs.'} {Number(treasury.bankBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                   {isCurrentlyInsufficient && currentBSNum > 0 && (
                     <div style={{ marginTop: '6px', color: '#B91C1C', fontWeight: 600, fontSize: '11px', lineHeight: 1.4 }}>
-                      ⚠️ <b>Saldo insuficiente en Banco:</b> Tienes Bs. {Number(treasury.bankBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} y el vale es de Bs. {currentBSNum.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Faltan Bs. {Math.abs(currentBSNum - (treasury.bankBs || 0)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}). Si confirmas, tu saldo bancario quedará en negativo.
+                      <b>Saldo insuficiente en Banco:</b> Tienes Bs. {Number(treasury.bankBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} y el vale es de Bs. {currentBSNum.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Faltan Bs. {Math.abs(currentBSNum - (treasury.bankBs || 0)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}). Si confirmas, tu saldo bancario quedará en negativo.
                     </div>
                   )}
                 </>
               ) : (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-                    <span style={{ color: '#64748B' }}>💵 Billetes en Gaveta:</span>
+                    <span style={{ color: '#64748B' }}>Billetes en Gaveta:</span>
                     <span style={{ fontWeight: 800, color: (treasury.cashUSD || 0) < 0 ? '#DC2626' : '#047857' }}>
                       ${Number(treasury.cashUSD || 0).toFixed(2)} USD
                     </span>
                   </div>
                   {isCurrentlyInsufficient && currentUSDNum > 0 && (
                     <div style={{ marginTop: '6px', color: '#B91C1C', fontWeight: 600, fontSize: '11px', lineHeight: 1.4 }}>
-                      ⚠️ <b>Efectivo insuficiente en Gaveta:</b> Hay ${Number(treasury.cashUSD || 0).toFixed(2)} USD en billetes y el vale es de ${currentUSDNum.toFixed(2)} USD. Si confirmas, la gaveta quedará en negativo. Si transferiste por Pago Móvil, selecciona <b>"Pago Móvil / Banco"</b> arriba.
+                      <b>Efectivo insuficiente en Gaveta:</b> Hay ${Number(treasury.cashUSD || 0).toFixed(2)} USD en billetes y el vale es de ${currentUSDNum.toFixed(2)} USD. Si confirmas, la gaveta quedará en negativo. Si transferiste por Pago Móvil, selecciona <b>"Pago Móvil / Banco"</b> arriba.
                     </div>
                   )}
                 </>
@@ -401,7 +401,7 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
               </option>
               {employees.map((e) => (
                 <option key={e.id} value={e.id}>
-                  👤 {e.name ? `${e.name} (${e.username})` : e.username} {e.jobTitle ? `• ${e.jobTitle}` : e.role ? `• ${e.role}` : ''}
+                  {e.name ? `${e.name} (${e.username})` : e.username} {e.jobTitle ? `• ${e.jobTitle}` : e.role ? `• ${e.role}` : ''}
                 </option>
               ))}
             </select>
@@ -415,7 +415,7 @@ export const SalaryAdvanceModal: React.FC<SalaryAdvanceModalProps> = ({
 
             {!isLoadingEmployees && employees.length === 0 && (
               <div style={{ fontSize: '12px', color: '#DC2626', marginTop: '6px', background: '#FEF2F2', padding: '8px 10px', borderRadius: '8px', border: '1px solid #FECACA' }}>
-                ⚠️ No se encontraron trabajadores registrados en este negocio. Ve a la sección de Personal para registrar empleados.
+                No se encontraron trabajadores registrados en este negocio. Ve a la sección de Personal para registrar empleados.
               </div>
             )}
           </div>

@@ -154,7 +154,7 @@ const PromoterDashboard: React.FC = () => {
     const lower = (name || '').toLowerCase();
     if (lower.includes('boutique') || lower.includes('retail') || lower.includes('moda')) {
       return {
-        category: '👗 Moda & Retail (Inventario con Tallas y Colores)',
+        category: 'Moda & Retail (Inventario con Tallas y Colores)',
         icon: pricetagOutline,
         color: '#8b5cf6',
         bg: '#f5f3ff',
@@ -163,7 +163,7 @@ const PromoterDashboard: React.FC = () => {
     }
     if (lower.includes('panadería') || lower.includes('panaderia') || lower.includes('espiga')) {
       return {
-        category: '🥖 Panadería & Pastelería (Producción y Fórmulas)',
+        category: 'Panadería & Pastelería (Producción y Fórmulas)',
         icon: restaurantOutline,
         color: '#d97706',
         bg: '#fffbeb',
@@ -172,7 +172,7 @@ const PromoterDashboard: React.FC = () => {
     }
     if (lower.includes('barbería') || lower.includes('barberia') || lower.includes('spa') || lower.includes('élite') || lower.includes('elite')) {
       return {
-        category: '✂️ Barbería & Spa Élite (Citas y Comisiones)',
+        category: 'Barbería & Spa Élite (Citas y Comisiones)',
         icon: cutOutline,
         color: '#0891b2',
         bg: '#ecfeff',
@@ -181,7 +181,7 @@ const PromoterDashboard: React.FC = () => {
     }
     if (lower.includes('lavado') || lower.includes('auto')) {
       return {
-        category: '🚗 Auto Lavado Express (Servicios Rápidos)',
+        category: 'Auto Lavado Express (Servicios Rápidos)',
         icon: carOutline,
         color: '#2563eb',
         bg: '#eff6ff',
@@ -190,7 +190,7 @@ const PromoterDashboard: React.FC = () => {
     }
     if (lower.includes('burger') || lower.includes('house') || lower.includes('gourmet') || lower.includes('gastronomia')) {
       return {
-        category: '🍔 Burger House Gourmet (Cocina, Salón y Delivery)',
+        category: 'Burger House Gourmet (Cocina, Salón y Delivery)',
         icon: fastFoodOutline,
         color: '#dc2626',
         bg: '#fef2f2',
@@ -199,7 +199,7 @@ const PromoterDashboard: React.FC = () => {
     }
     if (lower.includes('estética') || lower.includes('estetica') || lower.includes('glow')) {
       return {
-        category: '💆 Centro Estético Glow (Salud, Cabinas y Citas)',
+        category: 'Centro Estético Glow (Salud, Cabinas y Citas)',
         icon: sparklesOutline,
         color: '#db2777',
         bg: '#fdf2f8',
@@ -207,7 +207,7 @@ const PromoterDashboard: React.FC = () => {
       };
     }
     return {
-      category: '🏪 Negocio de Demostración en Vivo',
+      category: 'Negocio de Demostración en Vivo',
       icon: businessOutline,
       color: '#059669',
       bg: '#ecfdf5',
@@ -548,7 +548,7 @@ const PromoterDashboard: React.FC = () => {
                 </div>
 
                 <h1 style={{ fontSize: '26px', fontWeight: 800, margin: '8px 0 4px 0' }}>
-                  ¡Hola, {user?.username}! 👋
+                  ¡Hola, {user?.username}!
                 </h1>
                 <p style={{ color: '#94a3b8', margin: 0, fontSize: '14px', maxWidth: '640px' }}>
                   Recibe del <strong>10% al 20%</strong> sobre cada pago (mensual, trimestral o anual) que realicen tus comercios referidos activos.
@@ -842,7 +842,7 @@ const PromoterDashboard: React.FC = () => {
                 }}>
                   <div style={{ flex: '1 1 340px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '22px' }}>📖</span>
+                      
                       <span style={{ fontWeight: 800, fontSize: '16px', color: '#0f172a' }}>
                         Manual de Campo Oficial & Guía de Ventas
                       </span>
@@ -903,7 +903,7 @@ const PromoterDashboard: React.FC = () => {
                         ${(stats.monthlyEarnedUSD ?? 0).toFixed(2)} <span style={{ fontSize: '13px', fontWeight: 500, color: '#10b981' }}>USD</span>
                       </div>
                       <div style={{ fontSize: '12px', color: '#475569', marginTop: '4px', fontWeight: 600 }}>
-                        ✅ Pagado mes: ${(stats.monthlyPaidUSD ?? 0).toFixed(2)} • ⏳ Pend: ${(stats.monthlyPendingUSD ?? 0).toFixed(2)}
+                        Pagado mes: ${(stats.monthlyPaidUSD ?? 0).toFixed(2)} • Pendiente: ${(stats.monthlyPendingUSD ?? 0).toFixed(2)}
                       </div>
                     </IonCardContent>
                   </IonCard>
@@ -920,7 +920,7 @@ const PromoterDashboard: React.FC = () => {
                         ${stats.totalPaidBalanceUSD.toFixed(2)} <span style={{ fontSize: '13px', fontWeight: 500 }}>USD</span>
                       </div>
                       <div style={{ fontSize: '12px', color: '#475569', marginTop: '4px', fontWeight: 600 }}>
-                        🎉 Transferido a tu cuenta
+                        Transferido a tu cuenta
                       </div>
                     </IonCardContent>
                   </IonCard>
@@ -1021,7 +1021,7 @@ const PromoterDashboard: React.FC = () => {
                       </span>
                     )}
                     <div style={{ fontWeight: 800, fontSize: '14px', color: '#b45309', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>🥉</span> 1 a 49 Clientes Activos
+                      1 a 49 Clientes Activos
                     </div>
                     <div style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '4px 0' }}>
                       10% <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>de cada pago</span>
@@ -1056,7 +1056,7 @@ const PromoterDashboard: React.FC = () => {
                       </span>
                     )}
                     <div style={{ fontWeight: 800, fontSize: '14px', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>🥈</span> 50 a 99 Clientes Activos
+                      50 a 99 Clientes Activos
                     </div>
                     <div style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '4px 0' }}>
                       15% <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>de cada pago</span>
@@ -1091,7 +1091,7 @@ const PromoterDashboard: React.FC = () => {
                       </span>
                     )}
                     <div style={{ fontWeight: 800, fontSize: '14px', color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>🥇</span> 100+ Clientes Activos
+                      100+ Clientes Activos
                     </div>
                     <div style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '4px 0' }}>
                       20% <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>de cada pago</span>
@@ -1128,14 +1128,14 @@ const PromoterDashboard: React.FC = () => {
               <IonCardContent style={{ padding: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '22px' }}>🎯</span>
+                    
                     <span style={{ fontWeight: 800, fontSize: '16px', color: '#0f172a' }}>
                       Metas Históricas de Activación Comercial
                     </span>
                   </div>
                   {stats?.totalBonusCommissionsUSD !== undefined && stats.totalBonusCommissionsUSD > 0 && (
                     <IonBadge style={{ background: '#ecfdf5', color: '#065f46', padding: '6px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: 800 }}>
-                      🎁 ${stats.totalBonusCommissionsUSD.toFixed(2)} USD en Bonos Cobrados
+                      ${stats.totalBonusCommissionsUSD.toFixed(2)} USD en Bonos Cobrados
                     </IonBadge>
                   )}
                 </div>
@@ -1161,7 +1161,7 @@ const PromoterDashboard: React.FC = () => {
                   </div>
                 ) : (
                   <div style={{ background: '#ecfdf5', padding: '12px 16px', borderRadius: '10px', color: '#065f46', fontWeight: 700, fontSize: '13px', marginBottom: '16px' }}>
-                    🏆 ¡Felicitaciones! Has completado todas las metas de activación comercial disponibles.
+                    ¡Felicitaciones! Has completado todas las metas de activación comercial disponibles.
                   </div>
                 )}
 
@@ -1190,7 +1190,7 @@ const PromoterDashboard: React.FC = () => {
                         }}
                       >
                         <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: isUnlocked ? '#15803d' : '#64748b' }}>
-                          {isUnlocked ? '✅ Desbloqueado' : m.label}
+                          {isUnlocked ? 'Desbloqueado' : m.label}
                         </div>
                         <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: '4px 0' }}>
                           +${m.bonus} USD
@@ -1287,7 +1287,7 @@ const PromoterDashboard: React.FC = () => {
                       transition: 'all 0.2s ease',
                     }}
                   >
-                    <span>🟢 Activos</span>
+                    <span>Activos</span>
                     <span style={{
                       background: statusFilter === 'ACTIVE' ? 'rgba(255,255,255,0.25)' : '#dcfce7',
                       color: statusFilter === 'ACTIVE' ? '#ffffff' : '#15803d',
@@ -1319,7 +1319,7 @@ const PromoterDashboard: React.FC = () => {
                       transition: 'all 0.2s ease',
                     }}
                   >
-                    <span>⚠️ Por Pagar</span>
+                    <span>Por Pagar</span>
                     <span style={{
                       background: statusFilter === 'PAST_DUE' ? 'rgba(255,255,255,0.25)' : '#fef3c7',
                       color: statusFilter === 'PAST_DUE' ? '#ffffff' : '#b45309',
@@ -1351,7 +1351,7 @@ const PromoterDashboard: React.FC = () => {
                       transition: 'all 0.2s ease',
                     }}
                   >
-                    <span>🔷 En Prueba</span>
+                    <span>En Prueba</span>
                     <span style={{
                       background: statusFilter === 'TRIAL' ? 'rgba(255,255,255,0.25)' : '#bae6fd',
                       color: statusFilter === 'TRIAL' ? '#ffffff' : '#0369a1',
@@ -1383,7 +1383,7 @@ const PromoterDashboard: React.FC = () => {
                       transition: 'all 0.2s ease',
                     }}
                   >
-                    <span>⛔ Dados de Baja</span>
+                    <span>Inactivos</span>
                     <span style={{
                       background: statusFilter === 'INACTIVE' ? 'rgba(255,255,255,0.25)' : '#fee2e2',
                       color: statusFilter === 'INACTIVE' ? '#ffffff' : '#b91c1c',
@@ -1537,7 +1537,7 @@ const PromoterDashboard: React.FC = () => {
                                       borderRadius: '8px',
                                       display: 'inline-block',
                                     }}>
-                                      🟢 ACTIVO
+                                      ACTIVO
                                     </span>
                                     <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600, marginTop: '4px' }}>
                                       {t.daysRemaining !== null && t.daysRemaining !== undefined
@@ -1559,7 +1559,7 @@ const PromoterDashboard: React.FC = () => {
                                       borderRadius: '8px',
                                       display: 'inline-block',
                                     }}>
-                                      ⚠️ POR PAGAR
+                                      POR PAGAR
                                     </span>
                                     <div style={{ fontSize: '12px', color: '#d97706', fontWeight: 700, marginTop: '4px' }}>
                                       {t.daysOverdue !== null && t.daysOverdue !== undefined
@@ -1581,7 +1581,7 @@ const PromoterDashboard: React.FC = () => {
                                       borderRadius: '8px',
                                       display: 'inline-block',
                                     }}>
-                                      🔷 EN PRUEBA
+                                      EN PRUEBA
                                     </span>
                                     <div style={{ fontSize: '12px', color: '#0284c7', fontWeight: 600, marginTop: '4px' }}>
                                       {t.daysRemaining !== null && t.daysRemaining !== undefined
@@ -1603,7 +1603,7 @@ const PromoterDashboard: React.FC = () => {
                                       borderRadius: '8px',
                                       display: 'inline-block',
                                     }}>
-                                      ⛔ DADO DE BAJA
+                                      INACTIVO
                                     </span>
                                     <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
                                       Inactivo / Cancelado
@@ -1662,7 +1662,7 @@ const PromoterDashboard: React.FC = () => {
                                   <div style={{ fontSize: '11px', marginTop: '2px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px' }}>
                                     {(t.paidCommissionsUSD ?? 0) > 0 && (
                                       <span style={{ color: '#16a34a', fontWeight: 600 }}>
-                                        ✅ Pagado: ${(t.paidCommissionsUSD ?? 0).toFixed(2)}
+                                        Pagado: ${(t.paidCommissionsUSD ?? 0).toFixed(2)}
                                       </span>
                                     )}
                                     {(t.pendingCommissionsUSD ?? 0) > 0 && (
@@ -1767,10 +1767,10 @@ const PromoterDashboard: React.FC = () => {
                   {/* Resumen rápido en píldoras */}
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '5px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: 800 }}>
-                      📅 Ganado este mes: ${(stats.monthlyEarnedUSD ?? 0).toFixed(2)} USD
+                      Ganado este mes: ${(stats.monthlyEarnedUSD ?? 0).toFixed(2)} USD
                     </span>
                     <span style={{ background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe', padding: '5px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: 800 }}>
-                      ✅ Ya Pagado: ${stats.totalPaidBalanceUSD.toFixed(2)} USD
+                      Ya Pagado: ${stats.totalPaidBalanceUSD.toFixed(2)} USD
                     </span>
                     <span style={{ background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', padding: '5px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: 800 }}>
                       ⏳ Por Cobrar: ${stats.totalPendingBalanceUSD.toFixed(2)} USD
@@ -1811,7 +1811,7 @@ const PromoterDashboard: React.FC = () => {
                       cursor: 'pointer',
                     }}
                   >
-                    📅 Ganado Este Mes
+                    Ganado Este Mes
                   </button>
 
                   <button
@@ -1828,7 +1828,7 @@ const PromoterDashboard: React.FC = () => {
                       cursor: 'pointer',
                     }}
                   >
-                    ✅ Ya Pagados ({stats.recentCommissions.filter((c) => c.status === 'PAID').length})
+                    Ya Pagados ({stats.recentCommissions.filter((c) => c.status === 'PAID').length})
                   </button>
 
                   <button
@@ -1901,7 +1901,7 @@ const PromoterDashboard: React.FC = () => {
                                 {comm.notes && <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>{comm.notes}</div>}
                               </td>
                               <td style={{ padding: '12px 16px', fontSize: '12px', color: '#334155' }}>
-                                {comm.type === 'ACTIVATION' ? '⭐ 1ª Activación (50%)' : comm.type === 'BONUS' ? '🎁 Bono por Meta' : '🔄 Renovación de Suscripción'}
+                                {comm.type === 'ACTIVATION' ? '1ª Activación (50%)' : comm.type === 'BONUS' ? 'Bono por Meta' : 'Renovación de Suscripción'}
                               </td>
                               <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, fontSize: '14px', color: '#0f172a' }}>
                                 ${Number(comm.amountUSD).toFixed(2)} USD
@@ -1918,7 +1918,7 @@ const PromoterDashboard: React.FC = () => {
                                     borderRadius: '10px',
                                     display: 'inline-block',
                                   }}>
-                                    ✅ YA PAGADO
+                                    YA PAGADO
                                   </span>
                                 ) : comm.status === 'PENDING' ? (
                                   <span style={{
@@ -1990,7 +1990,7 @@ const PromoterDashboard: React.FC = () => {
           <IonHeader>
             <IonToolbar style={{ '--background': '#0f172a', '--color': '#ffffff' } as any}>
               <IonTitle style={{ fontWeight: 800, fontSize: '16px' }}>
-                {stats?.termsAccepted ? 'Términos y Condiciones del Promotor' : '⚠️ Aceptación Obligatoria de Términos'}
+                {stats?.termsAccepted ? 'Términos y Condiciones del Promotor' : 'Aceptación Obligatoria de Términos'}
               </IonTitle>
               {stats?.termsAccepted && (
                 <IonButtons slot="end">
@@ -2114,7 +2114,7 @@ const PromoterDashboard: React.FC = () => {
               <IonCard style={{ margin: 0, borderRadius: '12px' }}>
                 <IonCardContent>
                   <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1e293b', marginBottom: '12px' }}>
-                    📱 Pago Móvil (Venezuela)
+                    Pago Móvil (Venezuela)
                   </h3>
 
                   <div style={{ marginBottom: '12px' }}>
@@ -2146,7 +2146,7 @@ const PromoterDashboard: React.FC = () => {
                   </IonItem>
 
                   <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1e293b', marginBottom: '12px' }}>
-                    🪙 Binance Pay / USDT
+                    Binance Pay / USDT
                   </h3>
 
                   <IonItem lines="full" style={{ marginBottom: '20px' }}>
@@ -2227,22 +2227,22 @@ const PromoterDashboard: React.FC = () => {
                     <div>
                       {contactTenant.subStatus === 'ACTIVE' && (
                         <span style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', fontSize: '11px', fontWeight: 800, padding: '4px 10px', borderRadius: '10px' }}>
-                          🟢 ACTIVO ({contactTenant.daysRemaining !== null ? `${contactTenant.daysRemaining} d restantes` : 'Al día'})
+                          ACTIVO ({contactTenant.daysRemaining !== null ? `${contactTenant.daysRemaining} d restantes` : 'Al día'})
                         </span>
                       )}
                       {contactTenant.subStatus === 'PAST_DUE' && (
                         <span style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', fontSize: '11px', fontWeight: 800, padding: '4px 10px', borderRadius: '10px' }}>
-                          ⚠️ POR PAGAR ({contactTenant.daysOverdue !== null ? `Vencido hace ${contactTenant.daysOverdue} d` : 'Pendiente'})
+                          POR PAGAR ({contactTenant.daysOverdue !== null ? `Vencido hace ${contactTenant.daysOverdue} d` : 'Pendiente'})
                         </span>
                       )}
                       {contactTenant.subStatus === 'TRIAL' && (
                         <span style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', fontSize: '11px', fontWeight: 800, padding: '4px 10px', borderRadius: '10px' }}>
-                          🔷 EN PRUEBA ({contactTenant.daysRemaining !== null ? `${contactTenant.daysRemaining} d restantes` : 'Prueba'})
+                          EN PRUEBA ({contactTenant.daysRemaining !== null ? `${contactTenant.daysRemaining} d restantes` : 'Prueba'})
                         </span>
                       )}
                       {contactTenant.subStatus === 'INACTIVE' && (
                         <span style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', fontSize: '11px', fontWeight: 800, padding: '4px 10px', borderRadius: '10px' }}>
-                          ⛔ DADO DE BAJA / INACTIVO
+                          INACTIVO / INACTIVO
                         </span>
                       )}
                     </div>
@@ -2379,7 +2379,7 @@ const PromoterDashboard: React.FC = () => {
                         cursor: 'pointer',
                       }}
                     >
-                      🌟 Monitorear Satisfacción
+                      Monitorear Satisfacción
                     </button>
 
                     <button
@@ -2396,7 +2396,7 @@ const PromoterDashboard: React.FC = () => {
                         cursor: 'pointer',
                       }}
                     >
-                      💳 Apoyo de Pago
+                      Apoyo de Pago
                     </button>
 
                     <button
@@ -2413,7 +2413,7 @@ const PromoterDashboard: React.FC = () => {
                         cursor: 'pointer',
                       }}
                     >
-                      🚀 Asesoría de Prueba
+                      Asesoría de Prueba
                     </button>
 
                     <button
@@ -2430,7 +2430,7 @@ const PromoterDashboard: React.FC = () => {
                         cursor: 'pointer',
                       }}
                     >
-                      🔄 Recuperar Cliente
+                      Recuperar Cliente
                     </button>
 
                     <button
@@ -2447,7 +2447,7 @@ const PromoterDashboard: React.FC = () => {
                         cursor: 'pointer',
                       }}
                     >
-                      ✏️ Mensaje Libre
+                      Mensaje Libre
                     </button>
                   </div>
                 </div>
@@ -2505,7 +2505,7 @@ const PromoterDashboard: React.FC = () => {
 
                   {!cleanWhatsAppPhone(contactTenant.ownerPhone) && (
                     <div style={{ fontSize: '12px', color: '#ea580c', textAlign: 'center', fontWeight: 600 }}>
-                      ⚠️ Este comercio no tiene un número de teléfono registrado. Puedes contactarlo usando el botón de correo a continuación.
+                      Este comercio no tiene un número de teléfono registrado. Puedes contactarlo usando el botón de correo a continuación.
                     </div>
                   )}
 

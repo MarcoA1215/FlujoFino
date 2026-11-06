@@ -275,7 +275,7 @@ export const LibroVentasModal: React.FC<LibroVentasModalProps> = ({
         {/* Header no-print */}
         <div className="no-print" style={{ padding: '16px 20px', background: '#FFFFFF', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '22px' }}>📊</span>
+            
             <div>
               <div style={{ fontWeight: '800', fontSize: '16px', color: '#0F172A' }}>Libro de Ventas (Control de IVA)</div>
               <div style={{ fontSize: '12px', color: '#64748B' }}>Reporte y borrador de apoyo para conciliación contable</div>
@@ -306,7 +306,7 @@ export const LibroVentasModal: React.FC<LibroVentasModalProps> = ({
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
           {/* Disclaimer / Aviso de Apoyo Contable (no-print) */}
           <div className="no-print" style={{ padding: '10px 14px', background: '#EFF6FF', borderRadius: '10px', border: '1px solid #BFDBFE', color: '#1E40AF', fontSize: '12px', marginBottom: '14px', lineHeight: '1.4' }}>
-            💡 <b>Control Administrativo y Apoyo Contable:</b> Este módulo calcula y totaliza las ventas exentas, bases gravadas e IVA para facilitar la labor de su contador. Es un borrador de apoyo interno y no sustituye los libros fiscales oficiales ni la facturación por imprenta o máquina autorizada por el SENIAT.
+            <b>Control Administrativo y Apoyo Contable:</b> Este módulo calcula y totaliza las ventas exentas, bases gravadas e IVA para facilitar la labor de su contador. Es un borrador de apoyo interno y no sustituye los libros fiscales oficiales ni la facturación por imprenta o máquina autorizada por el SENIAT.
           </div>
 
           <div id="libro-ventas-print-area">
@@ -578,7 +578,7 @@ export const LibroVentasModal: React.FC<LibroVentasModalProps> = ({
               gap: '6px'
             }}
           >
-            🖨️ Imprimir
+            Imprimir
           </button>
           <button
             type="button"
@@ -597,7 +597,7 @@ export const LibroVentasModal: React.FC<LibroVentasModalProps> = ({
               gap: '6px'
             }}
           >
-            📄 Descargar CSV
+            Descargar CSV
           </button>
           <button
             type="button"
@@ -617,7 +617,7 @@ export const LibroVentasModal: React.FC<LibroVentasModalProps> = ({
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}
           >
-            📥 Descargar Excel (.xls)
+            Descargar Excel (.xls)
           </button>
         </div>
       </div>

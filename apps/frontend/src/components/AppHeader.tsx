@@ -20,7 +20,11 @@ import {
   refreshOutline,
   closeOutline,
   cloudDownloadOutline,
-  helpCircleOutline
+  helpCircleOutline,
+  cashOutline,
+  trendingUpOutline,
+  businessOutline,
+  globeOutline
 } from 'ionicons/icons';
 import { useAppUpdater } from '../hooks/useAppUpdater';
 import { AuthContext } from '../context/AuthContext';
@@ -346,7 +350,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     } else {
       localStorage.removeItem('flujofino_simulating_offline');
       presentToast({
-        message: '🟢 Modo en línea activo: Conexión normal restaurada',
+        message: 'Modo en línea activo: Conexión normal restaurada',
         duration: 2500,
         color: 'success'
       });
@@ -462,7 +466,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const handleApplyRateMode = async (mode: string, customRate?: number) => {
     if (!isAdmin) {
       presentToast({
-        message: '🔒 Solo un administrador puede modificar la tasa del negocio',
+        message: 'Solo un administrador puede modificar la tasa del negocio',
         duration: 2500,
         color: 'warning'
       });
@@ -580,7 +584,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       );
 
       presentToast({
-        message: `🇨🇴 Tasa COP actualizada (${copMode === 'AUTO' ? 'TRM Oficial' : 'Manual'}): $${Number(targetCopRate).toLocaleString('es-CO')} COP`,
+        message: `Tasa COP actualizada (${copMode === 'AUTO' ? 'TRM Oficial' : 'Manual'}): $${Number(targetCopRate).toLocaleString('es-CO')} COP`,
         duration: 2500,
         color: 'success',
       });
@@ -662,7 +666,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           ) : (
             <IonIcon icon={syncOutline} style={{ fontSize: '13px' }} />
           )}
-          <span>📦 {pendingOfflineCount} Sinc.</span>
+          <span>{pendingOfflineCount} Sinc.</span>
         </div>
       )}
 
@@ -688,7 +692,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               setShowRateModal(true);
             } else {
               presentToast({
-                message: '🔒 Solo un administrador puede modificar la tasa del negocio',
+                message: 'Solo un administrador puede modificar la tasa del negocio',
                 duration: 2500,
                 color: 'warning',
               });
@@ -714,7 +718,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               setShowRateModal(true);
             } else {
               presentToast({
-                message: '🔒 Solo un administrador puede modificar la tasa COP del negocio',
+                message: 'Solo un administrador puede modificar la tasa COP del negocio',
                 duration: 2500,
                 color: 'warning',
               });
@@ -730,7 +734,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             fontWeight: 800,
           }}
         >
-          <span>🇨🇴 COP: ${Number(exchangeRateCop || 4000).toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+          <span>COP: ${Number(exchangeRateCop || 4000).toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
         </div>
       )}
     </>
@@ -956,7 +960,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           }}>
             <div>
               <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                💱 Tasa de Facturación Activa
+                <IonIcon icon={cashOutline} style={{ color: '#10B981', fontSize: '20px' }} /> Tasa de Facturación Activa
               </h3>
               <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#64748B' }}>
                 Selecciona la tasa para nuevas ventas en caja y tienda
@@ -1001,7 +1005,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               >
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    🏛️ Dólar Oficial BCV
+                    <IonIcon icon={businessOutline} style={{ color: '#0369A1' }} /> Dólar Oficial BCV
                     {exchangeRateMode === 'BCV' && (
                       <span style={{ fontSize: '10px', background: '#10B981', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
                         ACTIVA
@@ -1034,7 +1038,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               >
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    📈 Dólar Paralelo / Promedio
+                    <IonIcon icon={trendingUpOutline} style={{ color: '#059669' }} /> Dólar Paralelo / Promedio
                     {exchangeRateMode === 'PARALELO' && (
                       <span style={{ fontSize: '10px', background: '#10B981', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
                         ACTIVA
@@ -1067,7 +1071,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               >
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    🟡 Binance P2P USDT
+                    <IonIcon icon={globeOutline} style={{ color: '#D97706' }} /> Binance P2P USDT
                     {exchangeRateMode === 'USDT' && (
                       <span style={{ fontSize: '10px', background: '#10B981', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
                         ACTIVA
@@ -1100,7 +1104,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               >
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    💶 Euro Oficial BCV
+                    <IonIcon icon={cashOutline} style={{ color: '#475569' }} /> Euro Oficial BCV
                     {exchangeRateMode === 'EUR' && (
                       <span style={{ fontSize: '10px', background: '#10B981', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
                         ACTIVA
@@ -1190,7 +1194,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <div style={{ fontSize: '14px', fontWeight: 900, color: '#854D0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      🇨🇴 Tasa Pesos Colombianos (COP)
+                      <IonIcon icon={cashOutline} style={{ color: '#854D0E' }} /> Tasa Pesos Colombianos (COP)
                       <span style={{ fontSize: '10px', background: '#CA8A04', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
                         {exchangeRateCopMode === 'AUTO' ? 'TRM AUTO' : 'MANUAL'}
                       </span>
@@ -1209,7 +1213,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                         cursor: 'pointer',
                       }}
                     >
-                      🌐 Usar TRM ({Number(availableRates?.cop || exchangeRateCop || 4000).toLocaleString('es-CO', { maximumFractionDigits: 0 })})
+                      Usar TRM ({Number(availableRates?.cop || exchangeRateCop || 4000).toLocaleString('es-CO', { maximumFractionDigits: 0 })})
                     </button>
                   </div>
                   <p style={{ margin: '0 0 8px 0', fontSize: '11px', color: '#713F12' }}>

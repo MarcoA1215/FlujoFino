@@ -712,8 +712,8 @@ const Users: React.FC = () => {
                             fontWeight: '600'
                           }}
                         >
-                          <IonSelectOption value="SYSTEM">💻 Empleado con Acceso al Sistema (Caja, Admin, Cocina...)</IonSelectOption>
-                          <IonSelectOption value="OPERATIVO">🧹 Personal Operativo / Sin Acceso (Limpieza, Vigilancia, etc.)</IonSelectOption>
+                          <IonSelectOption value="SYSTEM">Empleado con Acceso al Sistema (Caja, Admin, Cocina...)</IonSelectOption>
+                          <IonSelectOption value="OPERATIVO">Personal Operativo / Sin Acceso (Limpieza, Vigilancia, etc.)</IonSelectOption>
                         </IonSelect>
                       </div>
 
@@ -813,9 +813,9 @@ const Users: React.FC = () => {
                               value={compensationType}
                               onIonChange={e => setCompensationType(e.detail.value)}
                             >
-                              <IonSelectOption value="FIJO">💵 Sueldo Fijo</IonSelectOption>
-                              <IonSelectOption value="COMISION">💼 100% Por Comisión</IonSelectOption>
-                              <IonSelectOption value="MIXTO">⚖️ Mixto (Base + Comisión)</IonSelectOption>
+                              <IonSelectOption value="FIJO">Sueldo Fijo</IonSelectOption>
+                              <IonSelectOption value="COMISION">100% Por Comisión</IonSelectOption>
+                              <IonSelectOption value="MIXTO">Mixto (Base + Comisión)</IonSelectOption>
                             </IonSelect>
                           </IonItem>
                           {(compensationType === 'COMISION' || compensationType === 'MIXTO') && (
@@ -989,9 +989,9 @@ const Users: React.FC = () => {
                               value={compensationType}
                               onIonChange={e => setCompensationType(e.detail.value)}
                             >
-                              <IonSelectOption value="FIJO">💵 Sueldo Fijo</IonSelectOption>
-                              <IonSelectOption value="COMISION">💼 100% Por Comisión</IonSelectOption>
-                              <IonSelectOption value="MIXTO">⚖️ Mixto (Base + Comisión)</IonSelectOption>
+                              <IonSelectOption value="FIJO">Sueldo Fijo</IonSelectOption>
+                              <IonSelectOption value="COMISION">100% Por Comisión</IonSelectOption>
+                              <IonSelectOption value="MIXTO">Mixto (Base + Comisión)</IonSelectOption>
                             </IonSelect>
                           </IonItem>
                           {(compensationType === 'COMISION' || compensationType === 'MIXTO') && (
@@ -1087,19 +1087,19 @@ const Users: React.FC = () => {
                                   {u.compensationType === 'COMISION' ? (
                                     <div style={{ marginTop: '3px' }}>
                                       <span style={{ fontSize: '11px', background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0', padding: '2px 6px', borderRadius: '6px', fontWeight: 700 }}>
-                                        💼 {u.commissionPercentage || 0}% Comisión
+                                        {u.commissionPercentage || 0}% Comisión
                                       </span>
                                     </div>
                                   ) : u.compensationType === 'MIXTO' ? (
                                     <div style={{ marginTop: '3px' }}>
                                       <span style={{ fontSize: '11px', background: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', padding: '2px 6px', borderRadius: '6px', fontWeight: 700 }}>
-                                        ⚖️ Mixto: ${u.salaryAmount || 0} + {u.commissionPercentage || 0}%
+                                        Mixto: ${u.salaryAmount || 0} + {u.commissionPercentage || 0}%
                                       </span>
                                     </div>
                                   ) : u.salaryAmount ? (
                                     <div style={{ marginTop: '3px' }}>
                                       <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>
-                                        💵 ${u.salaryAmount} / {u.salaryPeriod || 'Sem'}
+                                        ${u.salaryAmount} / {u.salaryPeriod || 'Sem'}
                                       </span>
                                     </div>
                                   ) : null}
@@ -1107,7 +1107,7 @@ const Users: React.FC = () => {
                                 <td>{u.email}</td>
                                 <td>
                                   {u.role === UserRole.OPERATIVO ? (
-                                    <IonBadge color="medium">🧹 OPERATIVO</IonBadge>
+                                    <IonBadge color="medium">OPERATIVO</IonBadge>
                                   ) : (
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                       {(u.roles && u.roles.length > 0 ? u.roles : [u.role]).map((r: string) => {
@@ -1150,7 +1150,7 @@ const Users: React.FC = () => {
                                       <span style={{ fontSize: '0.85rem' }}>{formatTimeRange12h(u.entryTime, u.exitTime)}</span>
                                       {u.lunchStart && u.lunchEnd && (
                                         <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
-                                          🍽️ {formatTimeRange12h(u.lunchStart, u.lunchEnd)}
+                                          Almuerzo: {formatTimeRange12h(u.lunchStart, u.lunchEnd)}
                                         </div>
                                       )}
                                     </div>
@@ -1159,7 +1159,7 @@ const Users: React.FC = () => {
                                       <span style={{ fontSize: '0.85rem', color: '#888' }}>Sin definir</span>
                                       {u.lunchStart && u.lunchEnd && (
                                         <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
-                                          🍽️ {formatTimeRange12h(u.lunchStart, u.lunchEnd)}
+                                          Almuerzo: {formatTimeRange12h(u.lunchStart, u.lunchEnd)}
                                         </div>
                                       )}
                                     </div>
@@ -1172,10 +1172,10 @@ const Users: React.FC = () => {
                                 </td>
                                 <td>
                                   <IonButton size="small" color="primary" fill="clear" onClick={() => handleOpenEdit(u)}>
-                                    ✏️ Editar
+                                    Editar
                                   </IonButton>
                                   <IonButton size="small" color="success" fill="clear" onClick={() => handleOpenPayModal(u)}>
-                                    💵 Pagar
+                                    Pagar
                                   </IonButton>
                                   {u.username !== 'admin' && !isCurrentUser && (
                                     <IonButton size="small" color="danger" fill="clear" onClick={() => handleDelete(u.id, u.username)}>
@@ -1374,7 +1374,7 @@ const Users: React.FC = () => {
                               </IonBadge>
                             </td>
                             <td>
-                              <strong style={{ color: '#b45309' }}>⏱️ {formatTime12h(req.attemptTime)}</strong>
+                              <strong style={{ color: '#b45309' }}>{formatTime12h(req.attemptTime)}</strong>
                             </td>
                             <td>
                               {req.entryTime && req.exitTime ? (
@@ -1395,7 +1395,7 @@ const Users: React.FC = () => {
                                 onClick={() => handleApproveAccess(req.id, req.userName)}
                                 style={{ marginRight: '6px' }}
                               >
-                                ✅ Aprobar
+                                Aprobar
                               </IonButton>
                               <IonButton 
                                 size="small" 
@@ -1403,7 +1403,7 @@ const Users: React.FC = () => {
                                 fill="outline" 
                                 onClick={() => handleRejectAccess(req.id, req.userName)}
                               >
-                                ❌ Rechazar
+                                Rechazar
                               </IonButton>
                             </td>
                           </tr>
@@ -1438,7 +1438,7 @@ const Users: React.FC = () => {
             {selectedUserForEdit.role === UserRole.OPERATIVO ? (
               <div style={{ margin: '14px 0 10px 0' }}>
                 <IonBadge color="medium" style={{ padding: '6px 12px', fontSize: '12px' }}>
-                  🧹 Personal Operativo / Sin acceso al sistema
+                  Personal Operativo / Sin acceso al sistema
                 </IonBadge>
               </div>
             ) : (
@@ -1551,9 +1551,9 @@ const Users: React.FC = () => {
                 value={editCompensationType}
                 onIonChange={e => setEditCompensationType(e.detail.value)}
               >
-                <IonSelectOption value="FIJO">💵 Sueldo Fijo</IonSelectOption>
-                <IonSelectOption value="COMISION">💼 100% Por Comisión</IonSelectOption>
-                <IonSelectOption value="MIXTO">⚖️ Mixto (Base + Comisión)</IonSelectOption>
+                <IonSelectOption value="FIJO">Sueldo Fijo</IonSelectOption>
+                <IonSelectOption value="COMISION">100% Por Comisión</IonSelectOption>
+                <IonSelectOption value="MIXTO">Mixto (Base + Comisión)</IonSelectOption>
               </IonSelect>
             </IonItem>
 
@@ -1600,7 +1600,7 @@ const Users: React.FC = () => {
 
             <div className="ion-margin-top">
               <IonButton expand="block" color="primary" onClick={handleSaveEdit}>
-                💾 Guardar Cambios
+                Guardar Cambios
               </IonButton>
               <IonButton expand="block" fill="clear" color="medium" onClick={() => setSelectedUserForEdit(null)}>
                 Cancelar
@@ -1627,7 +1627,7 @@ const Users: React.FC = () => {
             {/* Selector de Período */}
             <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '14px', marginBottom: '14px' }}>
               <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>
-                📅 Período de Liquidación de Trabajos
+                Período de Liquidación de Trabajos
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', alignItems: 'center' }}>
                 <div>
@@ -1657,7 +1657,7 @@ const Users: React.FC = () => {
                     onClick={() => fetchPayrollSummary(selectedUserForPay.id, payrollStartDate, payrollEndDate, includeBaseSalary)}
                     style={{ width: '100%', height: '36px', margin: 0, fontWeight: 700 }}
                   >
-                    {loadingPayrollSummary ? 'Calculando...' : '🔄 Recalcular'}
+                    {loadingPayrollSummary ? 'Calculando...' : 'Recalcular'}
                   </IonButton>
                 </div>
               </div>
@@ -1675,7 +1675,7 @@ const Users: React.FC = () => {
                 alignItems: 'center',
                 gap: '10px',
               }}>
-                <span style={{ fontSize: '18px' }}>🗓️</span>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: '#166534' }}>Período:</span>
                 <div style={{ fontSize: '12px', color: '#166534' }}>
                   <strong>Última nómina liquidada:</strong> {payrollSummary?.lastPayrollDate || selectedUserForPay?.lastPayrollDate}
                   {(payrollSummary?.lastPayrollAmount !== null && payrollSummary?.lastPayrollAmount !== undefined) && (
@@ -1703,7 +1703,7 @@ const Users: React.FC = () => {
             {/* Error or Empty Fallback */}
             {!loadingPayrollSummary && !payrollSummary && (
               <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '14px', padding: '14px', textAlign: 'center', marginBottom: '14px', color: '#92400E', fontSize: '12px' }}>
-                ⚠️ No se pudo cargar el cálculo automático. Pulsa <strong>🔄 Recalcular</strong> para intentar de nuevo.
+                No se pudo cargar el cálculo automático. Pulsa <strong>Recalcular</strong> para intentar de nuevo.
               </div>
             )}
 
@@ -1723,9 +1723,9 @@ const Users: React.FC = () => {
                     color: payrollSummary.compensationType === 'COMISION' ? '#065F46' : payrollSummary.compensationType === 'MIXTO' ? '#166534' : '#334155',
                     border: '1px solid #CBD5E1'
                   }}>
-                    {payrollSummary.compensationType === 'COMISION' ? `💼 COMISIÓN ${payrollSummary.commissionPercentage}%` :
-                     payrollSummary.compensationType === 'MIXTO' ? `⚖️ MIXTO (${payrollSummary.commissionPercentage}% + $${payrollSummary.baseSalary})` :
-                     `💵 FIJO ($${payrollSummary.baseSalary})`}
+                    {payrollSummary.compensationType === 'COMISION' ? `COMISIÓN ${payrollSummary.commissionPercentage}%` :
+                     payrollSummary.compensationType === 'MIXTO' ? `MIXTO (${payrollSummary.commissionPercentage}% + $${payrollSummary.baseSalary})` :
+                     `FIJO ($${payrollSummary.baseSalary})`}
                   </span>
                 </div>
 
@@ -1808,7 +1808,7 @@ const Users: React.FC = () => {
                       </div>
                       <div style={{ fontSize: '10px', color: payrollSummary.baseSalaryAlreadySettled ? '#D97706' : '#64748B' }}>
                         {payrollSummary.baseSalaryAlreadySettled
-                          ? '⚠️ El sueldo base ya fue cancelado en una liquidación previa para este período'
+                          ? 'El sueldo base ya fue cancelado en una liquidación previa para este período'
                           : 'Se sumará al cálculo de la nómina'}
                       </div>
                     </div>
@@ -1842,7 +1842,7 @@ const Users: React.FC = () => {
                       onClick={() => setShowWorkDetails(!showWorkDetails)}
                       style={{ fontSize: '12px', textTransform: 'none', margin: 0, padding: 0 }}
                     >
-                      {showWorkDetails ? '🔼 Ocultar lista de trabajos' : `🔽 Ver lista detallada de trabajos (${payrollSummary.workItems.length})`}
+                      {showWorkDetails ? 'Ocultar lista de trabajos' : `Ver lista detallada de trabajos (${payrollSummary.workItems.length})`}
                     </IonButton>
 
                     {showWorkDetails && (
@@ -1873,7 +1873,7 @@ const Users: React.FC = () => {
                                   </span>
                                 ) : item.isPaid ? (
                                   <span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '1px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: 800, border: '1px solid #BFDBFE' }}>
-                                    ⚡ Por liquidar
+                                    Por liquidar
                                   </span>
                                 ) : item.paymentStatus === 'PARTIAL' ? (
                                   <span style={{ background: '#FFFBEB', color: '#B45309', padding: '1px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: 700 }}>
@@ -2004,7 +2004,7 @@ const Users: React.FC = () => {
                 onClick={handlePaySalary}
                 style={{ '--border-radius': '10px', fontWeight: 800, height: '44px' }}
               >
-                💵 Confirmar Pago y Liquidar Nómina
+                Confirmar Pago y Liquidar Nómina
               </IonButton>
             </div>
           </IonContent>
@@ -2081,7 +2081,7 @@ const Users: React.FC = () => {
                         color="success"
                         onClick={() => handleDeductAdvance(adv.id)}
                       >
-                        ✅ Descontar de Nómina
+                        Descontar de Nómina
                       </IonButton>
                     </div>
                   ))}
@@ -2138,7 +2138,7 @@ const Users: React.FC = () => {
                     </div>
                     {del.customerAddress && (
                       <div style={{ fontSize: '12px', color: '#64748B' }}>
-                        📍 {del.customerAddress} ({del.deliveryZone})
+                        {del.customerAddress} ({del.deliveryZone})
                       </div>
                     )}
                     <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>

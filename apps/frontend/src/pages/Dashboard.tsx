@@ -23,6 +23,11 @@ import {
   downloadOutline,
   closeOutline,
   documentTextOutline,
+  cashOutline,
+  businessOutline,
+  globeOutline,
+  phonePortraitOutline,
+  statsChartOutline,
 } from 'ionicons/icons';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { apiClient } from '../api/client';
@@ -158,7 +163,7 @@ const Dashboard: React.FC = () => {
           </p>
 
           <!-- SECCIÓN 1: RESUMEN EJECUTIVO (KPIs) -->
-          <div class="section-title">📊 1. RESUMEN EJECUTIVO COMERCIAL Y CONTABLE</div>
+          <div class="section-title">1. RESUMEN EJECUTIVO COMERCIAL Y CONTABLE</div>
           <table style="max-width: 800px;">
             <thead>
               <tr>
@@ -217,7 +222,7 @@ const Dashboard: React.FC = () => {
           </table>
 
           <!-- SECCIÓN 2: RESUMEN DE VENTAS POR PEDIDO / FACTURA -->
-          <div class="section-title">🛍️ 2. RESUMEN DE VENTAS POR PEDIDO / COMPROBANTE (${sales.length} registros)</div>
+          <div class="section-title">2. RESUMEN DE VENTAS POR PEDIDO / COMPROBANTE (${sales.length} registros)</div>
           <table>
             <thead>
               <tr style="background-color: #10B981;">
@@ -313,7 +318,7 @@ const Dashboard: React.FC = () => {
             const totalProfits = allItems.reduce((acc, it) => acc + (Number(it.lineProfit) || 0), 0);
 
             return `
-              <div class="section-title">📦 3. DESGLOSE INDIVIDUAL DE PRODUCTOS VENDIDOS (${allItems.length} líneas / ${totalQty} unidades)</div>
+              <div class="section-title">3. DESGLOSE INDIVIDUAL DE PRODUCTOS VENDIDOS (${allItems.length} líneas / ${totalQty} unidades)</div>
               <table>
                 <thead>
                   <tr style="background-color: #0369A1; color: #FFFFFF;">
@@ -385,7 +390,7 @@ const Dashboard: React.FC = () => {
           })()}
 
           <!-- SECCIÓN 4: LIBRO MAYOR CONTABLE DE MOVIMIENTOS -->
-          <div class="section-title">🏛️ 4. LIBRO MAYOR CONTABLE DE MOVIMIENTOS DE CAJA (${rows.length} movimientos)</div>
+          <div class="section-title">4. LIBRO MAYOR CONTABLE DE MOVIMIENTOS DE CAJA (${rows.length} movimientos)</div>
           <table>
             <thead>
               <tr>
@@ -439,7 +444,7 @@ const Dashboard: React.FC = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      presentToast({ message: '📊 Reporte Excel Completo (Resumen, Ventas y Movimientos) descargado con éxito', duration: 3000, color: 'success' });
+      presentToast({ message: 'Reporte Excel Completo (Resumen, Ventas y Movimientos) descargado con éxito', duration: 3000, color: 'success' });
     } catch (e: any) {
       console.error(e);
       presentToast({ message: 'Error exportando reporte a Excel', duration: 3000, color: 'danger' });
@@ -615,7 +620,7 @@ const Dashboard: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
                     <div>
                       <div style={{ fontSize: '15px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>🏛️</span> Tesorería y Fondos Reales
+                        <IonIcon icon={businessOutline} style={{ fontSize: '18px', color: '#0F172A' }} /> Tesorería y Fondos Reales
                       </div>
                       <div style={{ fontSize: '11px', color: '#64748B' }}>
                         Dinero exacto disponible en cada cuenta sin distorsión por la tasa
@@ -708,14 +713,14 @@ const Dashboard: React.FC = () => {
                         {/* Chips de Aporte por Moneda */}
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                           <div style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '10px', padding: '6px 12px', border: '1px solid rgba(255,255,255,0.12)' }}>
-                            <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: '700' }}>💵 DÓLARES</div>
+                            <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: '700' }}>DÓLARES (USD)</div>
                             <div style={{ fontSize: '13px', fontWeight: '800', color: '#F8FAFC' }}>
                               ${((summary.treasury.cashUSD || 0) + (summary.treasury.digitalUSD || 0)).toFixed(2)}
                             </div>
                           </div>
 
                           <div style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '10px', padding: '6px 12px', border: '1px solid rgba(255,255,255,0.12)' }}>
-                            <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: '700' }}>🇻🇪 BOLÍVARES</div>
+                            <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: '700' }}>BOLÍVARES (VES)</div>
                             <div style={{ fontSize: '13px', fontWeight: '800', color: '#F8FAFC' }}>
                               {summary.treasury.currencySymbol || 'Bs.'} {Number((summary.treasury.bankBs || 0) + (summary.treasury.cashBs || 0)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
@@ -726,7 +731,7 @@ const Dashboard: React.FC = () => {
 
                           {hasCopActive ? (
                             <div style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '10px', padding: '6px 12px', border: '1px solid rgba(255,255,255,0.12)' }}>
-                              <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: '700' }}>🇨🇴 PESOS (COP)</div>
+                              <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: '700' }}>PESOS (COP)</div>
                               <div style={{ fontSize: '13px', fontWeight: '800', color: '#F8FAFC' }}>
                                 $ {Number((summary.treasury.cashCop || 0) + (summary.treasury.bankCop || 0)).toLocaleString('es-CO')}
                               </div>
@@ -740,7 +745,7 @@ const Dashboard: React.FC = () => {
                     );
                   })()}
 
-                  {/* DIVISIÓN 1: 💵 LIQUIDEZ EN DÓLARES (USD) */}
+                  {/* DIVISIÓN 1: LIQUIDEZ EN DÓLARES (USD) */}
                   <div
                     style={{
                       backgroundColor: '#FAFAF9',
@@ -752,7 +757,7 @@ const Dashboard: React.FC = () => {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '18px' }}>💵</span>
+                        <IonIcon icon={cashOutline} style={{ fontSize: '18px', color: '#047857' }} />
                         <div>
                           <span style={{ fontSize: '13px', fontWeight: '800', color: '#1C1917', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             División Dólares (USD)
@@ -784,7 +789,7 @@ const Dashboard: React.FC = () => {
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                              💵 Gaveta Física (Efectivo USD)
+                              Gaveta Física (Efectivo USD)
                             </span>
                             <MetricInfoButton metricKey="treasury_cash" onOpen={setActiveInfoMetric} size="sm" />
                           </div>
@@ -808,7 +813,7 @@ const Dashboard: React.FC = () => {
                             fontSize: '22px',
                           }}
                         >
-                          💵
+                          <IonIcon icon={cashOutline} style={{ fontSize: '20px' }} />
                         </div>
                       </div>
 
@@ -828,7 +833,7 @@ const Dashboard: React.FC = () => {
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                              🟡 Digital (Binance Pay / USDT / Zelle)
+                              Digital (Binance Pay / USDT / Zelle)
                             </span>
                             <MetricInfoButton metricKey="treasury_digital" onOpen={setActiveInfoMetric} size="sm" />
                           </div>
@@ -852,13 +857,13 @@ const Dashboard: React.FC = () => {
                             fontSize: '22px',
                           }}
                         >
-                          🟡
+                          <IonIcon icon={globeOutline} style={{ fontSize: '20px' }} />
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* DIVISIÓN 2: 🇻🇪 LIQUIDEZ EN BOLÍVARES (Bs.) */}
+                  {/* DIVISIÓN 2: LIQUIDEZ EN BOLÍVARES (Bs.) */}
                   <div
                     style={{
                       backgroundColor: '#F8FAFC',
@@ -870,7 +875,7 @@ const Dashboard: React.FC = () => {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '18px' }}>🇻🇪</span>
+                        <IonIcon icon={cashOutline} style={{ fontSize: '18px', color: '#059669' }} />
                         <div>
                           <span style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             División Bolívares (Bs.)
@@ -907,7 +912,7 @@ const Dashboard: React.FC = () => {
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                              💵 Gaveta Física (Efectivo Bs.)
+                              Gaveta Física (Efectivo Bs.)
                             </span>
                             <MetricInfoButton metricKey="treasury_cash_bs" onOpen={setActiveInfoMetric} size="sm" />
                           </div>
@@ -931,7 +936,7 @@ const Dashboard: React.FC = () => {
                             fontSize: '22px',
                           }}
                         >
-                          💵
+                          <IonIcon icon={cashOutline} style={{ fontSize: '20px' }} />
                         </div>
                       </div>
 
@@ -952,7 +957,7 @@ const Dashboard: React.FC = () => {
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                🏦 Bancos Venezuela (Cuentas Nacionales)
+                                Bancos Venezuela (Cuentas Nacionales)
                               </span>
                               <MetricInfoButton metricKey="treasury_banks" onOpen={setActiveInfoMetric} size="sm" />
                             </div>
@@ -977,7 +982,7 @@ const Dashboard: React.FC = () => {
                               flexShrink: 0,
                             }}
                           >
-                            🏦
+                            <IonIcon icon={businessOutline} style={{ fontSize: '20px' }} />
                           </div>
                         </div>
 
@@ -994,20 +999,20 @@ const Dashboard: React.FC = () => {
                           }}
                         >
                           <span style={{ color: '#1E293B' }}>
-                            💳 Punto: <b>{Number(summary.treasury.puntoBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</b>
+                            Punto: <b>{Number(summary.treasury.puntoBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</b>
                           </span>
                           <span style={{ color: '#6D28D9' }}>
-                            📱 Pago Móvil: <b>{Number(summary.treasury.pagoMovilBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</b>
+                            Pago Móvil: <b>{Number(summary.treasury.pagoMovilBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</b>
                           </span>
                           <span style={{ color: '#0F172A' }}>
-                            🏛️ Transf: <b>{Number(summary.treasury.transferBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</b>
+                            Transf: <b>{Number(summary.treasury.transferBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</b>
                           </span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* DIVISIÓN 3: 🇨🇴 LIQUIDEZ EN PESOS COLOMBIANOS (COP) */}
+                  {/* DIVISIÓN 3: LIQUIDEZ EN PESOS COLOMBIANOS (COP) */}
                   {Boolean(
                     summary.treasury.enableCopCurrency ||
                     (Number(summary.treasury.cashCop || 0) > 0) ||
@@ -1025,7 +1030,7 @@ const Dashboard: React.FC = () => {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '18px' }}>🇨🇴</span>
+                          <IonIcon icon={cashOutline} style={{ fontSize: '18px', color: '#B45309' }} />
                           <div>
                             <span style={{ fontSize: '13px', fontWeight: '800', color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                               División Pesos Colombianos (COP)
@@ -1062,7 +1067,7 @@ const Dashboard: React.FC = () => {
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span style={{ fontSize: '11px', fontWeight: '700', color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                💵 Gaveta Pesos (Efectivo COP)
+                                Gaveta Pesos (Efectivo COP)
                               </span>
                               <MetricInfoButton metricKey="treasury_cop" onOpen={setActiveInfoMetric} size="sm" />
                             </div>
@@ -1086,7 +1091,7 @@ const Dashboard: React.FC = () => {
                               fontSize: '22px',
                             }}
                           >
-                            🇨🇴
+                            <IonIcon icon={cashOutline} style={{ fontSize: '20px' }} />
                           </div>
                         </div>
 
@@ -1106,7 +1111,7 @@ const Dashboard: React.FC = () => {
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span style={{ fontSize: '11px', fontWeight: '700', color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                📲 Bancos Colombia (Nequi / Daviplata / COP)
+                                Bancos Colombia (Nequi / Daviplata / COP)
                               </span>
                               <MetricInfoButton metricKey="treasury_bank_cop" onOpen={setActiveInfoMetric} size="sm" />
                             </div>
@@ -1130,7 +1135,7 @@ const Dashboard: React.FC = () => {
                               fontSize: '22px',
                             }}
                           >
-                            📲
+                            <IonIcon icon={phonePortraitOutline} style={{ fontSize: '20px' }} />
                           </div>
                         </div>
                       </div>
@@ -1153,7 +1158,7 @@ const Dashboard: React.FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
                   <div>
                     <div style={{ fontSize: '15px', fontWeight: '800', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>📅</span> Arqueo Mensual Detallado
+                      <IonIcon icon={calendarOutline} style={{ fontSize: '18px', color: '#0F172A' }} /> Arqueo Mensual Detallado
                       {monthlyData?.monthLabel && (
                         <span style={{ fontSize: '12px', fontWeight: '800', backgroundColor: '#ECFDF5', color: '#065F46', padding: '2px 8px', borderRadius: '999px', border: '1px solid #A7F3D0', textTransform: 'capitalize' }}>
                           {monthlyData.monthLabel}
@@ -1231,7 +1236,7 @@ const Dashboard: React.FC = () => {
                       <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '12px 14px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
-                            🧾 Facturado del Mes
+                            Facturado del Mes
                           </span>
                           <MetricInfoButton metricKey="monthly_invoiced" onOpen={setActiveInfoMetric} size="sm" />
                         </div>
@@ -1247,7 +1252,7 @@ const Dashboard: React.FC = () => {
                       <div style={{ backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '12px', padding: '12px 14px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '11px', fontWeight: '800', color: '#065F46', textTransform: 'uppercase' }}>
-                            💵 Cobrado Real (Debe)
+                            Cobrado Real (Debe)
                           </span>
                           <MetricInfoButton metricKey="monthly_collected" onOpen={setActiveInfoMetric} size="sm" />
                         </div>
@@ -1263,7 +1268,7 @@ const Dashboard: React.FC = () => {
                       <div style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', padding: '12px 14px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '11px', fontWeight: '800', color: '#92400E', textTransform: 'uppercase' }}>
-                            ⏳ Por Cobrar del Mes
+                            Por Cobrar del Mes
                           </span>
                           <MetricInfoButton metricKey="monthly_pending" onOpen={setActiveInfoMetric} size="sm" />
                         </div>
@@ -1279,7 +1284,7 @@ const Dashboard: React.FC = () => {
                       <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '12px 14px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '11px', fontWeight: '800', color: '#991B1B', textTransform: 'uppercase' }}>
-                            📉 Gastos + Costos (Haber)
+                            Gastos + Costos (Haber)
                           </span>
                           <MetricInfoButton metricKey="monthly_expenses" onOpen={setActiveInfoMetric} size="sm" />
                         </div>
@@ -1295,7 +1300,7 @@ const Dashboard: React.FC = () => {
                       <div style={{ backgroundColor: '#F0FDF4', border: '1.5px solid #10B981', borderRadius: '12px', padding: '12px 14px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '11px', fontWeight: '800', color: '#065F46', textTransform: 'uppercase' }}>
-                            ✨ Ganancia Neta del Mes
+                            Ganancia Neta del Mes
                           </span>
                           <MetricInfoButton metricKey="monthly_profit" onOpen={setActiveInfoMetric} size="sm" />
                         </div>
@@ -1312,7 +1317,7 @@ const Dashboard: React.FC = () => {
                     {Boolean(monthlyData.unpaidBookingsCount && monthlyData.unpaidBookingsCount > 0) && (
                       <div style={{ backgroundColor: '#F8FAFC', borderRadius: '12px', padding: '10px 14px', border: '1px dashed #CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', fontSize: '12px', marginBottom: monthlyData.byMethod ? '10px' : '0' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569' }}>
-                          <span style={{ fontSize: '15px' }}>🗓️</span>
+                          <IonIcon icon={calendarOutline} style={{ fontSize: '16px', color: '#475569' }} />
                           <span>
                             <strong style={{ color: '#1E293B' }}>{monthlyData.unpaidBookingsCount} citas o pedidos por confirmar/cobrar este mes:</strong>{' '}
                             <span style={{ color: '#64748B' }}>Totalizan</span> <strong style={{ color: '#0F172A' }}>${Number(monthlyData.unpaidBookingsAmount || 0).toFixed(2)}</strong>
@@ -1320,7 +1325,7 @@ const Dashboard: React.FC = () => {
                           <MetricInfoButton metricKey="monthly_unpaid_bookings" onOpen={setActiveInfoMetric} size="sm" />
                         </div>
                         <span style={{ fontSize: '11px', color: '#64748B', fontStyle: 'italic' }}>
-                          ℹ️ No computados en facturación ni arqueo hasta confirmarse su pago real
+                          No computados en facturación ni arqueo hasta confirmarse su pago real
                         </span>
                       </div>
                     )}
@@ -1329,25 +1334,25 @@ const Dashboard: React.FC = () => {
                     {monthlyData.byMethod && (
                       <div style={{ backgroundColor: '#F8FAFC', borderRadius: '12px', padding: '10px 14px', border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', fontSize: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontWeight: '800', color: '#334155' }}>💳 Arqueo por Método (Mes):</span>
+                          <span style={{ fontWeight: '800', color: '#334155' }}>Arqueo por Método (Mes):</span>
                           <MetricInfoButton metricKey="monthly_by_method" onOpen={setActiveInfoMetric} size="sm" />
                         </div>
                         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                          <span style={{ color: '#047857', fontWeight: '700' }}>💵 Efectivo USD: <b>${Number(monthlyData.byMethod.USD || 0).toFixed(2)}</b></span>
+                          <span style={{ color: '#047857', fontWeight: '700' }}>Efectivo USD: <b>${Number(monthlyData.byMethod.USD || 0).toFixed(2)}</b></span>
                           {Number(monthlyData.byMethod.CASH_BS || 0) > 0 && (
-                            <span style={{ color: '#059669', fontWeight: '700' }}>💵 Efectivo Bs: <b>${Number(monthlyData.byMethod.CASH_BS || 0).toFixed(2)}</b></span>
+                            <span style={{ color: '#059669', fontWeight: '700' }}>Efectivo Bs: <b>${Number(monthlyData.byMethod.CASH_BS || 0).toFixed(2)}</b></span>
                           )}
-                          <span style={{ color: '#6D28D9', fontWeight: '700' }}>📱 Pago Móvil: <b>${Number(monthlyData.byMethod.PAGO_MOVIL || 0).toFixed(2)}</b></span>
-                          <span style={{ color: '#1D4ED8', fontWeight: '700' }}>💳 Punto: <b>${Number(monthlyData.byMethod.PUNTO || 0).toFixed(2)}</b></span>
-                          <span style={{ color: '#0F172A', fontWeight: '700' }}>🏦 Transf: <b>${Number(monthlyData.byMethod.TRANSFER || 0).toFixed(2)}</b></span>
+                          <span style={{ color: '#6D28D9', fontWeight: '700' }}>Pago Móvil: <b>${Number(monthlyData.byMethod.PAGO_MOVIL || 0).toFixed(2)}</b></span>
+                          <span style={{ color: '#1D4ED8', fontWeight: '700' }}>Punto: <b>${Number(monthlyData.byMethod.PUNTO || 0).toFixed(2)}</b></span>
+                          <span style={{ color: '#0F172A', fontWeight: '700' }}>Transf: <b>${Number(monthlyData.byMethod.TRANSFER || 0).toFixed(2)}</b></span>
                           {Number(monthlyData.byMethod.BINANCE || 0) > 0 && (
-                            <span style={{ color: '#D97706', fontWeight: '700' }}>🟡 Binance: <b>${Number(monthlyData.byMethod.BINANCE || 0).toFixed(2)}</b></span>
+                            <span style={{ color: '#D97706', fontWeight: '700' }}>Binance: <b>${Number(monthlyData.byMethod.BINANCE || 0).toFixed(2)}</b></span>
                           )}
                           {Number(monthlyData.byMethod.CASH_COP || 0) > 0 && (
-                            <span style={{ color: '#B45309', fontWeight: '700' }}>🇨🇴 Efectivo COP: <b>${Number(monthlyData.byMethod.CASH_COP || 0).toFixed(2)}</b></span>
+                            <span style={{ color: '#B45309', fontWeight: '700' }}>Efectivo COP: <b>${Number(monthlyData.byMethod.CASH_COP || 0).toFixed(2)}</b></span>
                           )}
                           {Number(monthlyData.byMethod.BANK_COP || 0) > 0 && (
-                            <span style={{ color: '#92400E', fontWeight: '700' }}>📲 Bancos COP: <b>${Number(monthlyData.byMethod.BANK_COP || 0).toFixed(2)}</b></span>
+                            <span style={{ color: '#92400E', fontWeight: '700' }}>Bancos COP: <b>${Number(monthlyData.byMethod.BANK_COP || 0).toFixed(2)}</b></span>
                           )}
                         </div>
                       </div>
@@ -1358,7 +1363,7 @@ const Dashboard: React.FC = () => {
 
               {/* Título de Acumulado Histórico Total */}
               <div style={{ fontSize: '14px', fontWeight: '800', color: '#475569', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>📊</span> Acumulativo Total Histórico
+                <IonIcon icon={statsChartOutline} style={{ fontSize: '18px', color: '#475569' }} /> Acumulativo Total Histórico
               </div>
 
               {/* Main KPIs (Cards) */}
@@ -1432,7 +1437,7 @@ const Dashboard: React.FC = () => {
                     <span>Reinv: ${(summary.totalConsolidatedReinvestment !== undefined ? summary.totalConsolidatedReinvestment : summary.reinvestmentExpense || 0).toFixed(2)}</span>
                   </div>
                   <div style={{ fontSize: '10px', color: '#0284C7', fontWeight: 700, marginTop: '6px' }}>
-                    👆 Clic para ver / registrar
+                    Clic para ver / registrar
                   </div>
                 </div>
 
@@ -1463,7 +1468,7 @@ const Dashboard: React.FC = () => {
                 <div className="ff-card" style={{ padding: '20px', background: '#ffffff' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                     <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#0F172A' }}>
-                      📈 Ventas de los Últimos 7 Días
+                      <IonIcon icon={trendingUpOutline} style={{ color: '#10B981', verticalAlign: 'middle', marginRight: '6px' }} />Ventas de los Últimos 7 Días
                     </h3>
                     <MetricInfoButton metricKey="sales_chart" onOpen={setActiveInfoMetric} size="sm" />
                   </div>
@@ -1722,7 +1727,7 @@ const Dashboard: React.FC = () => {
                 }}
               >
                 <div style={{ fontSize: '12px', fontWeight: 800, color: '#0F172A' }}>
-                  🧾 ¿Necesitas el Libro de Ventas con desglose de IVA (16% / Exento) para tu contador?
+                  <IonIcon icon={documentTextOutline} style={{ color: '#2563EB', verticalAlign: 'middle', marginRight: '6px' }} />¿Necesitas el Libro de Ventas con desglose de IVA (16% / Exento) para tu contador?
                 </div>
                 <div style={{ fontSize: '11px', color: '#64748B', lineHeight: '1.4' }}>
                   También tienes incluido sin costo adicional el <b>Módulo de Desglose de IVA y Apoyo Contable</b>. Puedes activarlo cuando lo necesites desde Configuración.

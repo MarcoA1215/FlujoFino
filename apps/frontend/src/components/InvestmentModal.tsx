@@ -154,7 +154,7 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
       case 'TRANSFER':
       case 'BANCO':
         return {
-          label: '🏦 Banco Bs',
+          label: 'Banco Bs',
           fullName: 'Banco / Pago Móvil (Bs.)',
           bg: '#F5F3FF',
           color: '#6D28D9',
@@ -163,7 +163,7 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
       case 'BINANCE':
       case 'DIGITAL_USD':
         return {
-          label: '💎 Digital USD',
+          label: 'Digital USD',
           fullName: 'Digital / Binance ($ USD)',
           bg: '#FFFBEB',
           color: '#B45309',
@@ -173,7 +173,7 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
       case 'CASH_USD':
       default:
         return {
-          label: '💵 Efectivo USD',
+          label: 'Efectivo USD',
           fullName: 'Efectivo en Gaveta ($ USD)',
           bg: '#ECFDF5',
           color: '#047857',
@@ -199,8 +199,8 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
       presentToast({
         message:
           type === InvestmentType.REINVERSION_GANANCIA
-            ? `✅ Reinversión registrada y descontada de ${methodMeta.fullName}`
-            : '✅ Inversión externa registrada con éxito',
+            ? `Reinversión registrada y descontada de ${methodMeta.fullName}`
+            : 'Inversión externa registrada con éxito',
         duration: 3000,
         color: 'success',
       });
@@ -281,7 +281,7 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
 
     if (type === InvestmentType.REINVERSION_GANANCIA && insufficiency.isInsufficient) {
       presentAlert({
-        header: '⚠️ Saldo Insuficiente',
+        header: 'Saldo Insuficiente',
         subHeader: `Cuenta: ${insufficiency.accountLabel}`,
         message: `El monto a reinvertir supera los fondos disponibles en ${insufficiency.accountLabel} (Disponible: ${insufficiency.availableStr} • Faltan: ${insufficiency.missingStr}).\n\nSi continúas, esta cuenta quedará con saldo negativo en la tesorería.\n\n¿Deseas registrar esta reinversión de todas formas?`,
         buttons: [
@@ -391,7 +391,7 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
           >
             <IonIcon icon={alertCircleOutline} style={{ fontSize: '24px', color: '#B45309', flexShrink: 0, marginTop: '2px' }} />
             <div style={{ fontSize: '12px', color: '#92400E', lineHeight: '1.45' }}>
-              <strong>⚠️ Atención:</strong> Si compraste insumos que ya registraste en el módulo de Inventario/Insumos,{' '}
+              <strong>Atención:</strong> Si compraste insumos que ya registraste en el módulo de Inventario/Insumos,{' '}
               <strong>no los registres aquí</strong>. El sistema ya deduce ese costo automáticamente. Registra únicamente
               compras de equipamiento, adecuaciones o gastos extras no cargados como insumos para evitar duplicar
               deducciones.
@@ -437,7 +437,7 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
                       gap: '6px',
                     }}
                   >
-                    <span>💼 Inversión Externa</span>
+                    <span>Inversión Externa</span>
                   </button>
                   <button
                     type="button"
@@ -467,7 +467,7 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
                       gap: '6px',
                     }}
                   >
-                    <span>🔄 Reinversión de Ganancia</span>
+                    <span>Reinversión de Ganancia</span>
                   </button>
                 </div>
               </div>
@@ -530,7 +530,7 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
                                 : '#0F172A',
                           }}
                         >
-                          💵 Efectivo Gaveta ($ USD)
+                          Efectivo Gaveta ($ USD)
                         </span>
                         {paymentMethod === 'CASH_USD' && (
                           <IonIcon
@@ -573,7 +573,7 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
                             color: paymentMethod === 'PAGO_MOVIL' ? '#6D28D9' : '#0F172A',
                           }}
                         >
-                          🏦 Banco / Pago Móvil (Bs.)
+                          Banco / Pago Móvil (Bs.)
                         </span>
                         {paymentMethod === 'PAGO_MOVIL' && (
                           <IonIcon icon={checkmarkCircle} style={{ color: '#8B5CF6', fontSize: '16px', flexShrink: 0 }} />
@@ -613,7 +613,7 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
                             color: paymentMethod === 'BINANCE' ? '#B45309' : '#0F172A',
                           }}
                         >
-                          💎 Digital / Binance ($ USD)
+                          Digital / Binance ($ USD)
                         </span>
                         {paymentMethod === 'BINANCE' && (
                           <IonIcon icon={checkmarkCircle} style={{ color: '#F59E0B', fontSize: '16px', flexShrink: 0 }} />
@@ -648,7 +648,7 @@ export const InvestmentModal: React.FC<InvestmentModalProps> = ({
                         lineHeight: 1.4,
                       }}
                     >
-                      ⚠️ <b>Saldo insuficiente en {insufficiency.accountLabel}:</b> Disponible {insufficiency.availableStr} y
+                      <b>Saldo insuficiente en {insufficiency.accountLabel}:</b> Disponible {insufficiency.availableStr} y
                       estás intentando reinvertir{' '}
                       {paymentMethod === 'PAGO_MOVIL'
                         ? `Bs. ${currentBSNum.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`

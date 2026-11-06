@@ -160,7 +160,7 @@ const Reservations: React.FC = () => {
       setShowBlockModal(false);
       fetchReservations();
       presentToast({
-        message: res.data?.message || '🔒 Bloqueo de horario registrado con éxito',
+        message: res.data?.message || 'Bloqueo de horario registrado con éxito',
         duration: 3000,
         color: 'success',
       });
@@ -272,12 +272,12 @@ const Reservations: React.FC = () => {
       const whatsappLink = res.data?.whatsappLink;
       if (whatsappLink) {
         presentAlert({
-          header: '✅ Cita Reprogramada',
+          header: 'Cita Reprogramada',
           message: `${res.data?.message || 'Cita actualizada con éxito.'}\n\n¿Deseas enviar el aviso directo al cliente por WhatsApp?`,
           buttons: [
             { text: 'Listo', role: 'cancel' },
             {
-              text: 'Enviar WhatsApp 💬',
+              text: 'Enviar WhatsApp',
               handler: () => {
                 window.open(whatsappLink, '_blank');
               }
@@ -318,7 +318,7 @@ const Reservations: React.FC = () => {
 
       if (isWarningSchedule) {
         presentAlert({
-          header: '⚠️ Reprogramación fuera de horario / Solapada',
+          header: 'Reprogramación fuera de horario / Solapada',
           message: `${msg}\n\n¿Deseas autorizar la excepción y reprogramar esta cita de todas formas?`,
           buttons: [
             { text: 'Cancelar', role: 'cancel' },
@@ -350,12 +350,12 @@ const Reservations: React.FC = () => {
       const whatsappLink = res.data?.whatsappLink;
       if (whatsappLink) {
         presentAlert({
-          header: '⏱️ Horario de Cita Desplazado',
+          header: 'Horario de Cita Desplazado',
           message: `${res.data?.message || `Cita desplazada (+${minutes}m).`}\n\n¿Deseas avisar al cliente por WhatsApp?`,
           buttons: [
             { text: 'Cerrar', role: 'cancel' },
             {
-              text: 'Enviar WhatsApp 💬',
+              text: 'Enviar WhatsApp',
               handler: () => {
                 window.open(whatsappLink, '_blank');
               }
@@ -381,7 +381,7 @@ const Reservations: React.FC = () => {
   const handleApprovePayment = async (reservationId: string) => {
     try {
       await apiClient.patch(`/reservations/${reservationId}/approve-payment`);
-      presentToast({ message: '✅ Pago de cita verificado y aprobado con éxito', duration: 2500, color: 'success' });
+      presentToast({ message: 'Pago de cita verificado y aprobado con éxito', duration: 2500, color: 'success' });
       fetchReservations();
     } catch (e: any) {
       console.error(e);
@@ -412,7 +412,7 @@ const Reservations: React.FC = () => {
         bank: abonoBank.trim() || undefined,
       });
       presentToast({
-        message: `✅ Abono de $${amountUsd.toFixed(2)} USD registrado con éxito`,
+        message: `Abono de $${amountUsd.toFixed(2)} USD registrado con éxito`,
         duration: 3000,
         color: 'success',
       });
@@ -493,7 +493,7 @@ const Reservations: React.FC = () => {
           if (cached && cached.length > 0) {
             setReservations(cached);
             presentToast({
-              message: '⚡ Modo Sin Conexión: Visualizando agenda guardada localmente.',
+              message: 'Modo Sin Conexión: Visualizando agenda guardada localmente.',
               duration: 3000,
               color: 'warning'
             });
@@ -705,18 +705,18 @@ const Reservations: React.FC = () => {
             const waUrl = formatWhatsAppUrl(customerPhone, msg);
 
             presentAlert({
-              header: '✅ Cita Agendada Exitosamente',
+              header: 'Cita Agendada Exitosamente',
               message: `¿Deseas enviar el enlace de control de la cita a ${customerName} por WhatsApp?`,
               buttons: [
                 {
-                  text: 'Copiar Enlace 📋',
+                  text: 'Copiar Enlace',
                   handler: () => {
                     navigator.clipboard.writeText(appointmentUrl);
-                    presentToast({ message: '📋 Enlace copiado al portapapeles', duration: 2500, color: 'success' });
+                    presentToast({ message: 'Enlace copiado al portapapeles', duration: 2500, color: 'success' });
                   }
                 },
                 {
-                  text: 'Enviar WhatsApp 📲',
+                  text: 'Enviar WhatsApp',
                   handler: () => {
                     window.open(waUrl, '_blank');
                   }
@@ -726,14 +726,14 @@ const Reservations: React.FC = () => {
             });
           } else {
             presentAlert({
-              header: '✅ Cita Agendada Exitosamente',
+              header: 'Cita Agendada Exitosamente',
               message: `Puedes copiar el enlace de control para que el cliente gestione su cita:`,
               buttons: [
                 {
-                  text: 'Copiar Enlace 📋',
+                  text: 'Copiar Enlace',
                   handler: () => {
                     navigator.clipboard.writeText(appointmentUrl);
-                    presentToast({ message: '📋 Enlace copiado al portapapeles', duration: 2500, color: 'success' });
+                    presentToast({ message: 'Enlace copiado al portapapeles', duration: 2500, color: 'success' });
                   }
                 },
                 { text: 'Listo', role: 'cancel' }
@@ -771,7 +771,7 @@ const Reservations: React.FC = () => {
 
       if (isWarningSchedule) {
         presentAlert({
-          header: '⚠️ Cita fuera de horario / Solapada',
+          header: 'Cita fuera de horario / Solapada',
           message: `${errMsg}\n\n¿Deseas autorizar la excepción y agendar esta cita de todas formas?`,
           buttons: [
             { text: 'Cancelar', role: 'cancel' },
@@ -973,7 +973,7 @@ const formatCompactTime = (timeStr?: string): string => {
       return {
         id: r.id,
         title: r.isBlock
-          ? `🔒 ${r.customerName}${r.employeeName ? ` (${r.employeeName})` : ''}`
+          ? `[Bloqueo] ${r.customerName}${r.employeeName ? ` (${r.employeeName})` : ''}`
           : `${r.customerName} - ${r.serviceName || 'Cita'}`,
         start: `${r.date}T${r.time}`,
         end: `${r.date}T${endTimeStr}`,
@@ -993,7 +993,7 @@ const formatCompactTime = (timeStr?: string): string => {
     const customer = r.customerName || eventInfo.event.title || 'Cita';
     const service = r.serviceName ? ` (${r.serviceName})` : '';
     const fullTooltip = isBlock
-      ? `🔒 Bloqueo: ${customer}`
+      ? `Bloqueo: ${customer}`
       : `${formatTime12h(timeStr)} - ${customer}${service}`;
 
     if (isMonthView) {
@@ -1033,7 +1033,7 @@ const formatCompactTime = (timeStr?: string): string => {
               opacity: 0.95
             }}
           >
-            {isBlock ? '🔒 Bloqueo' : customer}
+            {isBlock ? 'Bloqueo' : customer}
           </span>
         </div>
       );
@@ -1064,7 +1064,7 @@ const formatCompactTime = (timeStr?: string): string => {
             opacity: 0.95
           }}
         >
-          {isBlock ? `🔒 ${customer}` : `${customer}${service}`}
+          {isBlock ? `Bloqueo: ${customer}` : `${customer}${service}`}
         </div>
       </div>
     );
@@ -1433,7 +1433,7 @@ const formatCompactTime = (timeStr?: string): string => {
                           cursor: 'pointer'
                         }}
                       >
-                        ⏱️ Retraso
+                        Retraso
                       </button>
                       <button
                         type="button"
@@ -1534,8 +1534,8 @@ const formatCompactTime = (timeStr?: string): string => {
                                   }}
                                 >
                                   {res.employeeId
-                                    ? `👤 ${res.employeeName || res.employee?.name || res.employee?.username || 'Personal'}`
-                                    : '🏪 Todo el Comercio'}
+                                    ? `${res.employeeName || res.employee?.name || res.employee?.username || 'Personal'}`
+                                    : 'Todo el Comercio'}
                                 </span>
                               </div>
                               <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px', fontWeight: '600' }}>
@@ -1673,7 +1673,7 @@ const formatCompactTime = (timeStr?: string): string => {
                               )}
                               {res.rescheduleStatus === 'DELAYED' && (
                                 <span style={{ fontSize: '10px', background: '#FEF3C7', color: '#92400E', padding: '2px 6px', borderRadius: '6px', fontWeight: '800' }}>
-                                  ⏱️ Retrasada
+                                  Retrasada
                                 </span>
                               )}
                               {res.rescheduleStatus === 'PENDING_ACCEPTANCE' && (
@@ -1688,7 +1688,7 @@ const formatCompactTime = (timeStr?: string): string => {
                               )}
                               {res.rescheduleStatus === 'RESCHEDULED_BY_ADMIN' && (
                                 <span style={{ fontSize: '10px', background: '#EFF6FF', color: '#1D4ED8', padding: '2px 6px', borderRadius: '6px', fontWeight: '800' }}>
-                                  🗓️ Reprogramada
+                                  Reprogramada
                                 </span>
                               )}
                             </div>
@@ -1710,7 +1710,7 @@ const formatCompactTime = (timeStr?: string): string => {
                         {/* Service Name & Optional Photo */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '6px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', color: '#334155', minWidth: 0, flex: '1 1 auto' }}>
-                            <span style={{ flexShrink: 0 }}>✂️</span>
+                            
                             <span style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{res.serviceName || 'Servicio Agendado'}</span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', flexShrink: 0 }}>
@@ -1736,7 +1736,7 @@ const formatCompactTime = (timeStr?: string): string => {
                             )}
                             {Boolean(res.isSimultaneous) && (
                               <span style={{ fontSize: '10px', background: 'rgba(16, 185, 129, 0.1)', color: '#065F46', padding: '2px 6px', borderRadius: '6px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                                ⚡ Simultánea
+                                Simultánea
                               </span>
                             )}
                             {res.totalAmount > 0 && (
@@ -1772,7 +1772,7 @@ const formatCompactTime = (timeStr?: string): string => {
                             style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', padding: '10px', marginBottom: '10px' }}
                           >
                             <div style={{ fontSize: '12px', fontWeight: '800', color: '#92400E', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span>📱 PAGO REPORTADO POR VERIFICAR</span>
+                              <span>PAGO REPORTADO POR VERIFICAR</span>
                               {res.paymentProofUrl && (
                                 <a
                                   href={res.paymentProofUrl}
@@ -1798,14 +1798,14 @@ const formatCompactTime = (timeStr?: string): string => {
                                 onClick={() => handleApprovePayment(res.id)}
                                 style={{ background: '#10B981', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
                               >
-                                ✅ Confirmar Pago en Cuenta
+                                Confirmar Pago en Cuenta
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleRejectPayment(res.id)}
                                 style={{ background: '#EF4444', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
                               >
-                                ❌ No Cayó / Inválido
+                                No Cayó / Inválido
                               </button>
                             </div>
                           </div>
@@ -1851,7 +1851,7 @@ const formatCompactTime = (timeStr?: string): string => {
                               e.stopPropagation();
                               const appointmentUrl = `${getPublicBaseUrl()}/appointment/${res.id}`;
                               navigator.clipboard.writeText(appointmentUrl);
-                              presentToast({ message: '📋 Enlace de control de cita copiado', duration: 2000, color: 'success' });
+                              presentToast({ message: 'Enlace de control de cita copiado', duration: 2000, color: 'success' });
                             }}
                             style={{
                               background: '#F8FAFC',
@@ -1958,7 +1958,7 @@ const formatCompactTime = (timeStr?: string): string => {
                               }}
                               title="Registrar un abono parcial o pago en esta cita"
                             >
-                              ➕ Abonar
+                              Abonar
                             </button>
                           )}
 
@@ -2254,7 +2254,7 @@ const formatCompactTime = (timeStr?: string): string => {
                                   {p.name}
                                 </div>
                                 <div style={{ fontSize: '11px', color: isSelected ? '#047857' : '#64748B' }}>
-                                  ⏱️ {p.durationMinutes || 30} min
+                                  {p.durationMinutes || 30} min
                                 </div>
                               </div>
                             </div>
@@ -2270,7 +2270,7 @@ const formatCompactTime = (timeStr?: string): string => {
                   {selectedServiceIds.length > 0 && (
                     <div style={{ marginTop: '8px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '10px', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontSize: '12px', color: '#166534', fontWeight: '600' }}>
-                        {isSimultaneous && selectedServices.length > 1 ? '⚡ Duración (a 4 manos):' : '⏱️ Duración total:'} <b>{totalDurationMinutes} min</b>
+                        {isSimultaneous && selectedServices.length > 1 ? 'Duración (a 4 manos):' : 'Duración total:'} <b>{totalDurationMinutes} min</b>
                       </div>
                       <div style={{ fontSize: '12px', color: '#166534', fontWeight: '800' }}>
                         Total servicios: <b>${totalCalculatedPrice.toFixed(2)}</b>
@@ -2281,7 +2281,7 @@ const formatCompactTime = (timeStr?: string): string => {
                   {selectedServices.length > 1 && (
                     <div style={{ marginTop: '8px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>⚡ Atención a 4 Manos (Simultánea)</div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>Atención a 4 Manos (Simultánea)</div>
                         <div style={{ fontSize: '11px', color: '#64748B' }}>Servicios al mismo tiempo con especialistas distintos</div>
                       </div>
                       <IonToggle
@@ -2320,10 +2320,10 @@ const formatCompactTime = (timeStr?: string): string => {
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <span style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A' }}>
-                                ✂️ {srv.name}
+                                {srv.name}
                               </span>
                               <span style={{ fontSize: '11px', color: '#047857', fontWeight: '700', background: '#ECFDF5', padding: '2px 8px', borderRadius: '8px' }}>
-                                ⏱️ {srv.durationMinutes || 30}m &bull; ${Number(srv.salePrice || 0).toFixed(2)}
+                                {srv.durationMinutes || 30}m &bull; ${Number(srv.salePrice || 0).toFixed(2)}
                               </span>
                             </div>
 
@@ -2354,7 +2354,7 @@ const formatCompactTime = (timeStr?: string): string => {
                               <IonSelectOption value="">Sin asignar / Cualquiera disponible</IonSelectOption>
                               {qualifiedStaff.map((emp: any) => (
                                 <IonSelectOption key={emp.id} value={emp.id}>
-                                  👤 {emp.name || emp.username} {emp.jobTitle ? `(${emp.jobTitle})` : ''}
+                                  {emp.name || emp.username} {emp.jobTitle ? `(${emp.jobTitle})` : ''}
                                 </IonSelectOption>
                               ))}
                             </IonSelect>
@@ -2400,7 +2400,7 @@ const formatCompactTime = (timeStr?: string): string => {
                         ));
                         return (
                           <IonSelectOption key={emp.id} value={emp.id}>
-                            👤 {emp.name || emp.username} {emp.jobTitle ? `(${emp.jobTitle})` : ''}{isBlockedOnDate ? ' 🚫 (Bloqueado/Día Libre)' : ''}
+                            {emp.name || emp.username} {emp.jobTitle ? `(${emp.jobTitle})` : ''}{isBlockedOnDate ? ' (Bloqueado/Día Libre)' : ''}
                           </IonSelectOption>
                         );
                       })}
@@ -2440,7 +2440,7 @@ const formatCompactTime = (timeStr?: string): string => {
                     </div>
                   ) : availableSlots.length === 0 ? (
                     <div style={{ padding: '10px', background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: '10px', fontSize: '12px', color: '#92400E', lineHeight: '1.4' }}>
-                      ⚠️ No hay cupos automáticos calculados para esta fecha o especialista. Si deseas autorizar una excepción, ajusta la hora manual a continuación.
+                      No hay cupos automáticos calculados para esta fecha o especialista. Si deseas autorizar una excepción, ajusta la hora manual a continuación.
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(82px, 1fr))', gap: '8px', maxHeight: '160px', overflowY: 'auto', padding: '2px' }}>
@@ -2532,7 +2532,7 @@ const formatCompactTime = (timeStr?: string): string => {
           <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
-                {selectedEvent?.isBlock ? '🔒 Bloqueo de Horario' : 'Detalles de la Cita'}
+                {selectedEvent?.isBlock ? 'Bloqueo de Horario' : 'Detalles de la Cita'}
               </h2>
               <button
                 type="button"
@@ -2557,8 +2557,8 @@ const formatCompactTime = (timeStr?: string): string => {
                         color: selectedEvent.employeeId ? '#92400E' : '#1E293B',
                       }}>
                         {selectedEvent.employeeId
-                          ? `👤 Personal: ${selectedEvent.employeeName || selectedEvent.employee?.name || selectedEvent.employee?.username || 'Personal'}`
-                          : '🏪 Cierre / Bloqueo de Todo el Comercio'}
+                          ? `Personal: ${selectedEvent.employeeName || selectedEvent.employee?.name || selectedEvent.employee?.username || 'Personal'}`
+                          : 'Cierre / Bloqueo de Todo el Comercio'}
                       </span>
                       <span style={{
                         fontSize: '11px',
@@ -2578,7 +2578,7 @@ const formatCompactTime = (timeStr?: string): string => {
 
                     <div style={{ fontSize: '13px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
                       <div>
-                        📅 <b>Fecha:</b> {selectedEvent.date}
+                        <b>Fecha:</b> {selectedEvent.date}
                       </div>
                       <div>
                         ⏰ <b>Bloque reservado:</b>{' '}
@@ -2631,14 +2631,14 @@ const formatCompactTime = (timeStr?: string): string => {
                     </div>
                     {selectedEvent.customerPhone && (
                       <div style={{ fontSize: '13px', color: '#64748B', marginBottom: '4px' }}>
-                        📞 {selectedEvent.customerPhone}
+                        {selectedEvent.customerPhone}
                       </div>
                     )}
                     <div style={{ fontSize: '13px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <span>📅 {selectedEvent.date} a las <b>{selectedEvent.time ? formatTime12h(selectedEvent.time) : ''}</b> ({Number(selectedEvent.durationMinutes) || 30} min)</span>
+                      <span>{selectedEvent.date} a las <b>{selectedEvent.time ? formatTime12h(selectedEvent.time) : ''}</b> ({Number(selectedEvent.durationMinutes) || 30} min)</span>
                       {selectedEvent.rescheduleStatus === 'DELAYED' && (
                         <span style={{ fontSize: '11px', background: '#FEF3C7', color: '#92400E', padding: '2px 8px', borderRadius: '6px', fontWeight: '800' }}>
-                          ⏱️ Retrasada {selectedEvent.originalTime ? `(Original: ${formatTime12h(selectedEvent.originalTime)})` : ''}
+                          Retrasada {selectedEvent.originalTime ? `(Original: ${formatTime12h(selectedEvent.originalTime)})` : ''}
                         </span>
                       )}
                       {selectedEvent.rescheduleStatus === 'PENDING_ACCEPTANCE' && (
@@ -2653,7 +2653,7 @@ const formatCompactTime = (timeStr?: string): string => {
                       )}
                       {selectedEvent.rescheduleStatus === 'RESCHEDULED_BY_ADMIN' && (
                         <span style={{ fontSize: '11px', background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: '6px', fontWeight: '800' }}>
-                          🗓️ Reprogramada {selectedEvent.originalDate ? `(Orig: ${selectedEvent.originalDate} ${selectedEvent.originalTime || ''})` : ''}
+                          Reprogramada {selectedEvent.originalDate ? `(Orig: ${selectedEvent.originalDate} ${selectedEvent.originalTime || ''})` : ''}
                         </span>
                       )}
                     </div>
@@ -2664,9 +2664,9 @@ const formatCompactTime = (timeStr?: string): string => {
                         </div>
                         {selectedEvent.serviceSpecialists.map((ss: any, idx: number) => (
                           <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FFFFFF', padding: '6px 10px', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }}>
-                            <span style={{ fontWeight: '700', color: '#0F172A' }}>✂️ {ss.serviceName || 'Servicio'}</span>
+                            <span style={{ fontWeight: '700', color: '#0F172A' }}>{ss.serviceName || 'Servicio'}</span>
                             <span style={{ color: '#047857', fontWeight: '700', background: '#ECFDF5', padding: '2px 8px', borderRadius: '6px' }}>
-                              👤 {ss.employeeName || 'Sin asignar'} {ss.price ? `($${Number(ss.price).toFixed(2)})` : ''}
+                              {ss.employeeName || 'Sin asignar'} {ss.price ? `($${Number(ss.price).toFixed(2)})` : ''}
                             </span>
                           </div>
                         ))}
@@ -2675,12 +2675,12 @@ const formatCompactTime = (timeStr?: string): string => {
                       <>
                         {selectedEvent.serviceName && (
                           <div style={{ fontSize: '13px', fontWeight: '700', color: '#047857', marginTop: '6px' }}>
-                            ✂️ {selectedEvent.serviceName}
+                            {selectedEvent.serviceName}
                           </div>
                         )}
                         {selectedEvent.employee && (
                           <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
-                            👤 Especialista: <b>{selectedEvent.employee.name || selectedEvent.employee.username}</b>
+                            Especialista: <b>{selectedEvent.employee.name || selectedEvent.employee.username}</b>
                           </div>
                         )}
                       </>
@@ -2730,7 +2730,7 @@ const formatCompactTime = (timeStr?: string): string => {
                   {selectedEvent.paymentStatus !== 'PAID' && (Boolean(selectedEvent.paymentReported) || (Array.isArray(selectedEvent.abonosHistory) && selectedEvent.abonosHistory.some((a: any) => a.status === 'REPORTED' || a.status === 'REPORTED_PENDING_APPROVAL'))) && (
                     <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '14px', padding: '14px', marginBottom: '16px' }}>
                       <div style={{ fontSize: '13px', fontWeight: '800', color: '#92400E', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>📱 PAGO REPORTADO POR VERIFICAR</span>
+                        <span>PAGO REPORTADO POR VERIFICAR</span>
                         {selectedEvent.paymentProofUrl && (
                           <a
                             href={selectedEvent.paymentProofUrl}
@@ -2763,7 +2763,7 @@ const formatCompactTime = (timeStr?: string): string => {
                           }}
                           style={{ flex: 1, background: '#10B981', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                         >
-                          ✅ Confirmar que cayó en Cuenta
+                          Confirmar que cayó en Cuenta
                         </button>
                         <button
                           type="button"
@@ -2773,7 +2773,7 @@ const formatCompactTime = (timeStr?: string): string => {
                           }}
                           style={{ background: '#EF4444', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                         >
-                          ❌ Inválido
+                          Inválido
                         </button>
                       </div>
                     </div>
@@ -2983,7 +2983,7 @@ const formatCompactTime = (timeStr?: string): string => {
                             cursor: 'pointer'
                           }}
                         >
-                          ➕ Registrar Abono
+                          Registrar Abono
                         </button>
                       )}
                       <button
@@ -3028,7 +3028,7 @@ const formatCompactTime = (timeStr?: string): string => {
                             onClick={() => {
                               const url = `${getPublicBaseUrl()}/appointment/${selectedEvent.id}`;
                               navigator.clipboard.writeText(url);
-                              presentToast({ message: '📋 Enlace copiado al portapapeles', duration: 2500, color: 'success' });
+                              presentToast({ message: 'Enlace copiado al portapapeles', duration: 2500, color: 'success' });
                             }}
                             style={{
                               padding: '9px 10px',
@@ -3172,7 +3172,7 @@ const formatCompactTime = (timeStr?: string): string => {
         <IonModal isOpen={showShiftModal} onDidDismiss={() => setShowShiftModal(false)} style={{ '--border-radius': '20px' } as any}>
           <div style={{ padding: '20px', background: '#ffffff' }}>
             <h3 style={{ margin: '0 0 8px 0', fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
-              ⏱️ Retraso Imprevisto de Jornada
+              Retraso Imprevisto de Jornada
             </h3>
             <p style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.4' }}>
               Todas las citas del día de hoy a partir de la hora seleccionada se desplazarán automáticamente.
@@ -3207,7 +3207,7 @@ const formatCompactTime = (timeStr?: string): string => {
           <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
-                🗓️ Reprogramar Cita
+                Reprogramar Cita
               </h2>
               <button
                 type="button"
@@ -3223,11 +3223,11 @@ const formatCompactTime = (timeStr?: string): string => {
                 <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '12px', border: '1px solid #E2E8F0', marginBottom: '16px' }}>
                   <div style={{ fontSize: '14px', fontWeight: '800', color: '#0F172A' }}>{selectedEvent.customerName}</div>
                   <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
-                    Horario Actual: 📅 {selectedEvent.date} a las <b>{selectedEvent.time ? formatTime12h(selectedEvent.time) : ''}</b> ({Number(selectedEvent.durationMinutes) || 30} min)
+                    Horario Actual: {selectedEvent.date} a las <b>{selectedEvent.time ? formatTime12h(selectedEvent.time) : ''}</b> ({Number(selectedEvent.durationMinutes) || 30} min)
                   </div>
                   {selectedEvent.serviceName && (
                     <div style={{ fontSize: '12px', color: '#059669', fontWeight: '700', marginTop: '2px' }}>
-                      ✂️ {selectedEvent.serviceName}
+                      {selectedEvent.serviceName}
                     </div>
                   )}
                 </div>
@@ -3257,7 +3257,7 @@ const formatCompactTime = (timeStr?: string): string => {
                   </div>
                 ) : rescheduleAvailableSlots.length === 0 ? (
                   <div style={{ padding: '8px 10px', background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: '10px', fontSize: '11px', color: '#92400E', lineHeight: '1.4' }}>
-                    ⚠️ No hay cupos automáticos calculados para esta fecha o especialista. Puedes ingresar la hora deseada manualmente abajo.
+                    No hay cupos automáticos calculados para esta fecha o especialista. Puedes ingresar la hora deseada manualmente abajo.
                   </div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(68px, 1fr))', gap: '6px', maxHeight: '130px', overflowY: 'auto', padding: '2px' }}>
@@ -3335,7 +3335,7 @@ const formatCompactTime = (timeStr?: string): string => {
           <div style={{ background: '#ffffff', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>
-                ➕ Registrar Abono de Cita
+                Registrar Abono de Cita
               </h2>
               <button
                 type="button"
@@ -3383,12 +3383,12 @@ const formatCompactTime = (timeStr?: string): string => {
                     </label>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                       {[
-                        { id: 'USD', label: '💵 USD' },
-                        { id: 'PAGO_MOVIL', label: '📱 Pago Móvil' },
-                        { id: 'PUNTO', label: '💳 Punto' },
-                        { id: 'TRANSFER', label: '🏦 Transf.' },
-                        { id: 'BINANCE', label: '🟡 Binance' },
-                        { id: 'CASH_BS', label: '🇻🇪 Efec. Bs' },
+                        { id: 'USD', label: 'USD' },
+                        { id: 'PAGO_MOVIL', label: 'Pago Móvil' },
+                        { id: 'PUNTO', label: 'Punto' },
+                        { id: 'TRANSFER', label: 'Transf.' },
+                        { id: 'BINANCE', label: 'Binance' },
+                        { id: 'CASH_BS', label: 'Efec. Bs' },
                       ].map(m => (
                         <button
                           key={m.id}
@@ -3521,7 +3521,7 @@ const formatCompactTime = (timeStr?: string): string => {
                   options={[
                     {
                       value: 'ALL',
-                      label: '🏪 Todo el Comercio (Cierre Temporal / Feriado)',
+                      label: 'Todo el Comercio (Cierre Temporal / Feriado)',
                       description: 'Nadie podrá reservar citas ni turnos en este rango de fechas/horario',
                     },
                     ...employees.map(emp => {
@@ -3535,7 +3535,7 @@ const formatCompactTime = (timeStr?: string): string => {
                       );
                       return {
                         value: String(emp.id),
-                        label: `👤 ${emp.name || emp.username} (${titleOrRole})`,
+                        label: `${emp.name || emp.username} (${titleOrRole})`,
                         description: `Día libre, permiso o receso para ${emp.name || emp.username}`,
                       };
                     }),
@@ -3610,9 +3610,9 @@ const formatCompactTime = (timeStr?: string): string => {
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {[
-                      { label: '🌅 Mañana (8am - 12pm)', from: '08:00', to: '12:00' },
-                      { label: '🍽️ Almuerzo (12pm - 2pm)', from: '12:00', to: '14:00' },
-                      { label: '🌇 Tarde (1pm - 6pm)', from: '13:00', to: '18:00' },
+                      { label: 'Mañana (8am - 12pm)', from: '08:00', to: '12:00' },
+                      { label: 'Almuerzo (12pm - 2pm)', from: '12:00', to: '14:00' },
+                      { label: 'Tarde (1pm - 6pm)', from: '13:00', to: '18:00' },
                     ].map(preset => {
                       const active = blockStartTime === preset.from && blockEndTime === preset.to;
                       return (
@@ -3690,7 +3690,7 @@ const formatCompactTime = (timeStr?: string): string => {
 
               {/* Aviso de $0 */}
               <div style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', color: '#475569', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>🔒</span>
+                <span>[Bloqueo]</span>
                 <span>
                   Este bloqueo ocupa el horario seleccionado con <b>monto $0.00</b> (no genera cobros ni afecta las métricas de ventas).
                 </span>

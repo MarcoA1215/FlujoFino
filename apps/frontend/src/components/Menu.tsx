@@ -43,6 +43,8 @@ import {
   medalOutline,
   cloudDownloadOutline,
   bookOutline,
+  desktopOutline,
+  bicycleOutline,
 } from 'ionicons/icons';
 import { Capacitor } from '@capacitor/core';
 import { useSettings } from '../context/SettingsContext';
@@ -61,36 +63,36 @@ const WORK_MODE_OPTIONS: WorkModeOption[] = [
   {
     role: UserRole.POS,
     name: 'Modo Caja (POS)',
-    badgeLabel: '💻 Modo Caja / POS',
-    icon: '💻',
+    badgeLabel: 'Modo Caja / POS',
+    icon: desktopOutline,
     description: 'Punto de venta, pedidos y clientes.',
   },
   {
     role: UserRole.INVENTORY,
     name: 'Modo Inventario',
-    badgeLabel: '📦 Modo Inventario',
-    icon: '📦',
+    badgeLabel: 'Modo Inventario',
+    icon: cubeOutline,
     description: 'Materias primas, insumos y producción.',
   },
   {
     role: UserRole.DELIVERY,
     name: 'Modo Repartidor',
-    badgeLabel: '🛵 Modo Repartidor',
-    icon: '🛵',
+    badgeLabel: 'Modo Repartidor',
+    icon: bicycleOutline,
     description: 'Panel de delivery, rutas y pedidos asignados.',
   },
   {
     role: UserRole.KITCHEN,
     name: 'Modo Especialista / Preparación',
-    badgeLabel: '✂️ Modo Especialista / Preparación',
-    icon: '✂️',
+    badgeLabel: 'Modo Especialista / Preparación',
+    icon: constructOutline,
     description: 'Comandas, citas y preparación de órdenes.',
   },
   {
     role: UserRole.ADMIN,
     name: 'Modo Administrador',
-    badgeLabel: '⚙️ Modo Administrador',
-    icon: '⚙️',
+    badgeLabel: 'Modo Administrador',
+    icon: settingsOutline,
     description: 'Panel general y configuración.',
   },
 ];
@@ -393,7 +395,7 @@ const Menu: React.FC = () => {
               title="Cambiar Modo de Trabajo Activo"
             >
               <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#0f172a' }}>
-                [ {currentBadgeLabel} ▾ ]
+                {currentBadgeLabel} ▾
               </span>
             </button>
           )}
@@ -557,7 +559,7 @@ const Menu: React.FC = () => {
                       boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                     } as any}
                   >
-                    <span style={{ fontSize: '22px', marginRight: '14px' }}>{opt.icon}</span>
+                    <IonIcon icon={opt.icon} slot="start" style={{ fontSize: '22px', color: isActive ? 'var(--theme-primary, #10b981)' : '#64748b' }} />
                     <IonLabel>
                       <h2 style={{ fontWeight: 800, fontSize: '15px', color: isActive ? 'var(--theme-primary-readable, #065f46)' : '#1e293b' }}>
                         {opt.name}

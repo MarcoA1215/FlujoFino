@@ -12,7 +12,7 @@ import {
   IonToggle,
   useIonToast
 } from '@ionic/react';
-import { closeOutline, checkmarkCircle, personOutline, timeOutline, pricetagOutline, buildOutline, imageOutline, trashOutline, addOutline, layersOutline } from 'ionicons/icons';
+import { closeOutline, checkmarkCircle, personOutline, timeOutline, pricetagOutline, buildOutline, imageOutline, trashOutline, addOutline, layersOutline, receiptOutline } from 'ionicons/icons';
 import { apiClient } from '../../api/client';
 import { useSettings } from '../../context/SettingsContext';
 import type { Product, ProductVariant } from '../../types';
@@ -455,7 +455,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  📦 Reventa Directa
+                  Reventa Directa
                 </button>
               )}
               {isProductionEnabled && (
@@ -479,7 +479,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  🧪 Con Fórmula
+                  Con Fórmula
                 </button>
               )}
               {isReservationsEnabled && (
@@ -503,7 +503,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  💆 Servicio / Cita
+                  Servicio / Cita
                 </button>
               )}
             </div>
@@ -588,7 +588,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
             {isService && (
               <div style={{ fontSize: '12px', color: '#64748b', marginTop: '-4px', marginBottom: '12px' }}>
-                💡 <b>Costo estimado del servicio:</b> Lo que te cuesta realizar la atención (mano de obra, insumos o gastos fijos). Se utiliza para calcular tu ganancia neta en Caja y Estadísticas.
+                <b>Costo estimado del servicio:</b> Lo que te cuesta realizar la atención (mano de obra, insumos o gastos fijos). Se utiliza para calcular tu ganancia neta en Caja y Estadísticas.
               </div>
             )}
 
@@ -603,7 +603,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '18px' }}>🧾</span>
+                    <IonIcon icon={receiptOutline} style={{ fontSize: '18px', color: '#0F172A' }} />
                     <div>
                       <span style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>Régimen de IVA (Exento / Gravado)</span>
                       <div style={{ fontSize: '11px', color: '#64748b' }}>Configuración de impuesto para cálculos comerciales y ventas</div>
@@ -762,7 +762,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </label>
                 {hasVariants ? (
                   <div style={{ padding: '11px 12px', borderRadius: '8px', border: '1px solid #A7F3D0', background: '#ECFDF5', color: '#065F46', fontSize: '14px', fontWeight: '800' }}>
-                    📦 {totalVariantsStock} unidades totales (suma de {variants.length} variante{variants.length === 1 ? '' : 's'})
+                    {totalVariantsStock} unidades totales (suma de {variants.length} variante{variants.length === 1 ? '' : 's'})
                   </div>
                 ) : (
                   <input 
@@ -779,7 +779,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
             {isFormula && (
               <div style={{ padding: '12px 14px', backgroundColor: '#fef3c7', borderRadius: '8px', border: '1px solid #fde68a', color: '#92400e', fontSize: '13px', marginTop: '6px' }}>
-                🧪 <b>Producto Armable / Con Fórmula:</b> Este producto se elabora a partir de insumos. Una vez guardado, podrás ingresar su receta y materias primas desde el menú del producto.
+                <b>Producto Armable / Con Fórmula:</b> Este producto se elabora a partir de insumos. Una vez guardado, podrás ingresar su receta y materias primas desde el menú del producto.
               </div>
             )}
 
@@ -806,7 +806,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <div style={{ padding: '14px', backgroundColor: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0', color: '#166534', marginTop: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
                     <div style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      🧪 <span>Insumos y Materiales de Trabajo</span>
+                      <span>Insumos y Materiales de Trabajo</span>
                     </div>
                     {product && onConfigureRecipe && (
                       <button
@@ -953,7 +953,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               {hasVariants && (
                 <div>
                   <div style={{ padding: '10px 12px', backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '10px', fontSize: '12px', color: '#065F46', marginBottom: '12px' }}>
-                    💡 Al activar variantes, el stock del producto se calcula <b>exclusivamente</b> sumando el stock de cada variante ({totalVariantsStock} unds). Cada variante permite hasta <b>3 fotos extras opcionales</b>.
+                    Al activar variantes, el stock del producto se calcula <b>exclusivamente</b> sumando el stock de cada variante ({totalVariantsStock} unds). Cada variante permite hasta <b>3 fotos extras opcionales</b>.
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '12px' }}>
@@ -1097,7 +1097,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                                     gap: '4px'
                                   }}
                                 >
-                                  📷 +Foto ({vImages.length}/3 máx)
+                                  +Foto ({vImages.length}/3 máx)
                                   <input
                                     type="file"
                                     accept="image/*"
@@ -1168,7 +1168,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     textAlign: 'center'
                   }}
                 >
-                  ⚡ Entrega Inmediata
+                  Entrega Inmediata
                   <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>Stock físico o salida rápida</div>
                 </button>
 
@@ -1187,7 +1187,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     textAlign: 'center'
                   }}
                 >
-                  🎂 Bajo Encargo
+                  Bajo Encargo
                   <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>Cocina / Repostería / A pedido</div>
                 </button>
               </div>
@@ -1213,7 +1213,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 />
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: '700', color: isSupplierPreorder ? '#7e22ce' : '#1e293b' }}>
-                    📦 Preorden por Catálogo (Sujeto a Proveedor)
+                    Preorden por Catálogo (Sujeto a Proveedor)
                   </div>
                   <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
                     Ideal para ropa, calzado o mercancía por encargo. En la tienda pública el cliente enviará una solicitud sin pagar de inmediato hasta que verifiques disponibilidad.

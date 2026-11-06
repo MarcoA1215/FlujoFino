@@ -317,7 +317,7 @@ const SuperAdminDashboard: React.FC = () => {
       setSeedResult(res.data);
       setShowSeedModal(false);
       presentToast({
-        message: '🌱 Negocios de prueba sincronizados correctamente (isTest=true). Cuentas reales y SuperAdmin intactos.',
+        message: 'Negocios de prueba sincronizados correctamente (isTest=true). Cuentas reales y SuperAdmin intactos.',
         duration: 4500,
         color: 'success',
         icon: checkmarkCircleOutline,
@@ -1691,7 +1691,7 @@ const SuperAdminDashboard: React.FC = () => {
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    🤝 Desglose Automático: ¿Cuánto le debo a mis Promotores?
+                    Desglose Automático: Saldos Pendientes de Promotores
                   </h3>
                   <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b' }}>
                     Cada vez que apruebas el pago de un negocio referido por un promotor, se suma aquí su comisión. Al pagarle, se descuenta automáticamente de tu deuda y se registra la salida.
@@ -1812,7 +1812,7 @@ const SuperAdminDashboard: React.FC = () => {
                             cursor: 'pointer',
                           }}
                         >
-                          {hasDebt ? `💸 Pagar y Descontar ($${p.pendingBalanceUSD.toFixed(2)})` : 'Ver Historial de Pagos'}
+                          {hasDebt ? `Pagar y Descontar ($${p.pendingBalanceUSD.toFixed(2)})` : 'Ver Historial de Pagos'}
                         </button>
                       </div>
                     );
@@ -1836,7 +1836,7 @@ const SuperAdminDashboard: React.FC = () => {
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    🏛️ Control de Impuestos (IVA {platformConfig.ivaPercentage ?? 16}% SENIAT)
+                    Control de Impuestos (IVA {platformConfig.ivaPercentage ?? 16}% SENIAT)
                   </h3>
                   <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b' }}>
                     Del total cobrado en suscripciones, el sistema separa automáticamente el {platformConfig.ivaPercentage ?? 16}% de IVA para que sepas cuánto retener y puedas marcar cuando ya lo pagaste al SENIAT.
@@ -1939,7 +1939,7 @@ const SuperAdminDashboard: React.FC = () => {
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-                    📒 Libro de Salidas Operativas, Inversiones y Retiros
+                    Libro de Salidas Operativas, Inversiones y Retiros
                   </h3>
                   <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b' }}>
                     Registro detallado de cada salida de dinero de tu negocio (servidores, publicidad, pagos al SENIAT, comisiones y pagos a ti mismo).
@@ -1950,11 +1950,11 @@ const SuperAdminDashboard: React.FC = () => {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {[
                     { key: 'ALL', label: 'Todos' },
-                    { key: PlatformExpenseType.OPERATING, label: '🖥️ Servidores / OPEX' },
-                    { key: PlatformExpenseType.INVESTMENT, label: '🚀 Inversión' },
-                    { key: PlatformExpenseType.OWNER_PAYOUT, label: '👤 Pagos a Mí' },
-                    { key: PlatformExpenseType.TAX_SENIAT, label: '🏛️ SENIAT IVA' },
-                    { key: PlatformExpenseType.PROMOTER_PAYOUT, label: '🤝 Promotores' },
+                    { key: PlatformExpenseType.OPERATING, label: 'Servidores / OPEX' },
+                    { key: PlatformExpenseType.INVESTMENT, label: 'Inversión' },
+                    { key: PlatformExpenseType.OWNER_PAYOUT, label: 'Pagos a Mí' },
+                    { key: PlatformExpenseType.TAX_SENIAT, label: 'SENIAT IVA' },
+                    { key: PlatformExpenseType.PROMOTER_PAYOUT, label: 'Promotores' },
                   ].map((tab) => {
                     const active = expenseFilterType === tab.key;
                     return (
@@ -2001,11 +2001,11 @@ const SuperAdminDashboard: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {filteredExpenses.map((exp) => {
                     const badgeConfig: Record<string, { label: string; bg: string; color: string }> = {
-                      [PlatformExpenseType.OPERATING]: { label: '🖥️ Gasto Operativo (OPEX)', bg: '#ffe4e6', color: '#be123c' },
-                      [PlatformExpenseType.INVESTMENT]: { label: '🚀 Inversión / Reinversión', bg: '#e0f2fe', color: '#0369a1' },
-                      [PlatformExpenseType.OWNER_PAYOUT]: { label: '👤 Pago a Mí (Retiro Dueño)', bg: '#f3e8ff', color: '#6d28d9' },
-                      [PlatformExpenseType.TAX_SENIAT]: { label: '🏛️ Pago IVA SENIAT', bg: '#e0e7ff', color: '#3730a3' },
-                      [PlatformExpenseType.PROMOTER_PAYOUT]: { label: '🤝 Comisión Promotor', bg: '#fef3c7', color: '#b45309' },
+                      [PlatformExpenseType.OPERATING]: { label: 'Gasto Operativo (OPEX)', bg: '#ffe4e6', color: '#be123c' },
+                      [PlatformExpenseType.INVESTMENT]: { label: 'Inversión / Reinversión', bg: '#e0f2fe', color: '#0369a1' },
+                      [PlatformExpenseType.OWNER_PAYOUT]: { label: 'Pago a Mí (Retiro Dueño)', bg: '#f3e8ff', color: '#6d28d9' },
+                      [PlatformExpenseType.TAX_SENIAT]: { label: 'Pago IVA SENIAT', bg: '#e0e7ff', color: '#3730a3' },
+                      [PlatformExpenseType.PROMOTER_PAYOUT]: { label: 'Comisión Promotor', bg: '#fef3c7', color: '#b45309' },
                     };
                     const badge = badgeConfig[exp.type] || { label: exp.type, bg: '#f1f5f9', color: '#334155' };
 
@@ -2122,7 +2122,7 @@ const SuperAdminDashboard: React.FC = () => {
                     cursor: 'pointer',
                   }}
                 >
-                  🏢 Clientes Reales ({realTenantsCount})
+                  Clientes Reales ({realTenantsCount})
                 </button>
                 <button
                   type="button"
@@ -2139,7 +2139,7 @@ const SuperAdminDashboard: React.FC = () => {
                     cursor: 'pointer',
                   }}
                 >
-                  🧪 Negocios de Prueba ({testTenantsCount})
+                  Negocios de Prueba ({testTenantsCount})
                 </button>
                 <button
                   type="button"
@@ -2179,7 +2179,7 @@ const SuperAdminDashboard: React.FC = () => {
                   }}
                 >
                   <IonIcon icon={refreshOutline} style={{ fontSize: '14px' }} />
-                  {isSeedingDemo ? 'Sembrando Datos...' : '🌱 Sembrar Negocios Demo (isTest)'}
+                  {isSeedingDemo ? 'Sembrando Datos...' : 'Sembrar Negocios Demo (isTest)'}
                 </button>
               </div>
             </div>
@@ -2237,12 +2237,12 @@ const SuperAdminDashboard: React.FC = () => {
                                     gap: '4px',
                                   }}
                                 >
-                                  🧪 PRUEBA
+                                  PRUEBA
                                 </span>
                               )}
                             </div>
                             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
-                              👤 {t.owner ? `${t.owner.name} (${t.owner.email})` : 'Sin dueño asignado'}
+                              {t.owner ? `${t.owner.name} (${t.owner.email})` : 'Sin dueño asignado'}
                             </div>
                             {t.referrerName && (
                               <div style={{ fontSize: '11px', color: '#3b82f6', marginTop: '2px' }}>
@@ -2297,7 +2297,7 @@ const SuperAdminDashboard: React.FC = () => {
                             </div>
                             {t.discountPercentage > 0 && (
                               <div style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, marginTop: '2px' }}>
-                                🎉 {t.discountPercentage}% Descuento
+                                {t.discountPercentage}% Descuento
                               </div>
                             )}
                           </td>
@@ -2445,7 +2445,7 @@ const SuperAdminDashboard: React.FC = () => {
                               <span>{p.tenantName || 'Negocio Registrado'}</span>
                               {p.isTest && (
                                 <span style={{ fontSize: '11px', fontWeight: 800, background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '6px', border: '1px solid #fde68a' }}>
-                                  🧪 PRUEBA
+                                  PRUEBA
                                 </span>
                               )}
                             </IonCardTitle>
@@ -2471,7 +2471,7 @@ const SuperAdminDashboard: React.FC = () => {
                             </div>
                           </div>
                           <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-                            📅 Reportado: {new Date(p.createdAt).toLocaleString('es-VE')}
+                            Reportado: {new Date(p.createdAt).toLocaleString('es-VE')}
                           </div>
                         </IonCardHeader>
 
@@ -2494,9 +2494,9 @@ const SuperAdminDashboard: React.FC = () => {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                               <span style={{ fontSize: '13px', color: '#64748b' }}>Método de Pago:</span>
                               <span style={{ fontWeight: 700, fontSize: '13px' }}>
-                                {p.paymentMethod === SaaSPaymentMethod.PAGO_MOVIL && '📱 Pago Móvil (en Bs)'}
-                                {p.paymentMethod === SaaSPaymentMethod.BINANCE && '🟡 Binance Pay (USDT)'}
-                                {p.paymentMethod === SaaSPaymentMethod.CASH && '🏦 Transferencia / Efectivo'}
+                                {p.paymentMethod === SaaSPaymentMethod.PAGO_MOVIL && 'Pago Móvil (en Bs)'}
+                                {p.paymentMethod === SaaSPaymentMethod.BINANCE && 'Binance Pay (USDT)'}
+                                {p.paymentMethod === SaaSPaymentMethod.CASH && 'Transferencia / Efectivo'}
                               </span>
                             </div>
 
@@ -2565,7 +2565,7 @@ const SuperAdminDashboard: React.FC = () => {
               flexWrap: 'wrap'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 300px' }}>
-                <span style={{ fontSize: '24px' }}>📖</span>
+                
                 <div>
                   <div style={{ fontWeight: 800, fontSize: '14px', color: '#166534' }}>
                     Guía de Campo Oficial y Manual de Promotores (PDF)
@@ -2641,7 +2641,7 @@ const SuperAdminDashboard: React.FC = () => {
             <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '10px 14px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <IonIcon icon={calculatorOutline} style={{ color: '#059669' }} />
               <strong style={{ fontSize: '13px' }}>Tasa Pago Móvil: Bs. {effectiveRate.toFixed(2)}</strong>
-              {([['BCV', `🏛️ BCV ${bcvRate.toFixed(2)}`], ['PARALLEL', `📈 Paralelo ${parallelRate.toFixed(2)}`], ['CUSTOM', '✏️ Manual']] as const).map(([k, label]) => (
+              {([['BCV', `BCV ${bcvRate.toFixed(2)}`], ['PARALLEL', `Paralelo ${parallelRate.toFixed(2)}`], ['CUSTOM', 'Manual']] as const).map(([k, label]) => (
                 <button
                   key={k}
                   type="button"
@@ -2666,7 +2666,7 @@ const SuperAdminDashboard: React.FC = () => {
             {/* Filtros */}
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {([['ALL', `Todos (${safePromoters.length})`], ['PENDING', `⏳ Con saldo pendiente (${promotersWithPendingCount})`], ['PAID', `✅ Al día (${safePromoters.length - promotersWithPendingCount})`]] as const).map(([k, label]) => (
+                {([['ALL', `Todos (${safePromoters.length})`], ['PENDING', `Con saldo pendiente (${promotersWithPendingCount})`], ['PAID', `Al día (${safePromoters.length - promotersWithPendingCount})`]] as const).map(([k, label]) => (
                   <button
                     key={k}
                     type="button"
@@ -2726,7 +2726,7 @@ const SuperAdminDashboard: React.FC = () => {
                   </thead>
                   <tbody>
                     {filteredPromoters.map((p) => {
-                      const rankEmoji = p.currentRank === 'ORO' ? '🥇' : p.currentRank === 'PLATA' ? '🥈' : p.currentRank === 'BRONCE' ? '🥉' : '🪵';
+                      const rankEmoji = p.currentRank === 'ORO' ? 'Oro' : p.currentRank === 'PLATA' ? 'Plata' : p.currentRank === 'BRONCE' ? 'Bronce' : 'Iniciación';
                       const hasPending = p.pendingBalanceUSD > 0;
                       const wa = (p.phone || p.pagoMovilPhone || '').replace(/[^0-9]/g, '');
                       return (
@@ -2757,7 +2757,7 @@ const SuperAdminDashboard: React.FC = () => {
                             {rankEmoji} {p.currentRank} ({p.commissionPercentage}%)
                             {(p.totalBonusCommissionsUSD ?? p.rankBonusUSD) > 0 && (
                               <div style={{ fontSize: '11px', color: '#10b981', fontWeight: 700 }}>
-                                🎁 Bonos: +${(p.totalBonusCommissionsUSD ?? p.rankBonusUSD).toFixed(2)}
+                                Bonos: +${(p.totalBonusCommissionsUSD ?? p.rankBonusUSD).toFixed(2)}
                               </div>
                             )}
                           </td>
@@ -2812,7 +2812,7 @@ const SuperAdminDashboard: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
                 <div>
                   <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    🏛️ Control de Tasas de Mercado Oficiales
+                    Control de Tasas de Mercado Oficiales
                   </h3>
                   <div style={{ fontSize: '12px', color: '#64748b' }}>
                     {platformRates?.ratesCache?.updatedAt ? (
@@ -2853,28 +2853,28 @@ const SuperAdminDashboard: React.FC = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
                 <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#166534' }}>🏛️ Dólar BCV Oficial</div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#166534' }}>Dólar BCV Oficial</div>
                   <div style={{ fontSize: '18px', fontWeight: 900, color: '#14532d', marginTop: '4px' }}>
                     Bs. {Number(platformRates?.ratesCache?.bcv || platformRates?.exchangeRateBs || 40).toFixed(2)}
                   </div>
                 </div>
 
                 <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#1e40af' }}>📈 Paralelo Promedio</div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#1e40af' }}>Paralelo Promedio</div>
                   <div style={{ fontSize: '18px', fontWeight: 900, color: '#1e3a8a', marginTop: '4px' }}>
                     Bs. {Number(platformRates?.ratesCache?.parallel || platformRates?.ratesCache?.bcv || 40).toFixed(2)}
                   </div>
                 </div>
 
                 <div style={{ background: '#fefce8', border: '1px solid #fef08a', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#854d0e' }}>🟡 Binance USDT</div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#854d0e' }}>Binance USDT</div>
                   <div style={{ fontSize: '18px', fontWeight: 900, color: '#713f12', marginTop: '4px' }}>
                     Bs. {Number(platformRates?.ratesCache?.usdt || platformRates?.ratesCache?.parallel || 40).toFixed(2)}
                   </div>
                 </div>
 
                 <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#6b21a8' }}>💶 Euro BCV</div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#6b21a8' }}>Euro BCV</div>
                   <div style={{ fontSize: '18px', fontWeight: 900, color: '#581c87', marginTop: '4px' }}>
                     Bs. {Number(platformRates?.ratesCache?.eur || 40).toFixed(2)}
                   </div>
@@ -3008,7 +3008,7 @@ const SuperAdminDashboard: React.FC = () => {
                   <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px', borderLeft: '4px solid #8b5cf6' }}>
                     <IonCardHeader style={{ paddingBottom: '8px' }}>
                       <IonCardTitle style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-                        ⚙️ Parámetros Globales de Suscripción e IVA
+                        Parámetros Globales de Suscripción e IVA
                       </IonCardTitle>
                     </IonCardHeader>
                     <IonCardContent>
@@ -3056,7 +3056,7 @@ const SuperAdminDashboard: React.FC = () => {
                       >
                         <div style={{ flex: '1 1 260px' }}>
                           <div style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span>🧾 Cobrar IVA en Suscripciones de FinoWork</span>
+                            <span>Cobrar IVA en Suscripciones de FinoWork</span>
                             <span
                               style={{
                                 fontSize: '11px',
@@ -3253,7 +3253,7 @@ const SuperAdminDashboard: React.FC = () => {
                     }}
                   />
                   <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                    💡 Con este correo podrás iniciar sesión directamente como SuperAdmin de la plataforma.
+                    Con este correo podrás iniciar sesión directamente como SuperAdmin de la plataforma.
                   </span>
                 </div>
               </div>
@@ -3689,22 +3689,22 @@ const SuperAdminDashboard: React.FC = () => {
                           <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748b' }}>Categorías:</span>
                           {addedCount > 0 && (
                             <span style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px' }}>
-                              ✨ {addedCount} Agregado{addedCount > 1 ? 's' : ''}
+                              {addedCount} Agregado{addedCount > 1 ? 's' : ''}
                             </span>
                           )}
                           {implementedCount > 0 && (
                             <span style={{ background: '#eff6ff', color: '#0284c7', border: '1px solid #bae6fd', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px' }}>
-                              🚀 {implementedCount} Implementado{implementedCount > 1 ? 's' : ''}
+                              {implementedCount} Implementado{implementedCount > 1 ? 's' : ''}
                             </span>
                           )}
                           {fixedCount > 0 && (
                             <span style={{ background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px' }}>
-                              🛠️ {fixedCount} Corregido{fixedCount > 1 ? 's' : ''}
+                              {fixedCount} Corregido{fixedCount > 1 ? 's' : ''}
                             </span>
                           )}
                           {removedCount > 0 && (
                             <span style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px' }}>
-                              🗑️ {removedCount} Eliminado{removedCount > 1 ? 's' : ''}
+                              {removedCount} Eliminado{removedCount > 1 ? 's' : ''}
                             </span>
                           )}
                           {(!update.changes || update.changes.length === 0) && (
@@ -3780,7 +3780,7 @@ const SuperAdminDashboard: React.FC = () => {
           <IonHeader>
             <IonToolbar color="primary">
               <IonTitle style={{ fontWeight: 700 }}>
-                🌱 Sembrar Negocios Demo (isTest)
+                Sembrar Negocios Demo (isTest)
               </IonTitle>
               <IonButtons slot="end">
                 <IonButton onClick={() => setShowSeedModal(false)}>Cerrar</IonButton>
@@ -4016,7 +4016,7 @@ const SuperAdminDashboard: React.FC = () => {
                     </div>
 
                     <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '12px', color: '#64748b' }}>
-                      💡 <strong>Motor de Referidos:</strong> Este negocio tiene actualmente <strong>{selectedTenant.activeReferrals} referidos activos</strong>.
+                      <strong>Motor de Referidos:</strong> Este negocio tiene actualmente <strong>{selectedTenant.activeReferrals} referidos activos</strong>.
                       Al asignar el plan {editPlanType === TenantPlanType.PIONEER ? 'PIONERA' : 'REGULAR'}, la cuota calculada se actualizará automáticamente.
                     </div>
 
@@ -4137,7 +4137,7 @@ const SuperAdminDashboard: React.FC = () => {
           <IonContent className="ion-padding">
             <div style={{ maxWidth: '600px', margin: '0 auto' }}>
               <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', marginBottom: '16px', border: '1px solid #e2e8f0', fontSize: '13px', color: '#475569' }}>
-                💡 <strong>Perfil de Promotor:</strong> Este usuario tendrá rol <code>PROMOTOR</code> con acceso exclusivo a su panel de captación y comisiones (<code>/promoter</code>). No requiere tener negocio propio.
+                <strong>Perfil de Promotor:</strong> Este usuario tendrá rol <code>PROMOTOR</code> con acceso exclusivo a su panel de captación y comisiones (<code>/promoter</code>). No requiere tener negocio propio.
               </div>
 
               <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px' }}>
@@ -4317,10 +4317,10 @@ const SuperAdminDashboard: React.FC = () => {
             <IonToolbar color="dark">
               <IonTitle style={{ fontWeight: 800 }}>
                 {newExpenseType === PlatformExpenseType.OPERATING
-                  ? '🖥️ Registrar Gasto Operativo (OPEX)'
+                  ? 'Registrar Gasto Operativo (OPEX)'
                   : newExpenseType === PlatformExpenseType.INVESTMENT
-                  ? '🚀 Registrar Inversión / Reinversión'
-                  : '👤 Pagarme a Mí (Retiro de Utilidad)'}
+                  ? 'Registrar Inversión / Reinversión'
+                  : 'Pagarme a Mí (Retiro de Utilidad)'}
               </IonTitle>
               <IonButtons slot="end">
                 <IonButton onClick={() => setIsExpenseModalOpen(false)}>Cerrar</IonButton>
@@ -4340,7 +4340,7 @@ const SuperAdminDashboard: React.FC = () => {
                     {
                       type: PlatformExpenseType.OPERATING,
                       cat: PlatformExpenseCategory.SERVIDORES,
-                      title: '🖥️ Gasto Operativo',
+                      title: 'Gasto Operativo',
                       sub: 'Servidores, VPS, Hosting, APIs',
                       color: '#e11d48',
                       bg: '#ffe4e6',
@@ -4348,7 +4348,7 @@ const SuperAdminDashboard: React.FC = () => {
                     {
                       type: PlatformExpenseType.INVESTMENT,
                       cat: PlatformExpenseCategory.PUBLICIDAD_MARKETING,
-                      title: '🚀 Inversión / Reinversión',
+                      title: 'Inversión / Reinversión',
                       sub: 'Marketing, Ads, Equipos, Mejoras',
                       color: '#0284c7',
                       bg: '#e0f2fe',
@@ -4356,7 +4356,7 @@ const SuperAdminDashboard: React.FC = () => {
                     {
                       type: PlatformExpenseType.OWNER_PAYOUT,
                       cat: PlatformExpenseCategory.RETIRO_DUEÑO,
-                      title: '👤 Pagarme a Mí',
+                      title: 'Pagarme a Mí',
                       sub: 'Retiro de ganancias o sueldo dueño',
                       color: '#7c3aed',
                       bg: '#f3e8ff',
@@ -4403,13 +4403,13 @@ const SuperAdminDashboard: React.FC = () => {
                       interface="action-sheet"
                       style={{ border: '1px solid #cbd5e1', borderRadius: '10px', padding: '10px 12px', background: '#ffffff' }}
                     >
-                      <IonSelectOption value={PlatformExpenseCategory.SERVIDORES}>🖥️ Servidores (Supabase, Vercel, VPS, Cloud)</IonSelectOption>
-                      <IonSelectOption value={PlatformExpenseCategory.DOMINIOS_APIS}>🌐 Dominios, Correos y APIs Externas</IonSelectOption>
-                      <IonSelectOption value={PlatformExpenseCategory.PUBLICIDAD_MARKETING}>📢 Publicidad y Marketing (Meta / Google Ads)</IonSelectOption>
-                      <IonSelectOption value={PlatformExpenseCategory.DESARROLLO_TECNOLOGIA}>💻 Desarrollo, Software y Licencias</IonSelectOption>
-                      <IonSelectOption value={PlatformExpenseCategory.EQUIPAMIENTO}>🛠️ Equipamiento e Infraestructura</IonSelectOption>
-                      <IonSelectOption value={PlatformExpenseCategory.RETIRO_DUEÑO}>👤 Pago al Dueño / Retiro de Utilidades</IonSelectOption>
-                      <IonSelectOption value={PlatformExpenseCategory.OTRO}>📌 Otro Gasto del Negocio</IonSelectOption>
+                      <IonSelectOption value={PlatformExpenseCategory.SERVIDORES}>Servidores (Supabase, Vercel, VPS, Cloud)</IonSelectOption>
+                      <IonSelectOption value={PlatformExpenseCategory.DOMINIOS_APIS}>Dominios, Correos y APIs Externas</IonSelectOption>
+                      <IonSelectOption value={PlatformExpenseCategory.PUBLICIDAD_MARKETING}>Publicidad y Marketing (Meta / Google Ads)</IonSelectOption>
+                      <IonSelectOption value={PlatformExpenseCategory.DESARROLLO_TECNOLOGIA}>Desarrollo, Software y Licencias</IonSelectOption>
+                      <IonSelectOption value={PlatformExpenseCategory.EQUIPAMIENTO}>Equipamiento e Infraestructura</IonSelectOption>
+                      <IonSelectOption value={PlatformExpenseCategory.RETIRO_DUEÑO}>Pago al Dueño / Retiro de Utilidades</IonSelectOption>
+                      <IonSelectOption value={PlatformExpenseCategory.OTRO}>Otro Gasto del Negocio</IonSelectOption>
                     </IonSelect>
                   </div>
 
@@ -4534,7 +4534,7 @@ const SuperAdminDashboard: React.FC = () => {
           <IonHeader>
             <IonToolbar style={{ '--background': '#4f46e5', '--color': '#ffffff' } as React.CSSProperties}>
               <IonTitle style={{ fontWeight: 800 }}>
-                🏛️ Declarar Pago de IVA al SENIAT
+                Declarar Pago de IVA al SENIAT
               </IonTitle>
               <IonButtons slot="end">
                 <IonButton onClick={() => setIsSeniatModalOpen(false)} style={{ color: '#ffffff' }}>
@@ -4730,14 +4730,14 @@ const SuperAdminDashboard: React.FC = () => {
                   color: '#475569',
                 }}
               >
-                📢 <strong>Registro de Novedades:</strong> Los clientes verán estas actualizaciones en la pestaña "Actualizaciones" de Ayuda y Soporte. Registra aquí todo lo que se agregó, implementó, corrigió o eliminó.
+                <strong>Registro de Novedades:</strong> Los clientes verán estas actualizaciones en la pestaña "Actualizaciones" de Ayuda y Soporte. Registra aquí todo lo que se agregó, implementó, corrigió o eliminó.
               </div>
 
               {/* Autoactualización de APK (Android) */}
               <IonCard style={{ margin: '0 0 16px 0', borderRadius: '12px', border: '1px solid #bfdbfe', background: '#f8fafc' }}>
                 <IonCardHeader style={{ paddingBottom: '4px' }}>
                   <IonCardTitle style={{ fontSize: '15px', fontWeight: 800, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>📦 Autoactualización y APK (Android)</span>
+                    <span>Autoactualización y APK (Android)</span>
                   </IonCardTitle>
                 </IonCardHeader>
                 <IonCardContent>
@@ -4912,10 +4912,10 @@ const SuperAdminDashboard: React.FC = () => {
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
                       {(
                         [
-                          { type: 'ADDED' as const, label: '✨ Agregado', bg: '#ecfdf5', text: '#059669', border: '#a7f3d0' },
-                          { type: 'IMPLEMENTED' as const, label: '🚀 Implementado', bg: '#eff6ff', text: '#0284c7', border: '#bae6fd' },
-                          { type: 'FIXED' as const, label: '🛠️ Corregido', bg: '#fffbeb', text: '#d97706', border: '#fde68a' },
-                          { type: 'REMOVED' as const, label: '🗑️ Eliminado', bg: '#fef2f2', text: '#dc2626', border: '#fecaca' },
+                          { type: 'ADDED' as const, label: 'Agregado', bg: '#ecfdf5', text: '#059669', border: '#a7f3d0' },
+                          { type: 'IMPLEMENTED' as const, label: 'Implementado', bg: '#eff6ff', text: '#0284c7', border: '#bae6fd' },
+                          { type: 'FIXED' as const, label: 'Corregido', bg: '#fffbeb', text: '#d97706', border: '#fde68a' },
+                          { type: 'REMOVED' as const, label: 'Eliminado', bg: '#fef2f2', text: '#dc2626', border: '#fecaca' },
                         ] as const
                       ).map((cat) => {
                         const isSelected = newChangeType === cat.type;

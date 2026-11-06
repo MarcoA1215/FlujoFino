@@ -81,7 +81,7 @@ describe('ProductFormModal & Service Feature Flag Control Suite', () => {
 
     // No debe existir el botón/pestaña de Servicio
     expect(screen.queryByText(/Servicio/i)).toBeNull();
-    expect(screen.queryByText(/💆/i)).toBeNull();
+    expect(screen.queryByText(/Servicio \/ Cita/i)).toBeNull();
 
     // Debe mostrar formulario de producto
     expect(screen.getByText(/Nombre del Producto \*/i)).toBeDefined();
@@ -89,7 +89,7 @@ describe('ProductFormModal & Service Feature Flag Control Suite', () => {
     expect(screen.getByText(/Nuevo Producto para Reventa/i)).toBeDefined();
 
     // No debe renderizar selector de arquetipos al haber un único tipo disponible (REVENTA)
-    expect(screen.queryByText(/📦 Reventa Directa/i)).toBeNull();
+    expect(screen.queryByText(/Reventa Directa/i)).toBeNull();
   });
 
   it('NO debe mostrar la pestaña de Servicios si hay múltiples tipos de producto (Reventa + Producción) pero Servicios está inactivo', async () => {
@@ -105,11 +105,11 @@ describe('ProductFormModal & Service Feature Flag Control Suite', () => {
     renderModalWithSettings(retailAndProdSettings);
 
     // Debe mostrar pestañas para los tipos activos
-    expect(screen.getByText(/📦 Reventa Directa/i)).toBeDefined();
-    expect(screen.getByText(/🧪 Con Fórmula/i)).toBeDefined();
+    expect(screen.getByText(/Reventa Directa/i)).toBeDefined();
+    expect(screen.getByText(/Con Fórmula/i)).toBeDefined();
 
     // Pero NO debe mostrar la pestaña de Servicio
-    expect(screen.queryByText(/💆 Servicio/i)).toBeNull();
+    expect(screen.queryByText(/Servicio \/ Cita/i)).toBeNull();
     expect(screen.queryByText(/Servicio \/ Cita/i)).toBeNull();
   });
 
@@ -126,12 +126,12 @@ describe('ProductFormModal & Service Feature Flag Control Suite', () => {
     renderModalWithSettings(allActiveSettings);
 
     // Deben estar disponibles las 3 opciones
-    expect(screen.getByText(/📦 Reventa Directa/i)).toBeDefined();
-    expect(screen.getByText(/🧪 Con Fórmula/i)).toBeDefined();
-    expect(screen.getByText(/💆 Servicio \/ Cita/i)).toBeDefined();
+    expect(screen.getByText(/Reventa Directa/i)).toBeDefined();
+    expect(screen.getByText(/Con Fórmula/i)).toBeDefined();
+    expect(screen.getByText(/Servicio \/ Cita/i)).toBeDefined();
 
     // Al hacer click en Servicio, debe cambiar los campos a los de Servicio
-    fireEvent.click(screen.getByText(/💆 Servicio \/ Cita/i));
+    fireEvent.click(screen.getByText(/Servicio \/ Cita/i));
 
     expect(screen.getByText(/Nombre del Servicio \*/i)).toBeDefined();
     expect(screen.getByText(/Duración Estimada \(Minutos\)/i)).toBeDefined();
